@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+backend/uploads/
+backend/cards/
+*.pyc
+.env
+
+# Mac
+.DS_Store
+
+# Node (frontend later)
+node_modules/
+frontend/dist/
