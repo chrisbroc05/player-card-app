@@ -28,12 +28,8 @@ load_dotenv(_REPO_ROOT / ".env")
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://127.0.0.1:4173",
-        "http://localhost:4173",
-        "http://127.0.0.1:5173",
-        "http://localhost:5173",
-    ],
+    allow_origins=[],
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -67,6 +63,8 @@ _players: list[dict] = []
 _next_player_id: int = 1
 _cards: list[dict] = []
 _next_card_id: int = 1
+_orders: list[dict] = []
+_next_order_id: int = 1
 MAX_CARDS_PER_PLAYER = 3
 
 # DALL·E 2 image edit API requires a square PNG (we resize/crop locally first).
@@ -74,6 +72,16 @@ _EDIT_IMAGE_SIZE = 1024
 
 # AI trading card rarity (drives different visual intensity in prompts).
 CardTier = Literal["base", "rare", "legendary"]
+BattingHand = Literal["Right", "Left", "Switch"]
+OrderTier = Literal["rookie", "all_star", "legends"]
+OrderStatus = Literal[
+    "new_order",
+    "awaiting_review",
+    "in_design",
+    "ready_for_delivery",
+    "delivered",
+    "completed",
+]
 
 
 def _tier_animated_card_prompt(
@@ -82,6 +90,7 @@ def _tier_animated_card_prompt(
     tier: str,
     *,
     variant: Literal["dual_edit", "single_edit", "text_generate"] = "dual_edit",
+    player_context_text: str = "",
 ) -> str:
     """
     Shared rules: illustrated/cel-shaded game-style athlete (not a photo).
@@ -130,13 +139,17 @@ def _tier_animated_card_prompt(
     return (
         "OUTPUT MUST BE FULLY ILLUSTRATED, CARTOON / CEL-SHADED animated baseball trading card art — like modern "
         "sports VIDEO GAME character cards. NOT a photograph, NOT photorealistic, NOT a light photo edit. "
+        "Do NOT preserve or copy exact pixels from the source photo; redraw everything as illustrated artwork. "
         "Slightly exaggerated athletic proportions, dynamic action pose (batting stance, mid-swing, or pitching); "
         "clean outlines, bold lighting, vibrant saturated colors. "
         f"{layout}"
         "Dramatic sports background: stadium lights, motion, energy effects scaled to tier. "
         f"{tier_rules[t]} "
         f"Player context (mood only): {name}, team {team}. "
-        "Reserve the bottom fifth for a name strip (keep it calmer). "
+        f"{player_context_text} "
+        "If numbers or labels appear in artwork, keep them abstract or unreadable. "
+        "Do NOT add any lower-third panel, text bar, label box, caption plate, or overlay box inside the artwork. "
+        "Keep the player's full body visible where possible, including legs/feet when in frame. "
         "CRITICAL TEXT RULE: Do NOT render readable player names, team names, letters, words, or jersey text "
         "on the card art itself; keep all naming text blank because it is added later in a clean overlay. "
         "Graphic logos/icons without readable text are allowed. "
@@ -154,6 +167,57 @@ def _resolve_player_and_source_path(player_id: int) -> tuple[dict, Path]:
     if not image_url:
         raise HTTPException(status_code=400, detail="Player has no image_url")
 
+    source_path = _resolve_source_path_from_image_url(image_url)
+    return player_row, source_path
+
+
+def _player_display_name(player_row: dict) -> str:
+    display_name = str(player_row.get("display_name") or "").strip()
+    if display_name:
+        return display_name
+    first = str(player_row.get("first_name") or "").strip()
+    last = str(player_row.get("last_name") or "").strip()
+    full = f"{first} {last}".strip()
+    if full:
+        return full
+    return str(player_row.get("name") or "Unknown Player")
+
+
+def _player_team_name(player_row: dict) -> str:
+    return str(
+        player_row.get("team_name")
+        or player_row.get("team")
+        or player_row.get("player_team")
+        or "Unknown Team"
+    )
+
+
+def _player_jersey_number(player_row: dict) -> str:
+    return str(player_row.get("jersey_number") or player_row.get("player_jersey_number") or "").strip()
+
+
+def _player_prompt_context(player_row: dict) -> str:
+    """Structured player metadata to personalize generated cards."""
+    name = _player_display_name(player_row)
+    team = _player_team_name(player_row)
+    jersey_number = str(player_row.get("jersey_number") or "").strip() or "N/A"
+    position = str(player_row.get("position") or "").strip() or "N/A"
+    grad_year = str(player_row.get("grad_year") or "").strip() or "N/A"
+    batting_hand = str(player_row.get("batting_hand") or "").strip()
+    batting_line = f"- Batting Hand: {batting_hand}" if batting_hand else ""
+    return (
+        "Player details to incorporate into the card design: "
+        f"- Name: {name} "
+        f"- Jersey Number: #{jersey_number} "
+        f"- Position: {position} "
+        f"- Team: {team} "
+        f"- Grad Year: {grad_year} "
+        f"{batting_line}"
+    ).strip()
+
+
+def _resolve_source_path_from_image_url(image_url: str) -> Path:
+    """Resolve /uploads/... URL to a local file path."""
     image_path_value = urlparse(image_url).path
     if not image_path_value.startswith("/uploads/"):
         raise HTTPException(status_code=400, detail="image_url must point to /uploads/")
@@ -161,8 +225,7 @@ def _resolve_player_and_source_path(player_id: int) -> tuple[dict, Path]:
     source_path = (Path(__file__).resolve().parent.parent / image_path_value.lstrip("/")).resolve()
     if not source_path.exists() or not source_path.is_file():
         raise HTTPException(status_code=404, detail="Source image not found")
-
-    return player_row, source_path
+    return source_path
 
 
 def _player_exists(player_id: int) -> bool:
@@ -203,6 +266,31 @@ def _style_from_generated_card(result: dict) -> str:
     if mode == "pillow":
         return f"pillow-{tier}"
     return mode
+
+
+def _get_order_or_404(order_id: int) -> dict:
+    for order in _orders:
+        if order["id"] == order_id:
+            return order
+    raise HTTPException(status_code=404, detail="Order not found")
+
+
+def _order_tier_to_card_tier(order_tier: str) -> CardTier:
+    mapping = {
+        "rookie": "base",
+        "all_star": "rare",
+        "legends": "legendary",
+    }
+    return mapping.get(order_tier, "base")
+
+
+def _preview_limit_for_tier(order_tier: str) -> int:
+    """
+    Default preview limit per order.
+    Kept as a helper so tier-based limits can be introduced later.
+    """
+    _ = order_tier
+    return 3
 
 
 def _store_generated_card(player_id: int, image_url: str, style: str) -> dict:
@@ -267,6 +355,7 @@ def _gpt_image_dual_edit_bytes(
     *,
     model: str,
     tier: str,
+    player_context_text: str,
 ) -> bytes:
     """
     Pass two images to images.edit: (1) player likeness, (2) card template.
@@ -274,7 +363,7 @@ def _gpt_image_dual_edit_bytes(
     """
     player_f = _bytesio_image_file_for_edit(player_path, "player")
     template_f = _bytesio_image_file_for_edit(template_path, "template")
-    prompt = _tier_animated_card_prompt(name, team, tier)
+    prompt = _tier_animated_card_prompt(name, team, tier, player_context_text=player_context_text)
     kwargs: dict = {
         "model": model,
         "image": [player_f, template_f],
@@ -326,13 +415,15 @@ def _vision_caption_for_card(client: OpenAI, source_path: Path) -> str:
 
 
 def _dalle3_generate_card_bytes(
-    client: OpenAI, name: str, team: str, caption: str, tier: str
+    client: OpenAI, name: str, team: str, caption: str, tier: str, player_context_text: str
 ) -> bytes:
     """
     Full illustrated card (not a photo edit). This is what makes the art look clearly 'AI generated'.
     """
     prompt = (
-        _tier_animated_card_prompt(name, team, tier, variant="text_generate")
+        _tier_animated_card_prompt(
+            name, team, tier, variant="text_generate", player_context_text=player_context_text
+        )
         + f" Subject inspiration (fictional): {caption}. NOT a photograph."
     )
     resp = client.images.generate(
@@ -346,12 +437,14 @@ def _dalle3_generate_card_bytes(
 
 
 def _dalle2_edit_card_bytes(
-    client: OpenAI, source_path: Path, name: str, team: str, tier: str
+    client: OpenAI, source_path: Path, name: str, team: str, tier: str, player_context_text: str
 ) -> bytes:
     """
     Fallback: DALL·E 2 image *edit* — often keeps most of the original photo pixels; use only if DALL·E 3 fails.
     """
-    prompt = _tier_animated_card_prompt(name, team, tier, variant="single_edit")
+    prompt = _tier_animated_card_prompt(
+        name, team, tier, variant="single_edit", player_context_text=player_context_text
+    )
     png_bytes = _image_to_square_png_bytes(source_path)
     image_file = io.BytesIO(png_bytes)
     image_file.name = "input.png"
@@ -408,33 +501,67 @@ def _resolve_card_fonts(
 
 def _tier_banner_style(
     tier: str,
-) -> tuple[tuple[int, int, int, int], tuple[int, int, int, int], tuple[int, int, int, int], tuple[int, int, int, int]]:
+) -> tuple[
+    tuple[int, int, int, int],
+    tuple[int, int, int, int],
+    tuple[int, int, int, int],
+    tuple[int, int, int, int],
+    tuple[int, int, int, int],
+    tuple[int, int, int, int],
+]:
     """Return banner/text/accent colors tuned to card rarity."""
     t = tier.lower()
     if t == "legendary":
         return (
-            (16, 10, 20, 225),     # banner
+            (16, 10, 20, 235),     # banner top
+            (36, 20, 10, 235),     # banner bottom
             (255, 232, 140, 255),  # name (gold)
             (235, 245, 255, 255),  # team
             (255, 190, 60, 255),   # accent line
+            (75, 45, 10, 240),     # rarity chip bg
         )
     if t == "rare":
         return (
-            (8, 22, 46, 220),      # banner
+            (8, 22, 46, 230),      # banner top
+            (8, 46, 72, 230),      # banner bottom
             (170, 225, 255, 255),  # name (cool glow tint)
             (232, 246, 255, 255),  # team
             (80, 195, 255, 255),   # accent line
+            (10, 62, 96, 240),     # rarity chip bg
         )
     return (
-        (0, 0, 0, 210),            # banner
+        (8, 12, 22, 225),          # banner top
+        (12, 18, 32, 225),         # banner bottom
         (255, 255, 255, 255),      # name
         (230, 240, 255, 255),      # team
         (180, 180, 180, 255),      # accent line
+        (36, 46, 62, 240),         # rarity chip bg
     )
 
 
+def _draw_vertical_gradient(
+    draw: ImageDraw.ImageDraw,
+    x0: int,
+    y0: int,
+    x1: int,
+    y1: int,
+    top: tuple[int, int, int, int],
+    bottom: tuple[int, int, int, int],
+) -> None:
+    """Paint a simple vertical RGBA gradient for the banner background."""
+    height = max(1, y1 - y0)
+    for i in range(height):
+        t = i / max(1, height - 1)
+        r = int(top[0] + (bottom[0] - top[0]) * t)
+        g = int(top[1] + (bottom[1] - top[1]) * t)
+        b = int(top[2] + (bottom[2] - top[2]) * t)
+        a = int(top[3] + (bottom[3] - top[3]) * t)
+        y = y0 + i
+        draw.line([(x0, y), (x1, y)], fill=(r, g, b, a))
+
+
 def _overlay_clean_text_on_card(
-    image: Image.Image, name: str, team: str, tier: str = "base"
+    image: Image.Image, name: str, team: str, tier: str = "base", jersey_number: str | None = None
 ) -> Image.Image:
     """
     Draw a dark bottom banner with large player name and smaller team name.
@@ -443,7 +570,7 @@ def _overlay_clean_text_on_card(
     img = image.convert("RGBA")
     w, h = img.size
     name_font, team_font = _resolve_card_fonts(w, tier=tier)
-    banner_fill, name_fill, team_fill, accent_fill = _tier_banner_style(tier)
+    banner_top_fill, banner_bottom_fill, name_fill, team_fill, accent_fill, chip_fill = _tier_banner_style(tier)
 
     pad = max(14, w // 48)
     stroke = max(1, min(4, w // 256))
@@ -465,24 +592,81 @@ def _overlay_clean_text_on_card(
     draw = ImageDraw.Draw(out)
     banner_top = h
     banner_bottom = out_h
-    draw.rectangle([(0, banner_top), (w, banner_bottom)], fill=banner_fill)
+    _draw_vertical_gradient(draw, 0, banner_top, w, banner_bottom, banner_top_fill, banner_bottom_fill)
     draw.line([(0, banner_top), (w, banner_top)], fill=accent_fill, width=max(2, w // 256))
 
+    # Rare/legendary-style rarity chip to the right, aligned with app theme.
+    tier_label = {"legendary": "1-OF-1", "rare": "RARE", "base": "BASE"}.get(tier.lower(), "BASE")
+    chip_font = team_font
+    cb = draw.textbbox((0, 0), tier_label, font=chip_font, anchor="lt")
+    chip_w = (cb[2] - cb[0]) + pad
+    chip_h = (cb[3] - cb[1]) + max(8, pad // 2)
+    chip_x1 = w - pad
+    chip_x0 = max(chip_x1 - chip_w, w // 2)
+    chip_y0 = banner_top + pad
+    chip_y1 = chip_y0 + chip_h
+    radius = max(8, pad // 2)
+    draw.rounded_rectangle(
+        [(chip_x0, chip_y0), (chip_x1, chip_y1)],
+        radius=radius,
+        fill=chip_fill,
+        outline=accent_fill,
+        width=max(1, w // 500),
+    )
+    draw.text(
+        (chip_x0 + pad // 2, chip_y0 + max(4, pad // 4)),
+        tier_label,
+        font=chip_font,
+        fill=team_fill,
+        stroke_width=max(1, stroke - 1),
+        stroke_fill=(0, 0, 0, 255),
+        anchor="lt",
+    )
+
+    # Deterministic jersey number chip (exact value from data, avoids AI text drift).
+    jersey_text = f"#{jersey_number}" if jersey_number else ""
+    if jersey_text:
+        jb = draw.textbbox((0, 0), jersey_text, font=chip_font, anchor="lt")
+        jersey_w = (jb[2] - jb[0]) + pad
+        jersey_h = chip_h
+        jersey_x0 = pad
+        jersey_x1 = jersey_x0 + jersey_w
+        jersey_y0 = chip_y0
+        jersey_y1 = jersey_y0 + jersey_h
+        draw.rounded_rectangle(
+            [(jersey_x0, jersey_y0), (jersey_x1, jersey_y1)],
+            radius=radius,
+            fill=chip_fill,
+            outline=accent_fill,
+            width=max(1, w // 500),
+        )
+        draw.text(
+            (jersey_x0 + pad // 2, jersey_y0 + max(4, pad // 4)),
+            jersey_text,
+            font=chip_font,
+            fill=team_fill,
+            stroke_width=max(1, stroke - 1),
+            stroke_fill=(0, 0, 0, 255),
+            anchor="lt",
+        )
+
     y_name = banner_top + pad
+    name_text = name.upper()
+    team_text = team
     draw.text(
         (x_text, y_name),
-        name,
+        name_text,
         font=name_font,
         fill=name_fill,
         stroke_width=stroke,
         stroke_fill=(0, 0, 0, 255),
         anchor="lt",
     )
-    nb2 = draw.textbbox((x_text, y_name), name, font=name_font, anchor="lt")
+    nb2 = draw.textbbox((x_text, y_name), name_text, font=name_font, anchor="lt")
     y_team = nb2[3] + gap
     draw.text(
         (x_text, y_team),
-        team,
+        team_text,
         font=team_font,
         fill=team_fill,
         stroke_width=stroke,
@@ -496,8 +680,13 @@ def _generate_card_pillow(
     player_row: dict, player_id: int, source_path: Path, tier: str = "base"
 ) -> dict:
     """Local fallback: draw name + team on the photo and save to cards/."""
+    player_name = _player_display_name(player_row)
+    team_name = _player_team_name(player_row)
+    jersey_number = _player_jersey_number(player_row)
     with Image.open(source_path) as image:
-        final_rgb = _overlay_clean_text_on_card(image, player_row["name"], player_row["team"], tier=tier)
+        final_rgb = _overlay_clean_text_on_card(
+            image, player_name, team_name, tier=tier, jersey_number=jersey_number
+        )
         card_filename = f"player-{player_id}-{uuid4().hex}.png"
         card_path = CARD_DIR / card_filename
         final_rgb.save(card_path, format="PNG")
@@ -533,12 +722,16 @@ def _generate_card_openai(
     if tier_norm not in ("base", "rare", "legendary"):
         tier_norm = "base"
 
-    name = player_row["name"]
-    team = player_row["team"]
+    name = _player_display_name(player_row)
+    team = _player_team_name(player_row)
+    jersey_number = _player_jersey_number(player_row)
+    player_context_text = _player_prompt_context(player_row)
     client = OpenAI(api_key=api_key)
 
     generation = "gpt-image-template"
     out_bytes: bytes | None = None
+
+    # Prefer template-guided generation to keep consistent card framing/style.
     for model in ("gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"):
         try:
             out_bytes = _gpt_image_dual_edit_bytes(
@@ -549,6 +742,7 @@ def _generate_card_openai(
                 team,
                 model=model,
                 tier=tier_norm,
+                player_context_text=player_context_text,
             )
             break
         except Exception:
@@ -561,13 +755,20 @@ def _generate_card_openai(
         except Exception:
             caption = "athletic portrait, confident sports pose"
         try:
-            out_bytes = _dalle3_generate_card_bytes(client, name, team, caption, tier_norm)
+            out_bytes = _dalle3_generate_card_bytes(
+                client, name, team, caption, tier_norm, player_context_text
+            )
         except Exception:
-            generation = "dall-e-2-edit"
-            out_bytes = _dalle2_edit_card_bytes(client, source_path, name, team, tier_norm)
+            out_bytes = None
+
+    if out_bytes is None:
+        generation = "dall-e-2-edit"
+        out_bytes = _dalle2_edit_card_bytes(client, source_path, name, team, tier_norm, player_context_text)
 
     with Image.open(io.BytesIO(out_bytes)) as generated:
-        final_rgb = _overlay_clean_text_on_card(generated, name, team, tier=tier_norm)
+        final_rgb = _overlay_clean_text_on_card(
+            generated, name, team, tier=tier_norm, jersey_number=jersey_number
+        )
 
     card_filename = f"player-{player_id}-ai-{tier_norm}-{uuid4().hex}.png"
     card_path = CARD_DIR / card_filename
@@ -593,24 +794,30 @@ class PlayerCreate(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
-    name: str = Field(..., min_length=1, max_length=200, description="Player name")
-    age: int = Field(..., ge=0, le=130, description="Age in years")
-    team: str = Field(..., min_length=1, max_length=200, description="Team name")
-    image_url: str | None = Field(
-        default=None,
-        max_length=2000,
-        description="Optional image URL (e.g. from POST /upload-image)",
-    )
+    first_name: str = Field(..., min_length=1, max_length=100, description="Player first name")
+    last_name: str = Field(..., min_length=1, max_length=100, description="Player last name")
+    display_name: str | None = Field(default=None, max_length=200, description="Optional display name")
+    jersey_number: str = Field(..., min_length=1, max_length=10, description="Jersey number")
+    position: str = Field(..., min_length=1, max_length=60, description="Player position")
+    grad_year: int = Field(..., ge=2000, le=2100, description="Graduation year")
+    team_name: str = Field(..., min_length=1, max_length=200, description="Team name")
+    batting_hand: BattingHand | None = Field(default=None)
+    image_url: str = Field(..., min_length=1, max_length=2000, description="Uploaded player image URL")
 
 
 class Player(BaseModel):
-    """Stored player: request fields plus id and optional image_url."""
+    """Stored player: request fields plus id."""
 
     id: int = Field(..., ge=1)
-    name: str
-    age: int
-    team: str
-    image_url: str | None = None
+    first_name: str
+    last_name: str
+    display_name: str | None = None
+    jersey_number: str
+    position: str
+    grad_year: int
+    team_name: str
+    batting_hand: BattingHand | None = None
+    image_url: str
 
 
 class PlayerImageUpdate(BaseModel):
@@ -629,6 +836,71 @@ class Card(BaseModel):
     image_url: str = Field(..., min_length=1, max_length=2000)
     style: str = Field(..., min_length=1, max_length=200)
     created_at: str
+
+
+class OrderCreate(BaseModel):
+    """Body for creating a card order."""
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    # Customer fields
+    customer_name: str = Field(..., min_length=1, max_length=200)
+    customer_email: str = Field(..., min_length=3, max_length=320)
+
+    # Player fields
+    player_first_name: str = Field(..., min_length=1, max_length=100)
+    player_last_name: str = Field(..., min_length=1, max_length=100)
+    player_display_name: str | None = Field(default=None, max_length=200)
+    player_jersey_number: str = Field(..., min_length=1, max_length=10)
+    player_position: str = Field(..., min_length=1, max_length=60)
+    player_grad_year: int = Field(..., ge=2000, le=2100)
+    player_team_name: str = Field(..., min_length=1, max_length=200)
+    player_batting_hand: BattingHand | None = Field(default=None)
+    player_image_url: str = Field(..., min_length=1, max_length=2000)
+
+    # Order details
+    tier: OrderTier
+    add_ons: list[str] = Field(default_factory=list)
+    status: OrderStatus = "new_order"
+
+
+class GeneratedOrderCard(BaseModel):
+    image_url: str = Field(..., min_length=1, max_length=2000)
+    tier: CardTier
+    created_at: str
+
+
+class Order(OrderCreate):
+    """Stored order record."""
+
+    id: int = Field(..., ge=1)
+    created_at: str
+    generated_cards: list[GeneratedOrderCard] = Field(default_factory=list)
+    preview_count: int = Field(default=0, ge=0)
+    preview_limit: int = Field(default=3, ge=1)
+    final_card_url: str | None = Field(default=None, max_length=2000)
+    delivered_at: str | None = None
+
+
+class OrderDeliverRequest(BaseModel):
+    """Optional override for selecting final delivered card URL."""
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    final_card_url: str | None = Field(default=None, max_length=2000)
+
+
+class OrderStatusUpdate(BaseModel):
+    """Body for updating order status."""
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    status: OrderStatus
+
+
+class OrderApprovePreviewRequest(BaseModel):
+    """Customer approval payload for selecting a preview as final."""
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    image_url: str | None = Field(default=None, max_length=2000)
 
 
 # ---------------------------------------------------------------------------
@@ -686,9 +958,14 @@ def create_player(body: PlayerCreate):
 
     player = Player(
         id=_next_player_id,
-        name=body.name,
-        age=body.age,
-        team=body.team,
+        first_name=body.first_name,
+        last_name=body.last_name,
+        display_name=body.display_name,
+        jersey_number=body.jersey_number,
+        position=body.position,
+        grad_year=body.grad_year,
+        team_name=body.team_name,
+        batting_hand=body.batting_hand,
         image_url=body.image_url,
     )
     _players.append(player.model_dump())
@@ -714,6 +991,162 @@ def list_cards_for_player(player_id: int):
     if not _player_exists(player_id):
         raise HTTPException(status_code=404, detail="Player not found")
     return [card for card in _cards if card["player_id"] == player_id]
+
+
+@app.post("/orders", response_model=Order, status_code=201)
+def create_order(body: OrderCreate):
+    """Create a new in-memory order."""
+    global _next_order_id
+
+    order = Order(
+        id=_next_order_id,
+        customer_name=body.customer_name,
+        customer_email=body.customer_email,
+        player_first_name=body.player_first_name,
+        player_last_name=body.player_last_name,
+        player_display_name=body.player_display_name,
+        player_jersey_number=body.player_jersey_number,
+        player_position=body.player_position,
+        player_grad_year=body.player_grad_year,
+        player_team_name=body.player_team_name,
+        player_batting_hand=body.player_batting_hand,
+        player_image_url=body.player_image_url,
+        tier=body.tier,
+        add_ons=body.add_ons,
+        status=body.status,
+        created_at=datetime.now(timezone.utc).isoformat(),
+        preview_count=0,
+        preview_limit=_preview_limit_for_tier(body.tier),
+    )
+    _orders.append(order.model_dump())
+    _next_order_id += 1
+    return order
+
+
+@app.get("/orders", response_model=list[Order])
+def list_orders(
+    status: OrderStatus | None = Query(default=None),
+    tier: OrderTier | None = Query(default=None),
+):
+    """List in-memory orders, optionally filtered by status and/or tier."""
+    results = _orders
+    if status is not None:
+        results = [order for order in results if order["status"] == status]
+    if tier is not None:
+        results = [order for order in results if order["tier"] == tier]
+    return results
+
+
+@app.get("/orders/{order_id}", response_model=Order)
+def get_order(order_id: int):
+    """Get one order by id."""
+    order = _get_order_or_404(order_id)
+    return Order.model_validate(order)
+
+
+@app.patch("/orders/{order_id}/status", response_model=Order)
+def update_order_status(order_id: int, body: OrderStatusUpdate):
+    """Update only the status for one order."""
+    order = _get_order_or_404(order_id)
+    order["status"] = body.status
+    return Order.model_validate(order)
+
+
+@app.post("/orders/{order_id}/generate-card", response_model=GeneratedOrderCard)
+def generate_card_for_order(order_id: int):
+    """
+    Generate one card from order player data and image.
+    Stores generated card metadata in order.generated_cards.
+    """
+    order = _get_order_or_404(order_id)
+    preview_count = int(order.get("preview_count", 0))
+    preview_limit = int(order.get("preview_limit", _preview_limit_for_tier(order.get("tier", "rookie"))))
+    if preview_count >= preview_limit:
+        raise HTTPException(status_code=400, detail="Preview limit reached")
+
+    player_row = {
+        "first_name": order.get("player_first_name", ""),
+        "last_name": order.get("player_last_name", ""),
+        "display_name": order.get("player_display_name"),
+        "jersey_number": order.get("player_jersey_number", ""),
+        "position": order.get("player_position", ""),
+        "grad_year": order.get("player_grad_year", ""),
+        "team_name": order.get("player_team_name") or order.get("player_team", ""),
+        "batting_hand": order.get("player_batting_hand"),
+        "image_url": order["player_image_url"],
+    }
+    source_path = _resolve_source_path_from_image_url(order["player_image_url"])
+    card_tier = _order_tier_to_card_tier(order["tier"])
+
+    try:
+        result = _generate_card_openai(player_row, order_id, source_path, tier=card_tier)
+    except Exception:
+        result = _generate_card_pillow(player_row, order_id, source_path, tier=card_tier)
+
+    generated = GeneratedOrderCard(
+        image_url=result["url"],
+        tier=card_tier,
+        created_at=datetime.now(timezone.utc).isoformat(),
+    )
+    order.setdefault("generated_cards", []).append(generated.model_dump())
+    order["preview_count"] = preview_count + 1
+    order["preview_limit"] = preview_limit
+    return generated
+
+
+@app.post("/orders/{order_id}/deliver", response_model=Order)
+def deliver_order(order_id: int, body: OrderDeliverRequest | None = None):
+    """
+    Mark order as delivered.
+    - final_card_url: use provided URL or latest generated card URL
+    - delivered_at: current UTC timestamp
+    - status: delivered
+    """
+    order = _get_order_or_404(order_id)
+
+    provided_url = body.final_card_url if body else None
+    if provided_url:
+        final_url = provided_url
+    else:
+        generated_cards = order.get("generated_cards", [])
+        if not generated_cards:
+            raise HTTPException(
+                status_code=400,
+                detail="No generated cards available. Provide final_card_url or generate a card first.",
+            )
+        final_url = generated_cards[-1]["image_url"]
+
+    order["final_card_url"] = final_url
+    order["delivered_at"] = datetime.now(timezone.utc).isoformat()
+    order["status"] = "delivered"
+    return Order.model_validate(order)
+
+
+@app.post("/orders/{order_id}/approve-preview", response_model=Order)
+def approve_order_preview(order_id: int, body: OrderApprovePreviewRequest | None = None):
+    """
+    Customer confirms which generated preview they want fulfilled.
+    - Sets final_card_url from provided image_url or latest generated preview
+    - Moves status to awaiting_review for admin quality check
+    """
+    order = _get_order_or_404(order_id)
+    provided_url = body.image_url if body else None
+
+    if provided_url:
+        final_url = provided_url
+    else:
+        generated_cards = order.get("generated_cards", [])
+        if not generated_cards:
+            raise HTTPException(
+                status_code=400,
+                detail="No generated previews available. Generate a preview first.",
+            )
+        final_url = generated_cards[-1]["image_url"]
+
+    order["final_card_url"] = final_url
+    if order.get("status") in ("new_order", "in_design"):
+        order["status"] = "awaiting_review"
+    return Order.model_validate(order)
 
 
 @app.put("/players/{player_id}/image", response_model=Player)
