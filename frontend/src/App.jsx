@@ -66,6 +66,8 @@ function App() {
   const activePreviewLimit = Number(activeOrder?.preview_limit ?? 3);
   const remainingPreviews = Math.max(0, activePreviewLimit - activePreviewCount);
   const isPreviewLimitReached = Boolean(activeOrder && activePreviewCount >= activePreviewLimit);
+  const selectedCardStyleLabel =
+    orderTier === "rookie" ? "BASE" : orderTier === "all_star" ? "RARE" : "1-OF-1";
 
   async function fetchCards() {
     const res = await fetch(`${API_BASE_URL}/cards`);
@@ -179,6 +181,7 @@ function App() {
   }
 
   async function handleGenerateForOrder(orderId) {
+    setIsGenerating(true);
     setOrderActionKey(`generate-${orderId}`);
     setMessage("");
     setError("");
@@ -195,6 +198,7 @@ function App() {
     } catch (err) {
       setError(err.message || "Failed to generate order card.");
     } finally {
+      setIsGenerating(false);
       setOrderActionKey("");
     }
   }
@@ -422,17 +426,21 @@ function App() {
                     />
                   </label>
                   <label className="grid gap-1.5 text-sm">
-                    <span className="text-slate-200">Order Tier</span>
+                    <span className="text-slate-200">Card Type</span>
                     <select
                       value={orderTier}
                       onChange={(e) => setOrderTier(e.target.value)}
                       className="rounded-xl border border-white/15 bg-cardBg2 px-3 py-2 text-slate-100 outline-none transition focus:border-neonPurple focus:ring-2 focus:ring-neonPurple/30"
                     >
-                      <option value="rookie">rookie</option>
-                      <option value="all_star">all_star</option>
-                      <option value="legends">legends</option>
+                      <option value="rookie">BASE</option>
+                      <option value="all_star">RARE</option>
+                      <option value="legends">1-OF-1</option>
                     </select>
                   </label>
+                  <p className="text-xs text-slate-400">
+                    Order tier controls fulfillment package and maps to card style:{" "}
+                    <span className="text-slate-200">BASE / RARE / 1-OF-1</span>.
+                  </p>
                   <button
                     type="button"
                     onClick={handleCreateOrderFromCurrentPlayer}
@@ -454,6 +462,9 @@ function App() {
                 Generate order-linked previews, then approve one to send to admin for final review.
               </p>
               <div className="mt-5 grid gap-3">
+                <div className="rounded-xl border border-white/10 bg-cardBg2 px-3 py-2 text-sm text-slate-300">
+                  Selected Card Type: <span className="font-medium text-white">{selectedCardStyleLabel}</span>
+                </div>
                 <div className="rounded-xl border border-white/10 bg-cardBg2 px-3 py-2 text-sm text-slate-300">
                   Active Order ID: <span className="font-medium text-white">{currentOrderId ?? "None yet"}</span>
                 </div>
@@ -488,8 +499,22 @@ function App() {
                 {isPreviewLimitReached ? (
                   <p className="text-xs text-amber-200">You’ve reached your preview limit</p>
                 ) : null}
+                {isGenerating ? (
+                  <div className="rounded-xl border border-neonPurple/30 bg-neonPurple/10 px-3 py-2">
+                    <div className="mb-2 flex items-center gap-2 text-xs text-violet-100">
+                      <span className="h-2 w-2 animate-pulse rounded-full bg-violet-300" />
+                      Generating your {selectedCardStyleLabel} preview...
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                      <div className="h-full w-1/3 animate-pulse rounded-full bg-gradient-to-r from-neonBlue via-neonPurple to-neonTeal" />
+                    </div>
+                    <p className="mt-2 text-[11px] text-slate-300">
+                      Applying style, effects, and clean text overlay. This can take up to a minute.
+                    </p>
+                  </div>
+                ) : null}
                 <p className="text-xs text-slate-400">
-                  Preview generation uses the order tier. Completing the order marks selected preview and moves to
+                  Preview generation uses the selected order tier. Completing the order marks selected preview and moves to
                   <code> awaiting_review</code>.
                 </p>
               </div>
