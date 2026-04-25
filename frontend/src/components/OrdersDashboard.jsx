@@ -1,4 +1,5 @@
 import React from "react";
+import { toApiUrl } from "../config/api";
 
 const STATUS_OPTIONS = [
   "new_order",
@@ -47,7 +48,6 @@ export default function OrdersDashboard({
   onUpdateStatus,
   onDeliver,
   activeActionKey,
-  apiBase,
 }) {
   return (
     <section className="rounded-2xl border border-white/10 bg-cardBg p-5 shadow-xl shadow-black/30 sm:p-6">
@@ -89,7 +89,7 @@ export default function OrdersDashboard({
                   <td className="px-3 py-3 text-xs text-slate-300">
                     {order.final_card_url ? (
                       <a
-                        href={`${apiBase}${order.final_card_url}`}
+                        href={toApiUrl(order.final_card_url)}
                         target="_blank"
                         rel="noreferrer"
                         className="text-neonBlue hover:underline"

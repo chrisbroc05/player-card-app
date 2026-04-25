@@ -1,4 +1,5 @@
 import React from "react";
+import { toApiUrl } from "../config/api";
 
 function inferTier(style) {
   const s = (style || "").toLowerCase();
@@ -7,7 +8,7 @@ function inferTier(style) {
   return "BASE";
 }
 
-export default function CardGallery({ cards, apiBase }) {
+export default function CardGallery({ cards }) {
   return (
     <section className="rounded-2xl border border-white/10 bg-cardBg p-5 shadow-xl shadow-black/30 sm:p-6">
       <div className="mb-4 flex items-center justify-between">
@@ -27,7 +28,7 @@ export default function CardGallery({ cards, apiBase }) {
               className="group rounded-xl border border-white/10 bg-cardBg2 p-3 transition duration-200 hover:scale-[1.02] hover:border-neonBlue/50 hover:shadow-glowBlue"
             >
               <img
-                src={`${apiBase}${card.image_url}`}
+                src={toApiUrl(card.image_url)}
                 alt={`Card ${card.id}`}
                 className="w-full rounded-lg border border-white/10"
               />

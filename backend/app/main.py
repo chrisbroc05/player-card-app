@@ -28,7 +28,9 @@ load_dotenv(_REPO_ROOT / ".env")
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[],
+    allow_origins=[
+        "https://player-card-app.onrender.com",
+    ],
     allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=False,
     allow_methods=["*"],

@@ -5,8 +5,7 @@ import PlayerFormCard from "./components/PlayerFormCard";
 import FeaturedCard from "./components/FeaturedCard";
 import CardGallery from "./components/CardGallery";
 import OrdersDashboard from "./components/OrdersDashboard";
-
-const API_BASE = "http://127.0.0.1:8766";
+import { API_BASE_URL, toApiUrl } from "./config/api";
 
 function App() {
   const [workspace, setWorkspace] = useState("customer");
@@ -56,7 +55,7 @@ function App() {
       !isGenerating
   );
   const generatedCardFullUrl = useMemo(
-    () => (generatedCardUrl ? `${API_BASE}${generatedCardUrl}` : ""),
+    () => toApiUrl(generatedCardUrl),
     [generatedCardUrl]
   );
   const activeOrder = useMemo(
@@ -69,7 +68,7 @@ function App() {
   const isPreviewLimitReached = Boolean(activeOrder && activePreviewCount >= activePreviewLimit);
 
   async function fetchCards() {
-    const res = await fetch(`${API_BASE}/cards`);
+    const res = await fetch(`${API_BASE_URL}/cards`);
     if (!res.ok) {
       throw new Error("Failed to load generated cards.");
     }
@@ -78,7 +77,7 @@ function App() {
   }
 
   async function fetchOrders() {
-    const res = await fetch(`${API_BASE}/orders`);
+    const res = await fetch(`${API_BASE_URL}/orders`);
     if (!res.ok) {
       throw new Error("Failed to load orders.");
     }
@@ -112,7 +111,7 @@ function App() {
       const formData = new FormData();
       formData.append("file", imageFile);
 
-      const uploadRes = await fetch(`${API_BASE}/upload-image`, {
+      const uploadRes = await fetch(`${API_BASE_URL}/upload-image`, {
         method: "POST",
         body: formData,
       });
@@ -121,7 +120,7 @@ function App() {
       }
       const uploadData = await uploadRes.json();
 
-      const playerRes = await fetch(`${API_BASE}/players`, {
+      const playerRes = await fetch(`${API_BASE_URL}/players`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -161,7 +160,7 @@ function App() {
     setMessage("");
     setError("");
     try {
-      const res = await fetch(`${API_BASE}/orders/${orderId}/status`, {
+      const res = await fetch(`${API_BASE_URL}/orders/${orderId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
@@ -184,7 +183,7 @@ function App() {
     setMessage("");
     setError("");
     try {
-      const res = await fetch(`${API_BASE}/orders/${orderId}/generate-card`, { method: "POST" });
+      const res = await fetch(`${API_BASE_URL}/orders/${orderId}/generate-card`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data?.detail || "Failed to generate order card.");
@@ -217,7 +216,7 @@ function App() {
     setMessage("");
     setError("");
     try {
-      const res = await fetch(`${API_BASE}/orders/${orderId}/deliver`, { method: "POST" });
+      const res = await fetch(`${API_BASE_URL}/orders/${orderId}/deliver`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data?.detail || "Failed to deliver order.");
@@ -244,7 +243,7 @@ function App() {
     setMessage("");
     setError("");
     try {
-      const res = await fetch(`${API_BASE}/orders`, {
+      const res = await fetch(`${API_BASE_URL}/orders`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -286,7 +285,7 @@ function App() {
     setMessage("");
     setError("");
     try {
-      const res = await fetch(`${API_BASE}/orders/${currentOrderId}/approve-preview`, {
+      const res = await fetch(`${API_BASE_URL}/orders/${currentOrderId}/approve-preview`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -504,7 +503,6 @@ function App() {
             onUpdateStatus={handleUpdateOrderStatus}
             onDeliver={handleDeliverOrder}
             activeActionKey={orderActionKey}
-            apiBase={API_BASE}
           />
         )}
 
@@ -514,7 +512,7 @@ function App() {
           loading={isGenerating}
         />
 
-        <CardGallery cards={cards} apiBase={API_BASE} />
+        <CardGallery cards={cards} />
 
         {workspace === "customer" ? (
           <section className="rounded-2xl border border-white/10 bg-cardBg p-4 text-sm text-slate-300 sm:p-5">
