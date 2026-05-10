@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 from urllib.parse import urlparse
+import re
 from uuid import uuid4
 
 from dotenv import load_dotenv
@@ -43,6 +44,8 @@ app.add_middleware(
 
 UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads"
 CARD_DIR = Path(__file__).resolve().parent.parent / "cards"
+# Served via StaticFiles — must not overlap REST routes /cards, /cards/{id}
+CARD_MEDIA_URL_PREFIX = "/media/cards"
 # Layout reference for AI card generation (replace with your own asset).
 CARD_TEMPLATE_PATH = Path(__file__).resolve().parent / "templates" / "cardtemplate.png"
 
@@ -63,8 +66,10 @@ CARD_DIR.mkdir(parents=True, exist_ok=True)
 
 _players: list[dict] = []
 _next_player_id: int = 1
-_cards: list[dict] = []
+# Collectible vault: keyed by canonical card_id (e.g. FL-2026-000001)
+_cards: dict[str, dict] = {}
 _next_card_id: int = 1
+_next_collectible_seq: int = 1
 _orders: list[dict] = []
 _next_order_id: int = 1
 MAX_CARDS_PER_PLAYER = 3
@@ -76,6 +81,7 @@ _EDIT_IMAGE_SIZE = 1024
 CardTier = Literal["base", "rare", "legendary"]
 BattingHand = Literal["Right", "Left", "Switch"]
 OrderTier = Literal["rookie", "all_star", "legends"]
+SpecialTheme = Literal["opening_day", "christmas", "gold_edition", "fire", "halloween", "neon"]
 OrderStatus = Literal[
     "new_order",
     "awaiting_review",
@@ -93,6 +99,7 @@ def _tier_animated_card_prompt(
     *,
     variant: Literal["dual_edit", "single_edit", "text_generate"] = "dual_edit",
     player_context_text: str = "",
+    special_theme: str | None = None,
 ) -> str:
     """
     Shared rules: illustrated/cel-shaded game-style athlete (not a photo).
@@ -138,6 +145,17 @@ def _tier_animated_card_prompt(
             f"character (team vibe: {team}). Invent a strong card frame and dynamic sports background for this tier. "
         )
 
+    theme_rules = {
+        "opening_day": "Theme: OPENING DAY — fresh spring stadium atmosphere, celebratory bunting/confetti accents, crisp daylight energy.",
+        "christmas": "Theme: CHRISTMAS — festive winter mood with subtle holiday lights, snow sparkle accents, red/green highlights.",
+        "gold_edition": "Theme: GOLD EDITION — premium metallic gold trims, luxe foil shimmer, elite collector finish.",
+        "fire": "Theme: FIRE — intense warm palette, ember particles, dynamic heat streaks and explosive motion.",
+        "halloween": "Theme: HALLOWEEN — moody night-game vibe, eerie glow, pumpkin-orange + deep violet accents.",
+        "neon": "Theme: NEON — electric neon cyan/magenta lighting, synthwave glow, high-contrast futuristic energy.",
+    }
+    themed = str(special_theme or "").strip().lower()
+    theme_line = theme_rules.get(themed, "")
+
     return (
         "OUTPUT MUST BE FULLY ILLUSTRATED, CARTOON / CEL-SHADED animated baseball trading card art — like modern "
         "sports VIDEO GAME character cards. NOT a photograph, NOT photorealistic, NOT a light photo edit. "
@@ -147,6 +165,7 @@ def _tier_animated_card_prompt(
         f"{layout}"
         "Dramatic sports background: stadium lights, motion, energy effects scaled to tier. "
         f"{tier_rules[t]} "
+        f"{theme_line} "
         f"Player context (mood only): {name}, team {team}. "
         f"{player_context_text} "
         "If numbers or labels appear in artwork, keep them abstract or unreadable. "
@@ -235,7 +254,7 @@ def _player_exists(player_id: int) -> bool:
 
 
 def _card_count_for_player(player_id: int) -> int:
-    return sum(1 for card in _cards if card["player_id"] == player_id)
+    return sum(1 for card in _cards.values() if card.get("player_id") == player_id)
 
 
 def _ensure_card_generation_limit(player_id: int, cards_to_generate: int = 1) -> None:
@@ -295,19 +314,142 @@ def _preview_limit_for_tier(order_tier: str) -> int:
     return 3
 
 
-def _store_generated_card(player_id: int, image_url: str, style: str) -> dict:
-    """Persist generated-card metadata in-memory."""
+def _next_collectible_card_id() -> str:
+    """Generate FL-YYYY-###### collectible identity values."""
+    global _next_collectible_seq
+    year = datetime.now(timezone.utc).year
+    card_id = f"FL-{year}-{_next_collectible_seq:06d}"
+    _next_collectible_seq += 1
+    return card_id
+
+
+def _normalize_rarity(tier: str) -> str:
+    t = str(tier or "").lower()
+    if t == "legendary":
+        return "legendary"
+    if t == "rare":
+        return "rare"
+    return "base"
+
+
+_CARD_ID_PATH_PATTERN = re.compile(r"^FL-(\d{4})-(\d{6})$", re.IGNORECASE)
+
+
+def _canonical_card_id(raw: str) -> str | None:
+    """Normalize URL/path card id to FL-YYYY-###### or None if invalid."""
+    s = (raw or "").strip()
+    m = _CARD_ID_PATH_PATTERN.match(s)
+    if not m:
+        return None
+    return f"FL-{m.group(1)}-{m.group(2)}"
+
+
+def _vault_tier_from_gen_tier(gen_tier: str) -> str:
+    """Map AI/generation tier (base/rare/legendary) to product tier labels."""
+    return {"base": "rookie", "rare": "allstar", "legendary": "legends"}.get(
+        str(gen_tier or "").lower(), "rookie"
+    )
+
+
+def _vault_tier_from_order_tier(order_tier: str) -> str:
+    return {"rookie": "rookie", "all_star": "allstar", "legends": "legends"}.get(
+        str(order_tier or ""), "rookie"
+    )
+
+
+def _theme_field(special_theme: str | None) -> str:
+    if special_theme is None or str(special_theme).strip() == "":
+        return "none"
+    return str(special_theme).strip().lower()
+
+
+def _grad_year_from_player_row(player_row: dict) -> int:
+    gy = player_row.get("grad_year")
+    try:
+        return int(gy)
+    except (TypeError, ValueError):
+        return 2000
+
+
+def _player_id_for_order(order: dict) -> int:
+    """Match order to an existing player row by image URL when possible."""
+    url = order.get("player_image_url")
+    if not url:
+        return 0
+    for p in _players:
+        if p.get("image_url") == url:
+            return int(p["id"])
+    return 0
+
+
+def _make_vault_record(
+    *,
+    internal_id: int,
+    card_id: str,
+    player_id: int,
+    image_url: str,
+    style: str,
+    player_row: dict,
+    gen_tier: str,
+    vault_tier: str,
+    special_theme: str | None,
+    owner_name: str,
+) -> dict:
+    """Build one vault row (also the canonical Card payload)."""
+    created_at = datetime.now(timezone.utc).isoformat()
+    return {
+        "id": internal_id,
+        "card_id": card_id,
+        "player_id": player_id,
+        "player_name": _player_display_name(player_row),
+        "team_name": _player_team_name(player_row),
+        "position": str(player_row.get("position") or "").strip(),
+        "jersey_number": _player_jersey_number(player_row),
+        "grad_year": _grad_year_from_player_row(player_row),
+        "tier": vault_tier,
+        "theme": _theme_field(special_theme),
+        "rarity": _normalize_rarity(gen_tier),
+        "edition_number": 1,
+        "print_run": 1,
+        "created_at": created_at,
+        "image_url": image_url,
+        "shareable_slug": card_id.lower(),
+        "style": style,
+        "special_theme": special_theme,
+        "owner_name": owner_name,
+    }
+
+
+def _store_generated_card(
+    player_id: int,
+    image_url: str,
+    style: str,
+    *,
+    gen_tier: str,
+    player_row: dict,
+    special_theme: str | None = None,
+    owner_name: str = "unassigned",
+    vault_tier: str | None = None,
+) -> dict:
+    """Persist generated-card metadata in the in-memory vault keyed by card_id."""
     global _next_card_id
-    card = Card(
-        id=_next_card_id,
+    cid = _next_collectible_card_id()
+    vt = vault_tier or _vault_tier_from_gen_tier(gen_tier)
+    rec = _make_vault_record(
+        internal_id=_next_card_id,
+        card_id=cid,
         player_id=player_id,
         image_url=image_url,
         style=style,
-        created_at=datetime.now(timezone.utc).isoformat(),
+        player_row=player_row,
+        gen_tier=str(gen_tier or "base"),
+        vault_tier=vt,
+        special_theme=special_theme,
+        owner_name=owner_name,
     )
-    _cards.append(card.model_dump())
+    _cards[cid] = rec
     _next_card_id += 1
-    return card.model_dump()
+    return rec
 
 
 def _image_to_square_png_bytes(source_path: Path, side: int = _EDIT_IMAGE_SIZE) -> bytes:
@@ -358,6 +500,7 @@ def _gpt_image_dual_edit_bytes(
     model: str,
     tier: str,
     player_context_text: str,
+    special_theme: str | None,
 ) -> bytes:
     """
     Pass two images to images.edit: (1) player likeness, (2) card template.
@@ -365,7 +508,13 @@ def _gpt_image_dual_edit_bytes(
     """
     player_f = _bytesio_image_file_for_edit(player_path, "player")
     template_f = _bytesio_image_file_for_edit(template_path, "template")
-    prompt = _tier_animated_card_prompt(name, team, tier, player_context_text=player_context_text)
+    prompt = _tier_animated_card_prompt(
+        name,
+        team,
+        tier,
+        player_context_text=player_context_text,
+        special_theme=special_theme,
+    )
     kwargs: dict = {
         "model": model,
         "image": [player_f, template_f],
@@ -417,14 +566,25 @@ def _vision_caption_for_card(client: OpenAI, source_path: Path) -> str:
 
 
 def _dalle3_generate_card_bytes(
-    client: OpenAI, name: str, team: str, caption: str, tier: str, player_context_text: str
+    client: OpenAI,
+    name: str,
+    team: str,
+    caption: str,
+    tier: str,
+    player_context_text: str,
+    special_theme: str | None,
 ) -> bytes:
     """
     Full illustrated card (not a photo edit). This is what makes the art look clearly 'AI generated'.
     """
     prompt = (
         _tier_animated_card_prompt(
-            name, team, tier, variant="text_generate", player_context_text=player_context_text
+            name,
+            team,
+            tier,
+            variant="text_generate",
+            player_context_text=player_context_text,
+            special_theme=special_theme,
         )
         + f" Subject inspiration (fictional): {caption}. NOT a photograph."
     )
@@ -439,13 +599,24 @@ def _dalle3_generate_card_bytes(
 
 
 def _dalle2_edit_card_bytes(
-    client: OpenAI, source_path: Path, name: str, team: str, tier: str, player_context_text: str
+    client: OpenAI,
+    source_path: Path,
+    name: str,
+    team: str,
+    tier: str,
+    player_context_text: str,
+    special_theme: str | None,
 ) -> bytes:
     """
     Fallback: DALL·E 2 image *edit* — often keeps most of the original photo pixels; use only if DALL·E 3 fails.
     """
     prompt = _tier_animated_card_prompt(
-        name, team, tier, variant="single_edit", player_context_text=player_context_text
+        name,
+        team,
+        tier,
+        variant="single_edit",
+        player_context_text=player_context_text,
+        special_theme=special_theme,
     )
     png_bytes = _image_to_square_png_bytes(source_path)
     image_file = io.BytesIO(png_bytes)
@@ -679,7 +850,11 @@ def _overlay_clean_text_on_card(
 
 
 def _generate_card_pillow(
-    player_row: dict, player_id: int, source_path: Path, tier: str = "base"
+    player_row: dict,
+    player_id: int,
+    source_path: Path,
+    tier: str = "base",
+    special_theme: str | None = None,
 ) -> dict:
     """Local fallback: draw name + team on the photo and save to cards/."""
     player_name = _player_display_name(player_row)
@@ -696,14 +871,20 @@ def _generate_card_pillow(
     return {
         "filename": card_filename,
         "path": str(card_path),
-        "url": f"/cards/{card_filename}",
+        "url": f"{CARD_MEDIA_URL_PREFIX}/{card_filename}",
         "mode": "pillow",
         "tier": tier.lower(),
+        "special_theme": special_theme,
     }
 
 
 def _generate_card_openai(
-    player_row: dict, player_id: int, source_path: Path, *, tier: str = "base"
+    player_row: dict,
+    player_id: int,
+    source_path: Path,
+    *,
+    tier: str = "base",
+    special_theme: str | None = None,
 ) -> dict:
     """
     1) Prefer GPT Image edit with [player photo, card template] and tier-specific animated prompt.
@@ -745,6 +926,7 @@ def _generate_card_openai(
                 model=model,
                 tier=tier_norm,
                 player_context_text=player_context_text,
+                special_theme=special_theme,
             )
             break
         except Exception:
@@ -758,14 +940,16 @@ def _generate_card_openai(
             caption = "athletic portrait, confident sports pose"
         try:
             out_bytes = _dalle3_generate_card_bytes(
-                client, name, team, caption, tier_norm, player_context_text
+                client, name, team, caption, tier_norm, player_context_text, special_theme
             )
         except Exception:
             out_bytes = None
 
     if out_bytes is None:
         generation = "dall-e-2-edit"
-        out_bytes = _dalle2_edit_card_bytes(client, source_path, name, team, tier_norm, player_context_text)
+        out_bytes = _dalle2_edit_card_bytes(
+            client, source_path, name, team, tier_norm, player_context_text, special_theme
+        )
 
     with Image.open(io.BytesIO(out_bytes)) as generated:
         final_rgb = _overlay_clean_text_on_card(
@@ -779,10 +963,11 @@ def _generate_card_openai(
     return {
         "filename": card_filename,
         "path": str(card_path),
-        "url": f"/cards/{card_filename}",
+        "url": f"{CARD_MEDIA_URL_PREFIX}/{card_filename}",
         "mode": "ai",
         "tier": tier_norm,
         "generation": generation,
+        "special_theme": special_theme,
     }
 
 
@@ -830,14 +1015,43 @@ class PlayerImageUpdate(BaseModel):
     image_url: str = Field(..., min_length=1, max_length=2000)
 
 
-class Card(BaseModel):
-    """Stored generated card metadata (in-memory)."""
+class CardVaultSummary(BaseModel):
+    """Public list row for GET /cards."""
 
-    id: int = Field(..., ge=1)
-    player_id: int = Field(..., ge=1)
-    image_url: str = Field(..., min_length=1, max_length=2000)
-    style: str = Field(..., min_length=1, max_length=200)
+    card_id: str
+    player_name: str
+    tier: str
+    theme: str
+    rarity: str
+    edition_number: int
+    print_run: int
     created_at: str
+    image_url: str
+    shareable_slug: str
+
+
+class Card(BaseModel):
+    """Full collectible record (vault) — GET /cards/{card_id} and player card lists."""
+
+    id: int = Field(..., ge=0)
+    card_id: str = Field(..., min_length=12, max_length=40)
+    player_id: int = Field(default=0, ge=0)
+    player_name: str = Field(..., min_length=1, max_length=200)
+    team_name: str = Field(..., min_length=1, max_length=200)
+    position: str = Field(default="", max_length=80)
+    jersey_number: str = Field(default="", max_length=20)
+    grad_year: int = Field(default=2000, ge=1900, le=2100)
+    tier: str = Field(..., min_length=1, max_length=40)
+    theme: str = Field(default="none", max_length=120)
+    rarity: str = Field(..., min_length=1, max_length=40)
+    edition_number: int = Field(default=1, ge=1)
+    print_run: int = Field(default=1, ge=1)
+    created_at: str
+    image_url: str = Field(..., min_length=1, max_length=2000)
+    shareable_slug: str = Field(..., min_length=12, max_length=48)
+    style: str = Field(..., min_length=1, max_length=200)
+    special_theme: str | None = Field(default=None, max_length=120)
+    owner_name: str = Field(default="unassigned", min_length=1, max_length=200)
 
 
 class OrderCreate(BaseModel):
@@ -862,14 +1076,23 @@ class OrderCreate(BaseModel):
 
     # Order details
     tier: OrderTier
+    special_theme: SpecialTheme | None = Field(default=None)
     add_ons: list[str] = Field(default_factory=list)
     status: OrderStatus = "new_order"
 
 
 class GeneratedOrderCard(BaseModel):
+    card_id: str = Field(..., min_length=12, max_length=30)
     image_url: str = Field(..., min_length=1, max_length=2000)
     tier: CardTier
     created_at: str
+    edition_number: int = Field(default=1, ge=1)
+    print_run: int = Field(default=1, ge=1)
+    owner_name: str = Field(default="unassigned", min_length=1, max_length=200)
+    player_name: str = Field(..., min_length=1, max_length=200)
+    team_name: str = Field(..., min_length=1, max_length=200)
+    special_theme: str | None = Field(default=None, max_length=120)
+    rarity: str = Field(..., min_length=1, max_length=40)
 
 
 class Order(OrderCreate):
@@ -981,10 +1204,23 @@ def list_players():
     return _players
 
 
-@app.get("/cards", response_model=list[Card])
+@app.get("/cards", response_model=list[CardVaultSummary])
 def list_cards():
-    """List all generated cards in memory."""
-    return _cards
+    """List all vault cards (newest first)."""
+    rows = sorted(_cards.values(), key=lambda c: c["created_at"], reverse=True)
+    return [CardVaultSummary.model_validate(r) for r in rows]
+
+
+@app.get("/cards/{card_id}", response_model=Card)
+def get_card(card_id: str):
+    """Single card by collectible id (shareable slug accepted: fl-2026-000001)."""
+    key = _canonical_card_id(card_id)
+    if key is None:
+        raise HTTPException(status_code=404, detail="Card not found")
+    row = _cards.get(key)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Card not found")
+    return Card.model_validate(row)
 
 
 @app.get("/players/{player_id}/cards", response_model=list[Card])
@@ -992,7 +1228,9 @@ def list_cards_for_player(player_id: int):
     """List generated cards for one player."""
     if not _player_exists(player_id):
         raise HTTPException(status_code=404, detail="Player not found")
-    return [card for card in _cards if card["player_id"] == player_id]
+    rows = [c for c in _cards.values() if c.get("player_id") == player_id]
+    rows.sort(key=lambda c: c["created_at"], reverse=True)
+    return [Card.model_validate(r) for r in rows]
 
 
 @app.post("/orders", response_model=Order, status_code=201)
@@ -1014,6 +1252,7 @@ def create_order(body: OrderCreate):
         player_batting_hand=body.player_batting_hand,
         player_image_url=body.player_image_url,
         tier=body.tier,
+        special_theme=body.special_theme,
         add_ons=body.add_ons,
         status=body.status,
         created_at=datetime.now(timezone.utc).isoformat(),
@@ -1076,19 +1315,49 @@ def generate_card_for_order(order_id: int):
         "team_name": order.get("player_team_name") or order.get("player_team", ""),
         "batting_hand": order.get("player_batting_hand"),
         "image_url": order["player_image_url"],
+        "special_theme": order.get("special_theme"),
     }
     source_path = _resolve_source_path_from_image_url(order["player_image_url"])
     card_tier = _order_tier_to_card_tier(order["tier"])
 
     try:
-        result = _generate_card_openai(player_row, order_id, source_path, tier=card_tier)
+        result = _generate_card_openai(
+            player_row, order_id, source_path, tier=card_tier, special_theme=order.get("special_theme")
+        )
     except Exception:
-        result = _generate_card_pillow(player_row, order_id, source_path, tier=card_tier)
+        result = _generate_card_pillow(
+            player_row, order_id, source_path, tier=card_tier, special_theme=order.get("special_theme")
+        )
+
+    global _next_card_id
+    new_card_id = _next_collectible_card_id()
+    vault_rec = _make_vault_record(
+        internal_id=_next_card_id,
+        card_id=new_card_id,
+        player_id=_player_id_for_order(order),
+        image_url=result["url"],
+        style=_style_from_generated_card(result),
+        player_row=player_row,
+        gen_tier=card_tier,
+        vault_tier=_vault_tier_from_order_tier(str(order.get("tier", "rookie"))),
+        special_theme=order.get("special_theme"),
+        owner_name=order.get("customer_name") or "unassigned",
+    )
+    _cards[new_card_id] = vault_rec
+    _next_card_id += 1
 
     generated = GeneratedOrderCard(
+        card_id=new_card_id,
         image_url=result["url"],
         tier=card_tier,
-        created_at=datetime.now(timezone.utc).isoformat(),
+        created_at=vault_rec["created_at"],
+        edition_number=1,
+        print_run=1,
+        owner_name=order.get("customer_name") or "unassigned",
+        player_name=_player_display_name(player_row),
+        team_name=_player_team_name(player_row),
+        special_theme=order.get("special_theme"),
+        rarity=_normalize_rarity(card_tier),
     )
     order.setdefault("generated_cards", []).append(generated.model_dump())
     order["preview_count"] = preview_count + 1
@@ -1129,7 +1398,7 @@ def approve_order_preview(order_id: int, body: OrderApprovePreviewRequest | None
     """
     Customer confirms which generated preview they want fulfilled.
     - Sets final_card_url from provided image_url or latest generated preview
-    - Moves status to awaiting_review for admin quality check
+    - Automatically marks the order as delivered for customer flow
     """
     order = _get_order_or_404(order_id)
     provided_url = body.image_url if body else None
@@ -1146,8 +1415,8 @@ def approve_order_preview(order_id: int, body: OrderApprovePreviewRequest | None
         final_url = generated_cards[-1]["image_url"]
 
     order["final_card_url"] = final_url
-    if order.get("status") in ("new_order", "in_design"):
-        order["status"] = "awaiting_review"
+    order["delivered_at"] = datetime.now(timezone.utc).isoformat()
+    order["status"] = "delivered"
     return Order.model_validate(order)
 
 
@@ -1198,6 +1467,10 @@ def generate_card(
         "base",
         description="Rarity tier for AI art: base (common), rare, or legendary (1-of-1 style).",
     ),
+    special_theme: SpecialTheme | None = Query(
+        default=None,
+        description="Optional special theme for styling (opening_day, christmas, gold_edition, fire, halloween, neon).",
+    ),
 ):
     """
     Generate a player card image into cards/.
@@ -1210,17 +1483,26 @@ def generate_card(
 
     if use_ai:
         try:
-            result = _generate_card_openai(player_row, player_id, source_path, tier=tier)
+            result = _generate_card_openai(player_row, player_id, source_path, tier=tier, special_theme=special_theme)
         except Exception as exc:
             # Fallback: keep the app usable if the key is missing, quota fails, or the API errors.
-            result = _generate_card_pillow(player_row, player_id, source_path, tier=tier)
+            result = _generate_card_pillow(player_row, player_id, source_path, tier=tier, special_theme=special_theme)
             result["mode"] = "pillow_fallback"
             result["ai_error"] = str(exc)
     else:
-        result = _generate_card_pillow(player_row, player_id, source_path, tier=tier)
+        result = _generate_card_pillow(player_row, player_id, source_path, tier=tier, special_theme=special_theme)
 
-    card = _store_generated_card(player_id, result["url"], _style_from_generated_card(result))
-    result["card_id"] = card["id"]
+    card = _store_generated_card(
+        player_id,
+        result["url"],
+        _style_from_generated_card(result),
+        gen_tier=str(result.get("tier", tier)),
+        player_row=player_row,
+        special_theme=special_theme,
+        owner_name="unassigned",
+    )
+    result["card_id"] = card["card_id"]
+    result["card_record_id"] = card["id"]
     result["created_at"] = card["created_at"]
     return result
 
@@ -1236,9 +1518,18 @@ def generate_card_set(player_id: int):
     cards: list[dict] = []
     for tier in ("base", "rare", "legendary"):
         try:
-            result = _generate_card_openai(player_row, player_id, source_path, tier=tier)
-            card = _store_generated_card(player_id, result["url"], _style_from_generated_card(result))
-            result["card_id"] = card["id"]
+            result = _generate_card_openai(player_row, player_id, source_path, tier=tier, special_theme=None)
+            card = _store_generated_card(
+                player_id,
+                result["url"],
+                _style_from_generated_card(result),
+                gen_tier=str(tier),
+                player_row=player_row,
+                special_theme=None,
+                owner_name="unassigned",
+            )
+            result["card_id"] = card["card_id"]
+            result["card_record_id"] = card["id"]
             result["created_at"] = card["created_at"]
             cards.append(result)
         except Exception as exc:
@@ -1248,4 +1539,4 @@ def generate_card_set(player_id: int):
 
 # Mount after API routes so /upload-image wins over static routing edge cases.
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
-app.mount("/cards", StaticFiles(directory=str(CARD_DIR)), name="cards")
+app.mount(CARD_MEDIA_URL_PREFIX, StaticFiles(directory=str(CARD_DIR)), name="card_media")

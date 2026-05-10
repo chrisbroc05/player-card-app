@@ -1,17 +1,12 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import { toApiUrl } from "../config/api";
-
-function inferTier(style) {
-  const s = (style || "").toLowerCase();
-  if (s.includes("legendary")) return "1-OF-1";
-  if (s.includes("rare")) return "RARE";
-  return "BASE";
-}
+import { vaultTierBadge, formatEditionShort, rarityDisplay } from "../utils/tierStyles";
 
 export default function CardGallery({ cards }) {
   return (
-    <section className="rounded-2xl border border-white/10 bg-cardBg p-5 shadow-xl shadow-black/30 sm:p-6">
-      <div className="mb-4 flex items-center justify-between">
+    <section className="rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold text-white">Card Gallery</h2>
         <span className="text-xs text-slate-400">{cards.length} card(s)</span>
       </div>
@@ -21,24 +16,35 @@ export default function CardGallery({ cards }) {
           <p className="text-sm text-slate-400">No generated cards yet.</p>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {cards.map((card) => (
-            <article
-              key={card.id}
-              className="group rounded-xl border border-white/10 bg-cardBg2 p-3 transition duration-200 hover:scale-[1.02] hover:border-neonBlue/50 hover:shadow-glowBlue"
-            >
-              <img
-                src={toApiUrl(card.image_url)}
-                alt={`Card ${card.id}`}
-                className="w-full rounded-lg border border-white/10"
-              />
-              <div className="mt-2 space-y-1 text-xs text-slate-300">
-                <p className="font-medium text-slate-100">#{card.id} · Player #{card.player_id}</p>
-                <p className="text-neonBlue">{inferTier(card.style)}</p>
-                <p className="truncate text-slate-400">{card.style}</p>
-              </div>
-            </article>
-          ))}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {cards.map((card) => {
+            const badge = vaultTierBadge(card.tier);
+            const key = card.card_id || card.id;
+            return (
+              <article
+                key={key}
+                className="group rounded-xl border border-white/10 bg-cardBg2 p-3 transition duration-200 hover:scale-[1.02] hover:border-neonBlue/50 hover:shadow-glowBlue"
+              >
+                <Link to={card.shareable_slug ? `/card/${encodeURIComponent(card.shareable_slug)}` : "/vault"}>
+                  <img
+                    src={toApiUrl(card.image_url)}
+                    alt={card.player_name || "Card"}
+                    className="aspect-[3/4] w-full rounded-lg border border-white/10 object-cover"
+                  />
+                </Link>
+                <div className="mt-2 space-y-1 text-xs text-slate-300">
+                  <p className="font-medium text-slate-100">{card.player_name || "Player"}</p>
+                  <div className="flex flex-wrap gap-1">
+                    <span className={`rounded-full border px-2 py-0.5 text-[10px] ${badge.pill}`}>{badge.label}</span>
+                    <span className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] text-slate-400">
+                      {rarityDisplay(card.rarity)}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">{formatEditionShort(card.edition_number, card.print_run)}</p>
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
     </section>

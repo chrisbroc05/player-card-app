@@ -50,7 +50,7 @@ export default function OrdersDashboard({
   activeActionKey,
 }) {
   return (
-    <section className="rounded-2xl border border-white/10 bg-cardBg p-5 shadow-xl shadow-black/30 sm:p-6">
+    <section className="rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-white">Orders Dashboard</h2>
         <span className="text-xs text-slate-400">{orders.length} order(s)</span>
@@ -61,8 +61,78 @@ export default function OrdersDashboard({
           <p className="text-sm text-slate-400">No orders yet. Create one from the Customer Checkout workspace.</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-white/10">
-          <table className="min-w-full text-left text-sm">
+        <>
+          <div className="grid gap-3 md:hidden">
+            {orders.map((order) => (
+              <article key={order.id} className="rounded-xl border border-white/10 bg-cardBg2 p-3">
+                <div className="mb-2 flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-medium text-slate-100">{orderPlayerName(order)}</p>
+                    <p className="text-xs text-slate-400">Order #{order.id}</p>
+                  </div>
+                  <span className={`rounded-full border px-2 py-1 text-[11px] ${chipClass(order.status)}`}>
+                    {order.status}
+                  </span>
+                </div>
+                <div className="space-y-1 text-xs text-slate-300">
+                  <p>Tier: {order.tier}</p>
+                  <p>Created: {formatDate(order.created_at)}</p>
+                  <p>
+                    Final Card:{" "}
+                    {order.final_card_url ? (
+                      <a
+                        href={toApiUrl(order.final_card_url)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-neonBlue hover:underline"
+                      >
+                        View selected
+                      </a>
+                    ) : (
+                      "Not selected yet"
+                    )}
+                  </p>
+                </div>
+                <div className="mt-3 grid gap-2">
+                  <select
+                    value={orderStatusDrafts[order.id] || order.status}
+                    onChange={(e) =>
+                      setOrderStatusDrafts((prev) => ({
+                        ...prev,
+                        [order.id]: e.target.value,
+                      }))
+                    }
+                    className="min-h-[42px] rounded-lg border border-white/15 bg-cardBg px-2 py-2 text-xs text-slate-100 outline-none focus:border-neonBlue"
+                  >
+                    {STATUS_OPTIONS.map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => onUpdateStatus(order.id)}
+                      disabled={Boolean(activeActionKey)}
+                      className="min-h-[42px] rounded-lg border border-neonBlue/40 bg-neonBlue/15 px-2.5 py-2 text-xs font-medium text-neonBlue disabled:opacity-50"
+                    >
+                      {activeActionKey === `status-${order.id}` ? "Saving..." : "Update"}
+                    </button>
+                    <button
+                      onClick={() => onDeliver(order.id)}
+                      disabled={Boolean(activeActionKey)}
+                      className="min-h-[42px] rounded-lg border border-emerald-300/40 bg-emerald-400/15 px-2.5 py-2 text-xs font-medium text-emerald-200 disabled:opacity-50"
+                    >
+                      {activeActionKey === `deliver-${order.id}` ? "Delivering..." : "Deliver"}
+                    </button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="hidden overflow-x-auto rounded-xl border border-white/10 md:block">
+            <table className="min-w-full text-left text-sm">
             <thead className="bg-white/5 text-xs uppercase tracking-wide text-slate-400">
               <tr>
                 <th className="px-3 py-3">Player</th>
@@ -111,7 +181,7 @@ export default function OrdersDashboard({
                             [order.id]: e.target.value,
                           }))
                         }
-                        className="rounded-lg border border-white/15 bg-cardBg px-2 py-1.5 text-xs text-slate-100 outline-none focus:border-neonBlue"
+                        className="min-h-[40px] rounded-lg border border-white/15 bg-cardBg px-2 py-1.5 text-xs text-slate-100 outline-none focus:border-neonBlue"
                       >
                         {STATUS_OPTIONS.map((status) => (
                           <option key={status} value={status}>
@@ -123,7 +193,7 @@ export default function OrdersDashboard({
                       <button
                         onClick={() => onUpdateStatus(order.id)}
                         disabled={Boolean(activeActionKey)}
-                        className="rounded-lg border border-neonBlue/40 bg-neonBlue/15 px-2.5 py-1.5 text-xs font-medium text-neonBlue disabled:opacity-50"
+                        className="min-h-[40px] rounded-lg border border-neonBlue/40 bg-neonBlue/15 px-2.5 py-1.5 text-xs font-medium text-neonBlue disabled:opacity-50"
                       >
                         {activeActionKey === `status-${order.id}` ? "Saving..." : "Update"}
                       </button>
@@ -131,7 +201,7 @@ export default function OrdersDashboard({
                       <button
                         onClick={() => onDeliver(order.id)}
                         disabled={Boolean(activeActionKey)}
-                        className="rounded-lg border border-emerald-300/40 bg-emerald-400/15 px-2.5 py-1.5 text-xs font-medium text-emerald-200 disabled:opacity-50"
+                        className="min-h-[40px] rounded-lg border border-emerald-300/40 bg-emerald-400/15 px-2.5 py-1.5 text-xs font-medium text-emerald-200 disabled:opacity-50"
                       >
                         {activeActionKey === `deliver-${order.id}` ? "Delivering..." : "Deliver"}
                       </button>
@@ -140,8 +210,9 @@ export default function OrdersDashboard({
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
+            </table>
+          </div>
+        </>
       )}
     </section>
   );

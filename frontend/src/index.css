@@ -10,9 +10,18 @@
   body {
     @apply m-0 bg-appBg text-slate-100 antialiased;
     font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    text-rendering: optimizeLegibility;
+    -webkit-tap-highlight-color: transparent;
   }
 
   #root {
     @apply min-h-screen;
+  }
+
+  input,
+  select,
+  button,
+  textarea {
+    font: inherit;
   }
 }
