@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 
-export default function StudioAuthGate({ onBackToTiers, backLabel = "← Back to tier examples" }) {
+export default function StudioAuthGate({ onBackToTiers, backLabel = "← Back to tiers" }) {
   return (
     <div className="rounded-2xl border border-neonBlue/30 bg-gradient-to-b from-neonBlue/10 to-cardBg2 p-6 text-center shadow-lg sm:p-8">
       <p className="text-xs font-medium uppercase tracking-[0.2em] text-slate-400">Account required</p>

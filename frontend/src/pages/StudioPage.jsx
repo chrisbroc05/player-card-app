@@ -7,7 +7,6 @@ import CardGallery from "../components/CardGallery";
 import OrdersDashboard from "../components/OrdersDashboard";
 import PostGenerationPanel from "../components/PostGenerationPanel";
 import StudioAuthGate from "../components/StudioAuthGate";
-import ExampleCardGallery from "../components/ExampleCardGallery";
 import { API_BASE_URL, authHeaders, toApiUrl } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 
@@ -489,7 +488,7 @@ export default function StudioPage() {
               <p className="text-xs text-slate-400">Guided customer flow with separate admin fulfillment controls.</p>
               {!initializing && !user ? (
                 <p className="mt-2 text-xs text-neonTeal/90">
-                  Browse tier previews and example styles below — sign up to build your own collectible.
+                  Sign up or log in to enter player details and create your own collectible cards.
                 </p>
               ) : null}
             </div>
@@ -940,7 +939,7 @@ export default function StudioPage() {
         )}
 
         <FeaturedCard imageUrl={generatedCardFullUrl} tier={generatedTier} loading={isGenerating} />
-        {user ? <CardGallery cards={cards} /> : <ExampleCardGallery />}
+        {user ? <CardGallery cards={cards} /> : null}
       </main>
 
       {showCompleteModal ? (
