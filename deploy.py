@@ -16,6 +16,10 @@ Optional:
   RENDER_API_BASE (defaults to https://api.render.com/v1)
   RENDER_DEPLOY_TIMEOUT_SECONDS (defaults to 1200)
   RENDER_POLL_INTERVAL_SECONDS (defaults to 10)
+
+Backend on Render: card PNGs live on disk under APP_DATA_DIR (or RENDER_DISK_PATH).
+Without a persistent disk, redeploys clear files while Postgres still has URLs — add a
+Render Disk, mount it (e.g. /var/render/data), and set APP_DATA_DIR=/var/render/data.
 """
 
 from __future__ import annotations

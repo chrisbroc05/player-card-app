@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { toApiUrl } from "../config/api";
+import CardImage from "./CardImage";
 import { vaultTierBadge, formatEditionShort, rarityDisplay } from "../utils/tierStyles";
 
 export default function CardGallery({ cards }) {
@@ -28,9 +28,10 @@ export default function CardGallery({ cards }) {
                 <Link
                   to={card.shareable_slug ? `/card/${encodeURIComponent(card.shareable_slug)}` : "/my-collection"}
                 >
-                  <img
-                    src={toApiUrl(card.image_url)}
+                  <CardImage
+                    imageUrl={card.image_url}
                     alt={card.player_name || "Card"}
+                    cacheBust={card.created_at}
                     className="aspect-[3/4] w-full rounded-lg border border-white/10 object-cover"
                   />
                 </Link>

@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import { API_BASE_URL, toApiUrl } from "../config/api";
+import CardImage from "../components/CardImage";
 import { useAuth } from "../context/AuthContext";
 import { vaultTierBadge, formatEdition, rarityDisplay } from "../utils/tierStyles";
 
@@ -52,8 +53,6 @@ export default function CardDetailPage() {
   }, [cardId]);
 
   const badge = card ? vaultTierBadge(card.tier) : null;
-  const imgSrc = card ? toApiUrl(card.image_url) : "";
-
   async function handleShare() {
     const url = typeof window !== "undefined" ? window.location.href : "";
     try {
@@ -92,7 +91,12 @@ export default function CardDetailPage() {
               <div
                 className={`animate-pulseGlow relative overflow-hidden rounded-2xl border-2 bg-black/40 p-1 ${badge?.glow ?? ""}`}
               >
-                <img src={imgSrc} alt={card.player_name} className="w-full rounded-xl object-cover shadow-2xl" />
+                <CardImage
+                  imageUrl={card.image_url}
+                  alt={card.player_name}
+                  cacheBust={card.created_at}
+                  className="w-full rounded-xl object-cover shadow-2xl"
+                />
               </div>
             </div>
 
@@ -144,7 +148,7 @@ export default function CardDetailPage() {
 
               <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 <a
-                  href={imgSrc}
+                  href={toApiUrl(card.image_url)}
                   download={`${card.shareable_slug || "card"}.png`}
                   className="inline-flex min-h-[46px] flex-1 items-center justify-center rounded-xl border border-cyan-300/40 bg-cyan-400/10 px-4 py-2.5 text-sm font-medium text-cyan-100 sm:flex-none"
                 >

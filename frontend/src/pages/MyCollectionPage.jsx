@@ -2,7 +2,8 @@ import React, { useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
-import { API_BASE_URL, authHeaders, toApiUrl } from "../config/api";
+import { API_BASE_URL, authHeaders } from "../config/api";
+import CardImage from "../components/CardImage";
 import { useAuth } from "../context/AuthContext";
 import { vaultTierBadge, formatEditionShort, rarityDisplay } from "../utils/tierStyles";
 
@@ -83,9 +84,10 @@ export default function MyCollectionPage() {
                   className={`group rounded-2xl border border-white/10 bg-cardBg p-3 shadow-lg transition duration-300 hover:scale-[1.02] hover:border-white/20 ${badge.glow}`}
                 >
                   <div className="overflow-hidden rounded-xl border border-white/10 bg-black/30">
-                    <img
-                      src={toApiUrl(card.image_url)}
+                    <CardImage
+                      imageUrl={card.image_url}
                       alt={card.player_name}
+                      cacheBust={card.created_at}
                       className="aspect-[3/4] w-full object-cover transition duration-300 group-hover:brightness-110"
                     />
                   </div>

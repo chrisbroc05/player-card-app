@@ -56,30 +56,23 @@ from database import engine, get_db  # noqa: E402
 from models import Base, User  # noqa: E402
 
 
-@asynccontextmanager
-async def lifespan(_app: FastAPI):
-    Base.metadata.create_all(bind=engine)
-    yield
-
-
-app = FastAPI(lifespan=lifespan)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "https://player-card-app.onrender.com",
-    ],
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # ---------------------------------------------------------------------------
 # Image uploads (local disk; not linked to players yet)
 # ---------------------------------------------------------------------------
+# On Render (and similar), the repo directory is ephemeral — redeploys wipe
+# ./cards and ./uploads while Postgres still has image_url. Set APP_DATA_DIR
+# (or RENDER_DISK_PATH) to a persistent disk mount, e.g. /var/render/data, so
+# images survive restarts. Render: create a Disk, mount it, set the env var.
+def _upload_and_card_dirs() -> tuple[Path, Path]:
+    base = (os.environ.get("APP_DATA_DIR") or os.environ.get("RENDER_DISK_PATH") or "").strip()
+    if base:
+        root = Path(base)
+        return root / "uploads", root / "cards"
+    repo_backend = Path(__file__).resolve().parent.parent
+    return repo_backend / "uploads", repo_backend / "cards"
 
-UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads"
-CARD_DIR = Path(__file__).resolve().parent.parent / "cards"
+
+UPLOAD_DIR, CARD_DIR = _upload_and_card_dirs()
 # Served via StaticFiles — must not overlap REST routes /cards, /cards/{id}
 CARD_MEDIA_URL_PREFIX = "/media/cards"
 # Layout reference for AI card generation (replace with your own asset).
@@ -96,9 +89,26 @@ _IMAGE_TYPES: dict[str, str] = {
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 CARD_DIR.mkdir(parents=True, exist_ok=True)
 
-# ---------------------------------------------------------------------------
-# In-memory storage (replaced by a database later)
-# ---------------------------------------------------------------------------
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    Base.metadata.create_all(bind=engine)
+    print(f"[startup] CARD_DIR={CARD_DIR} (exists={CARD_DIR.is_dir()}, writable={os.access(CARD_DIR, os.W_OK)})")
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://player-card-app.onrender.com",
+    ],
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 _players: list[dict] = []
 _next_player_id: int = 1

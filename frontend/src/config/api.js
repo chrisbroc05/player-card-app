@@ -7,8 +7,14 @@ function isLocalhostHost() {
   return host === "localhost" || host === "127.0.0.1";
 }
 
+function normalizeApiBase(raw) {
+  const s = (raw || "").trim().replace(/\/+$/, "");
+  return s || null;
+}
+
 export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || (isLocalhostHost() ? LOCAL_API_BASE_URL : PROD_API_BASE_URL);
+  normalizeApiBase(import.meta.env.VITE_API_BASE_URL) ||
+  (isLocalhostHost() ? LOCAL_API_BASE_URL : PROD_API_BASE_URL);
 
 export const AUTH_TOKEN_STORAGE_KEY = "fl_access_token";
 
@@ -23,8 +29,7 @@ export function toApiUrl(pathOrUrl) {
   if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")) {
     return pathOrUrl;
   }
-  if (pathOrUrl.startsWith("/")) {
-    return `${API_BASE_URL}${pathOrUrl}`;
-  }
-  return `${API_BASE_URL}/${pathOrUrl}`;
+  const base = (API_BASE_URL || "").replace(/\/+$/, "");
+  const path = pathOrUrl.startsWith("/") ? pathOrUrl : `/${pathOrUrl}`;
+  return `${base}${path}`;
 }
