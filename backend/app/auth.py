@@ -10,8 +10,8 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
-from database import get_db
-from models import User
+from app.database import get_db
+from app.models import User
 
 SECRET_KEY = (os.environ.get("SECRET_KEY") or "dev-insecure-change-me-use-env-on-render").strip()
 ALGORITHM = "HS256"
