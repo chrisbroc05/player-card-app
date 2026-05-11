@@ -20,7 +20,7 @@ from openai import OpenAI
 from PIL import Image, ImageDraw, ImageFont
 from pydantic import BaseModel, ConfigDict, Field
 
-# Load repo-root .env (e.g. OPENAI_API_KEY). Run API from repo: cd backend && uvicorn app.main:app
+# Load repo-root .env (e.g. OPENAI_API_KEY). Supports uvicorn app.main:app (cwd backend) or main:app (cwd backend/app).
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 load_dotenv(_REPO_ROOT / ".env")
 
@@ -28,25 +28,47 @@ load_dotenv(_REPO_ROOT / ".env")
 # App
 # ---------------------------------------------------------------------------
 
-from app.auth import (  # noqa: E402
-    create_access_token,
-    get_current_user,
-    get_optional_current_user,
-    hash_password,
-    verify_password,
-)
-from app.card_repo import (  # noqa: E402
-    card_to_dict,
-    count_cards_for_player,
-    create_card_row,
-    get_card_by_card_id,
-    list_all_cards_dicts,
-    list_cards_for_player_dicts,
-    list_my_cards_dicts,
-    next_collectible_card_id,
-)
-from app.database import engine, get_db  # noqa: E402
-from app.models import Base, User  # noqa: E402
+try:  # noqa: E402
+    from app.auth import (
+        create_access_token,
+        get_current_user,
+        get_optional_current_user,
+        hash_password,
+        verify_password,
+    )
+    from app.card_repo import (
+        card_to_dict,
+        count_cards_for_player,
+        create_card_row,
+        get_card_by_card_id,
+        list_all_cards_dicts,
+        list_cards_for_player_dicts,
+        list_my_cards_dicts,
+        next_collectible_card_id,
+    )
+    from app.database import engine, get_db
+    from app.models import Base, User
+except ModuleNotFoundError:
+    # Render (and some setups): root dir backend/app, uvicorn main:app — no "app" package on path
+    from auth import (
+        create_access_token,
+        get_current_user,
+        get_optional_current_user,
+        hash_password,
+        verify_password,
+    )
+    from card_repo import (
+        card_to_dict,
+        count_cards_for_player,
+        create_card_row,
+        get_card_by_card_id,
+        list_all_cards_dicts,
+        list_cards_for_player_dicts,
+        list_my_cards_dicts,
+        next_collectible_card_id,
+    )
+    from database import engine, get_db
+    from models import Base, User
 
 
 @asynccontextmanager

@@ -5,7 +5,10 @@ from datetime import datetime, timezone
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import Card
+try:
+    from app.models import Card
+except ModuleNotFoundError:
+    from models import Card
 
 
 def _year_prefix() -> str:
