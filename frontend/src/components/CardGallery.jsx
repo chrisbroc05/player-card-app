@@ -25,7 +25,9 @@ export default function CardGallery({ cards }) {
                 key={key}
                 className="group rounded-xl border border-white/10 bg-cardBg2 p-3 transition duration-200 hover:scale-[1.02] hover:border-neonBlue/50 hover:shadow-glowBlue"
               >
-                <Link to={card.shareable_slug ? `/card/${encodeURIComponent(card.shareable_slug)}` : "/vault"}>
+                <Link
+                  to={card.shareable_slug ? `/card/${encodeURIComponent(card.shareable_slug)}` : "/my-collection"}
+                >
                   <img
                     src={toApiUrl(card.image_url)}
                     alt={card.player_name || "Card"}

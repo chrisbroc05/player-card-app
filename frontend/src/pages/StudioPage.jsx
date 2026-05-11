@@ -6,6 +6,8 @@ import FeaturedCard from "../components/FeaturedCard";
 import CardGallery from "../components/CardGallery";
 import OrdersDashboard from "../components/OrdersDashboard";
 import PostGenerationPanel from "../components/PostGenerationPanel";
+import StudioAuthGate from "../components/StudioAuthGate";
+import ExampleCardGallery from "../components/ExampleCardGallery";
 import { API_BASE_URL, authHeaders, toApiUrl } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 
@@ -91,7 +93,7 @@ function formatApiError(detail, fallback) {
 
 export default function StudioPage() {
   const navigate = useNavigate();
-  const { token, user } = useAuth();
+  const { token, user, initializing } = useAuth();
   const [workspace, setWorkspace] = useState("customer");
   const [currentStep, setCurrentStep] = useState(1);
   const [dragActive, setDragActive] = useState(false);
@@ -129,7 +131,7 @@ export default function StudioPage() {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [vaultCardDetail, setVaultCardDetail] = useState(null);
+  const [savedCardDetail, setSavedCardDetail] = useState(null);
   const [shareToast, setShareToast] = useState("");
 
   const selectedTierLabel = (TIER_UI[orderTier] || TIER_UI.all_star).label;
@@ -186,7 +188,7 @@ export default function StudioPage() {
   useEffect(() => {
     const sel = previewCards.find((p) => p.image_url === selectedPreviewUrl);
     if (!sel?.card_id) {
-      setVaultCardDetail(null);
+      setSavedCardDetail(null);
       return;
     }
     let cancelled = false;
@@ -195,9 +197,9 @@ export default function StudioPage() {
         const res = await fetch(`${API_BASE_URL}/cards/${encodeURIComponent(sel.card_id)}`);
         if (!res.ok) throw new Error();
         const detail = await res.json();
-        if (!cancelled) setVaultCardDetail(detail);
+        if (!cancelled) setSavedCardDetail(detail);
       } catch {
-        if (!cancelled) setVaultCardDetail(null);
+        if (!cancelled) setSavedCardDetail(null);
       }
     })();
     return () => {
@@ -215,9 +217,9 @@ export default function StudioPage() {
         const res = await fetch(`${API_BASE_URL}/cards/${encodeURIComponent(match.card_id)}`);
         if (!res.ok) throw new Error();
         const detail = await res.json();
-        if (!cancelled) setVaultCardDetail(detail);
+        if (!cancelled) setSavedCardDetail(detail);
       } catch {
-        if (!cancelled) setVaultCardDetail(null);
+        if (!cancelled) setSavedCardDetail(null);
       }
     })();
     return () => {
@@ -225,15 +227,27 @@ export default function StudioPage() {
     };
   }, [currentStep, activeOrder]);
 
-  async function fetchCards() {
-    const res = await fetch(`${API_BASE_URL}/cards`);
-    if (!res.ok) throw new Error("Failed to load generated cards.");
+  async function fetchMyCards() {
+    if (!token) {
+      setCards([]);
+      return;
+    }
+    const res = await fetch(`${API_BASE_URL}/cards/my-cards`, {
+      headers: { ...authHeaders(token) },
+    });
+    if (!res.ok) throw new Error("Failed to load your cards.");
     const data = await res.json();
     setCards(Array.isArray(data) ? data : []);
   }
 
   async function fetchOrders() {
-    const res = await fetch(`${API_BASE_URL}/orders`);
+    if (!token) {
+      setOrders([]);
+      return;
+    }
+    const res = await fetch(`${API_BASE_URL}/orders`, {
+      headers: { ...authHeaders(token) },
+    });
     if (!res.ok) throw new Error("Failed to load orders.");
     const data = await res.json();
     const list = Array.isArray(data) ? data : [];
@@ -248,16 +262,18 @@ export default function StudioPage() {
   }
 
   useEffect(() => {
-    Promise.all([fetchCards(), fetchOrders()]).catch((err) => {
-      setError(err.message || "Could not load cards.");
+    if (initializing) return;
+    Promise.all([fetchMyCards(), fetchOrders()]).catch((err) => {
+      setError(err.message || "Could not load data.");
     });
-  }, []);
+  }, [token, initializing]);
 
   async function createPlayerFromCurrentForm() {
     const formData = new FormData();
     formData.append("file", imageFile);
     const uploadRes = await fetch(`${API_BASE_URL}/upload-image`, {
       method: "POST",
+      headers: { ...authHeaders(token) },
       body: formData,
     });
     if (!uploadRes.ok) throw new Error("Image upload failed.");
@@ -265,7 +281,7 @@ export default function StudioPage() {
 
     const playerRes = await fetch(`${API_BASE_URL}/players`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders(token) },
       body: JSON.stringify({
         first_name: firstName.trim(),
         last_name: lastName.trim() || "N/A",
@@ -297,7 +313,7 @@ export default function StudioPage() {
 
       const orderRes = await fetch(`${API_BASE_URL}/orders`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders(token) },
         body: JSON.stringify({
           customer_name: orderCustomerName.trim(),
           customer_email: orderCustomerEmail.trim(),
@@ -320,7 +336,7 @@ export default function StudioPage() {
 
       setCurrentOrderId(orderData.id);
       setMessage(`Order #${orderData.id} created. Generate your previews next.`);
-      await Promise.all([fetchCards(), fetchOrders()]);
+      await Promise.all([fetchMyCards(), fetchOrders()]);
       setCurrentStep(5);
     } catch (err) {
       setError(err.message || "Failed to create order.");
@@ -346,7 +362,7 @@ export default function StudioPage() {
       setSelectedPreviewUrl(data.image_url || "");
       setGeneratedTier(data.tier || "base");
       setMessage(`Preview generated for order #${orderId}.`);
-      await Promise.all([fetchCards(), fetchOrders()]);
+      await Promise.all([fetchMyCards(), fetchOrders()]);
     } catch (err) {
       setError(err.message || "Failed to generate order card.");
     } finally {
@@ -369,7 +385,7 @@ export default function StudioPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/orders/${currentOrderId}/approve-preview`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders(token) },
         body: JSON.stringify({ image_url: selectedPreviewUrl || generatedCardUrl || null }),
       });
       const data = await res.json();
@@ -400,7 +416,7 @@ export default function StudioPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/orders/${orderId}/status`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders(token) },
         body: JSON.stringify({ status }),
       });
       const data = await res.json();
@@ -419,12 +435,15 @@ export default function StudioPage() {
     setMessage("");
     setError("");
     try {
-      const res = await fetch(`${API_BASE_URL}/orders/${orderId}/deliver`, { method: "POST" });
+      const res = await fetch(`${API_BASE_URL}/orders/${orderId}/deliver`, {
+        method: "POST",
+        headers: { ...authHeaders(token) },
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(formatApiError(data?.detail, "Failed to deliver order."));
       if (data.final_card_url) setGeneratedCardUrl(data.final_card_url);
       setMessage(`Order #${orderId} marked as delivered.`);
-      await Promise.all([fetchCards(), fetchOrders()]);
+      await Promise.all([fetchMyCards(), fetchOrders()]);
     } catch (err) {
       setError(err.message || "Failed to deliver order.");
     } finally {
@@ -443,9 +462,9 @@ export default function StudioPage() {
     }
   }
 
-  function handleShareVaultCard() {
-    if (!vaultCardDetail?.shareable_slug) return;
-    const url = `${window.location.origin}/card/${vaultCardDetail.shareable_slug}`;
+  function handleShareSavedCard() {
+    if (!savedCardDetail?.shareable_slug) return;
+    const url = `${window.location.origin}/card/${savedCardDetail.shareable_slug}`;
     navigator.clipboard.writeText(url).then(
       () => {
         setShareToast("Link copied!");
@@ -468,6 +487,11 @@ export default function StudioPage() {
             <div>
               <h2 className="text-base font-semibold text-white">Card Creation Experience</h2>
               <p className="text-xs text-slate-400">Guided customer flow with separate admin fulfillment controls.</p>
+              {!initializing && !user ? (
+                <p className="mt-2 text-xs text-neonTeal/90">
+                  Browse tier previews and example styles below — sign up to build your own collectible.
+                </p>
+              ) : null}
             </div>
             <div className="inline-flex rounded-xl border border-white/15 bg-cardBg2 p-1">
               <button
@@ -529,6 +553,10 @@ export default function StudioPage() {
               })}
             </div>
 
+            {!user && currentStep >= 2 ? (
+              <StudioAuthGate onBackToTiers={() => setCurrentStep(1)} />
+            ) : (
+              <>
             {currentStep === 1 ? (
               <div className="grid gap-4 sm:grid-cols-3">
                 {[
@@ -836,12 +864,12 @@ export default function StudioPage() {
                     </button>
                   ))}
                 </div>
-                {vaultCardDetail && previewCards.length > 0 ? (
+                {savedCardDetail && previewCards.length > 0 ? (
                   <PostGenerationPanel
-                    detail={vaultCardDetail}
+                    detail={savedCardDetail}
                     shareToast={shareToast}
-                    onShare={handleShareVaultCard}
-                    onVault={() => navigate("/vault")}
+                    onShare={handleShareSavedCard}
+                    onViewCollection={() => navigate("/my-collection")}
                     isLoggedIn={Boolean(user)}
                   />
                 ) : null}
@@ -858,12 +886,12 @@ export default function StudioPage() {
 
             {currentStep === 6 ? (
               <div className="grid gap-6">
-                {vaultCardDetail ? (
+                {savedCardDetail ? (
                   <PostGenerationPanel
-                    detail={vaultCardDetail}
+                    detail={savedCardDetail}
                     shareToast={shareToast}
-                    onShare={handleShareVaultCard}
-                    onVault={() => navigate("/vault")}
+                    onShare={handleShareSavedCard}
+                    onViewCollection={() => navigate("/my-collection")}
                     isLoggedIn={Boolean(user)}
                   />
                 ) : null}
@@ -892,7 +920,14 @@ export default function StudioPage() {
                 </div>
               </div>
             ) : null}
+              </>
+            )}
           </section>
+        ) : !user ? (
+          <StudioAuthGate
+            onBackToTiers={() => setWorkspace("customer")}
+            backLabel="← Back to customer studio"
+          />
         ) : (
           <OrdersDashboard
             orders={orders}
@@ -905,7 +940,7 @@ export default function StudioPage() {
         )}
 
         <FeaturedCard imageUrl={generatedCardFullUrl} tier={generatedTier} loading={isGenerating} />
-        <CardGallery cards={cards} />
+        {user ? <CardGallery cards={cards} /> : <ExampleCardGallery />}
       </main>
 
       {showCompleteModal ? (

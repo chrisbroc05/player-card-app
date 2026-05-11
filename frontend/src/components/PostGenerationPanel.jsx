@@ -7,7 +7,7 @@ export default function PostGenerationPanel({
   detail,
   shareToast,
   onShare,
-  onVault,
+  onViewCollection,
   isLoggedIn = false,
   downloadFileName = "future-legends-card.png",
 }) {
@@ -72,13 +72,15 @@ export default function PostGenerationPanel({
         >
           Share Card
         </button>
-        <button
-          type="button"
-          onClick={onVault}
-          className="inline-flex min-h-[46px] flex-1 items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:flex-none"
-        >
-          View My Vault
-        </button>
+        {isLoggedIn && onViewCollection ? (
+          <button
+            type="button"
+            onClick={onViewCollection}
+            className="inline-flex min-h-[46px] flex-1 items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:flex-none"
+          >
+            View My Collection
+          </button>
+        ) : null}
       </div>
 
       {shareToast ? (

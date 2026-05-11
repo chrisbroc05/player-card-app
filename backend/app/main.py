@@ -40,7 +40,6 @@ load_dotenv(_REPO_ROOT / ".env")
 from auth import (  # noqa: E402
     create_access_token,
     get_current_user,
-    get_optional_current_user,
     hash_password,
     verify_password,
 )
@@ -49,7 +48,6 @@ from card_repo import (  # noqa: E402
     count_cards_for_player,
     create_card_row,
     get_card_by_card_id,
-    list_all_cards_dicts,
     list_cards_for_player_dicts,
     list_my_cards_dicts,
     next_collectible_card_id,
@@ -1246,7 +1244,10 @@ def test_openai():
 
 
 @app.post("/players", response_model=Player, status_code=201)
-def create_player(body: PlayerCreate):
+def create_player(
+    body: PlayerCreate,
+    _current_user: User = Depends(get_current_user),
+):
     """Create a player from JSON; assign id; keep in memory."""
     global _next_player_id
 
@@ -1268,15 +1269,18 @@ def create_player(body: PlayerCreate):
 
 
 @app.get("/players", response_model=list[Player])
-def list_players():
+def list_players(_current_user: User = Depends(get_current_user)):
     """All players in memory, including image_url when set."""
     return _players
 
 
 @app.get("/cards", response_model=list[CardVaultSummary])
-def list_cards(db: Session = Depends(get_db)):
-    """List all vault cards (newest first)."""
-    rows = list_all_cards_dicts(db)
+def list_cards(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List the authenticated user's cards (newest first). Same data as GET /cards/my-cards."""
+    rows = list_my_cards_dicts(db, current_user.id)
     return [CardVaultSummary.model_validate(r) for r in rows]
 
 
@@ -1303,7 +1307,11 @@ def get_card(card_id: str, db: Session = Depends(get_db)):
 
 
 @app.get("/players/{player_id}/cards", response_model=list[Card])
-def list_cards_for_player(player_id: int, db: Session = Depends(get_db)):
+def list_cards_for_player(
+    player_id: int,
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(get_current_user),
+):
     """List generated cards for one player."""
     if not _player_exists(player_id):
         raise HTTPException(status_code=404, detail="Player not found")
@@ -1312,7 +1320,10 @@ def list_cards_for_player(player_id: int, db: Session = Depends(get_db)):
 
 
 @app.post("/orders", response_model=Order, status_code=201)
-def create_order(body: OrderCreate):
+def create_order(
+    body: OrderCreate,
+    _current_user: User = Depends(get_current_user),
+):
     """Create a new in-memory order."""
     global _next_order_id
 
@@ -1346,6 +1357,7 @@ def create_order(body: OrderCreate):
 def list_orders(
     status: OrderStatus | None = Query(default=None),
     tier: OrderTier | None = Query(default=None),
+    _current_user: User = Depends(get_current_user),
 ):
     """List in-memory orders, optionally filtered by status and/or tier."""
     results = _orders
@@ -1357,14 +1369,18 @@ def list_orders(
 
 
 @app.get("/orders/{order_id}", response_model=Order)
-def get_order(order_id: int):
+def get_order(order_id: int, _current_user: User = Depends(get_current_user)):
     """Get one order by id."""
     order = _get_order_or_404(order_id)
     return Order.model_validate(order)
 
 
 @app.patch("/orders/{order_id}/status", response_model=Order)
-def update_order_status(order_id: int, body: OrderStatusUpdate):
+def update_order_status(
+    order_id: int,
+    body: OrderStatusUpdate,
+    _current_user: User = Depends(get_current_user),
+):
     """Update only the status for one order."""
     order = _get_order_or_404(order_id)
     order["status"] = body.status
@@ -1375,7 +1391,7 @@ def update_order_status(order_id: int, body: OrderStatusUpdate):
 def generate_card_for_order(
     order_id: int,
     db: Session = Depends(get_db),
-    current_user: User | None = Depends(get_optional_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Generate one card from order player data and image.
@@ -1412,7 +1428,7 @@ def generate_card_for_order(
         )
 
     new_card_id = next_collectible_card_id(db)
-    owner_id = current_user.id if current_user else None
+    owner_id = current_user.id
     vault_rec = _store_generated_card(
         db,
         _player_id_for_order(order),
@@ -1447,7 +1463,11 @@ def generate_card_for_order(
 
 
 @app.post("/orders/{order_id}/deliver", response_model=Order)
-def deliver_order(order_id: int, body: OrderDeliverRequest | None = None):
+def deliver_order(
+    order_id: int,
+    body: OrderDeliverRequest | None = None,
+    _current_user: User = Depends(get_current_user),
+):
     """
     Mark order as delivered.
     - final_card_url: use provided URL or latest generated card URL
@@ -1475,7 +1495,11 @@ def deliver_order(order_id: int, body: OrderDeliverRequest | None = None):
 
 
 @app.post("/orders/{order_id}/approve-preview", response_model=Order)
-def approve_order_preview(order_id: int, body: OrderApprovePreviewRequest | None = None):
+def approve_order_preview(
+    order_id: int,
+    body: OrderApprovePreviewRequest | None = None,
+    _current_user: User = Depends(get_current_user),
+):
     """
     Customer confirms which generated preview they want fulfilled.
     - Sets final_card_url from provided image_url or latest generated preview
@@ -1502,7 +1526,11 @@ def approve_order_preview(order_id: int, body: OrderApprovePreviewRequest | None
 
 
 @app.put("/players/{player_id}/image", response_model=Player)
-def set_player_image(player_id: int, body: PlayerImageUpdate):
+def set_player_image(
+    player_id: int,
+    body: PlayerImageUpdate,
+    _current_user: User = Depends(get_current_user),
+):
     """Set image_url for the player with this id."""
     for row in _players:
         if row["id"] == player_id:
@@ -1512,7 +1540,10 @@ def set_player_image(player_id: int, body: PlayerImageUpdate):
 
 
 @app.post("/upload-image")
-async def upload_image(file: UploadFile = File(..., description="Image file (JPEG, PNG, GIF, or WebP)")):
+async def upload_image(
+    file: UploadFile = File(..., description="Image file (JPEG, PNG, GIF, or WebP)"),
+    _current_user: User = Depends(get_current_user),
+):
     """Accept a single image upload, save under uploads/, return path and URL."""
     content_type = (file.content_type or "").split(";")[0].strip().lower()
     ext = _IMAGE_TYPES.get(content_type)
@@ -1541,7 +1572,7 @@ async def upload_image(file: UploadFile = File(..., description="Image file (JPE
 def generate_card(
     player_id: int,
     db: Session = Depends(get_db),
-    current_user: User | None = Depends(get_optional_current_user),
+    current_user: User = Depends(get_current_user),
     use_ai: bool = Query(
         False,
         description="If true, generate with OpenAI image API (falls back to Pillow on failure).",
@@ -1584,7 +1615,7 @@ def generate_card(
         player_row=player_row,
         special_theme=special_theme,
         owner_name="unassigned",
-        owner_id=current_user.id if current_user else None,
+        owner_id=current_user.id,
     )
     result["card_id"] = card["card_id"]
     result["card_record_id"] = card["id"]
@@ -1596,7 +1627,7 @@ def generate_card(
 def generate_card_set(
     player_id: int,
     db: Session = Depends(get_db),
-    current_user: User | None = Depends(get_optional_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Generate three AI cards for the same player: BASE, RARE, and LEGENDARY (distinct prompt intensity).
@@ -1617,7 +1648,7 @@ def generate_card_set(
                 player_row=player_row,
                 special_theme=None,
                 owner_name="unassigned",
-                owner_id=current_user.id if current_user else None,
+                owner_id=current_user.id,
             )
             result["card_id"] = card["card_id"]
             result["card_record_id"] = card["id"]

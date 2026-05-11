@@ -13,7 +13,7 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
 
   if (!initializing && user) {
-    return <Navigate to="/vault" replace />;
+    return <Navigate to="/my-collection" replace />;
   }
 
   async function handleSubmit(e) {
@@ -22,7 +22,7 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       await login(email, password);
-      navigate("/vault", { replace: true });
+      navigate("/my-collection", { replace: true });
     } catch {
       setError("Invalid email or password");
     } finally {

@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import { API_BASE_URL, toApiUrl } from "../config/api";
+import { useAuth } from "../context/AuthContext";
 import { vaultTierBadge, formatEdition, rarityDisplay } from "../utils/tierStyles";
 
 function formatCreatedAt(iso) {
@@ -17,6 +18,7 @@ function formatCreatedAt(iso) {
 
 export default function CardDetailPage() {
   const { cardId } = useParams();
+  const { user } = useAuth();
   const [card, setCard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -70,10 +72,10 @@ export default function CardDetailPage() {
 
       <main className="mx-auto w-full max-w-4xl px-3 py-8 sm:px-6 lg:px-8">
         <Link
-          to="/vault"
+          to={user ? "/my-collection" : "/"}
           className="mb-6 inline-flex items-center text-sm text-slate-400 transition hover:text-white"
         >
-          ← Back to Vault
+          {user ? "← Back to My Collection" : "← Back to Studio"}
         </Link>
 
         {loading ? (
@@ -156,10 +158,10 @@ export default function CardDetailPage() {
                   Share Card
                 </button>
                 <Link
-                  to="/vault"
+                  to={user ? "/my-collection" : "/"}
                   className="inline-flex min-h-[46px] flex-1 items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100 sm:flex-none"
                 >
-                  Back to Vault
+                  {user ? "Back to My Collection" : "Back to Studio"}
                 </Link>
               </div>
               {shareToast ? <p className="text-center text-xs text-emerald-300 sm:text-left">{shareToast}</p> : null}

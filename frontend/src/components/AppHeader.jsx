@@ -5,7 +5,6 @@ import { useAuth } from "../context/AuthContext";
 export default function AppHeader() {
   const location = useLocation();
   const { user, logout, initializing } = useAuth();
-  const onVault = location.pathname.startsWith("/vault");
   const onStudio = location.pathname === "/";
   const onMyCollection = location.pathname.startsWith("/my-collection");
 
@@ -15,7 +14,7 @@ export default function AppHeader() {
         <Link to="/" className="text-left transition hover:opacity-90">
           <p className="text-[10px] font-medium uppercase tracking-[0.25em] text-slate-500">Future Legends</p>
           <h1 className="text-lg font-semibold tracking-tight text-white sm:text-xl">
-            Card<span className="text-neonBlue">Vault</span>
+            Card<span className="text-neonBlue">Studio</span>
           </h1>
         </Link>
         <nav className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
@@ -26,14 +25,6 @@ export default function AppHeader() {
             }`}
           >
             Studio
-          </Link>
-          <Link
-            to="/vault"
-            className={`rounded-lg px-3 py-2 text-xs font-medium transition sm:text-sm ${
-              onVault ? "bg-neonTeal/20 text-neonTeal" : "text-slate-400 hover:text-white"
-            }`}
-          >
-            Vault
           </Link>
           {!initializing && user ? (
             <>

@@ -15,7 +15,7 @@ export default function RegisterPage() {
   const [submitting, setSubmitting] = useState(false);
 
   if (!initializing && user) {
-    return <Navigate to="/vault" replace />;
+    return <Navigate to="/my-collection" replace />;
   }
 
   async function handleSubmit(e) {
@@ -28,7 +28,7 @@ export default function RegisterPage() {
     setSubmitting(true);
     try {
       await register(email, displayName, password);
-      navigate("/vault", { replace: true });
+      navigate("/my-collection", { replace: true });
     } catch (err) {
       setError(err.message || "Registration failed");
     } finally {
@@ -43,7 +43,7 @@ export default function RegisterPage() {
         <div className="rounded-2xl border border-white/10 bg-cardBg p-6 shadow-2xl shadow-black/40 sm:p-8">
           <p className="text-center text-[10px] font-medium uppercase tracking-[0.3em] text-slate-500">Future Legends</p>
           <h1 className="mt-2 text-center text-2xl font-semibold text-white">Create your account</h1>
-          <p className="mt-1 text-center text-sm text-slate-400">Save cards to your vault and build your collection.</p>
+          <p className="mt-1 text-center text-sm text-slate-400">Create cards in the studio and keep them in your collection.</p>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-4">
             <div>
