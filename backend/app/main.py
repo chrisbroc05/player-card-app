@@ -59,17 +59,13 @@ from models import Base, User  # noqa: E402
 # ---------------------------------------------------------------------------
 # Image uploads (local disk; not linked to players yet)
 # ---------------------------------------------------------------------------
-# On Render (and similar), the repo directory is ephemeral — redeploys wipe
-# ./cards and ./uploads while Postgres still has image_url. Set APP_DATA_DIR
-# (or RENDER_DISK_PATH) to a persistent disk mount, e.g. /var/render/data, so
-# images survive restarts. Render: create a Disk, mount it, set the env var.
+# Generated cards → {APP_DATA_DIR}/cards/, uploads → {APP_DATA_DIR}/uploads/.
+# APP_DATA_DIR unset locally defaults to ./data (resolved from cwd). On Render,
+# set APP_DATA_DIR to your mounted disk (e.g. /var/render/data).
 def _upload_and_card_dirs() -> tuple[Path, Path]:
-    base = (os.environ.get("APP_DATA_DIR") or os.environ.get("RENDER_DISK_PATH") or "").strip()
-    if base:
-        root = Path(base)
-        return root / "uploads", root / "cards"
-    repo_backend = Path(__file__).resolve().parent.parent
-    return repo_backend / "uploads", repo_backend / "cards"
+    base = (os.environ.get("APP_DATA_DIR") or "").strip() or "./data"
+    root = Path(base).expanduser().resolve()
+    return root / "uploads", root / "cards"
 
 
 UPLOAD_DIR, CARD_DIR = _upload_and_card_dirs()
@@ -86,14 +82,16 @@ _IMAGE_TYPES: dict[str, str] = {
     "image/webp": ".webp",
 }
 
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-CARD_DIR.mkdir(parents=True, exist_ok=True)
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs(CARD_DIR, exist_ok=True)
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    os.makedirs(CARD_DIR, exist_ok=True)
     Base.metadata.create_all(bind=engine)
-    print(f"[startup] CARD_DIR={CARD_DIR} (exists={CARD_DIR.is_dir()}, writable={os.access(CARD_DIR, os.W_OK)})")
+    print(f"[startup] UPLOAD_DIR={UPLOAD_DIR} CARD_DIR={CARD_DIR} (writable={os.access(CARD_DIR, os.W_OK)})")
     yield
 
 
@@ -280,12 +278,17 @@ def _player_prompt_context(player_row: dict) -> str:
 
 
 def _resolve_source_path_from_image_url(image_url: str) -> Path:
-    """Resolve /uploads/... URL to a local file path."""
+    """Resolve /uploads/... URL to a local file path under UPLOAD_DIR."""
     image_path_value = urlparse(image_url).path
     if not image_path_value.startswith("/uploads/"):
         raise HTTPException(status_code=400, detail="image_url must point to /uploads/")
 
-    source_path = (Path(__file__).resolve().parent.parent / image_path_value.lstrip("/")).resolve()
+    rel = image_path_value.removeprefix("/uploads/").lstrip("/")
+    if not rel or ".." in rel.split("/"):
+        raise HTTPException(status_code=400, detail="Invalid upload path")
+    source_path = (UPLOAD_DIR / rel).resolve()
+    if not str(source_path).startswith(str(UPLOAD_DIR.resolve())):
+        raise HTTPException(status_code=400, detail="Invalid upload path")
     if not source_path.exists() or not source_path.is_file():
         raise HTTPException(status_code=404, detail="Source image not found")
     return source_path
