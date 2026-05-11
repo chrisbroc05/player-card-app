@@ -10,6 +10,14 @@ function isLocalhostHost() {
 export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || (isLocalhostHost() ? LOCAL_API_BASE_URL : PROD_API_BASE_URL);
 
+export const AUTH_TOKEN_STORAGE_KEY = "fl_access_token";
+
+/** Headers for authenticated API calls (omit if no token). */
+export function authHeaders(token) {
+  if (!token) return {};
+  return { Authorization: `Bearer ${token}` };
+}
+
 export function toApiUrl(pathOrUrl) {
   if (!pathOrUrl) return "";
   if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")) {

@@ -2,6 +2,7 @@ import base64
 import io
 import os
 import urllib.request
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
@@ -10,10 +11,11 @@ import re
 from uuid import uuid4
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.orm import Session
 from openai import OpenAI
 from PIL import Image, ImageDraw, ImageFont
 from pydantic import BaseModel, ConfigDict, Field
@@ -26,7 +28,34 @@ load_dotenv(_REPO_ROOT / ".env")
 # App
 # ---------------------------------------------------------------------------
 
-app = FastAPI()
+from auth import (  # noqa: E402
+    create_access_token,
+    get_current_user,
+    get_optional_current_user,
+    hash_password,
+    verify_password,
+)
+from card_repo import (  # noqa: E402
+    card_to_dict,
+    count_cards_for_player,
+    create_card_row,
+    get_card_by_card_id,
+    list_all_cards_dicts,
+    list_cards_for_player_dicts,
+    list_my_cards_dicts,
+    next_collectible_card_id,
+)
+from database import engine, get_db  # noqa: E402
+from models import Base, User  # noqa: E402
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    Base.metadata.create_all(bind=engine)
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -66,10 +95,6 @@ CARD_DIR.mkdir(parents=True, exist_ok=True)
 
 _players: list[dict] = []
 _next_player_id: int = 1
-# Collectible vault: keyed by canonical card_id (e.g. FL-2026-000001)
-_cards: dict[str, dict] = {}
-_next_card_id: int = 1
-_next_collectible_seq: int = 1
 _orders: list[dict] = []
 _next_order_id: int = 1
 MAX_CARDS_PER_PLAYER = 3
@@ -253,16 +278,16 @@ def _player_exists(player_id: int) -> bool:
     return any(row["id"] == player_id for row in _players)
 
 
-def _card_count_for_player(player_id: int) -> int:
-    return sum(1 for card in _cards.values() if card.get("player_id") == player_id)
+def _card_count_for_player(db: Session, player_id: int) -> int:
+    return count_cards_for_player(db, player_id)
 
 
-def _ensure_card_generation_limit(player_id: int, cards_to_generate: int = 1) -> None:
+def _ensure_card_generation_limit(db: Session, player_id: int, cards_to_generate: int = 1) -> None:
     """
     Simple per-player card cap.
     If creating the requested number would exceed the max, reject the request.
     """
-    existing = _card_count_for_player(player_id)
+    existing = _card_count_for_player(db, player_id)
     if existing + cards_to_generate > MAX_CARDS_PER_PLAYER:
         remaining = max(0, MAX_CARDS_PER_PLAYER - existing)
         raise HTTPException(
@@ -312,15 +337,6 @@ def _preview_limit_for_tier(order_tier: str) -> int:
     """
     _ = order_tier
     return 3
-
-
-def _next_collectible_card_id() -> str:
-    """Generate FL-YYYY-###### collectible identity values."""
-    global _next_collectible_seq
-    year = datetime.now(timezone.utc).year
-    card_id = f"FL-{year}-{_next_collectible_seq:06d}"
-    _next_collectible_seq += 1
-    return card_id
 
 
 def _normalize_rarity(tier: str) -> str:
@@ -382,45 +398,8 @@ def _player_id_for_order(order: dict) -> int:
     return 0
 
 
-def _make_vault_record(
-    *,
-    internal_id: int,
-    card_id: str,
-    player_id: int,
-    image_url: str,
-    style: str,
-    player_row: dict,
-    gen_tier: str,
-    vault_tier: str,
-    special_theme: str | None,
-    owner_name: str,
-) -> dict:
-    """Build one vault row (also the canonical Card payload)."""
-    created_at = datetime.now(timezone.utc).isoformat()
-    return {
-        "id": internal_id,
-        "card_id": card_id,
-        "player_id": player_id,
-        "player_name": _player_display_name(player_row),
-        "team_name": _player_team_name(player_row),
-        "position": str(player_row.get("position") or "").strip(),
-        "jersey_number": _player_jersey_number(player_row),
-        "grad_year": _grad_year_from_player_row(player_row),
-        "tier": vault_tier,
-        "theme": _theme_field(special_theme),
-        "rarity": _normalize_rarity(gen_tier),
-        "edition_number": 1,
-        "print_run": 1,
-        "created_at": created_at,
-        "image_url": image_url,
-        "shareable_slug": card_id.lower(),
-        "style": style,
-        "special_theme": special_theme,
-        "owner_name": owner_name,
-    }
-
-
 def _store_generated_card(
+    db: Session,
     player_id: int,
     image_url: str,
     style: str,
@@ -430,26 +409,35 @@ def _store_generated_card(
     special_theme: str | None = None,
     owner_name: str = "unassigned",
     vault_tier: str | None = None,
+    owner_id: int | None = None,
+    predefined_card_id: str | None = None,
 ) -> dict:
-    """Persist generated-card metadata in the in-memory vault keyed by card_id."""
-    global _next_card_id
-    cid = _next_collectible_card_id()
+    """Persist generated card to PostgreSQL; returns API-shaped dict."""
     vt = vault_tier or _vault_tier_from_gen_tier(gen_tier)
-    rec = _make_vault_record(
-        internal_id=_next_card_id,
+    cid = predefined_card_id or next_collectible_card_id(db)
+    grad_year_str = str(_grad_year_from_player_row(player_row))
+    row = create_card_row(
+        db,
         card_id=cid,
         player_id=player_id,
+        player_name=_player_display_name(player_row),
+        team_name=_player_team_name(player_row),
+        position=str(player_row.get("position") or "").strip(),
+        jersey_number=_player_jersey_number(player_row),
+        grad_year=grad_year_str,
+        tier=vt,
+        theme=_theme_field(special_theme),
+        rarity=_normalize_rarity(gen_tier),
+        edition_number=1,
+        print_run=1,
         image_url=image_url,
+        shareable_slug=cid.lower(),
         style=style,
-        player_row=player_row,
-        gen_tier=str(gen_tier or "base"),
-        vault_tier=vt,
         special_theme=special_theme,
         owner_name=owner_name,
+        owner_id=owner_id,
     )
-    _cards[cid] = rec
-    _next_card_id += 1
-    return rec
+    return card_to_dict(row)
 
 
 def _image_to_square_png_bytes(source_path: Path, side: int = _EDIT_IMAGE_SIZE) -> bytes:
@@ -1128,6 +1116,46 @@ class OrderApprovePreviewRequest(BaseModel):
     image_url: str | None = Field(default=None, max_length=2000)
 
 
+class RegisterBody(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    email: str = Field(..., min_length=3, max_length=320)
+    display_name: str = Field(..., min_length=1, max_length=200)
+    password: str = Field(..., min_length=8, max_length=128)
+
+
+class LoginBody(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    email: str = Field(..., min_length=1, max_length=320)
+    password: str = Field(..., min_length=1, max_length=128)
+
+
+class UserPublic(BaseModel):
+    id: int
+    email: str
+    display_name: str
+    created_at: str
+
+
+class AuthTokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserPublic
+
+
+def _user_public(user: User) -> UserPublic:
+    created = user.created_at
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=timezone.utc)
+    return UserPublic(
+        id=user.id,
+        email=user.email,
+        display_name=user.display_name,
+        created_at=created.isoformat(),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -1136,6 +1164,38 @@ class OrderApprovePreviewRequest(BaseModel):
 @app.get("/")
 def root():
     return {"message": "API is running"}
+
+
+@app.post("/auth/register", response_model=AuthTokenResponse, status_code=201)
+def auth_register(body: RegisterBody, db: Session = Depends(get_db)):
+    email = body.email.strip().lower()
+    if db.query(User).filter(User.email == email).first():
+        raise HTTPException(status_code=400, detail="Email already registered")
+    user = User(
+        email=email,
+        display_name=body.display_name.strip(),
+        hashed_password=hash_password(body.password),
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    token = create_access_token({"sub": user.email})
+    return AuthTokenResponse(access_token=token, user=_user_public(user))
+
+
+@app.post("/auth/login", response_model=AuthTokenResponse)
+def auth_login(body: LoginBody, db: Session = Depends(get_db)):
+    email = body.email.strip().lower()
+    user = db.query(User).filter(User.email == email).first()
+    if user is None or not verify_password(body.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    token = create_access_token({"sub": user.email})
+    return AuthTokenResponse(access_token=token, user=_user_public(user))
+
+
+@app.get("/auth/me", response_model=UserPublic)
+def auth_me(current_user: User = Depends(get_current_user)):
+    return _user_public(current_user)
 
 
 @app.get("/test-openai")
@@ -1205,31 +1265,40 @@ def list_players():
 
 
 @app.get("/cards", response_model=list[CardVaultSummary])
-def list_cards():
+def list_cards(db: Session = Depends(get_db)):
     """List all vault cards (newest first)."""
-    rows = sorted(_cards.values(), key=lambda c: c["created_at"], reverse=True)
+    rows = list_all_cards_dicts(db)
+    return [CardVaultSummary.model_validate(r) for r in rows]
+
+
+@app.get("/cards/my-cards", response_model=list[CardVaultSummary])
+def list_my_cards(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Authenticated user's cards only."""
+    rows = list_my_cards_dicts(db, current_user.id)
     return [CardVaultSummary.model_validate(r) for r in rows]
 
 
 @app.get("/cards/{card_id}", response_model=Card)
-def get_card(card_id: str):
+def get_card(card_id: str, db: Session = Depends(get_db)):
     """Single card by collectible id (shareable slug accepted: fl-2026-000001)."""
     key = _canonical_card_id(card_id)
     if key is None:
         raise HTTPException(status_code=404, detail="Card not found")
-    row = _cards.get(key)
-    if row is None:
+    orm = get_card_by_card_id(db, key)
+    if orm is None:
         raise HTTPException(status_code=404, detail="Card not found")
-    return Card.model_validate(row)
+    return Card.model_validate(card_to_dict(orm))
 
 
 @app.get("/players/{player_id}/cards", response_model=list[Card])
-def list_cards_for_player(player_id: int):
+def list_cards_for_player(player_id: int, db: Session = Depends(get_db)):
     """List generated cards for one player."""
     if not _player_exists(player_id):
         raise HTTPException(status_code=404, detail="Player not found")
-    rows = [c for c in _cards.values() if c.get("player_id") == player_id]
-    rows.sort(key=lambda c: c["created_at"], reverse=True)
+    rows = list_cards_for_player_dicts(db, player_id)
     return [Card.model_validate(r) for r in rows]
 
 
@@ -1294,7 +1363,11 @@ def update_order_status(order_id: int, body: OrderStatusUpdate):
 
 
 @app.post("/orders/{order_id}/generate-card", response_model=GeneratedOrderCard)
-def generate_card_for_order(order_id: int):
+def generate_card_for_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+):
     """
     Generate one card from order player data and image.
     Stores generated card metadata in order.generated_cards.
@@ -1329,22 +1402,21 @@ def generate_card_for_order(order_id: int):
             player_row, order_id, source_path, tier=card_tier, special_theme=order.get("special_theme")
         )
 
-    global _next_card_id
-    new_card_id = _next_collectible_card_id()
-    vault_rec = _make_vault_record(
-        internal_id=_next_card_id,
-        card_id=new_card_id,
-        player_id=_player_id_for_order(order),
-        image_url=result["url"],
-        style=_style_from_generated_card(result),
-        player_row=player_row,
+    new_card_id = next_collectible_card_id(db)
+    owner_id = current_user.id if current_user else None
+    vault_rec = _store_generated_card(
+        db,
+        _player_id_for_order(order),
+        result["url"],
+        _style_from_generated_card(result),
         gen_tier=card_tier,
-        vault_tier=_vault_tier_from_order_tier(str(order.get("tier", "rookie"))),
+        player_row=player_row,
         special_theme=order.get("special_theme"),
         owner_name=order.get("customer_name") or "unassigned",
+        vault_tier=_vault_tier_from_order_tier(str(order.get("tier", "rookie"))),
+        owner_id=owner_id,
+        predefined_card_id=new_card_id,
     )
-    _cards[new_card_id] = vault_rec
-    _next_card_id += 1
 
     generated = GeneratedOrderCard(
         card_id=new_card_id,
@@ -1459,6 +1531,8 @@ async def upload_image(file: UploadFile = File(..., description="Image file (JPE
 @app.post("/generate-card/{player_id}")
 def generate_card(
     player_id: int,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
     use_ai: bool = Query(
         False,
         description="If true, generate with OpenAI image API (falls back to Pillow on failure).",
@@ -1479,7 +1553,7 @@ def generate_card(
     player's uploaded photo as input; on any failure, use the Pillow path.
     """
     player_row, source_path = _resolve_player_and_source_path(player_id)
-    _ensure_card_generation_limit(player_id, cards_to_generate=1)
+    _ensure_card_generation_limit(db, player_id, cards_to_generate=1)
 
     if use_ai:
         try:
@@ -1493,6 +1567,7 @@ def generate_card(
         result = _generate_card_pillow(player_row, player_id, source_path, tier=tier, special_theme=special_theme)
 
     card = _store_generated_card(
+        db,
         player_id,
         result["url"],
         _style_from_generated_card(result),
@@ -1500,6 +1575,7 @@ def generate_card(
         player_row=player_row,
         special_theme=special_theme,
         owner_name="unassigned",
+        owner_id=current_user.id if current_user else None,
     )
     result["card_id"] = card["card_id"]
     result["card_record_id"] = card["id"]
@@ -1508,18 +1584,23 @@ def generate_card(
 
 
 @app.post("/generate-card-set/{player_id}")
-def generate_card_set(player_id: int):
+def generate_card_set(
+    player_id: int,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+):
     """
     Generate three AI cards for the same player: BASE, RARE, and LEGENDARY (distinct prompt intensity).
     Each result includes its own url; failures are reported per tier without stopping the batch.
     """
     player_row, source_path = _resolve_player_and_source_path(player_id)
-    _ensure_card_generation_limit(player_id, cards_to_generate=3)
+    _ensure_card_generation_limit(db, player_id, cards_to_generate=3)
     cards: list[dict] = []
     for tier in ("base", "rare", "legendary"):
         try:
             result = _generate_card_openai(player_row, player_id, source_path, tier=tier, special_theme=None)
             card = _store_generated_card(
+                db,
                 player_id,
                 result["url"],
                 _style_from_generated_card(result),
@@ -1527,6 +1608,7 @@ def generate_card_set(player_id: int):
                 player_row=player_row,
                 special_theme=None,
                 owner_name="unassigned",
+                owner_id=current_user.id if current_user else None,
             )
             result["card_id"] = card["card_id"]
             result["card_record_id"] = card["id"]

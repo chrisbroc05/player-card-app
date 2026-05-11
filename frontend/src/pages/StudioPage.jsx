@@ -6,7 +6,8 @@ import FeaturedCard from "../components/FeaturedCard";
 import CardGallery from "../components/CardGallery";
 import OrdersDashboard from "../components/OrdersDashboard";
 import PostGenerationPanel from "../components/PostGenerationPanel";
-import { API_BASE_URL, toApiUrl } from "../config/api";
+import { API_BASE_URL, authHeaders, toApiUrl } from "../config/api";
+import { useAuth } from "../context/AuthContext";
 
 const STEPS = [
   "Choose Tier",
@@ -90,6 +91,7 @@ function formatApiError(detail, fallback) {
 
 export default function StudioPage() {
   const navigate = useNavigate();
+  const { token, user } = useAuth();
   const [workspace, setWorkspace] = useState("customer");
   const [currentStep, setCurrentStep] = useState(1);
   const [dragActive, setDragActive] = useState(false);
@@ -334,7 +336,10 @@ export default function StudioPage() {
     setMessage("");
     setError("");
     try {
-      const res = await fetch(`${API_BASE_URL}/orders/${orderId}/generate-card`, { method: "POST" });
+      const res = await fetch(`${API_BASE_URL}/orders/${orderId}/generate-card`, {
+        method: "POST",
+        headers: { ...authHeaders(token) },
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(formatApiError(data?.detail, "Failed to generate order card."));
       setGeneratedCardUrl(data.image_url || "");
@@ -837,6 +842,7 @@ export default function StudioPage() {
                     shareToast={shareToast}
                     onShare={handleShareVaultCard}
                     onVault={() => navigate("/vault")}
+                    isLoggedIn={Boolean(user)}
                   />
                 ) : null}
                 <button
@@ -858,6 +864,7 @@ export default function StudioPage() {
                     shareToast={shareToast}
                     onShare={handleShareVaultCard}
                     onVault={() => navigate("/vault")}
+                    isLoggedIn={Boolean(user)}
                   />
                 ) : null}
                 <div className="rounded-xl border border-emerald-300/35 bg-emerald-400/10 p-4">

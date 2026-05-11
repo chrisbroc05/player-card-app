@@ -1,5 +1,8 @@
 # Python
 __pycache__/
+backend/.venv/
+backend/app/*.db
+backend/*.db
 backend/uploads/
 backend/cards/
 *.pyc

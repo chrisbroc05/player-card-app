@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import { toApiUrl } from "../config/api";
 import { vaultTierBadge, formatEdition, rarityDisplay } from "../utils/tierStyles";
 
@@ -7,6 +8,7 @@ export default function PostGenerationPanel({
   shareToast,
   onShare,
   onVault,
+  isLoggedIn = false,
   downloadFileName = "future-legends-card.png",
 }) {
   if (!detail?.image_url) return null;
@@ -16,9 +18,19 @@ export default function PostGenerationPanel({
 
   return (
     <div className="rounded-2xl border border-white/10 bg-cardBg2/80 p-4 shadow-xl sm:p-6">
-      <p className="mb-4 text-center text-xs font-medium uppercase tracking-[0.2em] text-slate-400">
+      <p className="mb-2 text-center text-xs font-medium uppercase tracking-[0.2em] text-slate-400">
         Your collectible
       </p>
+      {isLoggedIn ? (
+        <p className="mb-4 text-center text-sm font-medium text-emerald-300/95">Card saved to your collection!</p>
+      ) : (
+        <p className="mb-4 text-center text-sm text-slate-400">
+          <Link to="/register" className="font-medium text-neonTeal underline decoration-neonTeal/30 underline-offset-2 hover:text-teal-200">
+            Create an account
+          </Link>{" "}
+          to save your cards!
+        </p>
+      )}
       <div className="mx-auto max-w-md">
         <div
           className={`overflow-hidden rounded-xl border-2 bg-black/20 transition duration-500 ${badge.glow}`}
