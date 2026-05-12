@@ -64,7 +64,7 @@ function useShareMeta(card) {
     };
   }, [meta, card]);
 
-  return { meta, loading, error, resolved };
+  return { meta, error, resolved };
 }
 
 function ShareToast({ message }) {
