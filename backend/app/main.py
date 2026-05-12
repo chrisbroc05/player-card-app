@@ -169,14 +169,15 @@ def _tier_animated_card_prompt(
 
     if variant == "dual_edit":
         layout = (
-            "Use the FIRST image ONLY as inspiration for the subject's identity, pose, and general appearance — "
-            "redraw as a stylized fictional athlete. "
+            "Use the FIRST image for the subject's identity, keeping the **same athletic action and body pose** "
+            "as in that photo (e.g. throwing stays throwing, batting stays batting); redraw as a stylized fictional "
+            "athlete — do not invent a different sport action. "
             "Use the SECOND image as the CARD TEMPLATE — follow its layout, borders, proportions, and framing. "
         )
     elif variant == "single_edit":
         layout = (
-            "Use the INPUT image ONLY as loose inspiration for identity, pose, and general appearance — "
-            "fully redraw the subject as a stylized fictional athlete. "
+            "Use the INPUT image for identity, **keeping the same action and body pose as the photo**; "
+            "fully redraw the subject as a stylized fictional athlete — do not switch to a different sport action. "
             "Design a bold trading-card frame, borders, and composition appropriate to the tier (no photo crop). "
         )
     else:
@@ -196,13 +197,23 @@ def _tier_animated_card_prompt(
     themed = str(special_theme or "").strip().lower()
     theme_line = theme_rules.get(themed, "")
 
+    if variant == "text_generate":
+        pose_block = (
+            "Believable athletic baseball pose and energy appropriate to this tier and the written subject brief. "
+        )
+    else:
+        pose_block = (
+            "Slightly exaggerated athletic proportions that match the **same pose and action** as the reference "
+            "image (do not default to batting or swinging unless the photo already shows that). "
+        )
+
     return (
         "OUTPUT MUST BE FULLY ILLUSTRATED, CARTOON / CEL-SHADED animated baseball trading card art — like modern "
         "sports VIDEO GAME character cards. NOT a photograph, NOT photorealistic, NOT a light photo edit. "
         "Do NOT preserve or copy exact pixels from the source photo; redraw everything as illustrated artwork. "
-        "Slightly exaggerated athletic proportions, dynamic action pose (batting stance, mid-swing, or pitching); "
-        "clean outlines, bold lighting, vibrant saturated colors. "
+        f"{pose_block}"
         f"{layout}"
+        "Clean outlines, bold lighting, vibrant saturated colors. "
         "Dramatic sports background: stadium lights, motion, energy effects scaled to tier. "
         f"{tier_rules[t]} "
         f"{theme_line} "
@@ -265,7 +276,11 @@ def _player_prompt_context(player_row: dict) -> str:
     position = str(player_row.get("position") or "").strip() or "N/A"
     grad_year = str(player_row.get("grad_year") or "").strip() or "N/A"
     batting_hand = str(player_row.get("batting_hand") or "").strip()
-    batting_line = f"- Batting Hand: {batting_hand}" if batting_hand else ""
+    batting_line = (
+        f"- Batting form side (for uniform detail if drawn; do not use this to change the pose in the photo): {batting_hand}"
+        if batting_hand
+        else ""
+    )
     return (
         "Player details to incorporate into the card design: "
         f"- Name: {name} "
@@ -558,8 +573,9 @@ def _vision_caption_for_card(client: OpenAI, source_path: Path) -> str:
                     {
                         "type": "text",
                         "text": (
-                            "In 2 short phrases, describe the person's appearance (hair, skin tone, expression, "
-                            "clothing colors) for an illustrator drawing a stylized fictional sports trading card. "
+                            "In 2 short phrases, describe the person's appearance and what their body is doing "
+                            "(pose / action — e.g. throwing, batting, running) plus hair, skin tone, expression, "
+                            "and clothing colors, for an illustrator drawing a stylized fictional sports trading card. "
                             "Do not use real names."
                         ),
                     },
