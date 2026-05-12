@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY } from "../config/api";
+import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY, authHeaders } from "../config/api";
 
 function formatApiError(detail, fallback) {
   if (!detail) return fallback;
@@ -23,11 +23,31 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) ?? "");
   const [user, setUser] = useState(null);
   const [initializing, setInitializing] = useState(true);
+  const [pendingIncomingTradesCount, setPendingIncomingTradesCount] = useState(0);
+
+  const refreshIncomingTradeCount = useCallback(async (authToken) => {
+    const t = (authToken ?? token ?? localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) ?? "").trim();
+    if (!t) {
+      setPendingIncomingTradesCount(0);
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE_URL}/trades/incoming/count`, {
+        headers: { ...authHeaders(t) },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setPendingIncomingTradesCount(Number(data?.count) || 0);
+    } catch {
+      setPendingIncomingTradesCount(0);
+    }
+  }, [token]);
 
   const logout = useCallback(() => {
     localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
     setToken("");
     setUser(null);
+    setPendingIncomingTradesCount(0);
   }, []);
 
   useEffect(() => {
@@ -68,46 +88,74 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  const login = useCallback(async (email, password) => {
-    const res = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: email.trim(), password }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(formatApiError(data?.detail, "Invalid email or password"));
-    localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, data.access_token);
-    setToken(data.access_token);
-    setUser(data.user);
-  }, []);
+  useEffect(() => {
+    if (initializing) return;
+    if (user && token) {
+      refreshIncomingTradeCount(token);
+    } else {
+      setPendingIncomingTradesCount(0);
+    }
+  }, [user, token, initializing, refreshIncomingTradeCount]);
 
-  const register = useCallback(async (email, displayName, password) => {
-    const res = await fetch(`${API_BASE_URL}/auth/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: email.trim(),
-        display_name: displayName.trim(),
-        password,
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(formatApiError(data?.detail, "Registration failed"));
-    localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, data.access_token);
-    setToken(data.access_token);
-    setUser(data.user);
-  }, []);
+  const login = useCallback(
+    async (email, password) => {
+      const res = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(formatApiError(data?.detail, "Invalid email or password"));
+      localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, data.access_token);
+      setToken(data.access_token);
+      setUser(data.user);
+      refreshIncomingTradeCount(data.access_token);
+    },
+    [refreshIncomingTradeCount]
+  );
+
+  const register = useCallback(
+    async (email, displayName, password) => {
+      const res = await fetch(`${API_BASE_URL}/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim(),
+          display_name: displayName.trim(),
+          password,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(formatApiError(data?.detail, "Registration failed"));
+      localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, data.access_token);
+      setToken(data.access_token);
+      setUser(data.user);
+      refreshIncomingTradeCount(data.access_token);
+    },
+    [refreshIncomingTradeCount]
+  );
 
   const value = useMemo(
     () => ({
       token,
       user,
       initializing,
+      pendingIncomingTradesCount,
+      refreshIncomingTradeCount,
       login,
       logout,
       register,
     }),
-    [token, user, initializing, login, logout, register]
+    [
+      token,
+      user,
+      initializing,
+      pendingIncomingTradesCount,
+      refreshIncomingTradeCount,
+      login,
+      logout,
+      register,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

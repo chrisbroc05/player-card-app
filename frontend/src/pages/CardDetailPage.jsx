@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import { API_BASE_URL } from "../config/api";
 import CardImage from "../components/CardImage";
 import ShareCard from "../components/ShareCard";
+import SendCard from "../components/SendCard";
 import { useAuth } from "../context/AuthContext";
 import { vaultTierBadge, formatEdition, rarityDisplay } from "../utils/tierStyles";
 
@@ -24,6 +25,16 @@ export default function CardDetailPage() {
   const [card, setCard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const refetchCard = useCallback(async () => {
+    if (!cardId) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/cards/${encodeURIComponent(cardId)}`);
+      if (res.ok) setCard(await res.json());
+    } catch {
+      /* ignore */
+    }
+  }, [cardId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,6 +64,10 @@ export default function CardDetailPage() {
   }, [cardId]);
 
   const badge = card ? vaultTierBadge(card.tier) : null;
+  const isOwner =
+    user && card && card.owner_id != null && Number(user.id) === Number(card.owner_id);
+  const showSendTrade = isOwner && (card?.status || "active") === "active";
+  const showPendingTradePanel = isOwner && card?.status === "pending_trade";
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-appBg text-slate-100">
@@ -136,6 +151,9 @@ export default function CardDetailPage() {
               </dl>
 
               <ShareCard card={card} sectionTitle="Share This Card" />
+
+              {showSendTrade ? <SendCard card={card} onSent={refetchCard} /> : null}
+              {showPendingTradePanel ? <SendCard card={card} onCancelTrade={refetchCard} /> : null}
 
               <div className="flex justify-center sm:justify-start">
                 <Link

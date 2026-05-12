@@ -78,7 +78,7 @@ def create_card_row(
     return row
 
 
-def card_to_dict(card: Card) -> dict:
+def card_to_dict(card: Card, db: Session | None = None) -> dict:
     """Shape expected by existing Pydantic Card / CardVaultSummary responses."""
     created = card.created_at
     if created.tzinfo is None:
@@ -89,7 +89,8 @@ def card_to_dict(card: Card) -> dict:
         grad_year_int = int(gy)
     except ValueError:
         grad_year_int = 2000
-    return {
+    st = getattr(card, "status", None) or "active"
+    d = {
         "id": card.id,
         "card_id": card.card_id,
         "player_id": card.player_id,
@@ -109,12 +110,21 @@ def card_to_dict(card: Card) -> dict:
         "style": card.style,
         "special_theme": card.special_theme,
         "owner_name": card.owner_name,
+        "owner_id": card.owner_id,
+        "status": st,
+        "trade_offered_to": getattr(card, "trade_offered_to", None),
+        "pending_trade_offer_id": None,
     }
+    if db is not None and st == "pending_trade":
+        from trade_repo import pending_offer_id_for_card
+
+        d["pending_trade_offer_id"] = pending_offer_id_for_card(db, card.id)
+    return d
 
 
 def list_all_cards_dicts(db: Session) -> list[dict]:
     rows = db.query(Card).order_by(Card.created_at.desc()).all()
-    return [card_to_dict(r) for r in rows]
+    return [card_to_dict(r, db) for r in rows]
 
 
 def list_my_cards_dicts(db: Session, owner_id: int) -> list[dict]:
@@ -124,7 +134,7 @@ def list_my_cards_dicts(db: Session, owner_id: int) -> list[dict]:
         .order_by(Card.created_at.desc())
         .all()
     )
-    return [card_to_dict(r) for r in rows]
+    return [card_to_dict(r, db) for r in rows]
 
 
 def get_card_by_card_id(db: Session, canonical_id: str) -> Card | None:
@@ -138,4 +148,4 @@ def list_cards_for_player_dicts(db: Session, player_id: int) -> list[dict]:
         .order_by(Card.created_at.desc())
         .all()
     )
-    return [card_to_dict(r) for r in rows]
+    return [card_to_dict(r, db) for r in rows]

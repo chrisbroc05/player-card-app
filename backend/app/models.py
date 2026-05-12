@@ -1,5 +1,7 @@
 """SQLAlchemy ORM models."""
 
+from __future__ import annotations
+
 from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
@@ -21,7 +23,11 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
-    cards: Mapped[list["Card"]] = relationship("Card", back_populates="owner")
+    cards: Mapped[list["Card"]] = relationship(
+        "Card",
+        back_populates="owner",
+        foreign_keys="Card.owner_id",
+    )
 
 
 class Card(Base):
@@ -43,10 +49,36 @@ class Card(Base):
     shareable_slug: Mapped[str] = mapped_column(String(48), unique=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     owner_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
-    # Legacy in-memory player tracking (players table not migrated yet)
     player_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     style: Mapped[str] = mapped_column(String(200), default="")
     special_theme: Mapped[str | None] = mapped_column(String(120), nullable=True)
     owner_name: Mapped[str] = mapped_column(String(200), default="unassigned")
+    status: Mapped[str] = mapped_column(String(32), default="active", nullable=False)
+    trade_offered_to: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
 
-    owner: Mapped["User | None"] = relationship("User", back_populates="cards")
+    owner: Mapped["User | None"] = relationship(
+        "User",
+        back_populates="cards",
+        foreign_keys=[owner_id],
+    )
+    trade_offers: Mapped[list["TradeOffer"]] = relationship(
+        "TradeOffer",
+        back_populates="card",
+    )
+
+
+class TradeOffer(Base):
+    __tablename__ = "trade_offers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    card_id: Mapped[int] = mapped_column(Integer, ForeignKey("cards.id"), nullable=False, index=True)
+    sender_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    recipient_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(32), default="pending", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    card: Mapped["Card"] = relationship("Card", back_populates="trade_offers")
+    sender: Mapped["User"] = relationship("User", foreign_keys=[sender_id])
+    recipient: Mapped["User"] = relationship("User", foreign_keys=[recipient_id])

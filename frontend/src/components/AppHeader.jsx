@@ -4,9 +4,10 @@ import { useAuth } from "../context/AuthContext";
 
 export default function AppHeader() {
   const location = useLocation();
-  const { user, logout, initializing } = useAuth();
+  const { user, logout, initializing, pendingIncomingTradesCount } = useAuth();
   const onStudio = location.pathname === "/";
   const onMyCollection = location.pathname.startsWith("/my-collection");
+  const onTrades = location.pathname.startsWith("/trades");
 
   return (
     <header className="border-b border-white/10 bg-cardBg/50 backdrop-blur">
@@ -35,6 +36,19 @@ export default function AppHeader() {
                 }`}
               >
                 My Collection
+              </Link>
+              <Link
+                to="/trades"
+                className={`relative rounded-lg px-3 py-2 text-xs font-medium transition sm:text-sm ${
+                  onTrades ? "bg-amber-500/20 text-amber-100" : "text-slate-400 hover:text-white"
+                }`}
+              >
+                Trades
+                {pendingIncomingTradesCount > 0 ? (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[#ef4444] px-1 text-[10px] font-bold leading-none text-white shadow-sm">
+                    {pendingIncomingTradesCount > 9 ? "9+" : pendingIncomingTradesCount}
+                  </span>
+                ) : null}
               </Link>
               <span className="hidden max-w-[140px] truncate text-xs text-slate-300 sm:inline sm:max-w-[200px]">
                 {user.display_name}

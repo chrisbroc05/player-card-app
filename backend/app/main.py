@@ -54,6 +54,8 @@ from card_repo import (  # noqa: E402
 )
 from database import engine, get_db  # noqa: E402
 from models import Base, User  # noqa: E402
+from schema_migrations import run_schema_migrations_after_models  # noqa: E402
+from trade_routes import router as trade_router  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -91,11 +93,13 @@ async def lifespan(_app: FastAPI):
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     os.makedirs(CARD_DIR, exist_ok=True)
     Base.metadata.create_all(bind=engine)
+    run_schema_migrations_after_models(engine)
     print(f"[startup] UPLOAD_DIR={UPLOAD_DIR} CARD_DIR={CARD_DIR} (writable={os.access(CARD_DIR, os.W_OK)})")
     yield
 
 
 app = FastAPI(lifespan=lifespan)
+app.include_router(trade_router, prefix="/trades", tags=["trades"])
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -472,7 +476,7 @@ def _store_generated_card(
         owner_name=owner_name,
         owner_id=owner_id,
     )
-    return card_to_dict(row)
+    return card_to_dict(row, db)
 
 
 def _image_to_square_png_bytes(source_path: Path, side: int = _EDIT_IMAGE_SIZE) -> bytes:
@@ -1055,6 +1059,9 @@ class CardVaultSummary(BaseModel):
     created_at: str
     image_url: str
     shareable_slug: str
+    status: str = Field(default="active")
+    owner_id: int | None = Field(default=None)
+    pending_trade_offer_id: int | None = Field(default=None)
 
 
 class Card(BaseModel):
@@ -1079,6 +1086,10 @@ class Card(BaseModel):
     style: str = Field(..., min_length=1, max_length=200)
     special_theme: str | None = Field(default=None, max_length=120)
     owner_name: str = Field(default="unassigned", min_length=1, max_length=200)
+    owner_id: int | None = Field(default=None)
+    status: str = Field(default="active")
+    trade_offered_to: int | None = Field(default=None)
+    pending_trade_offer_id: int | None = Field(default=None)
 
 
 class CardShareMeta(BaseModel):
@@ -1363,7 +1374,7 @@ def get_card_share_meta(card_id: str, db: Session = Depends(get_db)):
     orm = get_card_by_card_id(db, key)
     if orm is None:
         raise HTTPException(status_code=404, detail="Card not found")
-    d = card_to_dict(orm)
+    d = card_to_dict(orm, db)
     slug = d.get("shareable_slug") or d.get("card_id")
     base = _frontend_base_url()
     shareable_url = f"{base}/card/{slug}"
@@ -1395,7 +1406,7 @@ def get_card(card_id: str, db: Session = Depends(get_db)):
     orm = get_card_by_card_id(db, key)
     if orm is None:
         raise HTTPException(status_code=404, detail="Card not found")
-    return Card.model_validate(card_to_dict(orm))
+    return Card.model_validate(card_to_dict(orm, db))
 
 
 @app.get("/players/{player_id}/cards", response_model=list[Card])
