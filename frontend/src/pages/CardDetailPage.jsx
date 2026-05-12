@@ -2,8 +2,9 @@ import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
-import { API_BASE_URL, toApiUrl } from "../config/api";
+import { API_BASE_URL } from "../config/api";
 import CardImage from "../components/CardImage";
+import ShareCard from "../components/ShareCard";
 import { useAuth } from "../context/AuthContext";
 import { vaultTierBadge, formatEdition, rarityDisplay } from "../utils/tierStyles";
 
@@ -23,7 +24,6 @@ export default function CardDetailPage() {
   const [card, setCard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [shareToast, setShareToast] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -53,17 +53,6 @@ export default function CardDetailPage() {
   }, [cardId]);
 
   const badge = card ? vaultTierBadge(card.tier) : null;
-  async function handleShare() {
-    const url = typeof window !== "undefined" ? window.location.href : "";
-    try {
-      await navigator.clipboard.writeText(url);
-      setShareToast("Link copied!");
-      setTimeout(() => setShareToast(""), 2500);
-    } catch {
-      setShareToast("Copy failed — copy from the address bar.");
-      setTimeout(() => setShareToast(""), 3000);
-    }
-  }
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-appBg text-slate-100">
@@ -146,29 +135,16 @@ export default function CardDetailPage() {
                 </div>
               </dl>
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                <a
-                  href={toApiUrl(card.image_url)}
-                  download={`${card.shareable_slug || "card"}.png`}
-                  className="inline-flex min-h-[46px] flex-1 items-center justify-center rounded-xl border border-cyan-300/40 bg-cyan-400/10 px-4 py-2.5 text-sm font-medium text-cyan-100 sm:flex-none"
-                >
-                  Download Card
-                </a>
-                <button
-                  type="button"
-                  onClick={handleShare}
-                  className="inline-flex min-h-[46px] flex-1 items-center justify-center rounded-xl border border-violet-300/40 bg-violet-400/10 px-4 py-2.5 text-sm font-medium text-violet-100 sm:flex-none"
-                >
-                  Share Card
-                </button>
+              <ShareCard card={card} sectionTitle="Share This Card" />
+
+              <div className="flex justify-center sm:justify-start">
                 <Link
                   to={user ? "/my-collection" : "/"}
-                  className="inline-flex min-h-[46px] flex-1 items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100 sm:flex-none"
+                  className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-6 py-2.5 text-sm font-medium text-slate-100 transition hover:border-neonBlue/40 hover:text-white"
                 >
                   {user ? "Back to My Collection" : "Back to Studio"}
                 </Link>
               </div>
-              {shareToast ? <p className="text-center text-xs text-emerald-300 sm:text-left">{shareToast}</p> : null}
             </div>
           </div>
         )}

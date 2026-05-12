@@ -4,6 +4,7 @@ import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import { API_BASE_URL, authHeaders } from "../config/api";
 import CardImage from "../components/CardImage";
+import { CardSharePopover } from "../components/ShareCard";
 import { useAuth } from "../context/AuthContext";
 import { vaultTierBadge, formatEditionShort, rarityDisplay } from "../utils/tierStyles";
 
@@ -83,13 +84,16 @@ export default function MyCollectionPage() {
                   key={card.card_id}
                   className={`group rounded-2xl border border-white/10 bg-cardBg p-3 shadow-lg transition duration-300 hover:scale-[1.02] hover:border-white/20 ${badge.glow}`}
                 >
-                  <div className="overflow-hidden rounded-xl border border-white/10 bg-black/30">
+                  <div className="relative overflow-hidden rounded-xl border border-white/10 bg-black/30">
                     <CardImage
                       imageUrl={card.image_url}
                       alt={card.player_name}
                       cacheBust={card.created_at}
                       className="aspect-[3/4] w-full object-cover transition duration-300 group-hover:brightness-110"
                     />
+                    <div className="absolute right-2 top-2">
+                      <CardSharePopover card={card} />
+                    </div>
                   </div>
                   <div className="mt-3 space-y-2 px-1">
                     <p className="truncate font-medium text-white">{card.player_name}</p>

@@ -131,7 +131,6 @@ export default function StudioPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [savedCardDetail, setSavedCardDetail] = useState(null);
-  const [shareToast, setShareToast] = useState("");
 
   const selectedTierLabel = (TIER_UI[orderTier] || TIER_UI.all_star).label;
   const selectedTierRarityLabel = (TIER_UI[orderTier] || TIER_UI.all_star).sub;
@@ -459,21 +458,6 @@ export default function StudioPage() {
       setMessage("Photo added.");
       setError("");
     }
-  }
-
-  function handleShareSavedCard() {
-    if (!savedCardDetail?.shareable_slug) return;
-    const url = `${window.location.origin}/card/${savedCardDetail.shareable_slug}`;
-    navigator.clipboard.writeText(url).then(
-      () => {
-        setShareToast("Link copied!");
-        setTimeout(() => setShareToast(""), 2200);
-      },
-      () => {
-        setShareToast("Unable to copy — copy from the address bar.");
-        setTimeout(() => setShareToast(""), 2800);
-      }
-    );
   }
 
   return (
@@ -866,8 +850,6 @@ export default function StudioPage() {
                 {savedCardDetail && previewCards.length > 0 ? (
                   <PostGenerationPanel
                     detail={savedCardDetail}
-                    shareToast={shareToast}
-                    onShare={handleShareSavedCard}
                     onViewCollection={() => navigate("/my-collection")}
                     isLoggedIn={Boolean(user)}
                   />
@@ -888,8 +870,6 @@ export default function StudioPage() {
                 {savedCardDetail ? (
                   <PostGenerationPanel
                     detail={savedCardDetail}
-                    shareToast={shareToast}
-                    onShare={handleShareSavedCard}
                     onViewCollection={() => navigate("/my-collection")}
                     isLoggedIn={Boolean(user)}
                   />

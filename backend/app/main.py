@@ -1081,6 +1081,34 @@ class Card(BaseModel):
     owner_name: str = Field(default="unassigned", min_length=1, max_length=200)
 
 
+class CardShareMeta(BaseModel):
+    """Public metadata for social sharing (GET /cards/{id}/meta)."""
+
+    card_id: str
+    player_name: str
+    tier: str
+    rarity: str
+    edition_number: int
+    print_run: int
+    image_url: str
+    shareable_url: str
+    share_text: str
+
+
+def _frontend_base_url() -> str:
+    return (os.getenv("FRONTEND_URL") or "http://localhost:5173").rstrip("/")
+
+
+def _tier_share_labels(tier: str) -> tuple[str, str]:
+    """(readable tier phrase, hashtag segment without #) for share copy."""
+    t = (tier or "").lower().replace("-", "").replace("_", "")
+    if t == "legends":
+        return "Legends", "Legends"
+    if t == "allstar":
+        return "All-Star", "AllStar"
+    return "Rookie", "Rookie"
+
+
 class OrderCreate(BaseModel):
     """Body for creating a card order."""
 
@@ -1324,6 +1352,38 @@ def list_my_cards(
     """Authenticated user's cards only."""
     rows = list_my_cards_dicts(db, current_user.id)
     return [CardVaultSummary.model_validate(r) for r in rows]
+
+
+@app.get("/cards/{card_id}/meta", response_model=CardShareMeta)
+def get_card_share_meta(card_id: str, db: Session = Depends(get_db)):
+    """Public card fields + share URL/text for Open Graph / social clients."""
+    key = _canonical_card_id(card_id)
+    if key is None:
+        raise HTTPException(status_code=404, detail="Card not found")
+    orm = get_card_by_card_id(db, key)
+    if orm is None:
+        raise HTTPException(status_code=404, detail="Card not found")
+    d = card_to_dict(orm)
+    slug = d.get("shareable_slug") or d.get("card_id")
+    base = _frontend_base_url()
+    shareable_url = f"{base}/card/{slug}"
+    tier_readable, tier_tag = _tier_share_labels(d.get("tier") or "")
+    player_name = d.get("player_name") or "Player"
+    share_text = (
+        f"Check out my {tier_readable} Future Legends card for {player_name}! "
+        f"#{tier_tag}Card #FutureLegends #YouthBaseball"
+    )
+    return CardShareMeta(
+        card_id=d["card_id"],
+        player_name=player_name,
+        tier=d.get("tier") or "",
+        rarity=d.get("rarity") or "",
+        edition_number=int(d.get("edition_number") or 1),
+        print_run=int(d.get("print_run") or 1),
+        image_url=d.get("image_url") or "",
+        shareable_url=shareable_url,
+        share_text=share_text,
+    )
 
 
 @app.get("/cards/{card_id}", response_model=Card)

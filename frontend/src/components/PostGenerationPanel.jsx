@@ -2,19 +2,18 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { toApiUrl } from "../config/api";
 import { vaultTierBadge, formatEdition, rarityDisplay } from "../utils/tierStyles";
+import ShareCard from "./ShareCard";
 
 export default function PostGenerationPanel({
   detail,
-  shareToast,
-  onShare,
   onViewCollection,
   isLoggedIn = false,
-  downloadFileName = "future-legends-card.png",
 }) {
   if (!detail?.image_url) return null;
 
   const imgSrc = toApiUrl(detail.image_url);
   const badge = vaultTierBadge(detail.tier);
+  const downloadName = detail.card_id ? `future-legends-${detail.card_id}.png` : "future-legends-card.png";
 
   return (
     <div className="rounded-2xl border border-white/10 bg-cardBg2/80 p-4 shadow-xl sm:p-6">
@@ -25,7 +24,10 @@ export default function PostGenerationPanel({
         <p className="mb-4 text-center text-sm font-medium text-emerald-300/95">Card saved to your collection!</p>
       ) : (
         <p className="mb-4 text-center text-sm text-slate-400">
-          <Link to="/register" className="font-medium text-neonTeal underline decoration-neonTeal/30 underline-offset-2 hover:text-teal-200">
+          <Link
+            to="/register"
+            className="font-medium text-neonTeal underline decoration-neonTeal/30 underline-offset-2 hover:text-teal-200"
+          >
             Create an account
           </Link>{" "}
           to save your cards!
@@ -60,18 +62,11 @@ export default function PostGenerationPanel({
       <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-center">
         <a
           href={imgSrc}
-          download={downloadFileName}
+          download={downloadName}
           className="inline-flex min-h-[46px] flex-1 items-center justify-center rounded-xl border border-cyan-300/40 bg-cyan-400/10 px-4 py-2.5 text-sm font-medium text-cyan-100 sm:flex-none"
         >
           Download Card
         </a>
-        <button
-          type="button"
-          onClick={onShare}
-          className="inline-flex min-h-[46px] flex-1 items-center justify-center rounded-xl border border-violet-300/40 bg-violet-400/10 px-4 py-2.5 text-sm font-medium text-violet-100 sm:flex-none"
-        >
-          Share Card
-        </button>
         {isLoggedIn && onViewCollection ? (
           <button
             type="button"
@@ -83,9 +78,7 @@ export default function PostGenerationPanel({
         ) : null}
       </div>
 
-      {shareToast ? (
-        <p className="mt-3 text-center text-xs font-medium text-emerald-300">{shareToast}</p>
-      ) : null}
+      <ShareCard card={detail} sectionTitle="Share Your Card" />
     </div>
   );
 }

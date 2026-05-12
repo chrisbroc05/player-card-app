@@ -1,0 +1,306 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link2, Download, Instagram, Share2, X } from "lucide-react";
+import { API_BASE_URL, toApiUrl } from "../config/api";
+import { vaultTierBadge, tierShareHashtagKey } from "../utils/tierStyles";
+
+function buildClientCardUrl(card) {
+  const slug = card?.shareable_slug || card?.card_id;
+  if (!slug || typeof window === "undefined") return "";
+  return `${window.location.origin}/card/${encodeURIComponent(slug)}`;
+}
+
+function buildFallbackShareText(card) {
+  const label = vaultTierBadge(card?.tier).label;
+  const tag = tierShareHashtagKey(card?.tier);
+  const name = card?.player_name || "Player";
+  return `Check out my ${label} Future Legends card for ${name}! #${tag}Card #FutureLegends #YouthBaseball`;
+}
+
+export async function fetchCardShareMeta(cardId) {
+  const res = await fetch(`${API_BASE_URL}/cards/${encodeURIComponent(cardId)}/meta`);
+  if (!res.ok) throw new Error("meta");
+  return res.json();
+}
+
+function useShareMeta(card) {
+  const lookupId = card?.shareable_slug || card?.card_id;
+  const [meta, setMeta] = useState(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (!lookupId) {
+      setMeta(null);
+      return undefined;
+    }
+    let cancelled = false;
+    setError(false);
+    fetchCardShareMeta(lookupId)
+      .then((data) => {
+        if (!cancelled) setMeta(data);
+      })
+      .catch(() => {
+        if (!cancelled) setError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [lookupId]);
+
+  const resolved = useMemo(() => {
+    const clientUrl = buildClientCardUrl(card);
+    if (meta) {
+      return {
+        share_text: meta.share_text,
+        card_url: clientUrl || meta.shareable_url,
+        image_url: meta.image_url,
+        card_id: meta.card_id,
+      };
+    }
+    return {
+      share_text: buildFallbackShareText(card),
+      card_url: clientUrl,
+      image_url: card?.image_url || "",
+      card_id: card?.card_id || "",
+    };
+  }, [meta, card]);
+
+  return { meta, loading, error, resolved };
+}
+
+function ShareToast({ message }) {
+  if (!message) return null;
+  return (
+    <div
+      role="status"
+      className="pointer-events-none fixed bottom-6 left-1/2 z-[100] max-w-[90vw] -translate-x-1/2 rounded-xl border border-emerald-400/40 bg-slate-950/95 px-4 py-2.5 text-center text-sm font-medium text-emerald-100 shadow-2xl shadow-black/50 backdrop-blur-md"
+    >
+      {message}
+    </div>
+  );
+}
+
+function ShareActionButtons({
+  resolved,
+  onCopyToast,
+  downloading,
+  setDownloading,
+  igHint,
+  setIgHint,
+  compact,
+}) {
+  const cardUrl = resolved.card_url;
+  const shareText = resolved.share_text;
+  const imgPath = resolved.image_url;
+  const cardId = resolved.card_id || "card";
+
+  const twitterHref = useMemo(() => {
+    const text = encodeURIComponent(shareText);
+    const url = encodeURIComponent(cardUrl);
+    return `https://twitter.com/intent/tweet?text=${text}&url=${url}`;
+  }, [shareText, cardUrl]);
+
+  const facebookHref = useMemo(() => {
+    return `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(cardUrl)}`;
+  }, [cardUrl]);
+
+  async function copyLink() {
+    if (!cardUrl) return;
+    try {
+      await navigator.clipboard.writeText(cardUrl);
+      onCopyToast("Link copied!");
+    } catch {
+      onCopyToast("Copy failed — try the address bar.");
+    }
+  }
+
+  async function downloadImage() {
+    const src = toApiUrl(imgPath);
+    if (!src) return;
+    setDownloading(true);
+    try {
+      const res = await fetch(src, { mode: "cors" });
+      if (!res.ok) throw new Error("fetch");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `future-legends-${cardId}.png`;
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      window.open(src, "_blank", "noopener,noreferrer");
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  async function instagramDownload() {
+    await downloadImage();
+    setIgHint(true);
+    window.setTimeout(() => setIgHint(false), 4000);
+  }
+
+  const btnBase =
+    "flex flex-col items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-2 py-2.5 text-[11px] font-medium text-slate-200 transition hover:border-white/25 hover:bg-white/[0.08] hover:text-white active:scale-[0.98] disabled:opacity-50";
+  const wrap = compact
+    ? "grid grid-cols-2 gap-2"
+    : "grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-center sm:gap-3";
+
+  return (
+    <div className={wrap}>
+      <button type="button" className={btnBase} onClick={copyLink}>
+        <Link2 className="h-5 w-5 text-cyan-200/90" strokeWidth={2} />
+        <span>Copy link</span>
+      </button>
+      <a
+        href={twitterHref}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`${btnBase} border-zinc-700 bg-zinc-950 hover:border-zinc-500 hover:bg-black`}
+      >
+        <X className="h-5 w-5 text-white" strokeWidth={2.5} />
+        <span className="text-white">X</span>
+      </a>
+      <a
+        href={facebookHref}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`${btnBase} border-[#1877F2]/50 bg-[#1877F2]/15 hover:border-[#1877F2]/70 hover:bg-[#1877F2]/25`}
+      >
+        <span className="text-lg font-bold leading-none text-[#1877F2]">f</span>
+        <span className="text-slate-100">Facebook</span>
+      </a>
+      <button type="button" className={btnBase} onClick={downloadImage} disabled={downloading || !imgPath}>
+        <Download className="h-5 w-5 text-teal-200/90" strokeWidth={2} />
+        <span>{downloading ? "Downloading..." : "Download"}</span>
+      </button>
+      {!compact ? (
+        <div className="relative flex flex-col items-center">
+          <button
+            type="button"
+            className={`${btnBase} w-full min-w-[4.5rem] bg-gradient-to-br from-[#833ab4]/25 via-[#fd1d1d]/20 to-[#fcb045]/20`}
+            style={{ borderColor: "rgba(252,176,69,0.35)" }}
+            onClick={instagramDownload}
+            disabled={downloading || !imgPath}
+          >
+            <Instagram className="h-5 w-5 text-pink-100" strokeWidth={2} />
+            <span>Instagram</span>
+          </button>
+          {igHint ? (
+            <p className="absolute -bottom-10 left-1/2 z-10 w-44 -translate-x-1/2 rounded-lg border border-white/15 bg-slate-950/95 px-2 py-1.5 text-center text-[10px] leading-snug text-slate-200 shadow-lg">
+              Image downloaded! Open Instagram to share.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function CardSharePopover({ card }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
+  const { resolved } = useShareMeta(card);
+  const [toast, setToast] = useState("");
+  const [downloading, setDownloading] = useState(false);
+  const [igHint, setIgHint] = useState(false);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    function onDocClick(e) {
+      if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false);
+    }
+    const t = window.setTimeout(() => {
+      document.addEventListener("click", onDocClick, true);
+    }, 0);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener("click", onDocClick, true);
+    };
+  }, [open]);
+
+  const showToast = useCallback((msg) => {
+    setToast(msg);
+    window.setTimeout(() => setToast(""), 2000);
+  }, []);
+
+  if (!card?.card_id && !card?.shareable_slug) return null;
+
+  return (
+    <div ref={rootRef} className="relative z-20">
+      <button
+        type="button"
+        aria-label="Share card"
+        aria-expanded={open}
+        className="rounded-full border border-white/20 bg-black/55 p-2 text-white shadow-lg backdrop-blur-sm transition hover:border-cyan-400/50 hover:bg-black/75"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+      >
+        <Share2 className="h-4 w-4" strokeWidth={2} />
+      </button>
+      {open ? (
+        <div
+          className="absolute right-0 top-full mt-2 w-[200px] rounded-xl border border-white/12 bg-slate-950/95 p-3 shadow-2xl shadow-black/40 backdrop-blur-md"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <ShareActionButtons
+            resolved={resolved}
+            onCopyToast={(m) => {
+              showToast(m);
+              setOpen(false);
+            }}
+            downloading={downloading}
+            setDownloading={setDownloading}
+            igHint={igHint}
+            setIgHint={setIgHint}
+            compact
+          />
+        </div>
+      ) : null}
+      <ShareToast message={toast} />
+    </div>
+  );
+}
+
+export default function ShareCard({ card, sectionTitle = "Share this card" }) {
+  const { error, resolved } = useShareMeta(card);
+  const [toast, setToast] = useState("");
+  const [downloading, setDownloading] = useState(false);
+  const [igHint, setIgHint] = useState(false);
+
+  const showToast = useCallback((msg) => {
+    setToast(msg);
+    window.setTimeout(() => setToast(""), 2000);
+  }, []);
+
+  if (!card?.card_id && !card?.shareable_slug) return null;
+
+  return (
+    <section className="mt-8">
+      <h2 className="mb-3 text-center text-sm font-semibold uppercase tracking-[0.18em] text-slate-400 sm:text-left">
+        {sectionTitle}
+      </h2>
+      <div className="rounded-2xl border border-white/10 bg-cardBg2/90 p-4 shadow-inner shadow-black/20 sm:p-5">
+        {error ? (
+          <p className="mb-3 text-center text-xs text-amber-200/90">Using on-page links — share server unavailable.</p>
+        ) : null}
+        <ShareActionButtons
+          resolved={resolved}
+          onCopyToast={showToast}
+          downloading={downloading}
+          setDownloading={setDownloading}
+          igHint={igHint}
+          setIgHint={setIgHint}
+          compact={false}
+        />
+      </div>
+      <ShareToast message={toast} />
+    </section>
+  );
+}

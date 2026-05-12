@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import CardImage from "./CardImage";
+import { CardSharePopover } from "./ShareCard";
 import { vaultTierBadge, formatEditionShort, rarityDisplay } from "../utils/tierStyles";
 
 export default function CardGallery({ cards }) {
@@ -25,16 +26,22 @@ export default function CardGallery({ cards }) {
                 key={key}
                 className="group rounded-xl border border-white/10 bg-cardBg2 p-3 transition duration-200 hover:scale-[1.02] hover:border-neonBlue/50 hover:shadow-glowBlue"
               >
-                <Link
-                  to={card.shareable_slug ? `/card/${encodeURIComponent(card.shareable_slug)}` : "/my-collection"}
-                >
-                  <CardImage
-                    imageUrl={card.image_url}
-                    alt={card.player_name || "Card"}
-                    cacheBust={card.created_at}
-                    className="aspect-[3/4] w-full rounded-lg border border-white/10 object-cover"
-                  />
-                </Link>
+                <div className="relative">
+                  <Link
+                    to={card.shareable_slug ? `/card/${encodeURIComponent(card.shareable_slug)}` : "/my-collection"}
+                    className="block"
+                  >
+                    <CardImage
+                      imageUrl={card.image_url}
+                      alt={card.player_name || "Card"}
+                      cacheBust={card.created_at}
+                      className="aspect-[3/4] w-full rounded-lg border border-white/10 object-cover"
+                    />
+                  </Link>
+                  <div className="absolute right-2 top-2">
+                    <CardSharePopover card={card} />
+                  </div>
+                </div>
                 <div className="mt-2 space-y-1 text-xs text-slate-300">
                   <p className="font-medium text-slate-100">{card.player_name || "Player"}</p>
                   <div className="flex flex-wrap gap-1">

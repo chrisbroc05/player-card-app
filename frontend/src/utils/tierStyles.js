@@ -44,3 +44,11 @@ export function rarityDisplay(rarity) {
   if (r === "rare") return "Rare";
   return "Common";
 }
+
+/** Hashtag segment (no #) matching backend share text, e.g. AllStarCard */
+export function tierShareHashtagKey(tier) {
+  const t = (tier || "").toLowerCase().replace(/-/g, "").replace(/_/g, "");
+  if (t === "legends") return "Legends";
+  if (t === "allstar") return "AllStar";
+  return "Rookie";
+}
