@@ -3,7 +3,8 @@
 #
 # Dashboard (fastest fix, no Blueprint required):
 #   Static Site → Redirects/Rewrites → Add rule:
-#   - Type: Rewrite
+#   - Type: Rewrite  (NOT "Redirect" — Redirect/301 sends the browser to /index.html and
+#     breaks deep links like /card/fl-2026-000004; React Router then shows a blank page.)
 #   - Source: /*
 #   - Destination: /index.html
 #   https://render.com/docs/redirects-rewrites

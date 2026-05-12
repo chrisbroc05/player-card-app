@@ -9,6 +9,9 @@ import MyCollectionPage from "./pages/MyCollectionPage";
 export default function App() {
   return (
     <Routes>
+      {/* If the host misconfigured SPA routing as a 301 redirect to /index.html, the
+          browser lands here with no matching /card route — send users home instead of a blank screen. */}
+      <Route path="/index.html" element={<Navigate to="/" replace />} />
       <Route path="/" element={<StudioPage />} />
       <Route path="/vault" element={<Navigate to="/my-collection" replace />} />
       <Route path="/card/:cardId" element={<CardDetailPage />} />
