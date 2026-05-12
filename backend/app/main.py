@@ -761,7 +761,8 @@ def _overlay_clean_text_on_card(
     image: Image.Image, name: str, team: str, tier: str = "base", jersey_number: str | None = None
 ) -> Image.Image:
     """
-    Draw a dark bottom banner with large player name and smaller team name.
+    Draw a dark bottom banner: top row has jersey # (left) and tier chip (right),
+    then player name and team below so text does not cover the number.
     White fill + dark stroke keeps text readable on busy AI backgrounds.
     """
     img = image.convert("RGBA")
@@ -781,7 +782,13 @@ def _overlay_clean_text_on_card(
     name_h = nb[3] - nb[1]
     team_h = tb[3] - tb[1]
     gap = max(6, h // 90)
-    banner_h = pad + name_h + gap + team_h + pad
+    # Rarity chip height (jersey chip matches this height when present)
+    tier_label = {"legendary": "1-OF-1", "rare": "RARE", "base": "BASE"}.get(tier.lower(), "BASE")
+    chip_font = team_font
+    cb = measure.textbbox((0, 0), tier_label, font=chip_font, anchor="lt")
+    chip_h = (cb[3] - cb[1]) + max(8, pad // 2)
+    # Banner: top chip row, then name, then team (jersey sits in chip row, left — not under name)
+    banner_h = pad + chip_h + gap + name_h + gap + team_h + pad
     out_h = h + banner_h
 
     out = Image.new("RGBA", (w, out_h), (0, 0, 0, 0))
@@ -793,11 +800,7 @@ def _overlay_clean_text_on_card(
     draw.line([(0, banner_top), (w, banner_top)], fill=accent_fill, width=max(2, w // 256))
 
     # Rare/legendary-style rarity chip to the right, aligned with app theme.
-    tier_label = {"legendary": "1-OF-1", "rare": "RARE", "base": "BASE"}.get(tier.lower(), "BASE")
-    chip_font = team_font
-    cb = draw.textbbox((0, 0), tier_label, font=chip_font, anchor="lt")
     chip_w = (cb[2] - cb[0]) + pad
-    chip_h = (cb[3] - cb[1]) + max(8, pad // 2)
     chip_x1 = w - pad
     chip_x0 = max(chip_x1 - chip_w, w // 2)
     chip_y0 = banner_top + pad
@@ -847,7 +850,7 @@ def _overlay_clean_text_on_card(
             anchor="lt",
         )
 
-    y_name = banner_top + pad
+    y_name = chip_y1 + gap
     name_text = name.upper()
     team_text = team
     draw.text(
