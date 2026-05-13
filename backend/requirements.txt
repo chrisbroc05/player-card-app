@@ -8,3 +8,4 @@ sqlalchemy
 psycopg2-binary
 bcrypt>=4.1.0
 python-jose[cryptography]
+resend>=2.0.0

@@ -7,12 +7,19 @@ from datetime import datetime, timezone
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from auth import get_current_user
 from card_repo import card_to_dict, get_card_by_card_id
+from email_service import (
+    frontend_url,
+    send_trade_accepted_email,
+    send_trade_cancelled_email,
+    send_trade_declined_email,
+    send_trade_offer_email,
+)
 from database import get_db
 from models import Card, TradeOffer, User
 from trade_repo import (
@@ -123,6 +130,7 @@ def trades_outgoing(
 @router.post("/send", response_model=TradeOfferResponse, status_code=status.HTTP_201_CREATED)
 def trades_send(
     body: TradeSendBody,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -159,12 +167,26 @@ def trades_send(
     offer = get_trade_by_id(db, new_id)
     if offer is None:
         raise HTTPException(status_code=500, detail="Trade creation failed")
+    background_tasks.add_task(
+        send_trade_offer_email,
+        recipient.email,
+        recipient.display_name,
+        current_user.display_name,
+        card.player_name,
+        card.tier,
+        card.rarity,
+        card.image_url,
+        offer.message,
+        f"{frontend_url()}/trades",
+        new_id,
+    )
     return _offer_to_response(db, offer)
 
 
 @router.post("/{trade_id}/accept")
 def trades_accept(
     trade_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -177,6 +199,14 @@ def trades_accept(
         raise HTTPException(status_code=400, detail="This trade is no longer pending")
 
     card = offer.card
+    sender = offer.sender
+    sender_email = sender.email
+    sender_name = sender.display_name
+    recipient_name = current_user.display_name
+    card_player_name = card.player_name
+    card_tier = card.tier
+    card_rarity = card.rarity
+    card_image_url = card.image_url
     card.owner_id = current_user.id
     card.owner_name = current_user.display_name
     card.status = "active"
@@ -185,12 +215,25 @@ def trades_accept(
     offer.updated_at = utcnow()
     db.commit()
     db.refresh(card)
+    background_tasks.add_task(
+        send_trade_accepted_email,
+        sender_email,
+        sender_name,
+        recipient_name,
+        card_player_name,
+        card_tier,
+        card_rarity,
+        card_image_url,
+        f"{frontend_url()}/my-collection",
+        trade_id,
+    )
     return card_to_dict(card, db)
 
 
 @router.post("/{trade_id}/decline", response_model=TradeOfferResponse)
 def trades_decline(
     trade_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -203,18 +246,39 @@ def trades_decline(
         raise HTTPException(status_code=400, detail="This trade is no longer pending")
 
     card = offer.card
+    sender = offer.sender
+    sender_email = sender.email
+    sender_name = sender.display_name
+    recipient_name = current_user.display_name
+    card_player_name = card.player_name
+    card_tier = card.tier
+    card_rarity = card.rarity
+    card_image_url = card.image_url
     card.status = "active"
     card.trade_offered_to = None
     offer.status = "declined"
     offer.updated_at = utcnow()
     db.commit()
     db.refresh(offer)
+    background_tasks.add_task(
+        send_trade_declined_email,
+        sender_email,
+        sender_name,
+        recipient_name,
+        card_player_name,
+        card_tier,
+        card_rarity,
+        card_image_url,
+        f"{frontend_url()}/my-collection",
+        trade_id,
+    )
     return _offer_to_response(db, offer)
 
 
 @router.post("/{trade_id}/cancel", response_model=TradeOfferResponse)
 def trades_cancel(
     trade_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -227,10 +291,29 @@ def trades_cancel(
         raise HTTPException(status_code=400, detail="This trade is no longer pending")
 
     card = offer.card
+    recipient = offer.recipient
+    recipient_email = recipient.email
+    recipient_name = recipient.display_name
+    sender_name = offer.sender.display_name
+    card_player_name = card.player_name
+    card_tier = card.tier
+    card_rarity = card.rarity
+    card_image_url = card.image_url
     card.status = "active"
     card.trade_offered_to = None
     offer.status = "cancelled"
     offer.updated_at = utcnow()
     db.commit()
     db.refresh(offer)
+    background_tasks.add_task(
+        send_trade_cancelled_email,
+        recipient_email,
+        recipient_name,
+        sender_name,
+        card_player_name,
+        card_tier,
+        card_rarity,
+        card_image_url,
+        trade_id,
+    )
     return _offer_to_response(db, offer)
