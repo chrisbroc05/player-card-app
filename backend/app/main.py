@@ -1200,6 +1200,16 @@ class RegisterBody(BaseModel):
     email: str = Field(..., min_length=3, max_length=320)
     display_name: str = Field(..., min_length=1, max_length=200)
     password: str = Field(..., min_length=8, max_length=128)
+    invite_code: str | None = Field(default=None, max_length=200)
+
+
+class BetaStatusResponse(BaseModel):
+    beta_mode: bool
+    message: str | None = None
+
+
+class FeaturesResponse(BaseModel):
+    social_sharing_enabled: bool
 
 
 class LoginBody(BaseModel):
@@ -1234,6 +1244,21 @@ def _user_public(user: User) -> UserPublic:
     )
 
 
+def _beta_invite_code_required() -> str | None:
+    """If set, registration must supply a matching invite code (case-insensitive)."""
+    v = (os.environ.get("BETA_INVITE_CODE") or "").strip()
+    return v or None
+
+
+def _social_sharing_enabled() -> bool:
+    raw = (os.environ.get("SOCIAL_SHARING_ENABLED") or "").strip().lower()
+    if raw == "false":
+        return False
+    if raw == "true":
+        return True
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -1244,8 +1269,34 @@ def root():
     return {"message": "API is running"}
 
 
+@app.get("/auth/beta-status", response_model=BetaStatusResponse)
+def auth_beta_status():
+    beta = _beta_invite_code_required() is not None
+    return BetaStatusResponse(
+        beta_mode=beta,
+        message=(
+            "This app is currently in private beta. You need an invite code to register."
+            if beta
+            else None
+        ),
+    )
+
+
+@app.get("/config/features", response_model=FeaturesResponse)
+def config_features():
+    return FeaturesResponse(social_sharing_enabled=_social_sharing_enabled())
+
+
 @app.post("/auth/register", response_model=AuthTokenResponse, status_code=201)
 def auth_register(body: RegisterBody, db: Session = Depends(get_db)):
+    required_invite = _beta_invite_code_required()
+    if required_invite is not None:
+        provided = (body.invite_code or "").strip()
+        if not provided or provided.casefold() != required_invite.casefold():
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid invite code. This app is currently in private beta.",
+            )
     email = body.email.strip().lower()
     if db.query(User).filter(User.email == email).first():
         raise HTTPException(status_code=400, detail="Email already registered")

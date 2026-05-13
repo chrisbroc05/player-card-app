@@ -115,15 +115,19 @@ export function AuthProvider({ children }) {
   );
 
   const register = useCallback(
-    async (email, displayName, password) => {
+    async (email, displayName, password, inviteCode) => {
+      const payload = {
+        email: email.trim(),
+        display_name: displayName.trim(),
+        password,
+      };
+      if (inviteCode !== undefined) {
+        payload.invite_code = inviteCode;
+      }
       const res = await fetch(`${API_BASE_URL}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: email.trim(),
-          display_name: displayName.trim(),
-          password,
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(formatApiError(data?.detail, "Registration failed"));

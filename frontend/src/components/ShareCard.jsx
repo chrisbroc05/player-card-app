@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link2, Download, Instagram, Share2, X } from "lucide-react";
 import { API_BASE_URL, toApiUrl } from "../config/api";
+import { useFeatures } from "../context/FeatureContext";
 import { vaultTierBadge, tierShareHashtagKey } from "../utils/tierStyles";
 
 function buildClientCardUrl(card) {
@@ -88,6 +89,7 @@ function ShareActionButtons({
   setIgHint,
   compact,
 }) {
+  const { socialSharingEnabled } = useFeatures();
   const cardUrl = resolved.card_url;
   const shareText = resolved.share_text;
   const imgPath = resolved.image_url;
@@ -150,51 +152,60 @@ function ShareActionButtons({
     : "grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-center sm:gap-3";
 
   return (
-    <div className={wrap}>
-      <button type="button" className={btnBase} onClick={copyLink}>
-        <Link2 className="h-5 w-5 text-cyan-200/90" strokeWidth={2} />
-        <span>Copy link</span>
-      </button>
-      <a
-        href={twitterHref}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`${btnBase} border-zinc-700 bg-zinc-950 hover:border-zinc-500 hover:bg-black`}
-      >
-        <X className="h-5 w-5 text-white" strokeWidth={2.5} />
-        <span className="text-white">X</span>
-      </a>
-      <a
-        href={facebookHref}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`${btnBase} border-[#1877F2]/50 bg-[#1877F2]/15 hover:border-[#1877F2]/70 hover:bg-[#1877F2]/25`}
-      >
-        <span className="text-lg font-bold leading-none text-[#1877F2]">f</span>
-        <span className="text-slate-100">Facebook</span>
-      </a>
-      <button type="button" className={btnBase} onClick={downloadImage} disabled={downloading || !imgPath}>
-        <Download className="h-5 w-5 text-teal-200/90" strokeWidth={2} />
-        <span>{downloading ? "Downloading..." : "Download"}</span>
-      </button>
-      {!compact ? (
-        <div className="relative flex flex-col items-center">
-          <button
-            type="button"
-            className={`${btnBase} w-full min-w-[4.5rem] bg-gradient-to-br from-[#833ab4]/25 via-[#fd1d1d]/20 to-[#fcb045]/20`}
-            style={{ borderColor: "rgba(252,176,69,0.35)" }}
-            onClick={instagramDownload}
-            disabled={downloading || !imgPath}
+    <div>
+      <div className={wrap}>
+        <button type="button" className={btnBase} onClick={copyLink}>
+          <Link2 className="h-5 w-5 text-cyan-200/90" strokeWidth={2} />
+          <span>Copy link</span>
+        </button>
+        {socialSharingEnabled ? (
+          <a
+            href={twitterHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`${btnBase} border-zinc-700 bg-zinc-950 hover:border-zinc-500 hover:bg-black`}
           >
-            <Instagram className="h-5 w-5 text-pink-100" strokeWidth={2} />
-            <span>Instagram</span>
-          </button>
-          {igHint ? (
-            <p className="absolute -bottom-10 left-1/2 z-10 w-44 -translate-x-1/2 rounded-lg border border-white/15 bg-slate-950/95 px-2 py-1.5 text-center text-[10px] leading-snug text-slate-200 shadow-lg">
-              Image downloaded! Open Instagram to share.
-            </p>
-          ) : null}
-        </div>
+            <X className="h-5 w-5 text-white" strokeWidth={2.5} />
+            <span className="text-white">X</span>
+          </a>
+        ) : null}
+        {socialSharingEnabled ? (
+          <a
+            href={facebookHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`${btnBase} border-[#1877F2]/50 bg-[#1877F2]/15 hover:border-[#1877F2]/70 hover:bg-[#1877F2]/25`}
+          >
+            <span className="text-lg font-bold leading-none text-[#1877F2]">f</span>
+            <span className="text-slate-100">Facebook</span>
+          </a>
+        ) : null}
+        <button type="button" className={btnBase} onClick={downloadImage} disabled={downloading || !imgPath}>
+          <Download className="h-5 w-5 text-teal-200/90" strokeWidth={2} />
+          <span>{downloading ? "Downloading..." : "Download"}</span>
+        </button>
+        {socialSharingEnabled && !compact ? (
+          <div className="relative flex flex-col items-center">
+            <button
+              type="button"
+              className={`${btnBase} w-full min-w-[4.5rem] bg-gradient-to-br from-[#833ab4]/25 via-[#fd1d1d]/20 to-[#fcb045]/20`}
+              style={{ borderColor: "rgba(252,176,69,0.35)" }}
+              onClick={instagramDownload}
+              disabled={downloading || !imgPath}
+            >
+              <Instagram className="h-5 w-5 text-pink-100" strokeWidth={2} />
+              <span>Instagram</span>
+            </button>
+            {igHint ? (
+              <p className="absolute -bottom-10 left-1/2 z-10 w-44 -translate-x-1/2 rounded-lg border border-white/15 bg-slate-950/95 px-2 py-1.5 text-center text-[10px] leading-snug text-slate-200 shadow-lg">
+                Image downloaded! Open Instagram to share.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+      {!socialSharingEnabled ? (
+        <p className="mt-3 text-center text-xs text-[#666666]">Social sharing will be available at launch. Stay tuned!</p>
       ) : null}
     </div>
   );
