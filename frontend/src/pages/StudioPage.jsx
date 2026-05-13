@@ -7,6 +7,7 @@ import CardGallery from "../components/CardGallery";
 import OrdersDashboard from "../components/OrdersDashboard";
 import PostGenerationPanel from "../components/PostGenerationPanel";
 import StudioAuthGate from "../components/StudioAuthGate";
+import ThemeLibraryPicker from "../components/ThemeLibraryPicker";
 import { API_BASE_URL, authHeaders, toApiUrl } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 
@@ -104,7 +105,6 @@ export default function StudioPage() {
   const [position, setPosition] = useState("");
   const [gradYear, setGradYear] = useState("");
   const [teamName, setTeamName] = useState("");
-  const [battingHand, setBattingHand] = useState("");
   const [imageFile, setImageFile] = useState(null);
 
   const [playerId, setPlayerId] = useState(null);
@@ -124,6 +124,10 @@ export default function StudioPage() {
   const [orderTier, setOrderTier] = useState("all_star");
   const [specialTheme, setSpecialTheme] = useState("");
 
+  const [themeCategories, setThemeCategories] = useState([]);
+  const [themesLoading, setThemesLoading] = useState(true);
+  const [themesError, setThemesError] = useState("");
+
   const [isCreating, setIsCreating] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [orderActionKey, setOrderActionKey] = useState("");
@@ -134,7 +138,14 @@ export default function StudioPage() {
 
   const selectedTierLabel = (TIER_UI[orderTier] || TIER_UI.all_star).label;
   const selectedTierRarityLabel = (TIER_UI[orderTier] || TIER_UI.all_star).sub;
-  const selectedThemeLabel = specialTheme || "No special theme";
+  const selectedThemeLabel = useMemo(() => {
+    if (!specialTheme) return "Default (no theme)";
+    for (const cat of themeCategories) {
+      const hit = (cat.themes || []).find((t) => t.id === specialTheme);
+      if (hit) return hit.name;
+    }
+    return specialTheme;
+  }, [specialTheme, themeCategories]);
   const tierTheme = TIER_UI[orderTier] || TIER_UI.all_star;
   const imagePreviewUrl = useMemo(() => (imageFile ? URL.createObjectURL(imageFile) : ""), [imageFile]);
   const generatedCardFullUrl = useMemo(() => toApiUrl(generatedCardUrl), [generatedCardUrl]);
@@ -164,6 +175,30 @@ export default function StudioPage() {
     }
   }, [savedCardDetail?.card_id, previewCards, selectedPreviewUrl]);
 
+  const fetchThemes = useCallback(async () => {
+    setThemesLoading(true);
+    setThemesError("");
+    try {
+      const res = await fetch(`${API_BASE_URL}/themes`);
+      let data = {};
+      try {
+        data = await res.json();
+      } catch {
+        data = {};
+      }
+      if (!res.ok) {
+        const msg = formatApiError(data?.detail, "Could not load themes.");
+        throw new Error(msg);
+      }
+      setThemeCategories(Array.isArray(data.categories) ? data.categories : []);
+    } catch (e) {
+      setThemeCategories([]);
+      setThemesError(e.message || "Could not load themes.");
+    } finally {
+      setThemesLoading(false);
+    }
+  }, []);
+
   const canGoStep2 = Boolean(orderTier);
   const canGoStep3 = Boolean(
     firstName.trim() &&
@@ -187,6 +222,10 @@ export default function StudioPage() {
       if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
     };
   }, [imagePreviewUrl]);
+
+  useEffect(() => {
+    fetchThemes();
+  }, [fetchThemes]);
 
   useEffect(() => {
     if (!previewCards.length) return;
@@ -301,7 +340,6 @@ export default function StudioPage() {
         position: position.trim(),
         grad_year: Number(gradYear),
         team_name: teamName.trim(),
-        batting_hand: battingHand || null,
         image_url: uploadData.url,
       }),
     });
@@ -335,7 +373,6 @@ export default function StudioPage() {
           player_position: playerData.position,
           player_grad_year: playerData.grad_year,
           player_team_name: playerData.team_name,
-          player_batting_hand: playerData.batting_hand ?? null,
           player_image_url: playerData.image_url,
           tier: orderTier,
           special_theme: specialTheme || null,
@@ -619,7 +656,7 @@ export default function StudioPage() {
                   />
                   <input
                     type="number"
-                    className="min-h-[44px] rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5"
+                    className="min-h-[44px] rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 sm:col-span-2"
                     placeholder="Grad Year"
                     value={gradYear}
                     onChange={(e) => setGradYear(e.target.value)}
@@ -630,16 +667,6 @@ export default function StudioPage() {
                     value={teamName}
                     onChange={(e) => setTeamName(e.target.value)}
                   />
-                  <select
-                    className="min-h-[44px] rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 sm:col-span-2"
-                    value={battingHand}
-                    onChange={(e) => setBattingHand(e.target.value)}
-                  >
-                    <option value="">Batting Hand (optional)</option>
-                    <option value="Right">Right</option>
-                    <option value="Left">Left</option>
-                    <option value="Switch">Switch</option>
-                  </select>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button
@@ -713,30 +740,17 @@ export default function StudioPage() {
             ) : null}
 
             {currentStep === 4 ? (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="grid gap-3">
-                  <div className="rounded-xl border border-white/10 bg-cardBg2 p-3">
-                    <p className="text-sm font-medium text-white">Card Styling</p>
-                    <p className="mt-1 text-xs text-slate-400">
-                      Pick an optional visual theme to influence the generated card art.
-                    </p>
-                    <label className="mt-3 block text-xs font-medium uppercase tracking-wide text-slate-300">
-                      Special Theme (optional)
-                    </label>
-                    <select
-                      value={specialTheme}
-                      onChange={(e) => setSpecialTheme(e.target.value)}
-                      className="mt-1 min-h-[44px] w-full rounded-xl border border-white/15 bg-cardBg px-3 py-2.5"
-                    >
-                      <option value="">None (default style)</option>
-                      <option value="fire">Fire</option>
-                      <option value="gold_edition">Gold Edition / Chrome</option>
-                      <option value="opening_day">Opening Day</option>
-                      <option value="christmas">Christmas</option>
-                      <option value="halloween">Halloween</option>
-                      <option value="neon">Neon</option>
-                    </select>
-                  </div>
+              <div className="grid gap-8">
+                <ThemeLibraryPicker
+                  categories={themeCategories}
+                  loading={themesLoading}
+                  error={themesError}
+                  onRetry={fetchThemes}
+                  value={specialTheme}
+                  onChange={setSpecialTheme}
+                />
+
+                <div className="grid gap-4 lg:grid-cols-2">
                   <div className="rounded-xl border border-white/10 bg-cardBg2 p-3">
                     <p className="text-sm font-medium text-white">Delivery Contact</p>
                     <p className="mt-1 text-xs text-slate-400">
@@ -761,32 +775,32 @@ export default function StudioPage() {
                       className="mt-1 min-h-[44px] w-full rounded-xl border border-white/15 bg-cardBg px-3 py-2.5"
                     />
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setCurrentStep(3)}
-                      className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
-                    >
-                      Back to Upload
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleCreatePlayerAndOrder}
-                      disabled={!canCreateOrder}
-                      className="inline-flex min-h-[46px] items-center justify-center rounded-xl bg-neonTeal px-4 py-2.5 text-sm font-medium text-slate-950 disabled:opacity-50"
-                    >
-                      {orderActionKey === "create-order" ? "Creating Player & Order..." : "Create Player & Order"}
-                    </button>
+                  <div className="rounded-xl border border-white/10 bg-cardBg2 p-4 text-sm text-slate-300">
+                    <p className="font-medium text-white">Selection Summary</p>
+                    <p className="mt-2">
+                      Tier: {selectedTierLabel}{" "}
+                      <span className="text-slate-400">({selectedTierRarityLabel})</span>
+                    </p>
+                    <p>Theme: {selectedThemeLabel}</p>
+                    <p>Player: {displayName || `${firstName} ${lastName}`.trim() || "TBD"}</p>
                   </div>
                 </div>
-                <div className="rounded-xl border border-white/10 bg-cardBg2 p-4 text-sm text-slate-300">
-                  <p className="font-medium text-white">Selection Summary</p>
-                  <p className="mt-2">
-                    Tier: {selectedTierLabel}{" "}
-                    <span className="text-slate-400">({selectedTierRarityLabel})</span>
-                  </p>
-                  <p>Theme: {selectedThemeLabel}</p>
-                  <p>Player: {displayName || `${firstName} ${lastName}`.trim() || "TBD"}</p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep(3)}
+                    className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
+                  >
+                    Back to Upload
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCreatePlayerAndOrder}
+                    disabled={!canCreateOrder}
+                    className="inline-flex min-h-[46px] items-center justify-center rounded-xl bg-neonTeal px-4 py-2.5 text-sm font-medium text-slate-950 disabled:opacity-50"
+                  >
+                    {orderActionKey === "create-order" ? "Creating Player & Order..." : "Create Player & Order"}
+                  </button>
                 </div>
               </div>
             ) : null}

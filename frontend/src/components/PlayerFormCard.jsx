@@ -8,7 +8,6 @@ export default function PlayerFormCard({
   position,
   gradYear,
   teamName,
-  battingHand,
   imageFile,
   setFirstName,
   setLastName,
@@ -17,7 +16,6 @@ export default function PlayerFormCard({
   setPosition,
   setGradYear,
   setTeamName,
-  setBattingHand,
   setImageFile,
   onSubmit,
   disabled,
@@ -84,31 +82,16 @@ export default function PlayerFormCard({
               />
             </label>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="grid gap-1.5 text-sm">
-              <span className="text-slate-200">Grad Year</span>
-              <input
-                type="number"
-                className="min-h-[44px] rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 text-slate-100 outline-none transition focus:border-neonBlue focus:ring-2 focus:ring-neonBlue/30"
-                value={gradYear}
-                onChange={(e) => setGradYear(e.target.value)}
-                placeholder="e.g. 2027"
-              />
-            </label>
-            <label className="grid gap-1.5 text-sm">
-              <span className="text-slate-200">Batting Hand (optional)</span>
-              <select
-                className="rounded-xl border border-white/15 bg-cardBg2 px-3 py-2 text-slate-100 outline-none transition focus:border-neonBlue focus:ring-2 focus:ring-neonBlue/30"
-                value={battingHand}
-                onChange={(e) => setBattingHand(e.target.value)}
-              >
-                <option value="">Select hand</option>
-                <option value="Right">Right</option>
-                <option value="Left">Left</option>
-                <option value="Switch">Switch</option>
-              </select>
-            </label>
-          </div>
+          <label className="grid gap-1.5 text-sm">
+            <span className="text-slate-200">Grad Year</span>
+            <input
+              type="number"
+              className="min-h-[44px] w-full max-w-full rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 text-slate-100 outline-none transition focus:border-neonBlue focus:ring-2 focus:ring-neonBlue/30 sm:max-w-md"
+              value={gradYear}
+              onChange={(e) => setGradYear(e.target.value)}
+              placeholder="e.g. 2027"
+            />
+          </label>
         </div>
 
         <div className="grid gap-3">

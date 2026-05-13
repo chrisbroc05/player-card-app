@@ -27,7 +27,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from openai import OpenAI
 from PIL import Image, ImageDraw, ImageFont
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # Load repo-root .env (e.g. OPENAI_API_KEY).
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -59,6 +59,11 @@ from database import engine, get_db  # noqa: E402
 from models import Base, User  # noqa: E402
 from schema_migrations import run_schema_migrations_after_models  # noqa: E402
 from trade_routes import router as trade_router  # noqa: E402
+from theme_library import (  # noqa: E402
+    THEME_CATEGORIES,
+    is_valid_theme_slug,
+    theme_prompt_for_slug,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -126,9 +131,7 @@ _EDIT_IMAGE_SIZE = 1024
 
 # AI trading card rarity (drives different visual intensity in prompts).
 CardTier = Literal["base", "rare", "legendary"]
-BattingHand = Literal["Right", "Left", "Switch"]
 OrderTier = Literal["rookie", "all_star", "legends"]
-SpecialTheme = Literal["opening_day", "christmas", "gold_edition", "fire", "halloween", "neon"]
 OrderStatus = Literal[
     "new_order",
     "awaiting_review",
@@ -193,16 +196,12 @@ def _tier_animated_card_prompt(
             f"character (team vibe: {team}). Invent a strong card frame and dynamic sports background for this tier. "
         )
 
-    theme_rules = {
-        "opening_day": "Theme: OPENING DAY — fresh spring stadium atmosphere, celebratory bunting/confetti accents, crisp daylight energy.",
-        "christmas": "Theme: CHRISTMAS — festive winter mood with subtle holiday lights, snow sparkle accents, red/green highlights.",
-        "gold_edition": "Theme: GOLD EDITION — premium metallic gold trims, luxe foil shimmer, elite collector finish.",
-        "fire": "Theme: FIRE — intense warm palette, ember particles, dynamic heat streaks and explosive motion.",
-        "halloween": "Theme: HALLOWEEN — moody night-game vibe, eerie glow, pumpkin-orange + deep violet accents.",
-        "neon": "Theme: NEON — electric neon cyan/magenta lighting, synthwave glow, high-contrast futuristic energy.",
-    }
-    themed = str(special_theme or "").strip().lower()
-    theme_line = theme_rules.get(themed, "")
+    modifier = theme_prompt_for_slug(special_theme)
+    theme_line = (
+        f"THEME (color palette, background atmosphere, overall card aesthetic, border and frame style): {modifier} "
+        if modifier
+        else ""
+    )
 
     if variant == "text_generate":
         pose_block = (
@@ -282,12 +281,6 @@ def _player_prompt_context(player_row: dict) -> str:
     jersey_number = str(player_row.get("jersey_number") or "").strip() or "N/A"
     position = str(player_row.get("position") or "").strip() or "N/A"
     grad_year = str(player_row.get("grad_year") or "").strip() or "N/A"
-    batting_hand = str(player_row.get("batting_hand") or "").strip()
-    batting_line = (
-        f"- Batting form side (for uniform detail if drawn; do not use this to change the pose in the photo): {batting_hand}"
-        if batting_hand
-        else ""
-    )
     return (
         "Player details to incorporate into the card design: "
         f"- Name: {name} "
@@ -295,7 +288,6 @@ def _player_prompt_context(player_row: dict) -> str:
         f"- Position: {position} "
         f"- Team: {team} "
         f"- Grad Year: {grad_year} "
-        f"{batting_line}"
     ).strip()
 
 
@@ -1022,7 +1014,6 @@ class PlayerCreate(BaseModel):
     position: str = Field(..., min_length=1, max_length=60, description="Player position")
     grad_year: int = Field(..., ge=2000, le=2100, description="Graduation year")
     team_name: str = Field(..., min_length=1, max_length=200, description="Team name")
-    batting_hand: BattingHand | None = Field(default=None)
     image_url: str = Field(..., min_length=1, max_length=2000, description="Uploaded player image URL")
 
 
@@ -1037,7 +1028,6 @@ class Player(BaseModel):
     position: str
     grad_year: int
     team_name: str
-    batting_hand: BattingHand | None = None
     image_url: str
 
 
@@ -1147,14 +1137,25 @@ class OrderCreate(BaseModel):
     player_position: str = Field(..., min_length=1, max_length=60)
     player_grad_year: int = Field(..., ge=2000, le=2100)
     player_team_name: str = Field(..., min_length=1, max_length=200)
-    player_batting_hand: BattingHand | None = Field(default=None)
     player_image_url: str = Field(..., min_length=1, max_length=2000)
 
     # Order details
     tier: OrderTier
-    special_theme: SpecialTheme | None = Field(default=None)
+    special_theme: str | None = Field(default=None, max_length=120)
     add_ons: list[str] = Field(default_factory=list)
     status: OrderStatus = "new_order"
+
+    @field_validator("special_theme", mode="before")
+    @classmethod
+    def _validate_special_theme(cls, v: object) -> str | None:
+        if v is None:
+            return None
+        if isinstance(v, str) and not v.strip():
+            return None
+        s = str(v).strip().lower()
+        if not is_valid_theme_slug(s):
+            raise ValueError("Invalid theme id. Use GET /themes for allowed values.")
+        return s
 
 
 class GeneratedOrderCard(BaseModel):
@@ -1173,6 +1174,8 @@ class GeneratedOrderCard(BaseModel):
 
 class Order(OrderCreate):
     """Stored order record."""
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="ignore")
 
     id: int = Field(..., ge=1)
     created_at: str
@@ -1220,6 +1223,23 @@ class BetaStatusResponse(BaseModel):
 
 class FeaturesResponse(BaseModel):
     social_sharing_enabled: bool
+
+
+class ThemeOption(BaseModel):
+    id: str
+    name: str
+    category: str
+    ai_prompt_modifier: str
+
+
+class ThemeCategoryPayload(BaseModel):
+    id: str
+    name: str
+    themes: list[ThemeOption]
+
+
+class ThemesResponse(BaseModel):
+    categories: list[ThemeCategoryPayload]
 
 
 class LoginBody(BaseModel):
@@ -1295,6 +1315,12 @@ def auth_beta_status():
 @app.get("/config/features", response_model=FeaturesResponse)
 def config_features():
     return FeaturesResponse(social_sharing_enabled=_social_sharing_enabled())
+
+
+@app.get("/themes", response_model=ThemesResponse)
+def get_themes():
+    """Theme library for the card creation flow (ids match order `special_theme`)."""
+    return {"categories": THEME_CATEGORIES}
 
 
 @app.post("/auth/register", response_model=AuthTokenResponse, status_code=201)
@@ -1392,7 +1418,6 @@ def create_player(
         position=body.position,
         grad_year=body.grad_year,
         team_name=body.team_name,
-        batting_hand=body.batting_hand,
         image_url=body.image_url,
     )
     _players.append(player.model_dump())
@@ -1559,7 +1584,6 @@ def create_order(
         player_position=body.player_position,
         player_grad_year=body.player_grad_year,
         player_team_name=body.player_team_name,
-        player_batting_hand=body.player_batting_hand,
         player_image_url=body.player_image_url,
         tier=body.tier,
         special_theme=body.special_theme,
@@ -1632,7 +1656,6 @@ def generate_card_for_order(
         "position": order.get("player_position", ""),
         "grad_year": order.get("player_grad_year", ""),
         "team_name": order.get("player_team_name") or order.get("player_team", ""),
-        "batting_hand": order.get("player_batting_hand"),
         "image_url": order["player_image_url"],
         "special_theme": order.get("special_theme"),
     }
@@ -1802,9 +1825,9 @@ def generate_card(
         "base",
         description="Rarity tier for AI art: base (common), rare, or legendary (1-of-1 style).",
     ),
-    special_theme: SpecialTheme | None = Query(
+    special_theme: str | None = Query(
         default=None,
-        description="Optional special theme for styling (opening_day, christmas, gold_edition, fire, halloween, neon).",
+        description="Optional theme id from GET /themes (e.g. neon, christmas, gold_edition).",
     ),
 ):
     """
@@ -1813,6 +1836,17 @@ def generate_card(
     Default: Pillow overlay (name + team). With use_ai=true: try OpenAI image edit using the
     player's uploaded photo as input; on any failure, use the Pillow path.
     """
+    if special_theme is not None and str(special_theme).strip():
+        s = str(special_theme).strip().lower()
+        if not is_valid_theme_slug(s):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid special_theme. Use GET /themes for valid theme ids.",
+            )
+        special_theme = s
+    else:
+        special_theme = None
+
     player_row, source_path = _resolve_player_and_source_path(player_id)
     _ensure_card_generation_limit(db, player_id, cards_to_generate=1)
 
