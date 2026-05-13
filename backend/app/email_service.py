@@ -76,15 +76,24 @@ def _rarity_label(rarity: str) -> str:
     return "Common"
 
 
+# Canvas behind the 600px card — set on html/body + full-width tables so phone
+# clients (Gmail iOS, etc.) match desktop instead of defaulting to white.
+_CANVAS_BG = "#0a0a0a"
+
+
 def _email_shell(content_tables: str) -> str:
     """Full document: table-based wrapper, inline CSS only (no style tags)."""
+    c = _CANVAS_BG
     return f"""<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background-color:#0a0a0a;font-family:Arial,Helvetica,sans-serif;">
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#0a0a0a" style="width:100%;background-color:#0a0a0a;padding:40px 20px;">
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" bgcolor="{c}" style="background-color:{c};">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="x-apple-disable-message-reformatting"></head>
+<body bgcolor="{c}" style="margin:0;padding:0;background-color:{c};font-family:Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="{c}" style="width:100%;background-color:{c};">
   <tr>
-    <td align="center" style="padding:0;">
+    <td bgcolor="{c}" style="background-color:{c};padding:0;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="{c}" style="width:100%;background-color:{c};padding:40px 20px;">
+  <tr>
+    <td align="center" bgcolor="{c}" style="padding:0;background-color:{c};">
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#111111" style="max-width:600px;width:100%;background-color:#111111;border:1px solid #2a2a2a;border-radius:12px;overflow:hidden;">
         <tr>
           <td align="center" style="padding:30px;background:linear-gradient(135deg,#1a1a1a 0%,#2a2a2a 100%);border-bottom:2px solid #ffd700;">
@@ -99,7 +108,7 @@ def _email_shell(content_tables: str) -> str:
           </td>
         </tr>
         <tr>
-          <td style="padding:36px 40px;color:#ffffff;">
+          <td bgcolor="#111111" style="padding:36px 40px;color:#ffffff;background-color:#111111;">
             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
               {content_tables}
             </table>
@@ -118,6 +127,9 @@ def _email_shell(content_tables: str) -> str:
           </td>
         </tr>
       </table>
+    </td>
+  </tr>
+</table>
     </td>
   </tr>
 </table>
@@ -313,7 +325,7 @@ def send_trade_offer_email(
             "Log in to accept or decline the offer."
         )
         parts = [
-            _heading("You've Got Mail! 📬"),
+            _heading("Trade incoming"),
             _subtext_html(sub_inner),
             _card_info_box(card_player_name, card_tier, card_rarity, card_image_url),
         ]
