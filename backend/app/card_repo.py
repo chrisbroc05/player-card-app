@@ -1,11 +1,15 @@
 """PostgreSQL persistence for collectible cards."""
 
+from __future__ import annotations
+
 from datetime import datetime, timezone
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from models import Card
+
+PRINT_RUN_ALLOWED_QUANTITIES = frozenset({1, 2, 5, 10})
 
 
 def _year_prefix() -> str:
@@ -51,6 +55,7 @@ def create_card_row(
     special_theme: str | None,
     owner_name: str,
     owner_id: int | None,
+    commit: bool = True,
 ) -> Card:
     row = Card(
         card_id=card_id,
@@ -73,8 +78,12 @@ def create_card_row(
         owner_id=owner_id,
     )
     db.add(row)
-    db.commit()
-    db.refresh(row)
+    if commit:
+        db.commit()
+        db.refresh(row)
+    else:
+        db.flush()
+        db.refresh(row)
     return row
 
 
@@ -139,6 +148,81 @@ def list_my_cards_dicts(db: Session, owner_id: int) -> list[dict]:
 
 def get_card_by_card_id(db: Session, canonical_id: str) -> Card | None:
     return db.query(Card).filter(Card.card_id == canonical_id).first()
+
+
+def list_print_family_for_owner_image(db: Session, owner_id: int, image_url: str) -> list[Card]:
+    return (
+        db.query(Card)
+        .filter(Card.owner_id == owner_id, Card.image_url == image_url)
+        .order_by(Card.edition_number.asc(), Card.id.asc())
+        .all()
+    )
+
+
+def list_cards_by_image_url_dicts(db: Session, image_url: str) -> list[dict]:
+    rows = (
+        db.query(Card)
+        .filter(Card.image_url == image_url)
+        .order_by(Card.edition_number.asc(), Card.id.asc())
+        .all()
+    )
+    return [card_to_dict(r, db) for r in rows]
+
+
+def expand_print_run_for_owner_image(
+    db: Session,
+    *,
+    template: Card,
+    target_quantity: int,
+) -> list[Card]:
+    """
+    Grow the owner's print run for this image to target_quantity (allowed: 1,2,5,10).
+    Updates print_run on all existing family rows, appends new rows with new card_ids.
+    Returns only newly created Card ORM rows (empty if already at target).
+    """
+    if target_quantity not in PRINT_RUN_ALLOWED_QUANTITIES:
+        raise ValueError("invalid_quantity")
+    family = list_print_family_for_owner_image(db, template.owner_id, template.image_url)
+    n = len(family)
+    if target_quantity < n:
+        raise ValueError("cannot_reduce")
+    if target_quantity == n:
+        return []
+    to_add = target_quantity - n
+    for c in family:
+        c.print_run = target_quantity
+    new_rows: list[Card] = []
+    for k in range(to_add):
+        edition = n + 1 + k
+        nid = next_collectible_card_id(db)
+        slug = nid.lower()
+        row = create_card_row(
+            db,
+            card_id=nid,
+            player_id=template.player_id,
+            player_name=template.player_name,
+            team_name=template.team_name,
+            position=template.position or "",
+            jersey_number=template.jersey_number or "",
+            grad_year=str(template.grad_year or ""),
+            tier=template.tier,
+            theme=template.theme or "none",
+            rarity=template.rarity,
+            edition_number=edition,
+            print_run=target_quantity,
+            image_url=template.image_url,
+            shareable_slug=slug,
+            style=template.style,
+            special_theme=template.special_theme,
+            owner_name=template.owner_name,
+            owner_id=template.owner_id,
+            commit=False,
+        )
+        new_rows.append(row)
+    db.commit()
+    for r in new_rows:
+        db.refresh(r)
+    return new_rows
 
 
 def list_cards_for_player_dicts(db: Session, player_id: int) -> list[dict]:

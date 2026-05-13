@@ -44,10 +44,13 @@ from auth import (  # noqa: E402
     verify_password,
 )
 from card_repo import (  # noqa: E402
+    PRINT_RUN_ALLOWED_QUANTITIES,
     card_to_dict,
     count_cards_for_player,
     create_card_row,
+    expand_print_run_for_owner_image,
     get_card_by_card_id,
+    list_cards_by_image_url_dicts,
     list_cards_for_player_dicts,
     list_my_cards_dicts,
     next_collectible_card_id,
@@ -1064,6 +1067,13 @@ class CardVaultSummary(BaseModel):
     pending_trade_offer_id: int | None = Field(default=None)
 
 
+class CardDuplicateBody(BaseModel):
+    """Request body for expanding a print run (target total: 1, 2, 5, or 10)."""
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    quantity: int = Field(..., ge=1, le=10)
+
+
 class Card(BaseModel):
     """Full collectible record (vault) — GET /cards/{card_id} and player card lists."""
 
@@ -1458,6 +1468,63 @@ def get_card(card_id: str, db: Session = Depends(get_db)):
     if orm is None:
         raise HTTPException(status_code=404, detail="Card not found")
     return Card.model_validate(card_to_dict(orm, db))
+
+
+@app.get("/cards/{card_id}/copies", response_model=list[CardVaultSummary])
+def get_card_copies(card_id: str, db: Session = Depends(get_db)):
+    """All cards sharing the same image (full print-run family), edition order."""
+    key = _canonical_card_id(card_id)
+    if key is None:
+        raise HTTPException(status_code=404, detail="Card not found")
+    orm = get_card_by_card_id(db, key)
+    if orm is None:
+        raise HTTPException(status_code=404, detail="Card not found")
+    rows = list_cards_by_image_url_dicts(db, orm.image_url)
+    return [CardVaultSummary.model_validate(r) for r in rows]
+
+
+@app.post("/cards/{card_id}/duplicate", response_model=list[Card])
+def duplicate_cards(
+    card_id: str,
+    body: CardDuplicateBody,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Expand the owner's print run for this card's image to `quantity` total copies
+    (allowed totals: 1, 2, 5, 10). Each new copy gets a new FL-YYYY-###### id and slug.
+    """
+    key = _canonical_card_id(card_id)
+    if key is None:
+        raise HTTPException(status_code=404, detail="Card not found")
+    orm = get_card_by_card_id(db, key)
+    if orm is None:
+        raise HTTPException(status_code=404, detail="Card not found")
+    if orm.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not own this card")
+    if (orm.status or "active") != "active":
+        raise HTTPException(status_code=400, detail="Only active cards can be duplicated")
+    if body.quantity not in PRINT_RUN_ALLOWED_QUANTITIES:
+        raise HTTPException(
+            status_code=400,
+            detail="Quantity must be one of: 1, 2, 5, 10.",
+        )
+    try:
+        new_rows = expand_print_run_for_owner_image(db, template=orm, target_quantity=body.quantity)
+    except ValueError as exc:
+        err = str(exc)
+        if err == "cannot_reduce":
+            raise HTTPException(
+                status_code=400,
+                detail="Print run cannot be reduced.",
+            ) from exc
+        if err == "invalid_quantity":
+            raise HTTPException(
+                status_code=400,
+                detail="Quantity must be one of: 1, 2, 5, 10.",
+            ) from exc
+        raise HTTPException(status_code=500, detail="Could not create copies.") from exc
+    return [Card.model_validate(card_to_dict(r, db)) for r in new_rows]
 
 
 @app.get("/players/{player_id}/cards", response_model=list[Card])

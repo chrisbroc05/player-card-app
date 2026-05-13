@@ -19,10 +19,22 @@ function formatCreatedAt(iso) {
   }
 }
 
+function copyRowMatchesRoute(c, routeParam) {
+  if (!routeParam) return false;
+  const raw = String(routeParam);
+  try {
+    const dec = decodeURIComponent(raw);
+    return c.card_id === dec || c.card_id === raw || c.shareable_slug === dec || c.shareable_slug === raw;
+  } catch {
+    return c.card_id === raw || c.shareable_slug === raw;
+  }
+}
+
 export default function CardDetailPage() {
   const { cardId } = useParams();
   const { user } = useAuth();
   const [card, setCard] = useState(null);
+  const [copies, setCopies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -31,6 +43,11 @@ export default function CardDetailPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/cards/${encodeURIComponent(cardId)}`);
       if (res.ok) setCard(await res.json());
+      const res2 = await fetch(`${API_BASE_URL}/cards/${encodeURIComponent(cardId)}/copies`);
+      if (res2.ok) {
+        const data = await res2.json();
+        setCopies(Array.isArray(data) ? data : []);
+      }
     } catch {
       /* ignore */
     }
@@ -56,6 +73,27 @@ export default function CardDetailPage() {
         if (!cancelled) setError(e.message || "Failed to load.");
       } finally {
         if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [cardId]);
+
+  useEffect(() => {
+    if (!cardId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/cards/${encodeURIComponent(cardId)}/copies`);
+        if (!res.ok) {
+          if (!cancelled) setCopies([]);
+          return;
+        }
+        const data = await res.json();
+        if (!cancelled) setCopies(Array.isArray(data) ? data : []);
+      } catch {
+        if (!cancelled) setCopies([]);
       }
     })();
     return () => {
@@ -149,6 +187,34 @@ export default function CardDetailPage() {
                   <dd className="text-slate-200">{formatCreatedAt(card.created_at)}</dd>
                 </div>
               </dl>
+
+              {copies.length > 0 ? (
+                <div className="rounded-2xl border border-white/10 bg-cardBg p-4 sm:p-5">
+                  <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">Print Run</h2>
+                  <p className="mt-2 text-sm text-slate-200">
+                    This is card #{card.edition_number} of {card.print_run}
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {copies.map((c) => {
+                      const isCurrent = copyRowMatchesRoute(c, cardId) || c.card_id === card.card_id;
+                      const slug = c.shareable_slug || c.card_id;
+                      return (
+                        <Link
+                          key={c.card_id}
+                          to={`/card/${encodeURIComponent(slug)}`}
+                          className={`inline-flex min-h-[32px] min-w-[2rem] items-center justify-center rounded-md border px-2 text-xs font-semibold transition ${
+                            isCurrent
+                              ? "border-[#ffd700] bg-[#ffd70022] text-[#ffd700]"
+                              : "border-[#2a2a2a] bg-[#1a1a1a] text-[#888888] hover:border-white/25 hover:text-slate-200"
+                          }`}
+                        >
+                          {c.edition_number}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
 
               <ShareCard card={card} sectionTitle="Share This Card" />
 

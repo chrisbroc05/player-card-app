@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
@@ -150,6 +150,19 @@ export default function StudioPage() {
   const isPreviewLimitReached = Boolean(activeOrder && activePreviewCount >= activePreviewLimit);
   const isOrderDelivered = (activeOrder?.status || "").toLowerCase() === "delivered";
   const deliveredCardUrl = toApiUrl(activeOrder?.final_card_url || selectedPreviewUrl || generatedCardUrl);
+
+  const refreshSavedCardDetail = useCallback(async () => {
+    const cid =
+      savedCardDetail?.card_id ||
+      previewCards.find((p) => p.image_url === selectedPreviewUrl)?.card_id;
+    if (!cid) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/cards/${encodeURIComponent(cid)}`);
+      if (res.ok) setSavedCardDetail(await res.json());
+    } catch {
+      /* ignore */
+    }
+  }, [savedCardDetail?.card_id, previewCards, selectedPreviewUrl]);
 
   const canGoStep2 = Boolean(orderTier);
   const canGoStep3 = Boolean(
@@ -852,6 +865,10 @@ export default function StudioPage() {
                     detail={savedCardDetail}
                     onViewCollection={() => navigate("/my-collection")}
                     isLoggedIn={Boolean(user)}
+                    showQuantityFlow={isOrderDelivered || currentStep >= 6}
+                    token={token || ""}
+                    onRefreshDetail={refreshSavedCardDetail}
+                    onCardsUpdated={fetchMyCards}
                   />
                 ) : null}
                 <button
@@ -872,6 +889,10 @@ export default function StudioPage() {
                     detail={savedCardDetail}
                     onViewCollection={() => navigate("/my-collection")}
                     isLoggedIn={Boolean(user)}
+                    showQuantityFlow={isOrderDelivered || currentStep >= 6}
+                    token={token || ""}
+                    onRefreshDetail={refreshSavedCardDetail}
+                    onCardsUpdated={fetchMyCards}
                   />
                 ) : null}
                 <div className="rounded-xl border border-emerald-300/35 bg-emerald-400/10 p-4">

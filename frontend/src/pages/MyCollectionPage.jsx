@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
@@ -6,7 +6,7 @@ import { API_BASE_URL, authHeaders } from "../config/api";
 import CardImage from "../components/CardImage";
 import { CardSharePopover } from "../components/ShareCard";
 import { useAuth } from "../context/AuthContext";
-import { vaultTierBadge, formatEditionShort, rarityDisplay } from "../utils/tierStyles";
+import { vaultTierBadge, rarityDisplay } from "../utils/tierStyles";
 
 export default function MyCollectionPage() {
   const { token, user, initializing, refreshIncomingTradeCount } = useAuth();
@@ -32,6 +32,29 @@ export default function MyCollectionPage() {
       setLoading(false);
     }
   }, [token]);
+
+  const displayRows = useMemo(() => {
+    const arr = [...cards];
+    arr.sort((a, b) => {
+      const ia = String(a.image_url || "");
+      const ib = String(b.image_url || "");
+      if (ia !== ib) return ia.localeCompare(ib);
+      return (Number(a.edition_number) || 0) - (Number(b.edition_number) || 0);
+    });
+    const counts = {};
+    for (const c of arr) {
+      const k = String(c.image_url || c.card_id);
+      counts[k] = (counts[k] || 0) + 1;
+    }
+    return arr.map((card, idx) => {
+      const k = String(card.image_url || card.card_id);
+      const prev = idx > 0 ? arr[idx - 1] : null;
+      const prevK = prev ? String(prev.image_url || prev.card_id) : null;
+      const isFirstInGroup = prevK !== k;
+      const groupSize = counts[k] || 1;
+      return { card, stackCount: isFirstInGroup && groupSize > 1 ? groupSize : null };
+    });
+  }, [cards]);
 
   useEffect(() => {
     if (!token || initializing) return;
@@ -97,7 +120,7 @@ export default function MyCollectionPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {cards.map((card) => {
+            {displayRows.map(({ card, stackCount }) => {
               const badge = vaultTierBadge(card.tier);
               const pending = (card.status || "active") === "pending_trade";
               return (
@@ -114,6 +137,11 @@ export default function MyCollectionPage() {
                       cacheBust={card.created_at}
                       className="aspect-[3/4] w-full object-cover transition duration-300 group-hover:brightness-110"
                     />
+                    {stackCount ? (
+                      <span className="absolute left-2 top-2 rounded-md border border-white/15 bg-black/70 px-2 py-0.5 text-[11px] font-semibold text-slate-200 backdrop-blur-sm">
+                        x{stackCount}
+                      </span>
+                    ) : null}
                     <div className="absolute right-2 top-2">
                       <CardSharePopover card={card} />
                     </div>
@@ -133,7 +161,12 @@ export default function MyCollectionPage() {
                         </span>
                       ) : null}
                     </div>
-                    <p className="text-xs text-slate-400">{formatEditionShort(card.edition_number, card.print_run)}</p>
+                    <span
+                      className="inline-block rounded border border-[#2a2a2a] bg-[#1a1a1a] px-2 py-0.5 text-[11px] text-[#aaaaaa]"
+                      style={{ padding: "2px 8px", borderRadius: "4px" }}
+                    >
+                      #{card.edition_number} of {card.print_run}
+                    </span>
                     <Link
                       to={`/card/${encodeURIComponent(card.shareable_slug)}`}
                       className="mt-2 inline-flex min-h-[40px] w-full items-center justify-center rounded-lg border border-white/20 bg-cardBg2 px-3 py-2 text-sm font-medium text-slate-100 transition hover:border-neonBlue/50 hover:text-white"
