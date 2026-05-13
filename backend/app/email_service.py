@@ -64,7 +64,7 @@ def _tier_color(tier: str) -> str:
         return "#ffd700"
     if t == "allstar":
         return "#00aaff"
-    return "#ff8c00"
+    return "#ff4500"
 
 
 def _rarity_label(rarity: str) -> str:
@@ -76,77 +76,205 @@ def _rarity_label(rarity: str) -> str:
     return "Common"
 
 
-def _email_wrapper(inner: str) -> str:
+def _email_shell(content_tables: str) -> str:
+    """Full document: table-based wrapper, inline CSS only (no style tags)."""
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background-color:#0f0f0f;font-family:Arial,sans-serif;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#0f0f0f;padding:24px 12px;">
-    <tr>
-      <td align="center">
-        <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width:600px;width:100%;background-color:#1a1a1a;border:1px solid #333333;border-radius:12px;overflow:hidden;">
-          <tr>
-            <td style="padding:28px 24px 8px 24px;text-align:center;">
-              <p style="margin:0;font-size:20px;font-weight:bold;color:#ffd700;letter-spacing:0.08em;">FUTURE LEGENDS</p>
-              <p style="margin:8px 0 0 0;font-size:11px;color:#999999;text-transform:uppercase;letter-spacing:0.2em;">Digital Collectibles</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:8px 24px 28px 24px;color:#ffffff;font-size:15px;line-height:1.55;">
-              {inner}
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:16px 24px;border-top:1px solid #333333;text-align:center;font-size:12px;color:#999999;">
-              Future Legends Digital Collectibles
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
+<body style="margin:0;padding:0;background-color:#0a0a0a;font-family:Arial,Helvetica,sans-serif;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#0a0a0a" style="width:100%;background-color:#0a0a0a;padding:40px 20px;">
+  <tr>
+    <td align="center" style="padding:0;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#111111" style="max-width:600px;width:100%;background-color:#111111;border:1px solid #2a2a2a;border-radius:12px;overflow:hidden;">
+        <tr>
+          <td align="center" style="padding:30px;background:linear-gradient(135deg,#1a1a1a 0%,#2a2a2a 100%);border-bottom:2px solid #ffd700;">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+              <tr>
+                <td align="center" style="padding:0;font-size:28px;font-weight:900;color:#ffd700;letter-spacing:3px;text-transform:uppercase;line-height:1.2;">⚡ FUTURE LEGENDS</td>
+              </tr>
+              <tr>
+                <td align="center" style="padding:6px 0 0 0;font-size:11px;color:#888888;letter-spacing:4px;text-transform:uppercase;line-height:1.4;">Digital Collectibles</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:36px 40px;color:#ffffff;">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+              {content_tables}
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td align="center" bgcolor="#0d0d0d" style="background-color:#0d0d0d;padding:24px 40px;border-top:1px solid #222222;">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+              <tr>
+                <td align="center" style="padding:0;font-size:12px;color:#555555;line-height:1.5;">Future Legends Digital Collectibles</td>
+              </tr>
+              <tr>
+                <td align="center" style="padding:4px 0 0 0;font-size:11px;color:#444444;line-height:1.5;">This is an automated message. Please do not reply.</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
 </body>
 </html>"""
 
 
-def _gold_button(href: str, label: str) -> str:
-    esc_href = html_module.escape(href, quote=True)
-    esc_label = html_module.escape(label)
-    return f"""<p style="margin:28px 0 8px 0;text-align:center;">
-  <a href="{esc_href}" style="display:inline-block;padding:14px 32px;background-color:#ffd700;color:#000000;font-weight:bold;text-decoration:none;border-radius:8px;font-size:15px;">{esc_label}</a>
-</p>"""
+def _content_row(inner: str) -> str:
+    return f'<tr><td style="padding:0;">{inner}</td></tr>'
 
 
-def _card_box(
+def _heading(text: str) -> str:
+    esc = html_module.escape(text)
+    return _content_row(
+        f'<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">'
+        f'<tr><td style="padding:0;font-size:26px;font-weight:800;color:#ffffff;margin:0;line-height:1.2;">{esc}</td></tr></table>'
+    )
+
+
+def _subtext_plain(text: str) -> str:
+    esc = html_module.escape(text)
+    return _content_row(
+        f'<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">'
+        f'<tr><td style="padding:0 0 28px 0;font-size:15px;color:#aaaaaa;line-height:1.5;">{esc}</td></tr></table>'
+    )
+
+
+def _subtext_html(inner_html: str) -> str:
+    return _content_row(
+        f'<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">'
+        f'<tr><td style="padding:0 0 28px 0;font-size:15px;color:#aaaaaa;line-height:1.5;">{inner_html}</td></tr></table>'
+    )
+
+
+def _divider() -> str:
+    return _content_row(
+        '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">'
+        '<tr><td style="padding:0;border:none;border-top:1px solid #222222;margin:0;height:1px;line-height:0;font-size:0;">&nbsp;</td></tr>'
+        '<tr><td style="padding:0;height:28px;line-height:28px;font-size:0;">&nbsp;</td></tr></table>'
+    )
+
+
+def _card_info_box(
     card_player_name: str,
     card_tier: str,
     card_rarity: str,
     card_image_url: str | None,
 ) -> str:
-    name = html_module.escape(card_player_name)
-    tier = html_module.escape(_tier_label(card_tier))
-    rarity = html_module.escape(_rarity_label(card_rarity))
     tc = _tier_color(card_tier)
-    img_block = ""
+    tier_label = html_module.escape(_tier_label(card_tier))
+    player = html_module.escape(card_player_name)
+    rarity = html_module.escape(_rarity_label(card_rarity))
+    edition = html_module.escape("Digital")
+    badge_bg = f"{tc}22"
+    badge_border = f"{tc}44"
+    img_row = ""
     abs_url = _absolute_image_url(card_image_url)
     if abs_url:
         u = html_module.escape(abs_url, quote=True)
-        img_block = f"""
-        <p style="margin:0 0 12px 0;text-align:center;">
-          <img src="{u}" alt="" width="220" style="max-width:100%;height:auto;border-radius:8px;border:1px solid #333333;display:inline-block;" />
-        </p>"""
-    return f"""
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#0f0f0f;border:1px solid #333333;border-radius:10px;margin:20px 0;">
-      <tr><td style="padding:20px;">
-        {img_block}
-        <p style="margin:0;font-size:18px;font-weight:bold;color:#ffffff;">{name}</p>
-        <p style="margin:10px 0 0 0;font-size:14px;">
-          <span style="color:{tc};font-weight:bold;">{tier}</span>
-          <span style="color:#999999;"> &middot; </span>
-          <span style="color:#cccccc;">{rarity}</span>
-        </p>
-      </td></tr>
-    </table>"""
+        img_row = (
+            '<tr><td align="center" style="padding:0 0 16px 0;">'
+            f'<img src="{u}" alt="" width="200" style="display:block;width:100%;max-width:200px;height:auto;'
+            f'margin:0 auto;border-radius:8px;border:2px solid {tc};" />'
+            "</td></tr>"
+        )
+    badge_row = (
+        '<tr><td align="center" style="padding:0 0 16px 0;">'
+        f'<span style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;'
+        f'letter-spacing:1px;text-transform:uppercase;background-color:{badge_bg};color:{tc};border:1px solid {badge_border};">'
+        f"{tier_label}</span></td></tr>"
+    )
+    detail_table = (
+        '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">'
+        f'<tr><td style="font-size:13px;color:#aaaaaa;padding:6px 0;border-bottom:1px solid #222222;">Player</td>'
+        f'<td align="right" style="font-size:13px;color:#ffffff;font-weight:600;padding:6px 0;border-bottom:1px solid #222222;">{player}</td></tr>'
+        f'<tr><td style="font-size:13px;color:#aaaaaa;padding:6px 0;border-bottom:1px solid #222222;">Rarity</td>'
+        f'<td align="right" style="font-size:13px;color:#ffffff;font-weight:600;padding:6px 0;border-bottom:1px solid #222222;">{rarity}</td></tr>'
+        f'<tr><td style="font-size:13px;color:#aaaaaa;padding:6px 0;border-bottom:1px solid #222222;">Edition</td>'
+        f'<td align="right" style="font-size:13px;color:#ffffff;font-weight:600;padding:6px 0;border-bottom:1px solid #222222;">{edition}</td></tr>'
+        "</table>"
+    )
+    inner = (
+        f'<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" '
+        f'style="background-color:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;margin:0 0 24px 0;">'
+        f'<tr><td style="padding:20px;">'
+        f'<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">{img_row}{badge_row}'
+        f'<tr><td style="padding:0;">{detail_table}</td></tr></table></td></tr></table>'
+    )
+    return _content_row(inner)
+
+
+def _message_box(sender_name: str, trade_message: str) -> str:
+    sn = html_module.escape(sender_name)
+    msg = html_module.escape(trade_message)
+    inner = (
+        '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" '
+        'style="background-color:#161616;border-left:3px solid #ffd700;border-radius:0 8px 8px 0;padding:0;margin:0 0 28px 0;">'
+        '<tr><td style="padding:16px 20px;font-size:14px;color:#cccccc;line-height:1.6;font-style:italic;">'
+        f'<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">'
+        f'<tr><td style="padding:0 0 8px 0;font-size:13px;color:#aaaaaa;font-style:normal;font-weight:600;">{sn} says:</td></tr>'
+        f'<tr><td style="padding:0;font-size:14px;color:#cccccc;font-style:italic;">{msg}</td></tr>'
+        "</table></td></tr></table>"
+    )
+    return _content_row(inner)
+
+
+def _cta_button(href: str, label: str) -> str:
+    esc_href = html_module.escape(href, quote=True)
+    esc_label = html_module.escape(label)
+    inner = (
+        '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">'
+        '<tr><td align="center" style="padding:0;">'
+        f'<a href="{esc_href}" style="display:inline-block;padding:14px 36px;'
+        "background:linear-gradient(135deg,#ffd700 0%,#ffaa00 100%);color:#000000;font-weight:800;font-size:15px;"
+        'text-decoration:none;border-radius:8px;letter-spacing:1px;text-transform:uppercase;">'
+        f"{esc_label}</a></td></tr></table>"
+    )
+    return _content_row(inner)
+
+
+def _muted_center(text: str) -> str:
+    esc = html_module.escape(text)
+    return _content_row(
+        '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">'
+        f'<tr><td align="center" style="padding:12px 0 0 0;font-size:12px;color:#666666;line-height:1.5;">{esc}</td></tr></table>'
+    )
+
+
+def _success_banner(recipient_name: str) -> str:
+    rn = html_module.escape(recipient_name)
+    text = f"✅ Ownership successfully transferred to {rn}"
+    inner = (
+        '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" '
+        'style="background-color:#052e16;border:1px solid #22c55e;border-radius:8px;margin:0 0 28px 0;">'
+        f'<tr><td align="center" style="padding:16px;color:#22c55e;font-weight:700;font-size:14px;line-height:1.4;">{text}</td></tr></table>'
+    )
+    return _content_row(inner)
+
+
+def _error_banner() -> str:
+    inner = (
+        '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" '
+        'style="background-color:#2d1515;border:1px solid #ef4444;border-radius:8px;margin:0 0 28px 0;">'
+        '<tr><td align="center" style="padding:16px;color:#ef4444;font-weight:700;font-size:14px;line-height:1.4;">'
+        "↩️ Card returned to your collection</td></tr></table>"
+    )
+    return _content_row(inner)
+
+
+def _warning_banner() -> str:
+    inner = (
+        '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" '
+        'style="background-color:#1a1500;border:1px solid #f59e0b;border-radius:8px;margin:0 0 28px 0;">'
+        '<tr><td align="center" style="padding:16px;color:#f59e0b;font-weight:700;font-size:14px;line-height:1.4;">'
+        "🚫 This trade offer has been cancelled</td></tr></table>"
+    )
+    return _content_row(inner)
 
 
 def _send_resend_html(to: str, subject: str, html: str, trade_id: int | None, kind: str) -> None:
@@ -177,26 +305,30 @@ def send_trade_offer_email(
     trade_id: int,
 ) -> None:
     try:
-        sn = html_module.escape(sender_name)
-        msg_html = ""
+        sn_plain = html_module.escape(sender_name)
+        tier_word = html_module.escape(_tier_label(card_tier))
+        tc = _tier_color(card_tier)
+        sub_inner = (
+            f'{sn_plain} has sent you a <span style="color:{tc};font-weight:700;">{tier_word}</span> Future Legends card.<br />'
+            "Log in to accept or decline the offer."
+        )
+        parts = [
+            _heading("You've Got Mail! 📬"),
+            _subtext_html(sub_inner),
+            _card_info_box(card_player_name, card_tier, card_rarity, card_image_url),
+        ]
         if trade_message and str(trade_message).strip():
-            msg = html_module.escape(str(trade_message).strip())
-            msg_html = f"""
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#0f0f0f;border:1px solid #333333;border-radius:10px;margin:20px 0;">
-          <tr><td style="padding:16px;">
-            <p style="margin:0;font-size:13px;color:#999999;">{sn} says:</p>
-            <p style="margin:8px 0 0 0;font-size:15px;color:#ffffff;">{msg}</p>
-          </td></tr>
-        </table>"""
-        inner = f"""
-      <h1 style="margin:0 0 8px 0;font-size:22px;color:#ffffff;">You've received a card!</h1>
-      <p style="margin:0;color:#999999;font-size:15px;">{sn} has sent you a <span style="color:{_tier_color(card_tier)};font-weight:bold;">{html_module.escape(_tier_label(card_tier))}</span> Future Legends card.</p>
-      {_card_box(card_player_name, card_tier, card_rarity, card_image_url)}
-      {msg_html}
-      {_gold_button(trades_url, "View & Accept Card")}
-      <p style="margin:24px 0 0 0;font-size:13px;color:#999999;text-align:center;">This card will remain pending until you accept or decline.</p>
-    """
-        html = _email_wrapper(inner)
+            parts.append(_message_box(sender_name, str(trade_message).strip()))
+        parts.extend(
+            [
+                _divider(),
+                _cta_button(trades_url, "View Trade Offer →"),
+                _muted_center(
+                    "This offer will remain pending until you accept or decline in the app."
+                ),
+            ]
+        )
+        html = _email_shell("".join(parts))
         subject = f"⚡ {sender_name} sent you a Future Legends card!"
         _send_resend_html(recipient_email, subject, html, trade_id, "trade_offer")
     except Exception as e:
@@ -216,15 +348,23 @@ def send_trade_accepted_email(
 ) -> None:
     try:
         rn = html_module.escape(recipient_name)
-        inner = f"""
-      <h1 style="margin:0 0 8px 0;font-size:22px;color:#ffffff;">Your trade was accepted!</h1>
-      <p style="margin:0;color:#999999;font-size:15px;">{rn} has accepted your <span style="color:{_tier_color(card_tier)};font-weight:bold;">{html_module.escape(_tier_label(card_tier))}</span> {html_module.escape(card_player_name)} card.</p>
-      {_card_box(card_player_name, card_tier, card_rarity, card_image_url)}
-      {_gold_button(collection_url, "View My Collection")}
-      <p style="margin:24px 0 0 0;font-size:13px;color:#999999;text-align:center;">The card has been transferred to {rn}&#39;s collection.</p>
-    """
-        html = _email_wrapper(inner)
-        subject = f"✅ {recipient_name} accepted your Future Legends card!"
+        tier_word = html_module.escape(_tier_label(card_tier))
+        player = html_module.escape(card_player_name)
+        tc = _tier_color(card_tier)
+        sub_inner = (
+            f"{rn} accepted your <span style=\"color:{tc};font-weight:700;\">{tier_word}</span> {player} card. "
+            "The card has been transferred to their collection."
+        )
+        parts = [
+            _heading("Trade Accepted! 🎉"),
+            _subtext_html(sub_inner),
+            _card_info_box(card_player_name, card_tier, card_rarity, card_image_url),
+            _divider(),
+            _success_banner(recipient_name),
+            _cta_button(collection_url, "View My Collection →"),
+        ]
+        html = _email_shell("".join(parts))
+        subject = f"✅ {recipient_name} accepted your card!"
         _send_resend_html(sender_email, subject, html, trade_id, "trade_accepted")
     except Exception as e:
         logger.error("Email failed for trade %s: %s", trade_id, e)
@@ -243,15 +383,23 @@ def send_trade_declined_email(
 ) -> None:
     try:
         rn = html_module.escape(recipient_name)
-        inner = f"""
-      <h1 style="margin:0 0 8px 0;font-size:22px;color:#ffffff;">Trade declined</h1>
-      <p style="margin:0;color:#999999;font-size:15px;">{rn} declined your <span style="color:{_tier_color(card_tier)};font-weight:bold;">{html_module.escape(_tier_label(card_tier))}</span> {html_module.escape(card_player_name)} card.</p>
-      {_card_box(card_player_name, card_tier, card_rarity, card_image_url)}
-      {_gold_button(collection_url, "View My Collection")}
-      <p style="margin:24px 0 0 0;font-size:13px;color:#999999;text-align:center;">Don&#39;t worry — the card is back in your collection.</p>
-    """
-        html = _email_wrapper(inner)
-        subject = f"❌ {recipient_name} declined your trade offer"
+        tier_word = html_module.escape(_tier_label(card_tier))
+        player = html_module.escape(card_player_name)
+        tc = _tier_color(card_tier)
+        sub_inner = (
+            f"{rn} declined your <span style=\"color:{tc};font-weight:700;\">{tier_word}</span> {player} card. "
+            "Don't worry — it's back in your collection."
+        )
+        parts = [
+            _heading("Trade Declined"),
+            _subtext_html(sub_inner),
+            _card_info_box(card_player_name, card_tier, card_rarity, card_image_url),
+            _divider(),
+            _error_banner(),
+            _cta_button(collection_url, "View My Collection →"),
+        ]
+        html = _email_shell("".join(parts))
+        subject = f"❌ {recipient_name} declined your trade"
         _send_resend_html(sender_email, subject, html, trade_id, "trade_declined")
     except Exception as e:
         logger.error("Email failed for trade %s: %s", trade_id, e)
@@ -269,13 +417,21 @@ def send_trade_cancelled_email(
 ) -> None:
     try:
         sn = html_module.escape(sender_name)
-        inner = f"""
-      <h1 style="margin:0 0 8px 0;font-size:22px;color:#ffffff;">Trade offer cancelled</h1>
-      <p style="margin:0;color:#999999;font-size:15px;">{sn} cancelled their offer to send you the <span style="color:{_tier_color(card_tier)};font-weight:bold;">{html_module.escape(_tier_label(card_tier))}</span> {html_module.escape(card_player_name)} card.</p>
-      {_card_box(card_player_name, card_tier, card_rarity, card_image_url)}
-      <p style="margin:24px 0 0 0;font-size:13px;color:#999999;text-align:center;">No action needed — this trade has been cancelled.</p>
-    """
-        html = _email_wrapper(inner)
+        tier_word = html_module.escape(_tier_label(card_tier))
+        player = html_module.escape(card_player_name)
+        tc = _tier_color(card_tier)
+        sub_inner = (
+            f"{sn} cancelled their offer to send you the <span style=\"color:{tc};font-weight:700;\">{tier_word}</span> {player} card. "
+            "No action needed on your part."
+        )
+        parts = [
+            _heading("Trade Cancelled"),
+            _subtext_html(sub_inner),
+            _card_info_box(card_player_name, card_tier, card_rarity, card_image_url),
+            _divider(),
+            _warning_banner(),
+        ]
+        html = _email_shell("".join(parts))
         subject = f"🚫 {sender_name} cancelled their trade offer"
         _send_resend_html(recipient_email, subject, html, trade_id, "trade_cancelled")
     except Exception as e:
