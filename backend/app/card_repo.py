@@ -55,8 +55,10 @@ def create_card_row(
     special_theme: str | None,
     owner_name: str,
     owner_id: int | None,
+    creator_user_id: int | None = None,
     commit: bool = True,
 ) -> Card:
+    creator = creator_user_id if creator_user_id is not None else owner_id
     row = Card(
         card_id=card_id,
         player_id=player_id,
@@ -76,6 +78,7 @@ def create_card_row(
         special_theme=special_theme,
         owner_name=owner_name,
         owner_id=owner_id,
+        creator_user_id=creator,
     )
     db.add(row)
     if commit:
@@ -216,6 +219,7 @@ def expand_print_run_for_owner_image(
             special_theme=template.special_theme,
             owner_name=template.owner_name,
             owner_id=template.owner_id,
+            creator_user_id=getattr(template, "creator_user_id", None) or template.owner_id,
             commit=False,
         )
         new_rows.append(row)

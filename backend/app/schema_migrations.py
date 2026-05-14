@@ -34,3 +34,14 @@ def run_schema_migrations_after_models(engine: Engine) -> None:
                 )
             else:
                 conn.execute(text("ALTER TABLE cards ADD COLUMN trade_offered_to INTEGER"))
+        if "creator_user_id" not in cols:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN IF NOT EXISTS creator_user_id INTEGER "
+                        "REFERENCES users(id)"
+                    )
+                )
+            else:
+                conn.execute(text("ALTER TABLE cards ADD COLUMN creator_user_id INTEGER"))
+            conn.execute(text("UPDATE cards SET creator_user_id = owner_id WHERE creator_user_id IS NULL"))

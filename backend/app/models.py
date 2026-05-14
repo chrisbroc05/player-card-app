@@ -49,6 +49,7 @@ class Card(Base):
     shareable_slug: Mapped[str] = mapped_column(String(48), unique=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     owner_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    creator_user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
     player_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     style: Mapped[str] = mapped_column(String(200), default="")
     special_theme: Mapped[str | None] = mapped_column(String(120), nullable=True)

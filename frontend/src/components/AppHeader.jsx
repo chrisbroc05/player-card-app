@@ -8,6 +8,7 @@ export default function AppHeader() {
   const onStudio = location.pathname === "/";
   const onMyCollection = location.pathname.startsWith("/my-collection");
   const onTrades = location.pathname.startsWith("/trades");
+  const onProfile = location.pathname.startsWith("/profile");
 
   return (
     <header className="border-b border-white/10 bg-cardBg/50 backdrop-blur">
@@ -50,9 +51,14 @@ export default function AppHeader() {
                   </span>
                 ) : null}
               </Link>
-              <span className="hidden max-w-[140px] truncate text-xs text-slate-300 sm:inline sm:max-w-[200px]">
+              <Link
+                to="/profile"
+                className={`inline-flex max-w-[140px] truncate text-xs text-slate-300 underline decoration-transparent underline-offset-2 transition hover:text-white hover:decoration-white/40 sm:max-w-[200px] ${
+                  onProfile ? "text-white decoration-white/30" : ""
+                }`}
+              >
                 {user.display_name}
-              </span>
+              </Link>
               <button
                 type="button"
                 onClick={() => logout()}

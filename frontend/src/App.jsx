@@ -8,6 +8,7 @@ import MyCollectionPage from "./pages/MyCollectionPage";
 import TradesPage from "./pages/TradesPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminRoute from "./components/AdminRoute";
+import ProfilePage from "./pages/ProfilePage";
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/my-collection" element={<MyCollectionPage />} />
       <Route path="/trades" element={<TradesPage />} />
+      <Route path="/profile" element={<ProfilePage />} />
     </Routes>
   );
 }
