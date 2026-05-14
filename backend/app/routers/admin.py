@@ -9,10 +9,10 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -25,19 +25,18 @@ from models import Card, TradeOffer, User
 router = APIRouter()
 admin_security = HTTPBearer(auto_error=False)
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-_admin_password_hash: str | None = None
+# Hash ADMIN_PASSWORD once per process (same bcrypt stack as auth.py — avoids passlib/bcrypt4 edge cases).
+_admin_password_hash: bytes | None = None
 
 
-def _get_or_create_admin_password_hash() -> str | None:
-    """Hash ADMIN_PASSWORD from env once per process (bcrypt salt fixed for lifetime)."""
+def _get_or_create_admin_password_hash() -> bytes | None:
     global _admin_password_hash
     if _admin_password_hash is not None:
         return _admin_password_hash
     raw = (os.environ.get("ADMIN_PASSWORD") or "").strip()
     if not raw:
         return None
-    _admin_password_hash = pwd_context.hash(raw)
+    _admin_password_hash = bcrypt.hashpw(raw.encode("utf-8"), bcrypt.gensalt(rounds=12))
     return _admin_password_hash
 
 
@@ -121,18 +120,32 @@ def _map_tier_key(db_tier: str) -> str | None:
 def admin_login(body: AdminLoginBody):
     """Shared admin login (env credentials). Returns JWT with role=admin (24h)."""
     env_email = (os.environ.get("ADMIN_EMAIL") or "").strip().lower()
-    if not env_email:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+    env_password_raw = (os.environ.get("ADMIN_PASSWORD") or "").strip()
+    if not env_email or not env_password_raw:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Admin login is not configured. Set ADMIN_EMAIL and ADMIN_PASSWORD "
+                "on the backend service (e.g. Render environment variables), then redeploy or restart."
+            ),
+        )
 
     submitted_email = body.email.strip().lower()
     if len(submitted_email) != len(env_email) or not secrets.compare_digest(
-        submitted_email.encode("utf-8"), env_email.encode("utf-8")
+        submitted_email.encode("utf-8"),
+        env_email.encode("utf-8"),
     ):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid admin credentials",
+        )
 
     ph = _get_or_create_admin_password_hash()
-    if ph is None or not pwd_context.verify(body.password, ph):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+    if ph is None or not bcrypt.checkpw(body.password.encode("utf-8"), ph):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid admin credentials",
+        )
 
     return AdminLoginResponse(access_token=create_admin_access_token())
 

@@ -5,6 +5,19 @@ import AppFooter from "../components/AppFooter";
 import { API_BASE_URL, ADMIN_TOKEN_STORAGE_KEY } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 
+function formatApiError(detail, fallback) {
+  if (!detail) return fallback;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const msgs = detail
+      .map((item) => (typeof item === "string" ? item : item?.msg))
+      .filter(Boolean);
+    return msgs.length ? msgs.join(" | ") : fallback;
+  }
+  if (typeof detail === "object" && typeof detail.message === "string") return detail.message;
+  return fallback;
+}
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const { login, user, initializing } = useAuth();
@@ -31,9 +44,19 @@ export default function LoginPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
         });
-        const data = await res.json().catch(() => ({}));
+        let data = {};
+        try {
+          data = await res.json();
+        } catch {
+          data = {};
+        }
         if (!res.ok || !data.access_token) {
-          throw new Error("admin_fail");
+          const fallback =
+            res.status === 503
+              ? "Admin login is not configured. Add ADMIN_EMAIL and ADMIN_PASSWORD on the backend (e.g. Render), then restart."
+              : "Invalid admin credentials";
+          setAdminError(formatApiError(data?.detail, fallback));
+          return;
         }
         localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, data.access_token);
         navigate("/admin", { replace: true });
@@ -42,7 +65,7 @@ export default function LoginPage() {
         navigate("/my-collection", { replace: true });
       }
     } catch {
-      if (adminMode) setAdminError("Invalid admin credentials");
+      if (adminMode) setAdminError("Could not reach the server. Check your connection and API URL.");
       else setError("Invalid email or password");
     } finally {
       setSubmitting(false);
