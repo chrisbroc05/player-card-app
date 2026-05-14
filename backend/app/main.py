@@ -56,9 +56,11 @@ from card_repo import (  # noqa: E402
     next_collectible_card_id,
 )
 from database import engine, get_db  # noqa: E402
+from beta_config import get_beta_invite_code  # noqa: E402
 from models import Base, User  # noqa: E402
 from schema_migrations import run_schema_migrations_after_models  # noqa: E402
 from trade_routes import router as trade_router  # noqa: E402
+from routers.admin import router as admin_router  # noqa: E402
 from theme_library import (  # noqa: E402
     THEME_CATEGORIES,
     is_valid_theme_slug,
@@ -108,6 +110,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 app.include_router(trade_router, prefix="/trades", tags=["trades"])
+app.include_router(admin_router, prefix="/admin", tags=["admin"])
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -1276,8 +1279,7 @@ def _user_public(user: User) -> UserPublic:
 
 def _beta_invite_code_required() -> str | None:
     """If set, registration must supply a matching invite code (case-insensitive)."""
-    v = (os.environ.get("BETA_INVITE_CODE") or "").strip()
-    return v or None
+    return get_beta_invite_code()
 
 
 def _social_sharing_enabled() -> bool:

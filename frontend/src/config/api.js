@@ -17,7 +17,13 @@ export const API_BASE_URL =
   (isLocalhostHost() ? LOCAL_API_BASE_URL : PROD_API_BASE_URL);
 
 export const AUTH_TOKEN_STORAGE_KEY = "fl_access_token";
+export const ADMIN_TOKEN_STORAGE_KEY = "adminToken";
 
+/** Headers for authenticated admin API calls. */
+export function adminHeaders(token) {
+  if (!token) return {};
+  return { Authorization: `Bearer ${token}` };
+}
 /** Headers for authenticated API calls (omit if no token). */
 export function authHeaders(token) {
   if (!token) return {};

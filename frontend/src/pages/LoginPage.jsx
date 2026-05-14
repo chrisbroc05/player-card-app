@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
+import { API_BASE_URL, ADMIN_TOKEN_STORAGE_KEY } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 
 export default function LoginPage() {
@@ -10,21 +11,39 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [adminError, setAdminError] = useState("");
+  const [adminMode, setAdminMode] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  if (!initializing && user) {
+  if (!initializing && user && !adminMode) {
     return <Navigate to="/my-collection" replace />;
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
+    setAdminError("");
     setSubmitting(true);
     try {
-      await login(email, password);
-      navigate("/my-collection", { replace: true });
+      if (adminMode) {
+        const res = await fetch(`${API_BASE_URL}/admin/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.access_token) {
+          throw new Error("admin_fail");
+        }
+        localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, data.access_token);
+        navigate("/admin", { replace: true });
+      } else {
+        await login(email, password);
+        navigate("/my-collection", { replace: true });
+      }
     } catch {
-      setError("Invalid email or password");
+      if (adminMode) setAdminError("Invalid admin credentials");
+      else setError("Invalid email or password");
     } finally {
       setSubmitting(false);
     }
@@ -36,8 +55,12 @@ export default function LoginPage() {
       <main className="mx-auto flex min-h-[calc(100vh-8rem)] max-w-lg flex-col justify-center px-4 py-12 sm:px-6">
         <div className="rounded-2xl border border-white/10 bg-cardBg p-6 shadow-2xl shadow-black/40 sm:p-8">
           <p className="text-center text-[10px] font-medium uppercase tracking-[0.3em] text-slate-500">Future Legends</p>
-          <h1 className="mt-2 text-center text-2xl font-semibold text-white">Welcome back</h1>
-          <p className="mt-1 text-center text-sm text-slate-400">Sign in to access your collection.</p>
+          <h1 className="mt-2 text-center text-2xl font-semibold text-white">
+            {adminMode ? "Admin Login" : "Welcome back"}
+          </h1>
+          <p className="mt-1 text-center text-sm text-slate-400">
+            {adminMode ? "Sign in with admin credentials." : "Sign in to access your collection."}
+          </p>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-4">
             <div>
@@ -62,17 +85,24 @@ export default function LoginPage() {
                 className="mt-1 min-h-[46px] w-full rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 text-slate-100"
               />
             </div>
-            <button
-              type="button"
-              className="text-xs text-slate-500 underline decoration-white/20 underline-offset-2 hover:text-slate-300"
-              disabled
-            >
-              Forgot password?
-            </button>
+            {!adminMode ? (
+              <button
+                type="button"
+                className="text-xs text-slate-500 underline decoration-white/20 underline-offset-2 hover:text-slate-300"
+                disabled
+              >
+                Forgot password?
+              </button>
+            ) : null}
 
-            {error ? (
+            {!adminMode && error ? (
               <p className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
-                Invalid email or password
+                {error}
+              </p>
+            ) : null}
+            {adminMode && adminError ? (
+              <p className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
+                {adminError}
               </p>
             ) : null}
 
@@ -81,16 +111,48 @@ export default function LoginPage() {
               disabled={submitting}
               className="min-h-[48px] w-full rounded-xl bg-neonBlue py-3 text-sm font-semibold text-slate-950 disabled:opacity-50"
             >
-              {submitting ? "Signing in…" : "Login"}
+              {submitting ? "Signing in…" : adminMode ? "Admin sign in" : "Login"}
             </button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-slate-400">
-            Don&apos;t have an account?{" "}
-            <Link to="/register" className="font-medium text-neonTeal hover:text-teal-200">
-              Sign up
-            </Link>
-          </p>
+          {!adminMode ? (
+            <p className="mt-6 text-center text-sm text-slate-400">
+              Don&apos;t have an account?{" "}
+              <Link to="/register" className="font-medium text-neonTeal hover:text-teal-200">
+                Sign up
+              </Link>
+            </p>
+          ) : (
+            <p className="mt-6 text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setAdminMode(false);
+                  setAdminError("");
+                  setError("");
+                }}
+                className="text-sm text-neonTeal underline decoration-white/20 underline-offset-2 hover:text-teal-200"
+              >
+                Back to user login
+              </button>
+            </p>
+          )}
+
+          {!adminMode ? (
+            <p className="mt-4 text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setAdminMode(true);
+                  setError("");
+                  setAdminError("");
+                }}
+                className="text-xs text-slate-600 transition hover:text-slate-400"
+              >
+                Admin Access
+              </button>
+            </p>
+          ) : null}
         </div>
       </main>
       <AppFooter />
