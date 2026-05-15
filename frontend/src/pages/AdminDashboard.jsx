@@ -8,6 +8,7 @@ const TABS = [
   { id: "users", label: "Users" },
   { id: "cards", label: "Cards" },
   { id: "trades", label: "Trades" },
+  { id: "marketplace", label: "Marketplace" },
 ];
 
 function formatApiError(detail, fallback) {
@@ -29,13 +30,20 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [cards, setCards] = useState([]);
   const [trades, setTrades] = useState([]);
+  const [marketplaceOffers, setMarketplaceOffers] = useState([]);
 
   const [inviteCode, setInviteCode] = useState("");
   const [betaActive, setBetaActive] = useState(false);
   const [inviteDraft, setInviteDraft] = useState("");
   const [inviteMsg, setInviteMsg] = useState("");
 
-  const [loading, setLoading] = useState({ overview: true, users: true, cards: true, trades: true });
+  const [loading, setLoading] = useState({
+    overview: true,
+    users: true,
+    cards: true,
+    trades: true,
+    marketplace: true,
+  });
   const [errors, setErrors] = useState({});
 
   const [userSort, setUserSort] = useState({ key: "display_name", dir: "asc" });
@@ -140,13 +148,29 @@ export default function AdminDashboard() {
     setLoading((s) => ({ ...s, trades: false }));
   }, [adminFetch]);
 
+  const loadMarketplace = useCallback(async () => {
+    setLoading((s) => ({ ...s, marketplace: true }));
+    setErrors((e) => ({ ...e, marketplace: "" }));
+    const res = await adminFetch("/admin/marketplace");
+    if (!res) return;
+    const data = await res.json().catch(() => []);
+    if (!res.ok) {
+      setErrors((e) => ({ ...e, marketplace: formatApiError(data?.detail, "Failed to load marketplace.") }));
+      setLoading((s) => ({ ...s, marketplace: false }));
+      return;
+    }
+    setMarketplaceOffers(Array.isArray(data) ? data : []);
+    setLoading((s) => ({ ...s, marketplace: false }));
+  }, [adminFetch]);
+
   useEffect(() => {
     loadInvite();
     loadStats();
     loadUsers();
     loadCards();
     loadTrades();
-  }, [loadInvite, loadStats, loadUsers, loadCards, loadTrades]);
+    loadMarketplace();
+  }, [loadInvite, loadStats, loadUsers, loadCards, loadTrades, loadMarketplace]);
 
   async function handleInviteUpdate(e) {
     e.preventDefault();
@@ -348,6 +372,30 @@ export default function AdminDashboard() {
                   {kpi("Trades accepted", stats.trades_accepted)}
                   {kpi("Trades declined", stats.trades_declined)}
                 </div>
+                {stats.marketplace_stats ? (
+                  <>
+                    <div>
+                      <h3 className="mb-3 text-sm font-semibold text-teal-200/90">Free Agency (marketplace)</h3>
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        {kpi("Listed cards", stats.marketplace_stats.total_listed)}
+                        {kpi("Total offers", stats.marketplace_stats.total_offers)}
+                        {kpi("Offers pending", stats.marketplace_stats.offers_pending)}
+                        {kpi("Offers accepted", stats.marketplace_stats.offers_accepted)}
+                      </div>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {kpi("Offers declined", stats.marketplace_stats.offers_declined)}
+                      {kpi(
+                        "Sale volume",
+                        "$" + Number(stats.marketplace_stats.total_volume || 0).toFixed(2)
+                      )}
+                      {kpi(
+                        "Royalties earned",
+                        "$" + Number(stats.marketplace_stats.total_royalties_earned || 0).toFixed(2)
+                      )}
+                    </div>
+                  </>
+                ) : null}
                 <div>
                   <h3 className="mb-3 text-sm font-semibold text-slate-300">Cards by tier</h3>
                   <div className="grid gap-3 sm:grid-cols-3">
@@ -696,6 +744,58 @@ export default function AdminDashboard() {
                         </td>
                         <td className="p-3 text-xs text-slate-500">{t.created_at?.slice(0, 16) || "—"}</td>
                         <td className="p-3 text-xs text-slate-500">{t.updated_at?.slice(0, 16) || "—"}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null}
+
+        {tab === "marketplace" ? (
+          <div>
+            {errors.marketplace ? (
+              <p className="mb-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
+                {errors.marketplace}
+              </p>
+            ) : null}
+            <p className="mb-4 text-sm text-slate-400">
+              Marketplace offers: <span className="font-semibold text-white">{marketplaceOffers.length}</span>
+            </p>
+            {loading.marketplace ? <p className="text-sm text-slate-400">Loading marketplace…</p> : null}
+            <div className="overflow-x-auto rounded-xl border border-white/10 bg-cardBg">
+              <table className="w-full min-w-[1000px] text-left text-sm">
+                <thead className="border-b border-white/10 bg-cardBg2 text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    {["Offer ID", "Card", "Player", "Buyer", "Seller", "Amount", "Royalty", "Status", "Created"].map((h) => (
+                      <th key={h} className="p-3 font-medium">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {marketplaceOffers.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="p-6 text-center text-slate-500">No marketplace offers yet.</td>
+                    </tr>
+                  ) : (
+                    marketplaceOffers.map((o) => (
+                      <tr key={o.offer_id} className="border-b border-white/5 hover:bg-white/[0.02]">
+                        <td className="p-3 text-slate-200">{o.offer_id}</td>
+                        <td className="p-3 font-mono text-xs text-neonTeal/90">{o.card_id}</td>
+                        <td className="p-3 text-slate-300">{o.player_name}</td>
+                        <td className="p-3 text-slate-300">
+                          <span className="block">{o.buyer_display_name}</span>
+                          <span className="text-xs text-slate-500">{o.buyer_email}</span>
+                        </td>
+                        <td className="p-3 text-slate-300">
+                          <span className="block">{o.seller_display_name}</span>
+                          <span className="text-xs text-slate-500">{o.seller_email}</span>
+                        </td>
+                        <td className="p-3 text-slate-200">${Number(o.offer_amount || 0).toFixed(2)}</td>
+                        <td className="p-3 text-slate-400">${Number(o.royalty_amount || 0).toFixed(2)}</td>
+                        <td className="p-3 text-slate-400">{o.status}</td>
+                        <td className="p-3 text-xs text-slate-500">{o.created_at?.slice(0, 16) || "—"}</td>
                       </tr>
                     ))
                   )}

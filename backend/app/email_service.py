@@ -448,3 +448,159 @@ def send_trade_cancelled_email(
         _send_resend_html(recipient_email, subject, html, trade_id, "trade_cancelled")
     except Exception as e:
         logger.error("Email failed for trade %s: %s", trade_id, e)
+
+
+def _money_label(amount: float) -> str:
+    return f"${amount:,.2f}"
+
+
+def send_marketplace_offer_received_email(
+    owner_email: str,
+    owner_name: str,
+    buyer_name: str,
+    card_player_name: str,
+    card_tier: str,
+    card_rarity: str,
+    card_image_url: str | None,
+    offer_amount: float,
+    offers_url: str,
+    offer_id: int,
+) -> None:
+    try:
+        bn = html_module.escape(buyer_name)
+        player = html_module.escape(card_player_name)
+        amt = html_module.escape(_money_label(offer_amount))
+        sub_inner = (
+            f"{bn} made an offer of <span style=\"color:#ffd700;font-weight:700;\">{amt}</span> "
+            f"on your {player} card. View and respond to the offer in your Future Legends account."
+        )
+        parts = [
+            _heading("New marketplace offer"),
+            _subtext_html(sub_inner),
+            _card_info_box(card_player_name, card_tier, card_rarity, card_image_url),
+            _divider(),
+            _cta_button(offers_url, "View incoming offers →"),
+        ]
+        html = _email_shell("".join(parts))
+        subject = f"Someone wants your {card_player_name} card!"
+        _send_resend_html(owner_email, subject, html, offer_id, "marketplace_offer_received")
+    except Exception as e:
+        logger.error("Email failed for marketplace offer %s: %s", offer_id, e)
+
+
+def send_marketplace_offer_accepted_buyer_email(
+    buyer_email: str,
+    buyer_name: str,
+    card_player_name: str,
+    card_tier: str,
+    card_rarity: str,
+    card_image_url: str | None,
+    offer_amount: float,
+    collection_url: str,
+    offer_id: int,
+) -> None:
+    try:
+        amt = html_module.escape(_money_label(offer_amount))
+        player = html_module.escape(card_player_name)
+        sub_inner = (
+            f"Your offer of <span style=\"color:#ffd700;font-weight:700;\">{amt}</span> for the "
+            f"{player} card was accepted. The card is now in your collection."
+        )
+        parts = [
+            _heading("Your offer was accepted! 🎉"),
+            _subtext_html(sub_inner),
+            _card_info_box(card_player_name, card_tier, card_rarity, card_image_url),
+            _divider(),
+            _cta_button(collection_url, "View My Collection →"),
+        ]
+        html = _email_shell("".join(parts))
+        subject = "Your offer was accepted! 🎉"
+        _send_resend_html(buyer_email, subject, html, offer_id, "marketplace_offer_accepted")
+    except Exception as e:
+        logger.error("Email failed for marketplace offer %s: %s", offer_id, e)
+
+
+def send_marketplace_sale_confirmed_seller_email(
+    seller_email: str,
+    seller_name: str,
+    buyer_name: str,
+    card_player_name: str,
+    card_tier: str,
+    card_rarity: str,
+    card_image_url: str | None,
+    offer_amount: float,
+    collection_url: str,
+    offer_id: int,
+) -> None:
+    try:
+        bn = html_module.escape(buyer_name)
+        amt = html_module.escape(_money_label(offer_amount))
+        player = html_module.escape(card_player_name)
+        sub_inner = (
+            f"Sale confirmed — {bn} purchased your {player} card for "
+            f"<span style=\"color:#ffd700;font-weight:700;\">{amt}</span>."
+        )
+        parts = [
+            _heading("Sale confirmed"),
+            _subtext_html(sub_inner),
+            _card_info_box(card_player_name, card_tier, card_rarity, card_image_url),
+            _divider(),
+            _cta_button(collection_url, "Open Future Legends →"),
+        ]
+        html = _email_shell("".join(parts))
+        subject = f"Sale confirmed — {card_player_name}"
+        _send_resend_html(seller_email, subject, html, offer_id, "marketplace_sale_confirmed")
+    except Exception as e:
+        logger.error("Email failed for marketplace offer %s: %s", offer_id, e)
+
+
+def send_marketplace_offer_declined_email(
+    buyer_email: str,
+    buyer_name: str,
+    card_player_name: str,
+    card_tier: str,
+    card_rarity: str,
+    card_image_url: str | None,
+    offer_amount: float,
+    marketplace_url: str,
+    offer_id: int,
+) -> None:
+    try:
+        amt = html_module.escape(_money_label(offer_amount))
+        player = html_module.escape(card_player_name)
+        sub_inner = (
+            f"The owner declined your offer of <span style=\"color:#ffd700;font-weight:700;\">{amt}</span> "
+            f"for {player}. You can browse more cards on Free Agency."
+        )
+        parts = [
+            _heading("Offer declined"),
+            _subtext_html(sub_inner),
+            _card_info_box(card_player_name, card_tier, card_rarity, card_image_url),
+            _divider(),
+            _cta_button(marketplace_url, "Browse Free Agency →"),
+        ]
+        html = _email_shell("".join(parts))
+        subject = f"Your offer on {card_player_name} was declined"
+        _send_resend_html(buyer_email, subject, html, offer_id, "marketplace_offer_declined")
+    except Exception as e:
+        logger.error("Email failed for marketplace offer %s: %s", offer_id, e)
+
+
+def send_marketplace_offer_cancelled_email(
+    buyer_email: str,
+    buyer_name: str,
+    card_player_name: str,
+    offer_id: int,
+) -> None:
+    try:
+        player = html_module.escape(card_player_name)
+        sub_inner = f"Your offer on {player} has been cancelled."
+        parts = [
+            _heading("Offer cancelled"),
+            _subtext_plain(sub_inner),
+        ]
+        html = _email_shell("".join(parts))
+        subject = "Offer cancelled"
+        _send_resend_html(buyer_email, subject, html, offer_id, "marketplace_offer_cancelled")
+    except Exception as e:
+        logger.error("Email failed for marketplace offer %s: %s", offer_id, e)

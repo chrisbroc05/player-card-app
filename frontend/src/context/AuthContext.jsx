@@ -24,6 +24,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [initializing, setInitializing] = useState(true);
   const [pendingIncomingTradesCount, setPendingIncomingTradesCount] = useState(0);
+  const [pendingIncomingMarketplaceCount, setPendingIncomingMarketplaceCount] = useState(0);
 
   const refreshIncomingTradeCount = useCallback(async (authToken) => {
     const t = (authToken ?? token ?? localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) ?? "").trim();
@@ -43,11 +44,38 @@ export function AuthProvider({ children }) {
     }
   }, [token]);
 
+  const refreshIncomingMarketplaceCount = useCallback(async (authToken) => {
+    const t = (authToken ?? token ?? localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) ?? "").trim();
+    if (!t) {
+      setPendingIncomingMarketplaceCount(0);
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE_URL}/marketplace/incoming-offers/count`, {
+        headers: { ...authHeaders(t) },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setPendingIncomingMarketplaceCount(Number(data?.count) || 0);
+    } catch {
+      setPendingIncomingMarketplaceCount(0);
+    }
+  }, [token]);
+
+  const refreshNavBadges = useCallback(
+    async (authToken) => {
+      const t = authToken ?? token;
+      await Promise.all([refreshIncomingTradeCount(t), refreshIncomingMarketplaceCount(t)]);
+    },
+    [token, refreshIncomingTradeCount, refreshIncomingMarketplaceCount]
+  );
+
   const logout = useCallback(() => {
     localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
     setToken("");
     setUser(null);
     setPendingIncomingTradesCount(0);
+    setPendingIncomingMarketplaceCount(0);
   }, []);
 
   useEffect(() => {
@@ -91,11 +119,20 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (initializing) return;
     if (user && token) {
-      refreshIncomingTradeCount(token);
+      refreshNavBadges(token);
     } else {
       setPendingIncomingTradesCount(0);
+      setPendingIncomingMarketplaceCount(0);
     }
-  }, [user, token, initializing, refreshIncomingTradeCount]);
+  }, [user, token, initializing, refreshNavBadges]);
+
+  useEffect(() => {
+    if (initializing || !user || !token) return undefined;
+    const id = window.setInterval(() => {
+      refreshNavBadges(token);
+    }, 60000);
+    return () => window.clearInterval(id);
+  }, [user, token, initializing, refreshNavBadges]);
 
   const login = useCallback(
     async (email, password) => {
@@ -109,9 +146,9 @@ export function AuthProvider({ children }) {
       localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, data.access_token);
       setToken(data.access_token);
       setUser(data.user);
-      refreshIncomingTradeCount(data.access_token);
+      refreshNavBadges(data.access_token);
     },
-    [refreshIncomingTradeCount]
+    [refreshNavBadges]
   );
 
   const register = useCallback(
@@ -134,9 +171,9 @@ export function AuthProvider({ children }) {
       localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, data.access_token);
       setToken(data.access_token);
       setUser(data.user);
-      refreshIncomingTradeCount(data.access_token);
+      refreshNavBadges(data.access_token);
     },
-    [refreshIncomingTradeCount]
+    [refreshNavBadges]
   );
 
   const value = useMemo(
@@ -145,7 +182,10 @@ export function AuthProvider({ children }) {
       user,
       initializing,
       pendingIncomingTradesCount,
+      pendingIncomingMarketplaceCount,
       refreshIncomingTradeCount,
+      refreshIncomingMarketplaceCount,
+      refreshNavBadges,
       login,
       logout,
       register,
@@ -155,7 +195,10 @@ export function AuthProvider({ children }) {
       user,
       initializing,
       pendingIncomingTradesCount,
+      pendingIncomingMarketplaceCount,
       refreshIncomingTradeCount,
+      refreshIncomingMarketplaceCount,
+      refreshNavBadges,
       login,
       logout,
       register,

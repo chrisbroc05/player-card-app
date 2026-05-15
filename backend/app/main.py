@@ -62,6 +62,7 @@ from schema_migrations import run_schema_migrations_after_models  # noqa: E402
 from trade_routes import router as trade_router  # noqa: E402
 from routers.admin import router as admin_router  # noqa: E402
 from routers.auth import router as auth_user_router  # noqa: E402
+from routers.marketplace import router as marketplace_router  # noqa: E402
 from theme_library import (  # noqa: E402
     THEME_CATEGORIES,
     is_valid_theme_slug,
@@ -113,6 +114,7 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(trade_router, prefix="/trades", tags=["trades"])
 app.include_router(admin_router, prefix="/admin", tags=["admin"])
 app.include_router(auth_user_router, prefix="/auth", tags=["auth"])
+app.include_router(marketplace_router, prefix="/marketplace", tags=["marketplace"])
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[

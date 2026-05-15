@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import { API_BASE_URL, ADMIN_TOKEN_STORAGE_KEY } from "../config/api";
@@ -20,7 +20,9 @@ function formatApiError(detail, fallback) {
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login, user, initializing } = useAuth();
+  const redirectTo = location.state?.from || "/my-collection";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -29,7 +31,7 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
 
   if (!initializing && user && !adminMode) {
-    return <Navigate to="/my-collection" replace />;
+    return <Navigate to={redirectTo} replace />;
   }
 
   async function handleSubmit(e) {
@@ -62,7 +64,7 @@ export default function LoginPage() {
         navigate("/admin", { replace: true });
       } else {
         await login(email, password);
-        navigate("/my-collection", { replace: true });
+        navigate(redirectTo, { replace: true });
       }
     } catch {
       if (adminMode) setAdminError("Could not reach the server. Check your connection and API URL.");

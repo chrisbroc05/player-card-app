@@ -20,7 +20,8 @@ from sqlalchemy.orm import Session
 from auth import ALGORITHM, SECRET_KEY
 from beta_config import beta_mode_active, get_beta_invite_code, set_beta_invite_code
 from database import get_db
-from models import Card, TradeOffer, User
+from models import Card, MarketplaceOffer, TradeOffer, User
+from marketplace_repo import float_from_decimal
 
 router = APIRouter()
 admin_security = HTTPBearer(auto_error=False)
@@ -234,6 +235,39 @@ def admin_stats(
             }
         )
 
+    total_listed = int(
+        db.query(func.count(Card.id)).filter(Card.listed_on_marketplace.is_(True)).scalar() or 0
+    )
+    total_offers = int(db.query(func.count(MarketplaceOffer.id)).scalar() or 0)
+    offers_pending = int(
+        db.query(func.count(MarketplaceOffer.id))
+        .filter(MarketplaceOffer.status == "pending")
+        .scalar()
+        or 0
+    )
+    offers_accepted = int(
+        db.query(func.count(MarketplaceOffer.id))
+        .filter(MarketplaceOffer.status == "accepted")
+        .scalar()
+        or 0
+    )
+    offers_declined = int(
+        db.query(func.count(MarketplaceOffer.id))
+        .filter(MarketplaceOffer.status == "declined")
+        .scalar()
+        or 0
+    )
+    total_royalties_earned = float_from_decimal(
+        db.query(func.coalesce(func.sum(MarketplaceOffer.royalty_amount), 0))
+        .filter(MarketplaceOffer.status == "accepted")
+        .scalar()
+    )
+    total_volume = float_from_decimal(
+        db.query(func.coalesce(func.sum(MarketplaceOffer.offer_amount), 0))
+        .filter(MarketplaceOffer.status == "accepted")
+        .scalar()
+    )
+
     return {
         "total_users": total_users,
         "total_cards": total_cards,
@@ -248,6 +282,15 @@ def admin_stats(
         "top_creators": top_creators,
         "recent_users": recent_users,
         "recent_cards": recent_cards,
+        "marketplace_stats": {
+            "total_listed": total_listed,
+            "total_offers": total_offers,
+            "offers_pending": offers_pending,
+            "offers_accepted": offers_accepted,
+            "offers_declined": offers_declined,
+            "total_royalties_earned": total_royalties_earned,
+            "total_volume": total_volume,
+        },
     }
 
 
@@ -354,6 +397,47 @@ def admin_trades(
             }
         )
     return out
+
+
+@router.get("/marketplace")
+def admin_marketplace(
+    db: Session = Depends(get_db),
+    _admin: dict[str, Any] = Depends(require_admin),
+):
+    Buyer = User
+    Seller = User
+    rows = (
+        db.query(
+            MarketplaceOffer,
+            Card.player_name,
+            Buyer.display_name,
+            Buyer.email,
+            Seller.display_name,
+            Seller.email,
+        )
+        .join(Card, MarketplaceOffer.card_id == Card.card_id)
+        .join(Buyer, MarketplaceOffer.buyer_id == Buyer.id)
+        .join(Seller, MarketplaceOffer.seller_id == Seller.id)
+        .order_by(MarketplaceOffer.created_at.desc())
+        .all()
+    )
+    return [
+        {
+            "offer_id": offer.id,
+            "card_id": offer.card_id,
+            "player_name": player_name or "",
+            "offer_amount": float_from_decimal(offer.offer_amount),
+            "royalty_amount": float_from_decimal(offer.royalty_amount),
+            "status": offer.status,
+            "created_at": _iso(offer.created_at),
+            "updated_at": _iso(offer.updated_at),
+            "buyer_display_name": buyer_dn,
+            "buyer_email": buyer_email,
+            "seller_display_name": seller_dn,
+            "seller_email": seller_email,
+        }
+        for offer, player_name, buyer_dn, buyer_email, seller_dn, seller_email in rows
+    ]
 
 
 @router.get("/invite-codes", response_model=AdminInviteCodesResponse)

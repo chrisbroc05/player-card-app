@@ -252,6 +252,24 @@ export default function ProfilePage() {
                   </Link>
                 </li>
                 <li>
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Free Agency</p>
+                  <Link
+                    to="/marketplace"
+                    className="mt-1 inline-flex min-h-[44px] w-full items-center justify-center rounded-xl border border-white/15 bg-cardBg2 px-4 text-sm font-medium text-slate-100 transition hover:border-teal-400/40 hover:bg-teal-500/10"
+                  >
+                    Browse marketplace
+                  </Link>
+                </li>
+                <li>
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">My Listings</p>
+                  <Link
+                    to="/marketplace/my-listings"
+                    className="mt-1 inline-flex min-h-[44px] w-full items-center justify-center rounded-xl border border-white/15 bg-cardBg2 px-4 text-sm font-medium text-slate-100 transition hover:border-teal-400/40 hover:bg-teal-500/10"
+                  >
+                    Manage listings
+                  </Link>
+                </li>
+                <li>
                   <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Trade Center</p>
                   <Link
                     to="/trades"

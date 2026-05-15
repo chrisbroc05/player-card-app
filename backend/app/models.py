@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
@@ -56,6 +57,9 @@ class Card(Base):
     owner_name: Mapped[str] = mapped_column(String(200), default="unassigned")
     status: Mapped[str] = mapped_column(String(32), default="active", nullable=False)
     trade_offered_to: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    listed_on_marketplace: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    asking_price: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    listed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     owner: Mapped["User | None"] = relationship(
         "User",
@@ -66,6 +70,39 @@ class Card(Base):
         "TradeOffer",
         back_populates="card",
     )
+    marketplace_offers: Mapped[list["MarketplaceOffer"]] = relationship(
+        "MarketplaceOffer",
+        back_populates="card",
+        foreign_keys="MarketplaceOffer.card_id",
+    )
+
+
+class MarketplaceOffer(Base):
+    __tablename__ = "marketplace_offers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    card_id: Mapped[str] = mapped_column(
+        String(40),
+        ForeignKey("cards.card_id"),
+        nullable=False,
+        index=True,
+    )
+    buyer_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    seller_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    offer_amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="pending", nullable=False)
+    royalty_amount: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    message: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    card: Mapped["Card"] = relationship(
+        "Card",
+        back_populates="marketplace_offers",
+        foreign_keys=[card_id],
+    )
+    buyer: Mapped["User"] = relationship("User", foreign_keys=[buyer_id])
+    seller: Mapped["User"] = relationship("User", foreign_keys=[seller_id])
 
 
 class TradeOffer(Base):

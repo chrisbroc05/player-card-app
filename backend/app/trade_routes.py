@@ -22,6 +22,7 @@ from email_service import (
 )
 from database import get_db
 from models import Card, TradeOffer, User
+from marketplace_repo import cancel_pending_marketplace_offers_for_card, clear_marketplace_listing
 from trade_repo import (
     count_incoming_pending,
     find_recipient_by_identifier,
@@ -207,6 +208,10 @@ def trades_accept(
     card_tier = card.tier
     card_rarity = card.rarity
     card_image_url = card.image_url
+    cancel_pending_marketplace_offers_for_card(db, card.card_id)
+    if card.listed_on_marketplace:
+        clear_marketplace_listing(card)
+
     card.owner_id = current_user.id
     card.owner_name = current_user.display_name
     card.status = "active"

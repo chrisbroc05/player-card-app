@@ -6,14 +6,18 @@ import { API_BASE_URL, authHeaders } from "../config/api";
 import CardImage from "../components/CardImage";
 import { CardSharePopover } from "../components/ShareCard";
 import { useAuth } from "../context/AuthContext";
+import MarketplaceListingActions from "../components/MarketplaceListingActions";
+import { authFetch, formatApiError } from "../utils/authFetch";
 import { vaultTierBadge, rarityDisplay } from "../utils/tierStyles";
 
 export default function MyCollectionPage() {
-  const { token, user, initializing, refreshIncomingTradeCount } = useAuth();
+  const { token, user, initializing, refreshIncomingTradeCount, refreshNavBadges } = useAuth();
   const [cards, setCards] = useState([]);
+  const [listingByCardId, setListingByCardId] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [cancelKey, setCancelKey] = useState("");
+  const [marketplaceBusyId, setMarketplaceBusyId] = useState("");
 
   const loadCards = useCallback(async () => {
     if (!token) return;
@@ -26,12 +30,69 @@ export default function MyCollectionPage() {
       if (!res.ok) throw new Error("Could not load your collection.");
       const data = await res.json();
       setCards(Array.isArray(data) ? data : []);
+      const listRes = await authFetch(token, "/marketplace/my-listings");
+      if (listRes.res.ok) {
+        const listings = await listRes.res.json().catch(() => []);
+        const map = {};
+        if (Array.isArray(listings)) {
+          for (const row of listings) {
+            if (row.card_id) map[row.card_id] = row;
+          }
+        }
+        setListingByCardId(map);
+      }
     } catch (e) {
       setError(e.message || "Failed to fetch.");
     } finally {
       setLoading(false);
     }
   }, [token]);
+
+  async function listCardOnMarketplace(cardId, askingPrice) {
+    if (!token) return;
+    setMarketplaceBusyId(cardId);
+    setError("");
+    try {
+      const { res, unauthorized } = await authFetch(token, "/marketplace/list", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ card_id: cardId, asking_price: askingPrice }),
+      });
+      if (unauthorized) throw new Error("Session expired.");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not list card."));
+      await loadCards();
+      refreshNavBadges?.();
+    } catch (e) {
+      setError(e.message || "Could not list card.");
+      throw e;
+    } finally {
+      setMarketplaceBusyId("");
+    }
+  }
+
+  async function unlistCardFromMarketplace(cardId) {
+    if (!token) return;
+    setMarketplaceBusyId(cardId);
+    setError("");
+    try {
+      const { res, unauthorized } = await authFetch(token, "/marketplace/unlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ card_id: cardId }),
+      });
+      if (unauthorized) throw new Error("Session expired.");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not remove listing."));
+      await loadCards();
+      refreshNavBadges?.();
+    } catch (e) {
+      setError(e.message || "Could not remove listing.");
+      throw e;
+    } finally {
+      setMarketplaceBusyId("");
+    }
+  }
 
   const displayRows = useMemo(() => {
     const arr = [...cards];
@@ -183,6 +244,13 @@ export default function MyCollectionPage() {
                         {cancelKey === card.card_id ? "Cancelling…" : "Cancel Trade"}
                       </button>
                     ) : null}
+                    <MarketplaceListingActions
+                      card={card}
+                      listingInfo={listingByCardId[card.card_id]}
+                      busy={marketplaceBusyId === card.card_id}
+                      onList={(price) => listCardOnMarketplace(card.card_id, price)}
+                      onUnlist={() => unlistCardFromMarketplace(card.card_id)}
+                    />
                   </div>
                 </article>
               );

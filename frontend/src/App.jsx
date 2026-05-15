@@ -9,6 +9,10 @@ import TradesPage from "./pages/TradesPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminRoute from "./components/AdminRoute";
 import ProfilePage from "./pages/ProfilePage";
+import MarketplacePage from "./pages/MarketplacePage";
+import MarketplaceCardDetailPage from "./pages/MarketplaceCardDetailPage";
+import MarketplaceMyListingsPage from "./pages/MarketplaceMyListingsPage";
+import MarketplaceMyOffersPage from "./pages/MarketplaceMyOffersPage";
 
 export default function App() {
   return (
@@ -28,6 +32,10 @@ export default function App() {
       />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/my-collection" element={<MyCollectionPage />} />
+      <Route path="/marketplace/my-listings" element={<MarketplaceMyListingsPage />} />
+      <Route path="/marketplace/my-offers" element={<MarketplaceMyOffersPage />} />
+      <Route path="/marketplace/:cardId" element={<MarketplaceCardDetailPage />} />
+      <Route path="/marketplace" element={<MarketplacePage />} />
       <Route path="/trades" element={<TradesPage />} />
       <Route path="/profile" element={<ProfilePage />} />
     </Routes>

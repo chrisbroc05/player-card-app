@@ -4,8 +4,11 @@ import { useAuth } from "../context/AuthContext";
 
 export default function AppHeader() {
   const location = useLocation();
-  const { user, logout, initializing, pendingIncomingTradesCount } = useAuth();
+  const { user, logout, initializing, pendingIncomingTradesCount, pendingIncomingMarketplaceCount } =
+    useAuth();
   const onStudio = location.pathname === "/";
+  const onVault = location.pathname.startsWith("/my-collection") || location.pathname === "/vault";
+  const onMarketplace = location.pathname.startsWith("/marketplace");
   const onMyCollection = location.pathname.startsWith("/my-collection");
   const onTrades = location.pathname.startsWith("/trades");
   const onProfile = location.pathname.startsWith("/profile");
@@ -28,6 +31,31 @@ export default function AppHeader() {
           >
             Studio
           </Link>
+          {!initializing && !user ? (
+            <Link
+              to="/my-collection"
+              className={`rounded-lg px-3 py-2 text-xs font-medium transition sm:text-sm ${
+                onVault && !onMarketplace ? "bg-violet-500/20 text-violet-200" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              Vault
+            </Link>
+          ) : null}
+          {!initializing ? (
+            <Link
+              to="/marketplace"
+              className={`relative rounded-lg px-3 py-2 text-xs font-medium transition sm:text-sm ${
+                onMarketplace ? "bg-teal-500/20 text-neonTeal" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              Free Agency
+              {user && pendingIncomingMarketplaceCount > 0 ? (
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[#ef4444] px-1 text-[10px] font-bold leading-none text-white shadow-sm">
+                  {pendingIncomingMarketplaceCount > 9 ? "9+" : pendingIncomingMarketplaceCount}
+                </span>
+              ) : null}
+            </Link>
+          ) : null}
           {!initializing && user ? (
             <>
               <Link
