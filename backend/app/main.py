@@ -43,6 +43,7 @@ from auth import (  # noqa: E402
     hash_password,
     verify_password,
 )
+from card_history import build_card_history  # noqa: E402
 from card_repo import (  # noqa: E402
     PRINT_RUN_ALLOWED_QUANTITIES,
     card_to_dict,
@@ -1513,6 +1514,27 @@ def get_card_copies(card_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Card not found")
     rows = list_cards_by_image_url_dicts(db, orm.image_url)
     return [CardVaultSummary.model_validate(r) for r in rows]
+
+
+class CardHistoryEvent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    event_type: str
+    event_date: str
+    description: str
+    actor: str | None = None
+
+
+@app.get("/cards/{card_id}/history", response_model=list[CardHistoryEvent])
+def get_card_history(card_id: str, db: Session = Depends(get_db)):
+    """Chronological lifetime events for a card (public, read-only)."""
+    key = _canonical_card_id(card_id)
+    if key is None:
+        raise HTTPException(status_code=404, detail="Card not found")
+    orm = get_card_by_card_id(db, key)
+    if orm is None:
+        raise HTTPException(status_code=404, detail="Card not found")
+    return [CardHistoryEvent.model_validate(e) for e in build_card_history(db, orm)]
 
 
 @app.post("/cards/{card_id}/duplicate", response_model=list[Card])

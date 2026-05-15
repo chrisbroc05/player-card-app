@@ -35,7 +35,7 @@ export default function CardGallery({ cards }) {
                       imageUrl={card.image_url}
                       alt={card.player_name || "Card"}
                       cacheBust={card.created_at}
-                      className="aspect-[3/4] w-full rounded-lg border border-white/10 object-cover"
+                      frameClassName="flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/30"
                     />
                   </Link>
                   <div className="absolute right-2 top-2">

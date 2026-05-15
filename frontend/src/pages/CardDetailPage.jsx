@@ -7,7 +7,9 @@ import CardImage from "../components/CardImage";
 import ShareCard from "../components/ShareCard";
 import SendCard from "../components/SendCard";
 import { useAuth } from "../context/AuthContext";
+import CardHistoryTimeline from "../components/CardHistoryTimeline";
 import { vaultTierBadge, formatEdition, rarityDisplay } from "../utils/tierStyles";
+import { CARD_IMAGE_FRAME } from "../utils/cardImageStyles";
 
 function formatCreatedAt(iso) {
   if (!iso) return "—";
@@ -137,7 +139,8 @@ export default function CardDetailPage() {
                   imageUrl={card.image_url}
                   alt={card.player_name}
                   cacheBust={card.created_at}
-                  className="w-full rounded-xl object-cover shadow-2xl"
+                  frameClassName={`${CARD_IMAGE_FRAME} shadow-2xl`}
+                  className="rounded-xl"
                 />
               </div>
             </div>
@@ -187,6 +190,8 @@ export default function CardDetailPage() {
                   <dd className="text-slate-200">{formatCreatedAt(card.created_at)}</dd>
                 </div>
               </dl>
+
+              <CardHistoryTimeline cardId={card.card_id} />
 
               {copies.length > 0 ? (
                 <div className="rounded-2xl border border-white/10 bg-cardBg p-4 sm:p-5">

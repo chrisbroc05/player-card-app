@@ -865,7 +865,7 @@ export default function StudioPage() {
                       <img
                         src={toApiUrl(preview.image_url)}
                         alt={`Preview ${idx + 1}`}
-                        className="aspect-[3/4] w-full object-cover"
+                        className="block aspect-[2/3] h-auto w-full object-contain"
                       />
                       <div className="bg-cardBg2 p-2 text-xs text-slate-300">
                         <span className={`rounded-full border px-1.5 py-0.5 ${tierTheme.pill}`}>{tierTheme.sub}</span>{" "}
@@ -969,7 +969,7 @@ export default function StudioPage() {
                 <img
                   src={toApiUrl(selectedPreviewUrl || generatedCardUrl)}
                   alt="Selected preview"
-                  className="h-full w-full object-cover"
+                  className="block h-auto w-full object-contain"
                 />
               </div>
               <div className="space-y-2 text-sm text-slate-300">

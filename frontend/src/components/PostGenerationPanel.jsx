@@ -95,7 +95,7 @@ export default function PostGenerationPanel({
 
       <div className="mx-auto max-w-md">
         <div className={`overflow-hidden rounded-xl border-2 bg-black/20 transition duration-500 ${badge.glow}`}>
-          <img src={imgSrc} alt={detail.player_name || "Card"} className="w-full object-cover" />
+          <img src={imgSrc} alt={detail.player_name || "Card"} className="block h-auto w-full object-contain" />
         </div>
       </div>
 

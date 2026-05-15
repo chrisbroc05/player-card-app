@@ -9,6 +9,7 @@ import { useAuth } from "../context/AuthContext";
 import MarketplaceListingActions from "../components/MarketplaceListingActions";
 import { authFetch, formatApiError } from "../utils/authFetch";
 import { vaultTierBadge, rarityDisplay } from "../utils/tierStyles";
+import { CARD_IMAGE_FRAME } from "../utils/cardImageStyles";
 
 export default function MyCollectionPage() {
   const { token, user, initializing, refreshIncomingTradeCount, refreshNavBadges } = useAuth();
@@ -191,19 +192,20 @@ export default function MyCollectionPage() {
                     pending ? "opacity-70" : "hover:scale-[1.02]"
                   }`}
                 >
-                  <div className="relative overflow-hidden rounded-xl border border-white/10 bg-black/30">
+                  <div className={`relative ${CARD_IMAGE_FRAME}`}>
                     <CardImage
                       imageUrl={card.image_url}
                       alt={card.player_name}
                       cacheBust={card.created_at}
-                      className="aspect-[3/4] w-full object-cover transition duration-300 group-hover:brightness-110"
+                      frameClassName="flex h-full w-full items-center justify-center"
+                      className="transition duration-300 group-hover:brightness-110"
                     />
                     {stackCount ? (
-                      <span className="absolute left-2 top-2 rounded-md border border-white/15 bg-black/70 px-2 py-0.5 text-[11px] font-semibold text-slate-200 backdrop-blur-sm">
+                      <span className="absolute left-2 top-2 z-10 rounded-md border border-white/15 bg-black/70 px-2 py-0.5 text-[11px] font-semibold text-slate-200 backdrop-blur-sm">
                         x{stackCount}
                       </span>
                     ) : null}
-                    <div className="absolute right-2 top-2">
+                    <div className="absolute right-2 top-2 z-10">
                       <CardSharePopover card={card} />
                     </div>
                   </div>

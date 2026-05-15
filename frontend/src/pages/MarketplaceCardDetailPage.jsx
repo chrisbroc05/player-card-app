@@ -7,7 +7,9 @@ import { API_BASE_URL } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import { authFetch, formatApiError } from "../utils/authFetch";
 import { computeRoyaltyPreview, formatMoney, listedAgeLabel } from "../utils/marketplace";
+import CardHistoryTimeline from "../components/CardHistoryTimeline";
 import { vaultTierBadge, rarityDisplay, formatEditionShort } from "../utils/tierStyles";
+import { CARD_IMAGE_FRAME } from "../utils/cardImageStyles";
 
 export default function MarketplaceCardDetailPage() {
   const { cardId } = useParams();
@@ -105,11 +107,11 @@ export default function MarketplaceCardDetailPage() {
           <div className="mt-8 rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-6 text-sm text-rose-100">{error}</div>
         ) : listing ? (
           <div className="mt-8 grid gap-8 lg:grid-cols-2">
-            <div className={`overflow-hidden rounded-2xl border border-white/10 bg-cardBg p-3 ${badge?.glow || ""}`}>
+            <div className={`rounded-2xl border border-white/10 bg-cardBg p-3 ${badge?.glow || ""}`}>
               <CardImage
                 imageUrl={listing.image_url}
                 alt={listing.player_name}
-                className="aspect-[3/4] w-full rounded-xl object-cover"
+                frameClassName={CARD_IMAGE_FRAME}
               />
             </div>
             <div className="space-y-4">
@@ -129,6 +131,8 @@ export default function MarketplaceCardDetailPage() {
                 <p className="mt-2 text-xs text-amber-200">{listing.pending_offer_count} pending offer(s)</p>
               ) : null}
             </div>
+              <CardHistoryTimeline cardId={listing.card_id} />
+
               <OfferPanel
                 isOwner={isOwner}
                 user={user}

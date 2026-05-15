@@ -42,7 +42,7 @@ export default function FeaturedCard({ imageUrl, tier, loading }) {
           <img
             src={imageUrl}
             alt="Generated baseball card"
-            className="mx-auto w-full max-w-2xl rounded-xl border border-white/15 shadow-2xl shadow-black/50"
+            className="mx-auto block h-auto w-full max-w-2xl rounded-xl border border-white/15 object-contain shadow-2xl shadow-black/50"
           />
         </div>
       ) : (

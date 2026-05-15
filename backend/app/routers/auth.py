@@ -11,7 +11,8 @@ from sqlalchemy.orm import Session
 
 from auth import get_current_user
 from database import get_db
-from models import Card, TradeOffer
+from marketplace_repo import float_from_decimal
+from models import Card, MarketplaceOffer, TradeOffer, User
 
 router = APIRouter()
 
@@ -28,6 +29,26 @@ class RarestCardOut(BaseModel):
     image_url: str
 
 
+class MarketplaceHighlightOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    card_id: str
+    player_name: str
+    offer_amount: float
+    image_url: str
+
+
+class MarketplaceStatsOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    total_spent: float
+    total_earned: float
+    highest_purchase: MarketplaceHighlightOut | None = None
+    highest_sale: MarketplaceHighlightOut | None = None
+    total_offers_made: int
+    active_listings: int
+
+
 class UserProfileResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -41,6 +62,7 @@ class UserProfileResponse(BaseModel):
     total_print_run_copies: int
     favorite_tier: str | None = Field(default=None)
     rarest_card: RarestCardOut | None = None
+    marketplace_stats: MarketplaceStatsOut
 
 
 def _member_since_label(created_at: datetime) -> str:
@@ -132,6 +154,65 @@ def get_profile(
     if created.tzinfo is None:
         created = created.replace(tzinfo=timezone.utc)
 
+    total_spent = float_from_decimal(
+        db.query(func.coalesce(func.sum(MarketplaceOffer.offer_amount), 0))
+        .filter(MarketplaceOffer.buyer_id == uid, MarketplaceOffer.status == "accepted")
+        .scalar()
+    )
+
+    total_earned = float_from_decimal(
+        db.query(func.coalesce(func.sum(MarketplaceOffer.offer_amount), 0))
+        .filter(MarketplaceOffer.seller_id == uid, MarketplaceOffer.status == "accepted")
+        .scalar()
+    )
+
+    total_offers_made = int(
+        db.query(func.count(MarketplaceOffer.id)).filter(MarketplaceOffer.buyer_id == uid).scalar() or 0
+    )
+
+    active_listings = int(
+        db.query(func.count(Card.id))
+        .filter(Card.owner_id == uid, Card.listed_on_marketplace.is_(True))
+        .scalar()
+        or 0
+    )
+
+    def _highlight_from_offer(offer: MarketplaceOffer | None) -> MarketplaceHighlightOut | None:
+        if offer is None:
+            return None
+        card_row = db.query(Card).filter(Card.card_id == offer.card_id).first()
+        if card_row is None:
+            return None
+        return MarketplaceHighlightOut(
+            card_id=card_row.card_id,
+            player_name=card_row.player_name,
+            offer_amount=float_from_decimal(offer.offer_amount),
+            image_url=card_row.image_url,
+        )
+
+    top_purchase = (
+        db.query(MarketplaceOffer)
+        .filter(MarketplaceOffer.buyer_id == uid, MarketplaceOffer.status == "accepted")
+        .order_by(MarketplaceOffer.offer_amount.desc())
+        .first()
+    )
+
+    top_sale = (
+        db.query(MarketplaceOffer)
+        .filter(MarketplaceOffer.seller_id == uid, MarketplaceOffer.status == "accepted")
+        .order_by(MarketplaceOffer.offer_amount.desc())
+        .first()
+    )
+
+    marketplace_stats = MarketplaceStatsOut(
+        total_spent=total_spent,
+        total_earned=total_earned,
+        highest_purchase=_highlight_from_offer(top_purchase),
+        highest_sale=_highlight_from_offer(top_sale),
+        total_offers_made=total_offers_made,
+        active_listings=active_listings,
+    )
+
     return UserProfileResponse(
         display_name=user.display_name,
         email=user.email,
@@ -143,4 +224,5 @@ def get_profile(
         total_print_run_copies=total_print_run_copies,
         favorite_tier=favorite_tier,
         rarest_card=rarest_out,
+        marketplace_stats=marketplace_stats,
     )

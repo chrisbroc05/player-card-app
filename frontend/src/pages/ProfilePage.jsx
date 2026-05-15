@@ -5,6 +5,8 @@ import AppFooter from "../components/AppFooter";
 import CardImage from "../components/CardImage";
 import { API_BASE_URL, authHeaders } from "../config/api";
 import { useAuth } from "../context/AuthContext";
+import { formatMoney } from "../utils/marketplace";
+import { CARD_IMAGE_FRAME_SM } from "../utils/cardImageStyles";
 
 function formatApiError(detail, fallback) {
   if (!detail) return fallback;
@@ -68,6 +70,11 @@ const iconLayers = (
     <path strokeLinecap="round" strokeLinejoin="round" d="M6.429 9.75L12 12.75l5.571-3M6.429 12.75L12 15.75l5.571-3m-11.142 3L12 21.75l5.571-3" />
   </svg>
 );
+const iconDollar = (
+  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
 const iconTrophy = (
   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
     <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 013 3H15a3 3 0 01-3-3h6zm-9 0a3 3 0 00-3 3H9a3 3 0 003-3zM6.75 7.5v7.5m10.5-7.5v7.5m-12-3h13.5m-13.5 0A2.25 2.25 0 013.75 9.75v-1.5A2.25 2.25 0 016 6h12a2.25 2.25 0 012.25 2.25v1.5a2.25 2.25 0 01-2.25 2.25m-13.5 0h13.5" />
@@ -114,6 +121,14 @@ export default function ProfilePage() {
   const fav = profile?.favorite_tier;
   const favDisplay = fav || "None yet";
   const favClass = fav ? tierValueClass(fav) : "text-slate-500";
+
+  const mp = profile?.marketplace_stats;
+  const showMarketplace =
+    mp &&
+    (mp.total_spent > 0 ||
+      mp.total_earned > 0 ||
+      mp.total_offers_made > 0 ||
+      mp.active_listings > 0);
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-appBg text-slate-100">
@@ -191,6 +206,58 @@ export default function ProfilePage() {
           </div>
         </section>
 
+        {!loading && showMarketplace ? (
+          <section className="mt-8">
+            <h2 className="mb-4 text-lg font-semibold text-white">Marketplace Activity</h2>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <StatCard icon={iconDollar} label="Spent on Cards" value={formatMoney(mp.total_spent)} valueClass="text-neonTeal" />
+              <StatCard icon={iconDollar} label="Earned from Sales" value={formatMoney(mp.total_earned)} valueClass="text-neonTeal" />
+              <StatCard icon={iconCards} label="Cards Listed" value={mp.active_listings} />
+              <StatCard icon={iconSend} label="Offers Submitted" value={mp.total_offers_made} />
+            </div>
+            {(mp.highest_purchase || mp.highest_sale) ? (
+              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                {mp.highest_purchase ? (
+                  <div className="rounded-xl border border-white/10 bg-cardBg2 p-4">
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Biggest Purchase</p>
+                    <div className="mt-3 flex gap-3">
+                      <CardImage
+                        imageUrl={mp.highest_purchase.image_url}
+                        alt={mp.highest_purchase.player_name}
+                        frameClassName={CARD_IMAGE_FRAME_SM}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-white">{mp.highest_purchase.player_name}</p>
+                        <p className="mt-1 text-lg font-semibold text-neonTeal">
+                          {formatMoney(mp.highest_purchase.offer_amount)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+                {mp.highest_sale ? (
+                  <div className="rounded-xl border border-white/10 bg-cardBg2 p-4">
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Biggest Sale</p>
+                    <div className="mt-3 flex gap-3">
+                      <CardImage
+                        imageUrl={mp.highest_sale.image_url}
+                        alt={mp.highest_sale.player_name}
+                        frameClassName={CARD_IMAGE_FRAME_SM}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-white">{mp.highest_sale.player_name}</p>
+                        <p className="mt-1 text-lg font-semibold text-neonTeal">
+                          {formatMoney(mp.highest_sale.offer_amount)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
         {loading ? (
           <div className="mt-10 flex min-h-[120px] items-center justify-center">
             <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/15 border-t-neonBlue" />
@@ -201,11 +268,11 @@ export default function ProfilePage() {
               <h2 className="text-lg font-semibold text-white">Rarest Card Owned</h2>
               {profile?.rarest_card ? (
                 <div className="mt-4">
-                  <div className="mx-auto max-w-[220px] overflow-hidden rounded-xl border border-white/10 bg-cardBg2 sm:mx-0">
+                  <div className="mx-auto max-w-[220px] sm:mx-0">
                     <CardImage
                       imageUrl={profile.rarest_card.image_url}
                       alt={profile.rarest_card.player_name}
-                      className="aspect-[3/4] w-full object-cover"
+                      frameClassName={CARD_IMAGE_FRAME_SM}
                     />
                   </div>
                   <dl className="mt-4 space-y-1 text-sm">

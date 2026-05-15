@@ -126,7 +126,7 @@ export default function MarketplaceMyListingsPage() {
                     <CardImage
                       imageUrl={listing.image_url}
                       alt={listing.player_name}
-                      className="aspect-[3/4] w-full object-cover"
+                      frameClassName="flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/30"
                     />
                   </Link>
                   <div className="min-w-0 flex-1">
