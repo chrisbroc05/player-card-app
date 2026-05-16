@@ -160,7 +160,7 @@ export default function MarketplaceMyOffersPage() {
                 <li key={offer.offer_id} className="rounded-2xl border border-white/10 bg-cardBg p-4">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                     <Link
-                      to={"/marketplace/" + encodeURIComponent(offer.card_id)}
+                      to={"/card/" + encodeURIComponent(offer.card_id)}
                       className="block w-full max-w-[100px] shrink-0"
                     >
                       <CardImage

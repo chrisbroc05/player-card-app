@@ -4,7 +4,6 @@ import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import FeaturedCard from "../components/FeaturedCard";
 import CardGallery from "../components/CardGallery";
-import OrdersDashboard from "../components/OrdersDashboard";
 import PostGenerationPanel from "../components/PostGenerationPanel";
 import StudioAuthGate from "../components/StudioAuthGate";
 import ThemeLibraryPicker from "../components/ThemeLibraryPicker";
@@ -94,7 +93,6 @@ function formatApiError(detail, fallback) {
 export default function StudioPage() {
   const navigate = useNavigate();
   const { token, user, initializing } = useAuth();
-  const [workspace, setWorkspace] = useState("customer");
   const [currentStep, setCurrentStep] = useState(1);
   const [dragActive, setDragActive] = useState(false);
 
@@ -117,7 +115,6 @@ export default function StudioPage() {
 
   const [cards, setCards] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [orderStatusDrafts, setOrderStatusDrafts] = useState({});
 
   const [orderCustomerName, setOrderCustomerName] = useState("Test User");
   const [orderCustomerEmail, setOrderCustomerEmail] = useState("test@email.com");
@@ -455,50 +452,6 @@ export default function StudioPage() {
     setShowCompleteModal(true);
   }
 
-  async function handleUpdateOrderStatus(orderId) {
-    const status = orderStatusDrafts[orderId];
-    if (!status) return;
-    setOrderActionKey(`status-${orderId}`);
-    setMessage("");
-    setError("");
-    try {
-      const res = await fetch(`${API_BASE_URL}/orders/${orderId}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", ...authHeaders(token) },
-        body: JSON.stringify({ status }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(formatApiError(data?.detail, "Failed to update order status."));
-      setMessage(`Order #${orderId} updated to ${data.status}.`);
-      await fetchOrders();
-    } catch (err) {
-      setError(err.message || "Failed to update order status.");
-    } finally {
-      setOrderActionKey("");
-    }
-  }
-
-  async function handleDeliverOrder(orderId) {
-    setOrderActionKey(`deliver-${orderId}`);
-    setMessage("");
-    setError("");
-    try {
-      const res = await fetch(`${API_BASE_URL}/orders/${orderId}/deliver`, {
-        method: "POST",
-        headers: { ...authHeaders(token) },
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(formatApiError(data?.detail, "Failed to deliver order."));
-      if (data.final_card_url) setGeneratedCardUrl(data.final_card_url);
-      setMessage(`Order #${orderId} marked as delivered.`);
-      await Promise.all([fetchMyCards(), fetchOrders()]);
-    } catch (err) {
-      setError(err.message || "Failed to deliver order.");
-    } finally {
-      setOrderActionKey("");
-    }
-  }
-
   function handleDropFile(e) {
     e.preventDefault();
     setDragActive(false);
@@ -519,36 +472,12 @@ export default function StudioPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold text-white">Card Creation Experience</h2>
-              <p className="text-xs text-slate-400">Guided customer flow with separate admin fulfillment controls.</p>
+              <p className="text-xs text-slate-400">Guided flow to create your collectible cards.</p>
               {!initializing && !user ? (
                 <p className="mt-2 text-xs text-neonTeal/90">
                   Sign up or log in to enter player details and create your own collectible cards.
                 </p>
               ) : null}
-            </div>
-            <div className="inline-flex rounded-xl border border-white/15 bg-cardBg2 p-1">
-              <button
-                type="button"
-                onClick={() => setWorkspace("customer")}
-                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                  workspace === "customer"
-                    ? "bg-neonBlue/25 text-neonBlue"
-                    : "text-slate-300 hover:text-white"
-                }`}
-              >
-                Customer Flow
-              </button>
-              <button
-                type="button"
-                onClick={() => setWorkspace("admin")}
-                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                  workspace === "admin"
-                    ? "bg-neonPurple/25 text-violet-200"
-                    : "text-slate-300 hover:text-white"
-                }`}
-              >
-                Admin Fulfillment
-              </button>
             </div>
           </div>
         </section>
@@ -565,8 +494,7 @@ export default function StudioPage() {
           </div>
         )}
 
-        {workspace === "customer" ? (
-          <section className="animate-fadeUp rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6">
+        <section className="animate-fadeUp rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6">
             <div className="mb-4 flex flex-wrap gap-2">
               {STEPS.map((label, i) => {
                 const step = i + 1;
@@ -937,21 +865,6 @@ export default function StudioPage() {
               </>
             )}
           </section>
-        ) : !user ? (
-          <StudioAuthGate
-            onBackToTiers={() => setWorkspace("customer")}
-            backLabel="← Back to customer studio"
-          />
-        ) : (
-          <OrdersDashboard
-            orders={orders}
-            orderStatusDrafts={orderStatusDrafts}
-            setOrderStatusDrafts={setOrderStatusDrafts}
-            onUpdateStatus={handleUpdateOrderStatus}
-            onDeliver={handleDeliverOrder}
-            activeActionKey={orderActionKey}
-          />
-        )}
 
         <FeaturedCard imageUrl={generatedCardFullUrl} tier={generatedTier} loading={isGenerating} />
         {user ? <CardGallery cards={cards} /> : null}
