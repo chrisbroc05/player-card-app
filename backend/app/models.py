@@ -60,6 +60,7 @@ class Card(Base):
     listed_on_marketplace: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     asking_price: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     listed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    listing_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     owner: Mapped["User | None"] = relationship(
         "User",
@@ -93,6 +94,10 @@ class MarketplaceOffer(Base):
     status: Mapped[str] = mapped_column(String(32), default="pending", nullable=False)
     royalty_amount: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     message: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    counter_amount: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    counter_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    counter_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 

@@ -6,7 +6,7 @@ import CardImage from "../components/CardImage";
 import { API_BASE_URL } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import { authFetch, formatApiError } from "../utils/authFetch";
-import { computeRoyaltyPreview, formatMoney, listedAgeLabel } from "../utils/marketplace";
+import { computeRoyaltyPreview, formatMoney, listedAgeLabel, listingExpiresSubtextClass } from "../utils/marketplace";
 import CardHistoryTimeline from "../components/CardHistoryTimeline";
 import { vaultTierBadge, rarityDisplay, formatEditionShort } from "../utils/tierStyles";
 import { CARD_IMAGE_FRAME } from "../utils/cardImageStyles";
@@ -58,8 +58,8 @@ export default function MarketplaceCardDetailPage() {
       return;
     }
     const n = Number(offerAmount);
-    if (!Number.isFinite(n) || n <= 0) {
-      setOfferError("Enter an offer amount greater than $0.00");
+    if (!Number.isFinite(n) || n < 0.01) {
+      setOfferError("Offer amount must be at least $0.01");
       return;
     }
     setSubmitting(true);
@@ -124,6 +124,13 @@ export default function MarketplaceCardDetailPage() {
                 <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[11px] text-slate-300">{rarityDisplay(listing.rarity)}</span>
               </div>
               <p className="mt-3 text-3xl font-bold text-neonTeal">{formatMoney(listing.asking_price)}</p>
+              {listing.days_remaining != null && listing.listing_expires_at ? (
+                <p className={`mt-1 text-sm ${listingExpiresSubtextClass(listing.days_remaining)}`}>
+                  {listing.days_remaining <= 0
+                    ? "Listing expires today"
+                    : `Listing expires in ${listing.days_remaining} day${listing.days_remaining === 1 ? "" : "s"}`}
+                </p>
+              ) : null}
               <p className="text-sm text-slate-500">Listed by {listing.owner_display_name}</p>
               <p className="text-xs text-slate-600">{listedAgeLabel(listing.listed_at)}</p>
               <p className="text-xs text-slate-500">{formatEditionShort(listing.edition_number, listing.print_run)}</p>
@@ -206,6 +213,7 @@ function OfferPanel({
               onChange={(e) => setOfferAmount(e.target.value)}
               className="mt-1 min-h-[44px] w-full rounded-lg border border-white/15 bg-cardBg px-3 py-2 text-slate-100"
             />
+            <p className="mt-1 text-xs text-slate-500">Enter your offer amount</p>
             <p className="mt-1 text-xs text-slate-500">
               Platform royalty (2%): {formatMoney(royaltyPreview)} · Asking: {formatMoney(listing.asking_price)}
             </p>

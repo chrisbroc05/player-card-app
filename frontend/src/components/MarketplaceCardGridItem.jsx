@@ -2,7 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import CardImage from "./CardImage";
 import { vaultTierBadge } from "../utils/tierStyles";
-import { formatMoney } from "../utils/marketplace";
+import { formatMoney, listingExpiresLabel, listingExpiresSubtextClass } from "../utils/marketplace";
 import { CARD_IMAGE_FRAME } from "../utils/cardImageStyles";
 
 export default function MarketplaceCardGridItem({ listing }) {
@@ -28,6 +28,11 @@ export default function MarketplaceCardGridItem({ listing }) {
         <p className="truncate font-semibold text-white">{listing.player_name}</p>
         <p className="truncate text-xs text-slate-400">{listing.team_name}</p>
         <p className="text-lg font-bold text-neonTeal">{formatMoney(listing.asking_price)}</p>
+        {listing.days_remaining != null && listing.listing_expires_at ? (
+          <p className={`text-[11px] ${listingExpiresSubtextClass(listing.days_remaining)}`}>
+            {listingExpiresLabel(listing.days_remaining)}
+          </p>
+        ) : null}
         <p className="text-xs text-slate-500">Listed by {listing.owner_display_name}</p>
         <span className="mt-2 block rounded-lg border border-teal-500/35 bg-teal-500/10 py-2 text-center text-xs font-semibold text-neonTeal transition group-hover:bg-neonTeal/20 sm:opacity-0 sm:group-hover:opacity-100">
           Make Offer

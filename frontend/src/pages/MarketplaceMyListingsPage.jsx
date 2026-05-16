@@ -6,8 +6,24 @@ import MarketplaceSubNav from "../components/MarketplaceSubNav";
 import CardImage from "../components/CardImage";
 import { useAuth } from "../context/AuthContext";
 import { authFetch, formatApiError } from "../utils/authFetch";
-import { formatMoney } from "../utils/marketplace";
+import {
+  formatMoney,
+  listingExpiresLabel,
+  listingExpiresSubtextClass,
+  offerExpiresLabel,
+  offerExpiresLineClass,
+} from "../utils/marketplace";
 import { vaultTierBadge } from "../utils/tierStyles";
+
+function formatListingExpiresDate(iso) {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  } catch {
+    return "";
+  }
+}
 
 export default function MarketplaceMyListingsPage() {
   const { token, user, initializing, refreshNavBadges } = useAuth();
@@ -16,6 +32,10 @@ export default function MarketplaceMyListingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionKey, setActionKey] = useState("");
+  const [relistBusyId, setRelistBusyId] = useState("");
+  const [counterFormOfferId, setCounterFormOfferId] = useState(null);
+  const [counterAmount, setCounterAmount] = useState("");
+  const [counterBusyId, setCounterBusyId] = useState(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -73,6 +93,62 @@ export default function MarketplaceMyListingsPage() {
     }
   }
 
+  async function sendCounter(offerId) {
+    if (!token) return;
+    const n = Number(counterAmount);
+    if (!Number.isFinite(n) || n < 1.0) {
+      setError("Counter amount must be at least $1.00");
+      return;
+    }
+    setCounterBusyId(offerId);
+    setError("");
+    try {
+      const { res, unauthorized } = await authFetch(token, `/marketplace/offer/${offerId}/counter`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ counter_amount: n }),
+      });
+      if (unauthorized) {
+        setError("Session expired. Please sign in again.");
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not send counter."));
+      setCounterFormOfferId(null);
+      setCounterAmount("");
+      await load();
+      refreshNavBadges?.();
+    } catch (e) {
+      setError(e.message || "Could not send counter.");
+    } finally {
+      setCounterBusyId(null);
+    }
+  }
+
+  async function relist(cardId, askingPrice) {
+    if (!token) return;
+    setRelistBusyId(cardId);
+    setError("");
+    try {
+      const { res, unauthorized } = await authFetch(token, "/marketplace/list", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ card_id: cardId, asking_price: askingPrice }),
+      });
+      if (unauthorized) {
+        setError("Session expired. Please sign in again.");
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(formatApiError(data?.detail, "Relist failed."));
+      await load();
+    } catch (e) {
+      setError(e.message || "Relist failed.");
+    } finally {
+      setRelistBusyId("");
+    }
+  }
+
   if (!initializing && !user) {
     return <Navigate to="/login" replace state={{ from: "/marketplace/my-listings" }} />;
   }
@@ -104,93 +180,190 @@ export default function MarketplaceMyListingsPage() {
           <div className="flex min-h-[200px] flex-col items-center justify-center rounded-2xl border border-dashed border-white/15 bg-cardBg/50 px-6 py-12 text-center">
             <p className="text-lg text-slate-300">No active listings</p>
             <p className="mt-2 text-sm text-slate-500">List a card from My Collection to start receiving offers.</p>
-            <Link to="/my-collection" className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-neonTeal px-5 text-sm font-semibold text-slate-950">
+            <Link
+              to="/my-collection"
+              className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-neonTeal px-5 text-sm font-semibold text-slate-950"
+            >
               My Collection
             </Link>
           </div>
         ) : (
-        <div className="space-y-6">
-          {listings.map((listing) => {
-            const badge = vaultTierBadge(listing.tier);
-            const cardOffers = offersByCard[listing.card_id] || [];
-            return (
-              <article
-                key={listing.card_id}
-                className={`rounded-2xl border border-white/10 bg-cardBg p-4 ${badge.glow}`}
-              >
-                <div className="flex flex-col gap-4 sm:flex-row">
-                  <Link
-                    to={`/marketplace/${encodeURIComponent(listing.card_id)}`}
-                    className="block w-full max-w-[140px] shrink-0 overflow-hidden rounded-xl border border-white/10"
-                  >
-                    <CardImage
-                      imageUrl={listing.image_url}
-                      alt={listing.player_name}
-                      frameClassName="flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/30"
-                    />
-                  </Link>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div>
-                        <h2 className="text-lg font-semibold text-white">{listing.player_name}</h2>
-                        <p className="text-sm text-slate-400">{listing.team_name}</p>
-                        <p className="mt-1 font-mono text-xs text-neonTeal/80">{listing.card_id}</p>
+          <div className="space-y-6">
+            {listings.map((listing) => {
+              const badge = vaultTierBadge(listing.tier);
+              const cardOffers = offersByCard[listing.card_id] || [];
+              const dr =
+                listing.days_remaining != null && listing.listing_expires_at ? Number(listing.days_remaining) : null;
+              const warnRelist = dr != null && dr <= 3;
+
+              return (
+                <article
+                  key={listing.card_id}
+                  className={`rounded-2xl border border-white/10 bg-cardBg p-4 ${badge.glow}`}
+                >
+                  <div className="flex flex-col gap-4 sm:flex-row">
+                    <Link
+                      to={`/marketplace/${encodeURIComponent(listing.card_id)}`}
+                      className="block w-full max-w-[140px] shrink-0 overflow-hidden rounded-xl border border-white/10"
+                    >
+                      <CardImage
+                        imageUrl={listing.image_url}
+                        alt={listing.player_name}
+                        frameClassName="flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/30"
+                      />
+                    </Link>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <h2 className="text-lg font-semibold text-white">{listing.player_name}</h2>
+                          <p className="text-sm text-slate-400">{listing.team_name}</p>
+                          <p className="mt-1 font-mono text-xs text-neonTeal/80">{listing.card_id}</p>
+                        </div>
+                        <p className="text-xl font-bold text-neonTeal">{formatMoney(listing.asking_price)}</p>
                       </div>
-                      <p className="text-xl font-bold text-neonTeal">{formatMoney(listing.asking_price)}</p>
+                      {listing.listing_expires_at ? (
+                        <p className={`mt-2 text-xs ${listingExpiresSubtextClass(dr)}`}>
+                          {listingExpiresLabel(dr)}
+                          {formatListingExpiresDate(listing.listing_expires_at)
+                            ? ` · ${formatListingExpiresDate(listing.listing_expires_at)}`
+                            : ""}
+                        </p>
+                      ) : null}
+                      {warnRelist ? (
+                        <div className="mt-3 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                          <p className="font-medium text-amber-200">Expiring soon — relist to keep it active</p>
+                          <button
+                            type="button"
+                            disabled={relistBusyId === listing.card_id}
+                            onClick={() => relist(listing.card_id, listing.asking_price)}
+                            className="mt-2 inline-flex min-h-[36px] items-center justify-center rounded-lg bg-neonTeal px-3 text-xs font-semibold text-slate-950 disabled:opacity-50"
+                          >
+                            {relistBusyId === listing.card_id ? "Relisting…" : "Relist for 30 more days"}
+                          </button>
+                        </div>
+                      ) : null}
+                      {(listing.pending_offer_count || 0) > 0 ? (
+                        <p className="mt-2 text-sm text-amber-200">
+                          {listing.pending_offer_count} pending offer
+                          {listing.pending_offer_count === 1 ? "" : "s"}
+                        </p>
+                      ) : (
+                        <p className="mt-2 text-sm text-slate-500">No pending offers yet</p>
+                      )}
                     </div>
-                    {(listing.pending_offer_count || 0) > 0 ? (
-                      <p className="mt-2 text-sm text-amber-200">
-                        {listing.pending_offer_count} pending offer
-                        {listing.pending_offer_count === 1 ? "" : "s"}
-                      </p>
-                    ) : (
-                      <p className="mt-2 text-sm text-slate-500">No pending offers yet</p>
-                    )}
                   </div>
-                </div>
-                {cardOffers.length > 0 ? (
-                  <ul className="mt-4 space-y-3 border-t border-white/10 pt-4">
-                    {cardOffers.map((offer) => (
-                      <li
-                        key={offer.offer_id}
-                        className="rounded-xl border border-white/10 bg-cardBg2 p-3 sm:flex sm:items-center sm:justify-between sm:gap-4"
-                      >
-                        <div className="min-w-0">
-                          <p className="font-medium text-white">{offer.buyer_display_name}</p>
-                          <p className="text-lg font-semibold text-neonTeal">{formatMoney(offer.offer_amount)}</p>
-                          <p className="text-xs text-slate-500">
-                            Royalty: {formatMoney(offer.royalty_amount)}
-                            {offer.message ? ` · “${offer.message}”` : ""}
-                          </p>
-                        </div>
-                        <div className="mt-3 flex flex-wrap gap-2 sm:mt-0">
-                          <button
-                            type="button"
-                            disabled={actionKey === `accept-${offer.offer_id}`}
-                            onClick={() => offerAction(offer.offer_id, "accept")}
-                            className="min-h-[40px] rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
-                          >
-                            {actionKey === `accept-${offer.offer_id}` ? "Accepting…" : "Accept"}
-                          </button>
-                          <button
-                            type="button"
-                            disabled={actionKey === `decline-${offer.offer_id}`}
-                            onClick={() => offerAction(offer.offer_id, "decline")}
-                            className="min-h-[40px] rounded-lg border border-white/20 px-4 text-sm text-slate-300 disabled:opacity-50"
-                          >
-                            {actionKey === `decline-${offer.offer_id}` ? "Declining…" : "Decline"}
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </article>
-            );
-          })}
-        </div>
-      )}
-          </main>
+                  {cardOffers.length > 0 ? (
+                    <ul className="mt-4 space-y-3 border-t border-white/10 pt-4">
+                      {cardOffers.map((offer) => (
+                        <li
+                          key={offer.offer_id}
+                          className="rounded-xl border border-white/10 bg-cardBg2 p-3 sm:flex sm:flex-col sm:gap-3"
+                        >
+                          <div className="sm:flex sm:items-start sm:justify-between sm:gap-4">
+                            <div className="min-w-0">
+                              <p className="font-medium text-white">{offer.buyer_display_name}</p>
+                              <p className="text-lg font-semibold text-neonTeal">{formatMoney(offer.offer_amount)}</p>
+                              <p className="text-xs text-slate-500">
+                                Royalty: {formatMoney(offer.royalty_amount)}
+                                {offer.message ? ` · “${offer.message}”` : ""}
+                              </p>
+                              {offer.status === "pending" && offer.days_remaining != null && offer.expires_at ? (
+                                <p className={`mt-2 text-xs ${offerExpiresLineClass(offer.days_remaining)}`}>
+                                  {offerExpiresLabel(offer.days_remaining)}
+                                </p>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          {offer.counter_status === "pending" ? (
+                            <div className="mt-3 rounded-lg border border-teal-500/25 bg-teal-500/10 px-3 py-2 text-sm text-teal-100">
+                              <p>
+                                Counter sent: <span className="font-semibold text-white">{formatMoney(offer.counter_amount)}</span>
+                              </p>
+                              <p className="mt-1 text-xs text-slate-400">Awaiting buyer response</p>
+                            </div>
+                          ) : null}
+
+                          {offer.counter_status == null ? (
+                            counterFormOfferId === offer.offer_id ? (
+                              <div className="mt-3 space-y-2 rounded-lg border border-white/15 bg-cardBg p-3">
+                                <label className="text-xs font-medium text-slate-400">Your counter amount ($)</label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  step="0.01"
+                                  value={counterAmount}
+                                  onChange={(e) => setCounterAmount(e.target.value)}
+                                  className="min-h-[40px] w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-white"
+                                  placeholder="1.00"
+                                />
+                                <p className="text-xs text-slate-500">
+                                  Buyer will see your counter and can accept or decline
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={counterBusyId === offer.offer_id}
+                                    onClick={() => sendCounter(offer.offer_id)}
+                                    className="min-h-[40px] rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+                                  >
+                                    {counterBusyId === offer.offer_id ? "Sending…" : "Send Counter"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={counterBusyId === offer.offer_id}
+                                    onClick={() => {
+                                      setCounterFormOfferId(null);
+                                      setCounterAmount("");
+                                    }}
+                                    className="min-h-[40px] rounded-lg border border-white/20 px-4 text-sm text-slate-300"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  disabled={actionKey === `accept-${offer.offer_id}`}
+                                  onClick={() => offerAction(offer.offer_id, "accept")}
+                                  className="min-h-[40px] rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+                                >
+                                  {actionKey === `accept-${offer.offer_id}` ? "Accepting…" : "Accept"}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={actionKey === `decline-${offer.offer_id}`}
+                                  onClick={() => offerAction(offer.offer_id, "decline")}
+                                  className="min-h-[40px] rounded-lg border border-white/20 px-4 text-sm text-slate-300 disabled:opacity-50"
+                                >
+                                  {actionKey === `decline-${offer.offer_id}` ? "Declining…" : "Decline"}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={actionKey.startsWith("accept-") || actionKey.startsWith("decline-")}
+                                  onClick={() => {
+                                    setCounterFormOfferId(offer.offer_id);
+                                    setCounterAmount("");
+                                  }}
+                                  className="min-h-[40px] rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 text-sm font-medium text-amber-200 disabled:opacity-50"
+                                >
+                                  Counter Offer
+                                </button>
+                              </div>
+                            )
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </main>
       <AppFooter />
     </div>
   );

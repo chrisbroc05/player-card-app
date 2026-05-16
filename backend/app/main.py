@@ -59,6 +59,11 @@ from card_repo import (  # noqa: E402
 from database import engine, get_db  # noqa: E402
 from beta_config import get_beta_invite_code  # noqa: E402
 from models import Base, User  # noqa: E402
+from marketplace_jobs import run_marketplace_expiration_pass  # noqa: E402
+from marketplace_scheduler import (
+    shutdown_marketplace_scheduler,
+    start_marketplace_scheduler,
+)  # noqa: E402
 from schema_migrations import run_schema_migrations_after_models  # noqa: E402
 from trade_routes import router as trade_router  # noqa: E402
 from routers.admin import router as admin_router  # noqa: E402
@@ -107,8 +112,11 @@ async def lifespan(_app: FastAPI):
     os.makedirs(CARD_DIR, exist_ok=True)
     Base.metadata.create_all(bind=engine)
     run_schema_migrations_after_models(engine)
+    run_marketplace_expiration_pass()
+    start_marketplace_scheduler()
     print(f"[startup] UPLOAD_DIR={UPLOAD_DIR} CARD_DIR={CARD_DIR} (writable={os.access(CARD_DIR, os.W_OK)})")
     yield
+    shutdown_marketplace_scheduler()
 
 
 app = FastAPI(lifespan=lifespan)

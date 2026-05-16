@@ -20,8 +20,8 @@ from sqlalchemy.orm import Session
 from auth import ALGORITHM, SECRET_KEY
 from beta_config import beta_mode_active, get_beta_invite_code, set_beta_invite_code
 from database import get_db
-from models import Card, MarketplaceOffer, TradeOffer, User
-from marketplace_repo import float_from_decimal
+from marketplace_repo import float_from_decimal, listing_active_filter
+from models import Card, MarketplaceOffer, TradeOffer, User, utcnow
 
 router = APIRouter()
 admin_security = HTTPBearer(auto_error=False)
@@ -236,7 +236,10 @@ def admin_stats(
         )
 
     total_listed = int(
-        db.query(func.count(Card.id)).filter(Card.listed_on_marketplace.is_(True)).scalar() or 0
+        db.query(func.count(Card.id))
+        .filter(Card.listed_on_marketplace.is_(True), listing_active_filter(utcnow()))
+        .scalar()
+        or 0
     )
     total_offers = int(db.query(func.count(MarketplaceOffer.id)).scalar() or 0)
     offers_pending = int(
@@ -254,6 +257,30 @@ def admin_stats(
     offers_declined = int(
         db.query(func.count(MarketplaceOffer.id))
         .filter(MarketplaceOffer.status == "declined")
+        .scalar()
+        or 0
+    )
+    offers_expired = int(
+        db.query(func.count(MarketplaceOffer.id))
+        .filter(MarketplaceOffer.status == "expired")
+        .scalar()
+        or 0
+    )
+    offers_countered = int(
+        db.query(func.count(MarketplaceOffer.id))
+        .filter(MarketplaceOffer.counter_amount.isnot(None))
+        .scalar()
+        or 0
+    )
+    counters_accepted = int(
+        db.query(func.count(MarketplaceOffer.id))
+        .filter(MarketplaceOffer.counter_status == "accepted")
+        .scalar()
+        or 0
+    )
+    counters_declined = int(
+        db.query(func.count(MarketplaceOffer.id))
+        .filter(MarketplaceOffer.counter_status == "declined")
         .scalar()
         or 0
     )
@@ -288,6 +315,10 @@ def admin_stats(
             "offers_pending": offers_pending,
             "offers_accepted": offers_accepted,
             "offers_declined": offers_declined,
+            "offers_expired": offers_expired,
+            "offers_countered": offers_countered,
+            "counters_accepted": counters_accepted,
+            "counters_declined": counters_declined,
             "total_royalties_earned": total_royalties_earned,
             "total_volume": total_volume,
         },
@@ -428,6 +459,8 @@ def admin_marketplace(
             "player_name": player_name or "",
             "offer_amount": float_from_decimal(offer.offer_amount),
             "royalty_amount": float_from_decimal(offer.royalty_amount),
+            "counter_amount": float_from_decimal(offer.counter_amount) if offer.counter_amount is not None else None,
+            "counter_status": offer.counter_status,
             "status": offer.status,
             "created_at": _iso(offer.created_at),
             "updated_at": _iso(offer.updated_at),

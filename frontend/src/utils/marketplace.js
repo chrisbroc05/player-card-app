@@ -27,8 +27,37 @@ export function offerStatusStyle(status) {
   const s = (status || "").toLowerCase();
   if (s === "accepted") return "border-emerald-500/50 bg-emerald-500/15 text-emerald-200";
   if (s === "declined") return "border-rose-500/50 bg-rose-500/15 text-rose-200";
-  if (s === "cancelled") return "border-slate-500/50 bg-slate-500/15 text-slate-400";
+  if (s === "cancelled" || s === "expired") return "border-slate-500/50 bg-slate-500/15 text-slate-400";
   return "border-amber-500/50 bg-amber-500/15 text-amber-200";
+}
+
+/** Subtle listing countdown on browse grid (null days → omit). */
+export function listingExpiresSubtextClass(daysRemaining) {
+  if (daysRemaining == null || Number.isNaN(Number(daysRemaining))) return "text-slate-500";
+  const d = Number(daysRemaining);
+  if (d <= 0) return "text-rose-400 font-medium";
+  if (d <= 3) return "text-amber-400 font-medium";
+  return "text-slate-500";
+}
+
+export function listingExpiresLabel(daysRemaining) {
+  if (daysRemaining == null || Number.isNaN(Number(daysRemaining))) return null;
+  const d = Number(daysRemaining);
+  if (d <= 0) return "Expires today";
+  return `Expires in ${d} day${d === 1 ? "" : "s"}`;
+}
+
+/** Pending offer expiry line (buyer/seller views). */
+export function offerExpiresLineClass(daysRemaining) {
+  if (daysRemaining == null || Number.isNaN(Number(daysRemaining))) return "text-slate-500";
+  const d = Number(daysRemaining);
+  if (d <= 0) return "text-rose-400 font-semibold";
+  if (d <= 3) return "text-amber-400 font-semibold";
+  return "text-slate-500";
+}
+
+export function offerExpiresLabel(daysRemaining) {
+  return listingExpiresLabel(daysRemaining);
 }
 
 export function listedAgeLabel(iso) {

@@ -6,7 +6,13 @@ import MarketplaceSubNav from "../components/MarketplaceSubNav";
 import CardImage from "../components/CardImage";
 import { useAuth } from "../context/AuthContext";
 import { authFetch, formatApiError } from "../utils/authFetch";
-import { formatMoney, offerStatusStyle, compareOfferToAsking } from "../utils/marketplace";
+import {
+  formatMoney,
+  offerExpiresLabel,
+  offerExpiresLineClass,
+  offerStatusStyle,
+  compareOfferToAsking,
+} from "../utils/marketplace";
 import { CARD_IMAGE_FRAME_XS } from "../utils/cardImageStyles";
 
 const STATUS_TABS = [
@@ -15,6 +21,7 @@ const STATUS_TABS = [
   { id: "accepted", label: "Accepted" },
   { id: "declined", label: "Declined" },
   { id: "cancelled", label: "Cancelled" },
+  { id: "expired", label: "Expired" },
 ];
 
 const EMPTY_BY_FILTER = {
@@ -23,13 +30,30 @@ const EMPTY_BY_FILTER = {
   accepted: { title: "No accepted offers yet.", hint: null },
   declined: { title: "No declined offers.", hint: null },
   cancelled: { title: "No cancelled offers.", hint: null },
+  expired: { title: "No expired offers.", hint: null },
 };
 
-const STATUS_NOTE = {
-  accepted: "Card added to your collection",
-  declined: "Offer was declined by the seller",
-  cancelled: "You cancelled this offer",
-};
+function statusBadgeLabel(status) {
+  const s = (status || "").toLowerCase();
+  if (s === "expired") return "Expired";
+  return status || "—";
+}
+
+function footerNote(offer) {
+  const st = (offer.status || "").toLowerCase();
+  const cs = offer.counter_status;
+  if (st === "expired") return "Offer expired with no response";
+  if (st === "accepted" && cs === "accepted") {
+    return `Accepted seller counter of ${formatMoney(offer.counter_amount)}`;
+  }
+  if (st === "declined" && cs === "declined") {
+    return `You declined the seller's counter of ${formatMoney(offer.counter_amount)}`;
+  }
+  if (st === "accepted") return "Card added to your collection";
+  if (st === "declined") return "Offer was declined by the seller";
+  if (st === "cancelled") return "You cancelled this offer";
+  return null;
+}
 
 export default function MarketplaceMyOffersPage() {
   const { token, user, initializing, refreshNavBadges } = useAuth();
@@ -73,7 +97,7 @@ export default function MarketplaceMyOffersPage() {
 
   async function cancelOffer(offerId) {
     if (!token) return;
-    setActionKey(String(offerId));
+    setActionKey(`cancel-${offerId}`);
     setError("");
     try {
       const path = "/marketplace/offer/" + offerId + "/cancel";
@@ -88,6 +112,29 @@ export default function MarketplaceMyOffersPage() {
       refreshNavBadges?.();
     } catch (e) {
       setError(e.message || "Cancel failed.");
+    } finally {
+      setActionKey("");
+    }
+  }
+
+  async function counterDecision(offerId, suffix) {
+    if (!token) return;
+    setActionKey(`${suffix === "accept" ? "cacc" : "cdec"}-${offerId}`);
+    setError("");
+    try {
+      const { res, unauthorized } = await authFetch(token, `/marketplace/offer/${offerId}/counter/${suffix}`, {
+        method: "POST",
+      });
+      if (unauthorized) {
+        setError("Session expired. Please sign in again.");
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(formatApiError(data?.detail, "Action failed."));
+      await load();
+      refreshNavBadges?.();
+    } catch (e) {
+      setError(e.message || "Action failed.");
     } finally {
       setActionKey("");
     }
@@ -116,9 +163,7 @@ export default function MarketplaceMyOffersPage() {
               type="button"
               onClick={() => setStatusFilter(tab.id)}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-                statusFilter === tab.id
-                  ? "bg-teal-500/20 text-neonTeal"
-                  : "text-slate-400 hover:bg-white/5 hover:text-white"
+                statusFilter === tab.id ? "bg-teal-500/20 text-neonTeal" : "text-slate-400 hover:bg-white/5 hover:text-white"
               }`}
             >
               {tab.label}
@@ -154,20 +199,43 @@ export default function MarketplaceMyOffersPage() {
               const compare = compareOfferToAsking(offer.offer_amount, offer.asking_price);
               const statusKey = (offer.status || "").toLowerCase();
               const pending = statusKey === "pending";
-              const note = STATUS_NOTE[statusKey];
+              const counterPending = pending && offer.counter_status === "pending";
+              const note = footerNote(offer);
 
               return (
                 <li key={offer.offer_id} className="rounded-2xl border border-white/10 bg-cardBg p-4">
+                  {counterPending ? (
+                    <div className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/15 px-4 py-3">
+                      <p className="text-sm font-semibold text-amber-100">
+                        The seller countered with {formatMoney(offer.counter_amount)}
+                      </p>
+                      <p className="mt-1 text-xs text-amber-200/90">Accept or decline to continue.</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          disabled={actionKey === `cacc-${offer.offer_id}`}
+                          onClick={() => counterDecision(offer.offer_id, "accept")}
+                          className="min-h-[40px] rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+                        >
+                          {actionKey === `cacc-${offer.offer_id}`
+                            ? "Accepting…"
+                            : `Accept Counter (${formatMoney(offer.counter_amount)})`}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={actionKey === `cdec-${offer.offer_id}`}
+                          onClick={() => counterDecision(offer.offer_id, "decline")}
+                          className="min-h-[40px] rounded-lg border border-white/20 px-4 text-sm text-slate-300 disabled:opacity-50"
+                        >
+                          {actionKey === `cdec-${offer.offer_id}` ? "Declining…" : "Decline Counter"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                    <Link
-                      to={"/card/" + encodeURIComponent(offer.card_id)}
-                      className="block w-full max-w-[100px] shrink-0"
-                    >
-                      <CardImage
-                        imageUrl={offer.image_url}
-                        alt={offer.player_name}
-                        frameClassName={CARD_IMAGE_FRAME_XS}
-                      />
+                    <Link to={"/marketplace/" + encodeURIComponent(offer.card_id)} className="block w-full max-w-[100px] shrink-0">
+                      <CardImage imageUrl={offer.image_url} alt={offer.player_name} frameClassName={CARD_IMAGE_FRAME_XS} />
                     </Link>
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-white">{offer.player_name}</p>
@@ -179,22 +247,26 @@ export default function MarketplaceMyOffersPage() {
                       </p>
                       <span
                         className={
-                          "mt-2 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold capitalize " +
-                          statusClass
+                          "mt-2 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold capitalize " + statusClass
                         }
                       >
-                        {offer.status}
+                        {statusBadgeLabel(offer.status)}
                       </span>
+                      {pending && !counterPending && offer.days_remaining != null && offer.expires_at ? (
+                        <p className={`mt-2 text-xs ${offerExpiresLineClass(offer.days_remaining)}`}>
+                          {offerExpiresLabel(offer.days_remaining)}
+                        </p>
+                      ) : null}
                       {note ? <p className="mt-1 text-xs text-slate-500">{note}</p> : null}
                     </div>
-                    {pending ? (
+                    {pending && !counterPending ? (
                       <button
                         type="button"
-                        disabled={actionKey === String(offer.offer_id)}
+                        disabled={actionKey === `cancel-${offer.offer_id}`}
                         onClick={() => cancelOffer(offer.offer_id)}
                         className="min-h-[40px] shrink-0 self-start rounded-lg border border-white/20 px-4 text-sm text-slate-300 disabled:opacity-50"
                       >
-                        {actionKey === String(offer.offer_id) ? "Cancelling…" : "Cancel offer"}
+                        {actionKey === `cancel-${offer.offer_id}` ? "Cancelling…" : "Cancel offer"}
                       </button>
                     ) : null}
                   </div>

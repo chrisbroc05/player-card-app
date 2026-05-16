@@ -604,3 +604,144 @@ def send_marketplace_offer_cancelled_email(
         _send_resend_html(buyer_email, subject, html, offer_id, "marketplace_offer_cancelled")
     except Exception as e:
         logger.error("Email failed for marketplace offer %s: %s", offer_id, e)
+
+
+def send_marketplace_listing_expired_email(
+    owner_email: str,
+    owner_name: str,
+    card_player_name: str,
+    collection_url: str,
+) -> None:
+    try:
+        player = html_module.escape(card_player_name)
+        sub_inner = (
+            f"Your {player} card was listed on Free Agency for 30 days and has been removed. "
+            "You can relist it anytime from your collection."
+        )
+        parts = [
+            _heading("Listing expired"),
+            _subtext_html(sub_inner),
+            _divider(),
+            _cta_button(collection_url, "Open My Collection →"),
+        ]
+        html = _email_shell("".join(parts))
+        subject = f"Your listing for {card_player_name} has expired"
+        _send_resend_html(owner_email, subject, html, 0, "marketplace_listing_expired")
+    except Exception as e:
+        logger.error("Listing expired email failed for %s: %s", owner_email, e)
+
+
+def send_marketplace_offer_expired_buyer_email(
+    buyer_email: str,
+    buyer_name: str,
+    card_player_name: str,
+    offer_amount: float,
+    marketplace_url: str,
+    offer_id: int,
+) -> None:
+    try:
+        player = html_module.escape(card_player_name)
+        amt = html_module.escape(_money_label(offer_amount))
+        sub_inner = (
+            f"Your offer of <span style=\"color:#ffd700;font-weight:700;\">{amt}</span> on the "
+            f"{player} card expired after 14 days without a response from the seller. "
+            "You can make a new offer anytime on Free Agency."
+        )
+        parts = [
+            _heading("Offer expired"),
+            _subtext_html(sub_inner),
+            _divider(),
+            _cta_button(marketplace_url, "Browse Free Agency →"),
+        ]
+        html = _email_shell("".join(parts))
+        subject = f"Your offer on {card_player_name} has expired"
+        _send_resend_html(buyer_email, subject, html, offer_id, "marketplace_offer_expired")
+    except Exception as e:
+        logger.error("Email failed for marketplace offer %s: %s", offer_id, e)
+
+
+def send_marketplace_counter_sent_buyer_email(
+    buyer_email: str,
+    buyer_name: str,
+    card_player_name: str,
+    original_amount: float,
+    counter_amount: float,
+    my_offers_url: str,
+    offer_id: int,
+) -> None:
+    try:
+        player = html_module.escape(card_player_name)
+        orig = html_module.escape(_money_label(original_amount))
+        ctr = html_module.escape(_money_label(counter_amount))
+        sub_inner = (
+            f"You offered <span style=\"color:#ffd700;font-weight:700;\">{orig}</span> on the {player} card. "
+            f"The seller has countered with <span style=\"color:#ffd700;font-weight:700;\">{ctr}</span>. "
+            "Log in to accept or decline the counter."
+        )
+        parts = [
+            _heading("Seller counter-offer"),
+            _subtext_html(sub_inner),
+            _divider(),
+            _cta_button(my_offers_url, "View My Offers →"),
+        ]
+        html = _email_shell("".join(parts))
+        subject = f"The seller countered your offer on {card_player_name}"
+        _send_resend_html(buyer_email, subject, html, offer_id, "marketplace_counter_sent")
+    except Exception as e:
+        logger.error("Email failed for marketplace offer %s: %s", offer_id, e)
+
+
+def send_marketplace_counter_accepted_seller_email(
+    seller_email: str,
+    seller_name: str,
+    card_player_name: str,
+    counter_amount: float,
+    collection_url: str,
+    offer_id: int,
+) -> None:
+    try:
+        player = html_module.escape(card_player_name)
+        amt = html_module.escape(_money_label(counter_amount))
+        sub_inner = (
+            f"Your counter of <span style=\"color:#ffd700;font-weight:700;\">{amt}</span> for {player} "
+            "was accepted. The card has been transferred to the buyer."
+        )
+        parts = [
+            _heading("Counter-offer accepted! 🎉"),
+            _subtext_html(sub_inner),
+            _divider(),
+            _cta_button(collection_url, "Open My Collection →"),
+        ]
+        html = _email_shell("".join(parts))
+        subject = "Your counter-offer was accepted! 🎉"
+        _send_resend_html(seller_email, subject, html, offer_id, "marketplace_counter_accepted_seller")
+    except Exception as e:
+        logger.error("Email failed for marketplace offer %s: %s", offer_id, e)
+
+
+def send_marketplace_counter_declined_seller_email(
+    seller_email: str,
+    seller_name: str,
+    card_player_name: str,
+    counter_amount: float,
+    my_listings_url: str,
+    offer_id: int,
+) -> None:
+    try:
+        player = html_module.escape(card_player_name)
+        amt = html_module.escape(_money_label(counter_amount))
+        sub_inner = (
+            f"The buyer declined your counter of <span style=\"color:#ffd700;font-weight:700;\">{amt}</span> "
+            f"on {player}. The card remains listed on Free Agency."
+        )
+        parts = [
+            _heading("Counter-offer declined"),
+            _subtext_html(sub_inner),
+            _divider(),
+            _cta_button(my_listings_url, "My Listings →"),
+        ]
+        html = _email_shell("".join(parts))
+        subject = "Your counter-offer was declined"
+        _send_resend_html(seller_email, subject, html, offer_id, "marketplace_counter_declined_seller")
+    except Exception as e:
+        logger.error("Email failed for marketplace offer %s: %s", offer_id, e)

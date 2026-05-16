@@ -22,8 +22,8 @@ export default function MarketplaceListingActions({
     e.preventDefault();
     setLocalError("");
     const n = Number(price);
-    if (!Number.isFinite(n) || n <= 0) {
-      setLocalError("Enter a price greater than $0.00");
+    if (!Number.isFinite(n) || n < 1.0) {
+      setLocalError("Asking price must be at least $1.00");
       return;
     }
     try {
@@ -79,13 +79,14 @@ export default function MarketplaceListingActions({
               <label className="block text-xs font-medium text-slate-400">Asking Price ($)</label>
               <input
                 type="number"
-                min="0.01"
+                min="1.00"
                 step="0.01"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 className="min-h-[42px] w-full rounded-lg border border-white/15 bg-cardBg px-3 py-2 text-sm text-slate-100"
-                placeholder="0.00"
+                placeholder="1.00"
               />
+              <p className="text-xs text-slate-500">Minimum $1.00</p>
               <ListFormActions busy={busy} onCancel={() => setOpen(false)} />
             </form>
           )}

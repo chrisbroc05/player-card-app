@@ -53,6 +53,7 @@ export default function AdminDashboard() {
   const [cardSearch, setCardSearch] = useState("");
 
   const [tradeStatusFilter, setTradeStatusFilter] = useState("all");
+  const [marketplaceStatusFilter, setMarketplaceStatusFilter] = useState("all");
 
   const clearAdminAndRedirect = useCallback(() => {
     localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
@@ -250,6 +251,13 @@ export default function AdminDashboard() {
     return trades.filter((t) => (t.status || "").toLowerCase() === tradeStatusFilter);
   }, [trades, tradeStatusFilter]);
 
+  const filteredMarketplaceOffers = useMemo(() => {
+    if (marketplaceStatusFilter === "all") return marketplaceOffers;
+    return marketplaceOffers.filter(
+      (o) => (o.status || "").toLowerCase() === marketplaceStatusFilter
+    );
+  }, [marketplaceOffers, marketplaceStatusFilter]);
+
   function logoutAdmin() {
     localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
     navigate("/login", { replace: true });
@@ -383,8 +391,14 @@ export default function AdminDashboard() {
                         {kpi("Offers accepted", stats.marketplace_stats.offers_accepted)}
                       </div>
                     </div>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      {kpi("Offers declined", stats.marketplace_stats.offers_declined ?? 0)}
+                      {kpi("Offers expired", stats.marketplace_stats.offers_expired ?? 0)}
+                      {kpi("Offers countered", stats.marketplace_stats.offers_countered ?? 0)}
+                      {kpi("Counters accepted", stats.marketplace_stats.counters_accepted ?? 0)}
+                    </div>
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                      {kpi("Offers declined", stats.marketplace_stats.offers_declined)}
+                      {kpi("Counters declined", stats.marketplace_stats.counters_declined ?? 0)}
                       {kpi(
                         "Sale volume",
                         "$" + Number(stats.marketplace_stats.total_volume || 0).toFixed(2)
@@ -762,13 +776,34 @@ export default function AdminDashboard() {
             ) : null}
             <p className="mb-4 text-sm text-slate-400">
               Marketplace offers: <span className="font-semibold text-white">{marketplaceOffers.length}</span>
+              {marketplaceStatusFilter !== "all" ? (
+                <>
+                  {" "}
+                  · Shown: <span className="font-semibold text-white">{filteredMarketplaceOffers.length}</span>
+                </>
+              ) : null}
             </p>
+            <div className="mb-4 flex flex-wrap items-center gap-3">
+              <label className="text-xs uppercase tracking-wide text-slate-500">Status</label>
+              <select
+                value={marketplaceStatusFilter}
+                onChange={(e) => setMarketplaceStatusFilter(e.target.value)}
+                className="rounded-lg border border-white/15 bg-cardBg px-3 py-2 text-sm text-slate-100"
+              >
+                <option value="all">All</option>
+                <option value="pending">Pending</option>
+                <option value="accepted">Accepted</option>
+                <option value="declined">Declined</option>
+                <option value="cancelled">Cancelled</option>
+                <option value="expired">Expired</option>
+              </select>
+            </div>
             {loading.marketplace ? <p className="text-sm text-slate-400">Loading marketplace…</p> : null}
             <div className="overflow-x-auto rounded-xl border border-white/10 bg-cardBg">
               <table className="w-full min-w-[1000px] text-left text-sm">
                 <thead className="border-b border-white/10 bg-cardBg2 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
-                    {["Offer ID", "Card", "Player", "Buyer", "Seller", "Amount", "Royalty", "Status", "Created"].map((h) => (
+                    {["Offer ID", "Card", "Player", "Buyer", "Seller", "Amount", "Royalty", "Counter", "Status", "Created"].map((h) => (
                       <th key={h} className="p-3 font-medium">{h}</th>
                     ))}
                   </tr>
@@ -776,10 +811,16 @@ export default function AdminDashboard() {
                 <tbody>
                   {marketplaceOffers.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="p-6 text-center text-slate-500">No marketplace offers yet.</td>
+                      <td colSpan={10} className="p-6 text-center text-slate-500">No marketplace offers yet.</td>
+                    </tr>
+                  ) : filteredMarketplaceOffers.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="p-6 text-center text-slate-500">
+                        No offers match this status filter.
+                      </td>
                     </tr>
                   ) : (
-                    marketplaceOffers.map((o) => (
+                    filteredMarketplaceOffers.map((o) => (
                       <tr key={o.offer_id} className="border-b border-white/5 hover:bg-white/[0.02]">
                         <td className="p-3 text-slate-200">{o.offer_id}</td>
                         <td className="p-3 font-mono text-xs text-neonTeal/90">{o.card_id}</td>
@@ -794,6 +835,9 @@ export default function AdminDashboard() {
                         </td>
                         <td className="p-3 text-slate-200">${Number(o.offer_amount || 0).toFixed(2)}</td>
                         <td className="p-3 text-slate-400">${Number(o.royalty_amount || 0).toFixed(2)}</td>
+                        <td className="p-3 text-slate-300">
+                          {o.counter_amount != null ? `$${Number(o.counter_amount).toFixed(2)}` : "—"}
+                        </td>
                         <td className="p-3 text-slate-400">{o.status}</td>
                         <td className="p-3 text-xs text-slate-500">{o.created_at?.slice(0, 16) || "—"}</td>
                       </tr>
