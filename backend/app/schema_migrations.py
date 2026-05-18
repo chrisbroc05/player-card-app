@@ -87,6 +87,65 @@ def run_schema_migrations_after_models(engine: Engine) -> None:
                 )
             else:
                 conn.execute(text("ALTER TABLE cards ADD COLUMN listing_expires_at DATETIME"))
+        if "is_animated" not in cols:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN IF NOT EXISTS is_animated BOOLEAN "
+                        "NOT NULL DEFAULT FALSE"
+                    )
+                )
+            else:
+                conn.execute(
+                    text("ALTER TABLE cards ADD COLUMN is_animated BOOLEAN NOT NULL DEFAULT 0")
+                )
+        if "animated_video_url" not in cols:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN IF NOT EXISTS animated_video_url VARCHAR(512)"
+                    )
+                )
+            else:
+                conn.execute(text("ALTER TABLE cards ADD COLUMN animated_video_url VARCHAR(512)"))
+        if "animation_status" not in cols:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN IF NOT EXISTS animation_status VARCHAR(32)"
+                    )
+                )
+            else:
+                conn.execute(text("ALTER TABLE cards ADD COLUMN animation_status VARCHAR(32)"))
+        if "animation_motion" not in cols:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN IF NOT EXISTS animation_motion VARCHAR(64)"
+                    )
+                )
+            else:
+                conn.execute(text("ALTER TABLE cards ADD COLUMN animation_motion VARCHAR(64)"))
+        if "animation_requested_at" not in cols:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN IF NOT EXISTS animation_requested_at "
+                        "TIMESTAMP WITH TIME ZONE"
+                    )
+                )
+            else:
+                conn.execute(text("ALTER TABLE cards ADD COLUMN animation_requested_at DATETIME"))
+        if "animation_completed_at" not in cols:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN IF NOT EXISTS animation_completed_at "
+                        "TIMESTAMP WITH TIME ZONE"
+                    )
+                )
+            else:
+                conn.execute(text("ALTER TABLE cards ADD COLUMN animation_completed_at DATETIME"))
 
         if "marketplace_offers" in insp.get_table_names():
             mcols = {c["name"] for c in insp.get_columns("marketplace_offers")}

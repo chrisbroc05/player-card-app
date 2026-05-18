@@ -61,6 +61,12 @@ class Card(Base):
     asking_price: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     listed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     listing_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_animated: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    animated_video_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    animation_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    animation_motion: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    animation_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    animation_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     owner: Mapped["User | None"] = relationship(
         "User",

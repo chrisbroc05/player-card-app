@@ -8,6 +8,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
+from card_repo import animation_fields_for_card
 from models import Card, MarketplaceOffer, User, utcnow
 
 
@@ -123,6 +124,7 @@ def listing_dict(card: Card, owner_display_name: str, *, pending_offer_count: in
     row["days_remaining"] = dr if dr is not None else None
     if pending_offer_count is not None:
         row["pending_offer_count"] = pending_offer_count
+    row.update(animation_fields_for_card(card))
     return row
 
 

@@ -295,6 +295,27 @@ def admin_stats(
         .scalar()
     )
 
+    total_animated = int(
+        db.query(func.count(Card.id)).filter(Card.is_animated.is_(True)).scalar() or 0
+    )
+    animations_pending = int(
+        db.query(func.count(Card.id))
+        .filter(Card.animation_status.in_(["pending", "processing"]))
+        .scalar()
+        or 0
+    )
+    animations_failed = int(
+        db.query(func.count(Card.id)).filter(Card.animation_status == "failed").scalar() or 0
+    )
+    popular_row = (
+        db.query(Card.animation_motion, func.count(Card.id).label("cnt"))
+        .filter(Card.is_animated.is_(True), Card.animation_motion.isnot(None))
+        .group_by(Card.animation_motion)
+        .order_by(func.count(Card.id).desc())
+        .first()
+    )
+    most_popular_motion = popular_row[0] if popular_row and popular_row[0] else ""
+
     return {
         "total_users": total_users,
         "total_cards": total_cards,
@@ -321,6 +342,12 @@ def admin_stats(
             "counters_declined": counters_declined,
             "total_royalties_earned": total_royalties_earned,
             "total_volume": total_volume,
+        },
+        "animation_stats": {
+            "total_animated": total_animated,
+            "animations_pending": animations_pending,
+            "animations_failed": animations_failed,
+            "most_popular_motion": most_popular_motion,
         },
     }
 

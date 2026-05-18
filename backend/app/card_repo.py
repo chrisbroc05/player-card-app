@@ -131,7 +131,17 @@ def card_to_dict(card: Card, db: Session | None = None) -> dict:
         from trade_repo import pending_offer_id_for_card
 
         d["pending_trade_offer_id"] = pending_offer_id_for_card(db, card.id)
+    d.update(animation_fields_for_card(card))
     return d
+
+
+def animation_fields_for_card(card: Card) -> dict:
+    return {
+        "is_animated": bool(getattr(card, "is_animated", False)),
+        "animated_video_url": getattr(card, "animated_video_url", None) or None,
+        "animation_status": getattr(card, "animation_status", None),
+        "animation_motion": getattr(card, "animation_motion", None),
+    }
 
 
 def list_all_cards_dicts(db: Session) -> list[dict]:

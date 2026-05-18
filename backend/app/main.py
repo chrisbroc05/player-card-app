@@ -68,6 +68,7 @@ from schema_migrations import run_schema_migrations_after_models  # noqa: E402
 from trade_routes import router as trade_router  # noqa: E402
 from routers.admin import router as admin_router  # noqa: E402
 from routers.auth import router as auth_user_router  # noqa: E402
+from routers.cards import router as cards_animation_router  # noqa: E402
 from routers.marketplace import router as marketplace_router  # noqa: E402
 from theme_library import (  # noqa: E402
     THEME_CATEGORIES,
@@ -82,13 +83,18 @@ from theme_library import (  # noqa: E402
 # Generated cards → {APP_DATA_DIR}/cards/, uploads → {APP_DATA_DIR}/uploads/.
 # APP_DATA_DIR unset locally defaults to ./data (resolved from cwd). On Render,
 # set APP_DATA_DIR to your mounted disk (e.g. /var/render/data).
-def _upload_and_card_dirs() -> tuple[Path, Path]:
+def _app_data_root() -> Path:
     base = (os.environ.get("APP_DATA_DIR") or "").strip() or "./data"
-    root = Path(base).expanduser().resolve()
+    return Path(base).expanduser().resolve()
+
+
+def _upload_and_card_dirs() -> tuple[Path, Path]:
+    root = _app_data_root()
     return root / "uploads", root / "cards"
 
 
 UPLOAD_DIR, CARD_DIR = _upload_and_card_dirs()
+ANIMATIONS_DIR = _app_data_root() / "animations"
 # Served via StaticFiles — must not overlap REST routes /cards, /cards/{id}
 CARD_MEDIA_URL_PREFIX = "/media/cards"
 # Layout reference for AI card generation (replace with your own asset).
@@ -104,12 +110,14 @@ _IMAGE_TYPES: dict[str, str] = {
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(CARD_DIR, exist_ok=True)
+os.makedirs(ANIMATIONS_DIR, exist_ok=True)
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     os.makedirs(CARD_DIR, exist_ok=True)
+    os.makedirs(ANIMATIONS_DIR, exist_ok=True)
     Base.metadata.create_all(bind=engine)
     run_schema_migrations_after_models(engine)
     run_marketplace_expiration_pass()
@@ -124,6 +132,11 @@ app.include_router(trade_router, prefix="/trades", tags=["trades"])
 app.include_router(admin_router, prefix="/admin", tags=["admin"])
 app.include_router(auth_user_router, prefix="/auth", tags=["auth"])
 app.include_router(marketplace_router, prefix="/marketplace", tags=["marketplace"])
+app.include_router(
+    cards_animation_router,
+    prefix="/cards",
+    tags=["cards", "animations"],
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -1072,6 +1085,10 @@ class CardVaultSummary(BaseModel):
     status: str = Field(default="active")
     owner_id: int | None = Field(default=None)
     pending_trade_offer_id: int | None = Field(default=None)
+    is_animated: bool = Field(default=False)
+    animated_video_url: str | None = Field(default=None)
+    animation_status: str | None = Field(default=None)
+    animation_motion: str | None = Field(default=None)
 
 
 class CardDuplicateBody(BaseModel):
@@ -1107,6 +1124,10 @@ class Card(BaseModel):
     status: str = Field(default="active")
     trade_offered_to: int | None = Field(default=None)
     pending_trade_offer_id: int | None = Field(default=None)
+    is_animated: bool = Field(default=False)
+    animated_video_url: str | None = Field(default=None)
+    animation_status: str | None = Field(default=None)
+    animation_motion: str | None = Field(default=None)
 
 
 class CardShareMeta(BaseModel):
@@ -1954,3 +1975,4 @@ def generate_card_set(
 # Mount after API routes so /upload-image wins over static routing edge cases.
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 app.mount(CARD_MEDIA_URL_PREFIX, StaticFiles(directory=str(CARD_DIR)), name="card_media")
+app.mount("/animations", StaticFiles(directory=str(ANIMATIONS_DIR)), name="animations")

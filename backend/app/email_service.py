@@ -745,3 +745,55 @@ def send_marketplace_counter_declined_seller_email(
         _send_resend_html(seller_email, subject, html, offer_id, "marketplace_counter_declined_seller")
     except Exception as e:
         logger.error("Email failed for marketplace offer %s: %s", offer_id, e)
+
+
+def send_animation_complete_email(
+    owner_email: str,
+    owner_name: str,
+    card_player_name: str,
+    card_url: str,
+    card_id: str,
+) -> None:
+    try:
+        player = html_module.escape(card_player_name)
+        sub_inner = (
+            f"Your {player} card has been brought to life. "
+            "Log in to see your animated card in action."
+        )
+        parts = [
+            _heading("Your animated card is ready! 🎬"),
+            _subtext_html(sub_inner),
+            _divider(),
+            _cta_button(card_url, "View animated card →"),
+        ]
+        html = _email_shell("".join(parts))
+        subject = "Your animated card is ready! 🎬"
+        _send_resend_html(owner_email, subject, html, 0, f"animation_complete_{card_id}")
+    except Exception as e:
+        logger.error("Animation complete email failed for card %s: %s", card_id, e)
+
+
+def send_animation_failed_email(
+    owner_email: str,
+    owner_name: str,
+    card_player_name: str,
+    collection_url: str,
+    card_id: str,
+) -> None:
+    try:
+        player = html_module.escape(card_player_name)
+        sub_inner = (
+            f"We ran into a problem generating the animation for your {player} card. "
+            "Please try again from your collection. If the problem continues please contact support."
+        )
+        parts = [
+            _heading("Animation issue"),
+            _subtext_html(sub_inner),
+            _divider(),
+            _cta_button(collection_url, "Open My Collection →"),
+        ]
+        html = _email_shell("".join(parts))
+        subject = "There was an issue animating your card"
+        _send_resend_html(owner_email, subject, html, 0, f"animation_failed_{card_id}")
+    except Exception as e:
+        logger.error("Animation failed email failed for card %s: %s", card_id, e)
