@@ -12,7 +12,7 @@ import AnimationProgressBanner from "../components/AnimationProgressBanner";
 import { authFetch, formatApiError } from "../utils/authFetch";
 import { canAnimateCard, isAnimatedCard, isAnimationInProgress } from "../utils/animationCard";
 import { vaultTierBadge, rarityDisplay } from "../utils/tierStyles";
-import { CARD_IMAGE_FRAME } from "../utils/cardImageStyles";
+import { CARD_IMAGE_FRAME, CARD_IMAGE_FRAME_ANIMATED } from "../utils/cardImageStyles";
 
 export default function MyCollectionPage() {
   const { token, user, initializing, refreshIncomingTradeCount, refreshNavBadges } = useAuth();
@@ -258,13 +258,14 @@ export default function MyCollectionPage() {
                     pending ? "opacity-70" : "hover:scale-[1.02]"
                   }`}
                 >
-                  <div className={`relative ${CARD_IMAGE_FRAME}`}>
+                  <div
+                    className={`relative ${isAnimatedCard(card) ? CARD_IMAGE_FRAME_ANIMATED : CARD_IMAGE_FRAME}`}
+                  >
                     <CardImage
                       card={card}
                       alt={card.player_name}
                       cacheBust={card.created_at}
-                      frameClassName="flex h-full w-full items-center justify-center"
-                      className="transition duration-300 group-hover:brightness-110"
+                      playOnHover
                       forcePlay={isAnimatedCard(card)}
                     />
                     {stackCount ? (

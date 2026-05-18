@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import CardImage from "./CardImage";
 import { vaultTierBadge } from "../utils/tierStyles";
 import { formatMoney, listingExpiresLabel, listingExpiresSubtextClass } from "../utils/marketplace";
-import { CARD_IMAGE_FRAME } from "../utils/cardImageStyles";
+import { CARD_IMAGE_FRAME, CARD_IMAGE_FRAME_ANIMATED } from "../utils/cardImageStyles";
+import { isAnimatedCard } from "../utils/animationCard";
 
 export default function MarketplaceCardGridItem({ listing }) {
   const badge = vaultTierBadge(listing.tier);
@@ -17,7 +18,7 @@ export default function MarketplaceCardGridItem({ listing }) {
       <CardImage
         card={listing}
         alt={listing.player_name}
-        frameClassName={CARD_IMAGE_FRAME}
+        frameClassName={isAnimatedCard(listing) ? CARD_IMAGE_FRAME_ANIMATED : CARD_IMAGE_FRAME}
         playOnHover
         forcePlay={Boolean(listing.is_animated)}
       />

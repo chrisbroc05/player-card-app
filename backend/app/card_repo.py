@@ -56,6 +56,7 @@ def create_card_row(
     owner_name: str,
     owner_id: int | None,
     creator_user_id: int | None = None,
+    status: str = "active",
     commit: bool = True,
 ) -> Card:
     creator = creator_user_id if creator_user_id is not None else owner_id
@@ -79,6 +80,7 @@ def create_card_row(
         owner_name=owner_name,
         owner_id=owner_id,
         creator_user_id=creator,
+        status=(status or "active").strip() or "active",
     )
     db.add(row)
     if commit:
@@ -150,13 +152,66 @@ def list_all_cards_dicts(db: Session) -> list[dict]:
 
 
 def list_my_cards_dicts(db: Session, owner_id: int) -> list[dict]:
+    """Cards in the user's collection — excludes studio previews and discarded variants."""
     rows = (
         db.query(Card)
-        .filter(Card.owner_id == owner_id)
+        .filter(
+            Card.owner_id == owner_id,
+            Card.status.in_(["active", "pending_trade"]),
+        )
         .order_by(Card.created_at.desc())
         .all()
     )
     return [card_to_dict(r, db) for r in rows]
+
+
+def _image_urls_match(a: str | None, b: str | None) -> bool:
+    sa = (a or "").strip()
+    sb = (b or "").strip()
+    if not sa or not sb:
+        return False
+    if sa == sb:
+        return True
+    return sa.endswith(sb) or sb.endswith(sa)
+
+
+def finalize_order_preview(
+    db: Session,
+    *,
+    owner_id: int,
+    final_image_url: str,
+    generated_card_ids: list[str],
+) -> str | None:
+    """
+    Promote the chosen preview to active; mark other order previews discarded.
+    Returns the activated card_id, if any.
+    """
+    selected_id: str | None = None
+    for cid in generated_card_ids:
+        if not cid:
+            continue
+        card = get_card_by_card_id(db, cid)
+        if card is None or card.owner_id != owner_id:
+            continue
+        if _image_urls_match(card.image_url, final_image_url):
+            selected_id = cid
+            break
+
+    for cid in generated_card_ids:
+        if not cid:
+            continue
+        card = get_card_by_card_id(db, cid)
+        if card is None or card.owner_id != owner_id:
+            continue
+        if cid == selected_id or (selected_id is None and _image_urls_match(card.image_url, final_image_url)):
+            card.status = "active"
+            if selected_id is None:
+                selected_id = cid
+        elif (card.status or "") == "preview":
+            card.status = "discarded"
+
+    db.commit()
+    return selected_id
 
 
 def get_card_by_card_id(db: Session, canonical_id: str) -> Card | None:

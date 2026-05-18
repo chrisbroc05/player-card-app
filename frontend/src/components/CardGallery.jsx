@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import CardImage from "./CardImage";
 import { CardSharePopover } from "./ShareCard";
 import { vaultTierBadge, formatEditionShort, rarityDisplay } from "../utils/tierStyles";
+import { CARD_IMAGE_FRAME, CARD_IMAGE_FRAME_ANIMATED } from "../utils/cardImageStyles";
+import { isAnimatedCard } from "../utils/animationCard";
 
 export default function CardGallery({ cards }) {
   return (
@@ -35,7 +37,7 @@ export default function CardGallery({ cards }) {
                       card={card}
                       alt={card.player_name || "Card"}
                       cacheBust={card.created_at}
-                      frameClassName="flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/30"
+                      frameClassName={isAnimatedCard(card) ? CARD_IMAGE_FRAME_ANIMATED : CARD_IMAGE_FRAME}
                       playOnHover
                       forcePlay={Boolean(card.is_animated)}
                     />

@@ -199,7 +199,11 @@ def marketplace_listings(
     q = (
         db.query(Card, User.display_name)
         .join(User, Card.owner_id == User.id)
-        .filter(Card.listed_on_marketplace.is_(True), listing_active_filter(now))
+        .filter(
+            Card.listed_on_marketplace.is_(True),
+            Card.status == "active",
+            listing_active_filter(now),
+        )
     )
 
     tier_vals = _tier_filter_values(tier) if tier else None

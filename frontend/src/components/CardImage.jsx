@@ -1,10 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toApiUrl } from "../config/api";
+import {
+  CARD_IMAGE_FRAME,
+  CARD_IMAGE_FRAME_ANIMATED,
+  CARD_IMAGE_MEDIA_CLASS,
+  CARD_IMAGE_MEDIA_DETAIL,
+} from "../utils/cardImageStyles";
 import { isAnimatedCard, isAnimationInProgress } from "../utils/animationCard";
 import { useIsMobileViewport } from "../hooks/usePrefersReducedMotion";
 import AnimatedBadge from "./AnimatedBadge";
-
-const IMG_BASE = "block h-auto w-full object-contain";
 
 function resolveCardFields(card, props) {
   if (card && typeof card === "object") {
@@ -38,12 +42,15 @@ export default function CardImage({
   forcePlay = false,
   showAnimatedBadge = true,
   showInProgressOverlay = true,
+  /** "grid" (default) | "detail" — detail shows full card without cropping */
+  variant = "grid",
 }) {
   const [failed, setFailed] = useState(false);
   const [videoFailed, setVideoFailed] = useState(false);
   const [hovered, setHovered] = useState(false);
   const videoRef = useRef(null);
   const isMobile = useIsMobileViewport();
+  const isDetail = variant === "detail";
 
   const fields = resolveCardFields(card, {
     imageUrl,
@@ -67,7 +74,12 @@ export default function CardImage({
 
   const shouldPlayVideo = showVideo && (forcePlay || isMobile || !playOnHover || hovered);
 
-  const imgClass = [IMG_BASE, className].filter(Boolean).join(" ");
+  const mediaClass = [
+    isDetail ? CARD_IMAGE_MEDIA_DETAIL : CARD_IMAGE_MEDIA_CLASS,
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   useEffect(() => {
     const el = videoRef.current;
@@ -90,7 +102,7 @@ export default function CardImage({
       <video
         ref={videoRef}
         src={videoSrc}
-        className={imgClass}
+        className={mediaClass}
         autoPlay={shouldPlayVideo}
         loop
         muted
@@ -101,13 +113,13 @@ export default function CardImage({
       />
     );
   } else if (failed || !imgSrc) {
-    content = <PlaceholderInner alt={alt} className={className} />;
+    content = <PlaceholderInner alt={alt} className={className} isDetail={isDetail} />;
   } else {
     content = (
       <img
         src={imgSrc}
         alt={alt || "Card"}
-        className={imgClass}
+        className={mediaClass}
         loading="lazy"
         decoding="async"
         onError={() => setFailed(true)}
@@ -115,9 +127,17 @@ export default function CardImage({
     );
   }
 
+  const resolvedFrame =
+    frameClassName ||
+    (variant === "grid"
+      ? showVideo
+        ? CARD_IMAGE_FRAME_ANIMATED
+        : CARD_IMAGE_FRAME
+      : "");
+
   const media = (
     <div
-      className="relative h-full w-full"
+      className={`relative flex h-full w-full items-center justify-center ${isDetail ? "min-h-[260px]" : ""}`}
       onMouseEnter={playOnHover && !isMobile ? () => setHovered(true) : undefined}
       onMouseLeave={playOnHover && !isMobile ? () => setHovered(false) : undefined}
     >
@@ -137,16 +157,18 @@ export default function CardImage({
     </div>
   );
 
-  if (frameClassName) {
-    return <div className={frameClassName}>{media}</div>;
+  if (resolvedFrame) {
+    return <div className={resolvedFrame}>{media}</div>;
   }
   return media;
 }
 
-function PlaceholderInner({ alt, className }) {
+function PlaceholderInner({ alt, className, isDetail }) {
   return (
     <div
-      className={`flex min-h-[120px] flex-col items-center justify-center gap-2 bg-slate-900/90 p-4 text-center text-slate-400 ${className}`}
+      className={`flex flex-col items-center justify-center gap-2 bg-slate-900/90 p-4 text-center text-slate-400 ${
+        isDetail ? "min-h-[200px] w-full" : "min-h-[120px]"
+      } ${className}`}
       role="img"
       aria-label={alt || "Card preview unavailable"}
     >

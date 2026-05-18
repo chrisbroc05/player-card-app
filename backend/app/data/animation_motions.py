@@ -2,14 +2,23 @@
 
 from __future__ import annotations
 
+# Shared instruction: keep the full trading card (borders, name plate) in frame.
+_FRAME = (
+    "Keep the entire trading card visible in frame at all times — borders, name text, "
+    "and design elements must not be cropped. Subtle motion only on the illustrated player. "
+)
+
 ANIMATION_MOTIONS: list[dict[str, str]] = [
     {
         "id": "pitch_windup",
         "label": "Winding Up and Throwing",
         "category": "Pitching",
         "prompt": (
-            "Baseball pitcher winding up and throwing a powerful pitch, "
-            "dynamic athletic motion, realistic sports action"
+            _FRAME
+            + "Pitching windup mechanics: balanced stance, stride leg lifts, glove hand rises, "
+            "throwing arm reaches back in a high cocked position, hips rotate closed then open, "
+            "arm accelerates forward through release with follow-through across the body. "
+            "Smooth sequential windup-to-throw, realistic baseball pitching form."
         ),
     },
     {
@@ -17,8 +26,11 @@ ANIMATION_MOTIONS: list[dict[str, str]] = [
         "label": "Full Pitch Delivery",
         "category": "Pitching",
         "prompt": (
-            "Baseball pitcher in full pitch delivery motion, explosive athletic movement, "
-            "professional baseball action"
+            _FRAME
+            + "Full pitch delivery mechanics: explosive drive off the rubber, lead leg braces, "
+            "torso rotates toward home plate, throwing arm whips through release point, "
+            "back leg kicks up for balance, chest finishes over the front knee. "
+            "Powerful professional delivery motion, one continuous athletic sequence."
         ),
     },
     {
@@ -26,8 +38,11 @@ ANIMATION_MOTIONS: list[dict[str, str]] = [
         "label": "Powerful Home Run Swing",
         "category": "Hitting",
         "prompt": (
-            "Baseball batter swinging for a home run, powerful full swing follow through, "
-            "dynamic sports motion"
+            _FRAME
+            + "Home run swing mechanics: load with slight coil, front foot plants, hips explode open, "
+            "hands drive the bat on a level plane, barrel whips through the zone, "
+            "full extension and high finish over the back shoulder. "
+            "Maximum bat speed, powerful follow-through, realistic power-hitter swing."
         ),
     },
     {
@@ -35,8 +50,11 @@ ANIMATION_MOTIONS: list[dict[str, str]] = [
         "label": "Batting Stance and Follow Through",
         "category": "Hitting",
         "prompt": (
-            "Baseball batter in athletic batting stance swinging through, "
-            "smooth athletic motion, sports action"
+            _FRAME
+            + "Batting swing mechanics: athletic stance with slight knee bend, small load stride, "
+            "weight transfer to front side, level swing path through the strike zone, "
+            "wrists roll through contact, balanced one-handed or two-handed finish. "
+            "Controlled smooth hitter's swing, realistic timing and form."
         ),
     },
     {
@@ -44,8 +62,11 @@ ANIMATION_MOTIONS: list[dict[str, str]] = [
         "label": "Diving Catch",
         "category": "Fielding",
         "prompt": (
-            "Baseball fielder making a spectacular diving catch, explosive athletic movement, "
-            "dynamic sports action"
+            _FRAME
+            + "Diving catch mechanics: reads the ball, first step burst, full extension layout "
+            "with glove arm reaching forward, off-hand stabilizes, body parallel to ground, "
+            "glove secures the ball at the end of the dive. "
+            "Dramatic but realistic fielding dive, athletic full-extension."
         ),
     },
     {
@@ -53,8 +74,11 @@ ANIMATION_MOTIONS: list[dict[str, str]] = [
         "label": "Sprinting to Field a Ball",
         "category": "Fielding",
         "prompt": (
-            "Baseball player sprinting at full speed to field a ball, explosive athletic motion, "
-            "professional sports action"
+            _FRAME
+            + "Sprint-and-field mechanics: explosive first step, pumping arms, knees drive high, "
+            "player breaks down with choppy steps approaching the ball, glove lowers in front, "
+            "smooth fielding position. "
+            "Full-speed sprint decelerating into a field, realistic outfield or infield run."
         ),
     },
     {
@@ -62,8 +86,11 @@ ANIMATION_MOTIONS: list[dict[str, str]] = [
         "label": "Pumping Fist in Celebration",
         "category": "Celebration",
         "prompt": (
-            "Baseball player pumping fist in celebration, explosive celebratory motion, "
-            "sports victory moment"
+            _FRAME
+            + "Celebration mechanics: moment of triumph, fist pumps upward from the chest, "
+            "slight bounce on the legs, head tilts back, shoulders rise with intensity, "
+            "brief held pose then second pump. "
+            "Victory fist pump, energetic but controlled celebratory motion."
         ),
     },
     {
@@ -71,8 +98,11 @@ ANIMATION_MOTIONS: list[dict[str, str]] = [
         "label": "Pointing to the Crowd",
         "category": "Celebration",
         "prompt": (
-            "Baseball player pointing to the crowd in celebration, confident athletic pose "
-            "with dynamic movement, sports victory moment"
+            _FRAME
+            + "Crowd-point celebration mechanics: arm extends toward the stands, index finger points, "
+            "chest opens proudly, slight turn of the torso toward the crowd, "
+            "confident stride or planted stance. "
+            "Acknowledging the fans, bold celebratory gesture, athletic pride."
         ),
     },
     {
@@ -80,8 +110,10 @@ ANIMATION_MOTIONS: list[dict[str, str]] = [
         "label": "Running Full Speed",
         "category": "General Athletic",
         "prompt": (
-            "Baseball player running at full athletic speed, powerful dynamic motion, "
-            "professional sports action"
+            _FRAME
+            + "Sprint mechanics: forward lean, rapid leg turnover, arms pump opposite legs, "
+            "head steady, accelerating run across the frame. "
+            "Full-speed baseball run — rounding bases or breaking out of the box, dynamic athletic sprint."
         ),
     },
     {
@@ -89,8 +121,11 @@ ANIMATION_MOTIONS: list[dict[str, str]] = [
         "label": "Explosive Celebratory Moment",
         "category": "General Athletic",
         "prompt": (
-            "Baseball player in explosive celebratory athletic moment, dynamic energetic movement, "
-            "sports action"
+            _FRAME
+            + "Explosive celebration mechanics: jump off both feet with arms raised, "
+            "mid-air peak with legs tucked slightly, landing with flexed knees, "
+            "immediate energetic arm movement. "
+            "Big-game celebration jump, high energy, joyful athletic burst."
         ),
     },
 ]

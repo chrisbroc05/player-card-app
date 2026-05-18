@@ -53,6 +53,7 @@ from card_repo import (  # noqa: E402
     get_card_by_card_id,
     list_cards_by_image_url_dicts,
     list_cards_for_player_dicts,
+    finalize_order_preview,
     list_my_cards_dicts,
     next_collectible_card_id,
 )
@@ -474,6 +475,7 @@ def _store_generated_card(
     vault_tier: str | None = None,
     owner_id: int | None = None,
     predefined_card_id: str | None = None,
+    status: str = "active",
 ) -> dict:
     """Persist generated card to PostgreSQL; returns API-shaped dict."""
     vt = vault_tier or _vault_tier_from_gen_tier(gen_tier)
@@ -500,6 +502,7 @@ def _store_generated_card(
         owner_name=owner_name,
         owner_id=owner_id,
         creator_user_id=owner_id,
+        status=status,
     )
     return card_to_dict(row, db)
 
@@ -1743,6 +1746,7 @@ def generate_card_for_order(
         vault_tier=_vault_tier_from_order_tier(str(order.get("tier", "rookie"))),
         owner_id=owner_id,
         predefined_card_id=new_card_id,
+        status="preview",
     )
 
     generated = GeneratedOrderCard(
@@ -1800,7 +1804,8 @@ def deliver_order(
 def approve_order_preview(
     order_id: int,
     body: OrderApprovePreviewRequest | None = None,
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     Customer confirms which generated preview they want fulfilled.
@@ -1824,6 +1829,16 @@ def approve_order_preview(
     order["final_card_url"] = final_url
     order["delivered_at"] = datetime.now(timezone.utc).isoformat()
     order["status"] = "delivered"
+
+    generated_cards = order.get("generated_cards", [])
+    card_ids = [str(g.get("card_id") or "") for g in generated_cards if g.get("card_id")]
+    finalize_order_preview(
+        db,
+        owner_id=current_user.id,
+        final_image_url=final_url,
+        generated_card_ids=card_ids,
+    )
+
     return Order.model_validate(order)
 
 

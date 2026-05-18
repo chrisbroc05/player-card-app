@@ -12,7 +12,7 @@ import { vaultTierBadge, formatEdition, rarityDisplay } from "../utils/tierStyle
 import { motionLabel } from "../constants/animationMotions";
 import { isAnimatedCard } from "../utils/animationCard";
 import AnimatedBadge from "../components/AnimatedBadge";
-import { CARD_IMAGE_FRAME } from "../utils/cardImageStyles";
+import { CARD_IMAGE_FRAME_DETAIL } from "../utils/cardImageStyles";
 
 function formatCreatedAt(iso) {
   if (!iso) return "—";
@@ -136,14 +136,14 @@ export default function CardDetailPage() {
           <div className="animate-fadeUp">
             <div className="mx-auto max-w-lg">
               <div
-                className={`animate-pulseGlow relative overflow-hidden rounded-2xl border-2 bg-black/40 p-1 ${badge?.glow ?? ""}`}
+                className={`animate-pulseGlow relative rounded-2xl border-2 bg-black/40 ${badge?.glow ?? ""}`}
               >
                 <CardImage
                   card={card}
                   alt={card.player_name}
                   cacheBust={card.created_at}
-                  frameClassName={`${CARD_IMAGE_FRAME} shadow-2xl`}
-                  className="rounded-xl"
+                  frameClassName={CARD_IMAGE_FRAME_DETAIL}
+                  variant="detail"
                   forcePlay={isAnimatedCard(card)}
                 />
               </div>

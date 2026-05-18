@@ -913,6 +913,14 @@ export default function StudioPage() {
                     {tierTheme.desc} Framing, glow, and accents are tuned to this rarity tier.
                   </p>
                 </div>
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/95">
+                  <p className="font-medium text-amber-50">Previews are for reference only</p>
+                  <p className="mt-1 text-xs text-amber-100/80">
+                    {isAnimatedCardType
+                      ? "Nothing is saved to your collection until you complete and create your animation. The preview artwork is used to generate your animated card."
+                      : "Nothing is saved to your collection until you click Complete Order & Add to Collection below."}
+                  </p>
+                </div>
                 <button
                   type="button"
                   onClick={handleGeneratePreviewForCurrentOrder}
@@ -969,24 +977,13 @@ export default function StudioPage() {
                     </button>
                   ))}
                 </div>
-                {savedCardDetail && previewCards.length > 0 && !isAnimatedCardType ? (
-                  <PostGenerationPanel
-                    detail={savedCardDetail}
-                    onViewCollection={() => navigate("/my-collection")}
-                    isLoggedIn={Boolean(user)}
-                    showQuantityFlow={isOrderDelivered || currentStep >= STEP_APPROVE}
-                    token={token || ""}
-                    onRefreshDetail={refreshSavedCardDetail}
-                    onCardsUpdated={fetchMyCards}
-                  />
-                ) : null}
                 <button
                   type="button"
                   onClick={handleOpenCompleteOrderModal}
                   disabled={!selectedPreviewUrl && !generatedCardUrl}
                   className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonTeal px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:opacity-50"
                 >
-                  {isAnimatedCardType ? "Create Animated Card" : "Complete Order"}
+                  {isAnimatedCardType ? "Complete & Create Animation" : "Complete Order & Add to Collection"}
                 </button>
               </div>
             ) : null}
@@ -1051,7 +1048,7 @@ export default function StudioPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-3 py-4 sm:px-4">
           <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/10 bg-cardBg p-4 shadow-2xl shadow-black/50 sm:p-6">
             <h3 className="text-lg font-semibold text-white">
-              {isAnimatedCardType ? "Create Your Animated Card" : "Approve Final Card"}
+              {isAnimatedCardType ? "Add Animated Card to Collection" : "Add Card to Collection"}
             </h3>
             <p className="mt-1 text-sm text-slate-300">
               {isAnimatedCardType

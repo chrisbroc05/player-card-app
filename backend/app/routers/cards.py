@@ -66,6 +66,11 @@ def _validate_animate_request(card: Card, current_user: User, motion_id: str) ->
         raise HTTPException(status_code=400, detail="Animation is already in progress for this card")
     if get_motion_by_id(motion_id) is None:
         raise HTTPException(status_code=400, detail="Invalid motion_id")
+    if (card.status or "active") not in ("active",):
+        raise HTTPException(
+            status_code=400,
+            detail="Complete your order and add the card to your collection before animating.",
+        )
     if not (card.image_url or "").strip():
         raise HTTPException(status_code=400, detail="Card has no image to animate")
     if _absolute_image_url(card.image_url) is None:

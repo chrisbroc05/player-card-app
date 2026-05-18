@@ -12,7 +12,7 @@ import { isAnimatedCard } from "../utils/animationCard";
 import AnimatedBadge from "../components/AnimatedBadge";
 import CardHistoryTimeline from "../components/CardHistoryTimeline";
 import { vaultTierBadge, rarityDisplay, formatEditionShort } from "../utils/tierStyles";
-import { CARD_IMAGE_FRAME } from "../utils/cardImageStyles";
+import { CARD_IMAGE_FRAME_DETAIL } from "../utils/cardImageStyles";
 
 export default function MarketplaceCardDetailPage() {
   const { cardId } = useParams();
@@ -114,7 +114,8 @@ export default function MarketplaceCardDetailPage() {
               <CardImage
                 card={listing}
                 alt={listing.player_name}
-                frameClassName={CARD_IMAGE_FRAME}
+                frameClassName={CARD_IMAGE_FRAME_DETAIL}
+                variant="detail"
                 forcePlay={isAnimatedCard(listing)}
               />
             </div>
