@@ -7,6 +7,7 @@ import { API_BASE_URL, authHeaders } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import { formatMoney } from "../utils/marketplace";
 import { CARD_IMAGE_FRAME_SM } from "../utils/cardImageStyles";
+import { isAnimatedCard } from "../utils/animationCard";
 
 function formatApiError(detail, fallback) {
   if (!detail) return fallback;
@@ -75,6 +76,11 @@ const iconDollar = (
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
   </svg>
 );
+const iconPlay = (
+  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z" />
+  </svg>
+);
 const iconTrophy = (
   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
     <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 013 3H15a3 3 0 01-3-3h6zm-9 0a3 3 0 00-3 3H9a3 3 0 003-3zM6.75 7.5v7.5m10.5-7.5v7.5m-12-3h13.5m-13.5 0A2.25 2.25 0 013.75 9.75v-1.5A2.25 2.25 0 016 6h12a2.25 2.25 0 012.25 2.25v1.5a2.25 2.25 0 01-2.25 2.25m-13.5 0h13.5" />
@@ -84,6 +90,7 @@ const iconTrophy = (
 export default function ProfilePage() {
   const { token, user, initializing } = useAuth();
   const [profile, setProfile] = useState(null);
+  const [animatedCardsOwned, setAnimatedCardsOwned] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -98,9 +105,20 @@ export default function ProfilePage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not load profile."));
       setProfile(data);
+      const cardsRes = await fetch(`${API_BASE_URL}/cards/my-cards`, {
+        headers: { ...authHeaders(token) },
+      });
+      if (cardsRes.ok) {
+        const cards = await cardsRes.json().catch(() => []);
+        const list = Array.isArray(cards) ? cards : [];
+        setAnimatedCardsOwned(list.filter((c) => isAnimatedCard(c)).length);
+      } else {
+        setAnimatedCardsOwned(0);
+      }
     } catch (e) {
       setError(e.message || "Failed to load profile.");
       setProfile(null);
+      setAnimatedCardsOwned(0);
     } finally {
       setLoading(false);
     }
@@ -203,6 +221,21 @@ export default function ProfilePage() {
               value={loading ? dash : favDisplay}
               valueClass={favClass}
             />
+            {!loading && animatedCardsOwned > 0 ? (
+              <div className="rounded-xl border border-violet-400/35 bg-gradient-to-br from-violet-500/15 via-cardBg2 to-cardBg2 p-4 shadow-[0_0_24px_rgba(139,92,246,0.15)]">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-violet-400/30 bg-violet-500/20 text-violet-100">
+                    {iconPlay}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-2xl font-semibold tabular-nums text-violet-100">{animatedCardsOwned}</p>
+                    <p className="mt-1 text-xs font-medium uppercase tracking-wide text-violet-200/70">
+                      Animated Cards
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>
         </section>
 
@@ -270,9 +303,10 @@ export default function ProfilePage() {
                 <div className="mt-4">
                   <div className="mx-auto max-w-[220px] sm:mx-0">
                     <CardImage
-                      imageUrl={profile.rarest_card.image_url}
+                      card={profile.rarest_card}
                       alt={profile.rarest_card.player_name}
                       frameClassName={CARD_IMAGE_FRAME_SM}
+                      forcePlay={isAnimatedCard(profile.rarest_card)}
                     />
                   </div>
                   <dl className="mt-4 space-y-1 text-sm">

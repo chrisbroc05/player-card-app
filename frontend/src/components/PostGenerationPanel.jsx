@@ -2,8 +2,10 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toApiUrl, API_BASE_URL, authHeaders } from "../config/api";
 import { vaultTierBadge, formatEdition, rarityDisplay } from "../utils/tierStyles";
+import CardImage from "./CardImage";
 import ShareCard from "./ShareCard";
 import QuantitySelector from "./QuantitySelector";
+import { isAnimatedCard } from "../utils/animationCard";
 
 export default function PostGenerationPanel({
   detail,
@@ -95,7 +97,7 @@ export default function PostGenerationPanel({
 
       <div className="mx-auto max-w-md">
         <div className={`overflow-hidden rounded-xl border-2 bg-black/20 transition duration-500 ${badge.glow}`}>
-          <img src={imgSrc} alt={detail.player_name || "Card"} className="block h-auto w-full object-contain" />
+          <CardImage card={detail} alt={detail.player_name || "Card"} forcePlay={isAnimatedCard(detail)} />
         </div>
       </div>
 

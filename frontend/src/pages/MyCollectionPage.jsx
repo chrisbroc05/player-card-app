@@ -7,7 +7,10 @@ import CardImage from "../components/CardImage";
 import { CardSharePopover } from "../components/ShareCard";
 import { useAuth } from "../context/AuthContext";
 import MarketplaceListingActions from "../components/MarketplaceListingActions";
+import AnimateCardModal from "../components/AnimateCardModal";
+import AnimationProgressBanner from "../components/AnimationProgressBanner";
 import { authFetch, formatApiError } from "../utils/authFetch";
+import { canAnimateCard, isAnimatedCard, isAnimationInProgress } from "../utils/animationCard";
 import { vaultTierBadge, rarityDisplay } from "../utils/tierStyles";
 import { CARD_IMAGE_FRAME } from "../utils/cardImageStyles";
 
@@ -19,6 +22,9 @@ export default function MyCollectionPage() {
   const [error, setError] = useState("");
   const [cancelKey, setCancelKey] = useState("");
   const [marketplaceBusyId, setMarketplaceBusyId] = useState("");
+  const [animateModalCard, setAnimateModalCard] = useState(null);
+  const [animateBusyId, setAnimateBusyId] = useState("");
+  const [bannerDismissed, setBannerDismissed] = useState({});
 
   const loadCards = useCallback(async () => {
     if (!token) return;
@@ -123,6 +129,66 @@ export default function MyCollectionPage() {
     loadCards();
   }, [token, initializing, loadCards]);
 
+  useEffect(() => {
+    if (!token) return undefined;
+    const needsPoll = cards.some((c) => isAnimationInProgress(c));
+    if (!needsPoll) return undefined;
+    const iv = setInterval(() => {
+      loadCards();
+    }, 10000);
+    return () => clearInterval(iv);
+  }, [token, cards, loadCards]);
+
+  useEffect(() => {
+    for (const c of cards) {
+      const st = (c.animation_status || "").toLowerCase();
+      if (st === "completed" && !bannerDismissed[c.card_id]) {
+        const t = setTimeout(() => {
+          setBannerDismissed((prev) => ({ ...prev, [c.card_id]: true }));
+        }, 3000);
+        return () => clearTimeout(t);
+      }
+    }
+    return undefined;
+  }, [cards, bannerDismissed]);
+
+  async function startAnimateUpgrade(card, motionId) {
+    if (!token) return;
+    setAnimateBusyId(card.card_id);
+    setError("");
+    try {
+      const { res, unauthorized } = await authFetch(token, `/cards/${encodeURIComponent(card.card_id)}/animate-upgrade`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ motion_id: motionId }),
+      });
+      if (unauthorized) throw new Error("Session expired.");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not start animation."));
+      setAnimateModalCard(null);
+      await loadCards();
+    } catch (e) {
+      setError(e.message || "Could not start animation.");
+    } finally {
+      setAnimateBusyId("");
+    }
+  }
+
+  function renderAnimationBanner(card) {
+    const st = (card.animation_status || "").toLowerCase();
+    if (isAnimatedCard(card)) return null;
+    if (st === "pending" || st === "processing") {
+      return <AnimationProgressBanner variant="progress" />;
+    }
+    if (st === "completed" && !bannerDismissed[card.card_id]) {
+      return <AnimationProgressBanner variant="success" />;
+    }
+    if (st === "failed") {
+      return <AnimationProgressBanner variant="failed" />;
+    }
+    return null;
+  }
+
   async function cancelTradeForCard(card) {
     if (!token || !card?.pending_trade_offer_id) return;
     setCancelKey(card.card_id);
@@ -194,11 +260,12 @@ export default function MyCollectionPage() {
                 >
                   <div className={`relative ${CARD_IMAGE_FRAME}`}>
                     <CardImage
-                      imageUrl={card.image_url}
+                      card={card}
                       alt={card.player_name}
                       cacheBust={card.created_at}
                       frameClassName="flex h-full w-full items-center justify-center"
                       className="transition duration-300 group-hover:brightness-110"
+                      forcePlay={isAnimatedCard(card)}
                     />
                     {stackCount ? (
                       <span className="absolute left-2 top-2 z-10 rounded-md border border-white/15 bg-black/70 px-2 py-0.5 text-[11px] font-semibold text-slate-200 backdrop-blur-sm">
@@ -246,6 +313,16 @@ export default function MyCollectionPage() {
                         {cancelKey === card.card_id ? "Cancelling…" : "Cancel Trade"}
                       </button>
                     ) : null}
+                    {renderAnimationBanner(card)}
+                    {canAnimateCard(card) ? (
+                      <button
+                        type="button"
+                        onClick={() => setAnimateModalCard(card)}
+                        className="inline-flex min-h-[40px] w-full items-center justify-center rounded-lg border border-violet-500/40 bg-violet-500/15 px-3 py-2 text-sm font-medium text-violet-100 transition hover:border-violet-400/60"
+                      >
+                        Animate This Card
+                      </button>
+                    ) : null}
                     <MarketplaceListingActions
                       card={card}
                       listingInfo={listingByCardId[card.card_id]}
@@ -260,6 +337,14 @@ export default function MyCollectionPage() {
           </div>
         )}
       </main>
+
+      <AnimateCardModal
+        card={animateModalCard}
+        open={Boolean(animateModalCard)}
+        busy={Boolean(animateBusyId)}
+        onClose={() => setAnimateModalCard(null)}
+        onConfirm={(motionId) => startAnimateUpgrade(animateModalCard, motionId)}
+      />
 
       <AppFooter />
     </div>

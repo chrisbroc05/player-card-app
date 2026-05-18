@@ -25,3 +25,68 @@
     font: inherit;
   }
 }
+
+@layer utilities {
+  .animation-card-glow {
+    animation: animation-card-pulse 2.4s ease-in-out infinite;
+    box-shadow: 0 0 40px rgba(167, 139, 250, 0.35), 0 0 80px rgba(45, 212, 191, 0.15);
+  }
+
+  .animation-shimmer {
+    background: linear-gradient(
+      105deg,
+      transparent 40%,
+      rgba(255, 255, 255, 0.08) 50%,
+      transparent 60%
+    );
+    animation: animation-shimmer 2.2s ease-in-out infinite;
+  }
+
+  .animation-progress-indeterminate {
+    animation: animation-progress-slide 1.6s ease-in-out infinite;
+  }
+
+  .animation-banner-pulse {
+    animation: animation-banner-glow 2s ease-in-out infinite;
+  }
+}
+
+@keyframes animation-card-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.92;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+}
+
+@keyframes animation-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes animation-progress-slide {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+@keyframes animation-banner-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 12px rgba(167, 139, 250, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 22px rgba(167, 139, 250, 0.45);
+  }
+}

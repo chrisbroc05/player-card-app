@@ -7,6 +7,9 @@ import { API_BASE_URL } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import { authFetch, formatApiError } from "../utils/authFetch";
 import { computeRoyaltyPreview, formatMoney, listedAgeLabel, listingExpiresSubtextClass } from "../utils/marketplace";
+import { motionLabel } from "../constants/animationMotions";
+import { isAnimatedCard } from "../utils/animationCard";
+import AnimatedBadge from "../components/AnimatedBadge";
 import CardHistoryTimeline from "../components/CardHistoryTimeline";
 import { vaultTierBadge, rarityDisplay, formatEditionShort } from "../utils/tierStyles";
 import { CARD_IMAGE_FRAME } from "../utils/cardImageStyles";
@@ -109,9 +112,10 @@ export default function MarketplaceCardDetailPage() {
           <div className="mt-8 grid gap-8 lg:grid-cols-2">
             <div className={`rounded-2xl border border-white/10 bg-cardBg p-3 ${badge?.glow || ""}`}>
               <CardImage
-                imageUrl={listing.image_url}
+                card={listing}
                 alt={listing.player_name}
                 frameClassName={CARD_IMAGE_FRAME}
+                forcePlay={isAnimatedCard(listing)}
               />
             </div>
             <div className="space-y-4">
@@ -122,7 +126,11 @@ export default function MarketplaceCardDetailPage() {
               <div className="mt-3 flex flex-wrap gap-2">
                 <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${badge?.pill || ""}`}>{badge?.label}</span>
                 <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[11px] text-slate-300">{rarityDisplay(listing.rarity)}</span>
+                {isAnimatedCard(listing) ? <AnimatedBadge /> : null}
               </div>
+              {listing.animation_motion ? (
+                <p className="text-sm text-slate-500">Motion: {motionLabel(listing.animation_motion)}</p>
+              ) : null}
               <p className="mt-3 text-3xl font-bold text-neonTeal">{formatMoney(listing.asking_price)}</p>
               {listing.days_remaining != null && listing.listing_expires_at ? (
                 <p className={`mt-1 text-sm ${listingExpiresSubtextClass(listing.days_remaining)}`}>

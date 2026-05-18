@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppFooter from "../components/AppFooter";
 import { ADMIN_TOKEN_STORAGE_KEY, API_BASE_URL, adminHeaders } from "../config/api";
+import { motionLabel } from "../constants/animationMotions";
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -50,6 +51,7 @@ export default function AdminDashboard() {
   const [userSearch, setUserSearch] = useState("");
 
   const [cardTierFilter, setCardTierFilter] = useState("all");
+  const [cardAnimatedOnly, setCardAnimatedOnly] = useState(false);
   const [cardSearch, setCardSearch] = useState("");
 
   const [tradeStatusFilter, setTradeStatusFilter] = useState("all");
@@ -238,13 +240,14 @@ export default function AdminDashboard() {
         if (want === "rookie" && t !== "rookie") return false;
         if (want === "legends" && t !== "legends") return false;
       }
+      if (cardAnimatedOnly && !c.is_animated) return false;
       if (!q) return true;
       return (
         (c.player_name || "").toLowerCase().includes(q) ||
         (c.card_id || "").toLowerCase().includes(q)
       );
     });
-  }, [cards, cardSearch, cardTierFilter]);
+  }, [cards, cardSearch, cardTierFilter, cardAnimatedOnly]);
 
   const filteredTrades = useMemo(() => {
     if (tradeStatusFilter === "all") return trades;
@@ -409,6 +412,20 @@ export default function AdminDashboard() {
                       )}
                     </div>
                   </>
+                ) : null}
+                {stats.animation_stats ? (
+                  <div>
+                    <h3 className="mb-3 text-sm font-semibold text-violet-200/90">Animation</h3>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      {kpi("Total animated cards", stats.animation_stats.total_animated ?? 0)}
+                      {kpi("Animations pending", stats.animation_stats.animations_pending ?? 0)}
+                      {kpi("Animations failed", stats.animation_stats.animations_failed ?? 0)}
+                      {kpi(
+                        "Most popular motion",
+                        motionLabel(stats.animation_stats.most_popular_motion) || "—"
+                      )}
+                    </div>
+                  </div>
                 ) : null}
                 <div>
                   <h3 className="mb-3 text-sm font-semibold text-slate-300">Cards by tier</h3>
@@ -615,7 +632,7 @@ export default function AdminDashboard() {
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <p className="text-sm text-slate-400">
                 Total cards: <span className="font-semibold text-white">{cards.length}</span>
-                {cardSearch.trim() || cardTierFilter !== "all" ? (
+                {cardSearch.trim() || cardTierFilter !== "all" || cardAnimatedOnly ? (
                   <>
                     {" "}
                     · Shown: <span className="font-semibold text-white">{filteredCards.length}</span>
@@ -633,6 +650,15 @@ export default function AdminDashboard() {
                   <option value="all_star">All-Star</option>
                   <option value="legends">Legends</option>
                 </select>
+                <label className="flex min-h-[42px] cursor-pointer items-center gap-2 rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 text-sm text-violet-100">
+                  <input
+                    type="checkbox"
+                    checked={cardAnimatedOnly}
+                    onChange={(e) => setCardAnimatedOnly(e.target.checked)}
+                    className="rounded border-white/20"
+                  />
+                  Animated only
+                </label>
                 <input
                   placeholder="Player or card ID…"
                   value={cardSearch}
@@ -646,7 +672,7 @@ export default function AdminDashboard() {
               <table className="w-full min-w-[960px] text-left text-sm">
                 <thead className="border-b border-white/10 bg-cardBg2 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
-                    {["Card ID", "Player", "Team", "Tier", "Theme", "Rarity", "Ed.", "Print", "Owner", "Status", "Created"].map(
+                    {["Card ID", "Player", "Team", "Tier", "Theme", "Rarity", "Ed.", "Print", "Animated", "Owner", "Status", "Created"].map(
                       (h) => (
                         <th key={h} className="p-3 font-medium">
                           {h}
@@ -658,7 +684,7 @@ export default function AdminDashboard() {
                 <tbody>
                   {filteredCards.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className="p-6 text-center text-slate-500">
+                      <td colSpan={12} className="p-6 text-center text-slate-500">
                         No cards match.
                       </td>
                     </tr>
@@ -673,6 +699,15 @@ export default function AdminDashboard() {
                         <td className="p-3 text-slate-400">{c.rarity}</td>
                         <td className="p-3 text-slate-400">{c.edition_number}</td>
                         <td className="p-3 text-slate-400">{c.print_run}</td>
+                        <td className="p-3">
+                          {c.is_animated ? (
+                            <span className="rounded-full border border-violet-400/40 bg-violet-500/15 px-2 py-0.5 text-[11px] font-medium text-violet-100">
+                              Yes
+                            </span>
+                          ) : (
+                            <span className="text-slate-500">No</span>
+                          )}
+                        </td>
                         <td className="p-3 text-slate-300">
                           <span className="block">{c.owner_display_name}</span>
                           <span className="text-xs text-slate-500">{c.owner_email}</span>

@@ -9,6 +9,9 @@ import SendCard from "../components/SendCard";
 import { useAuth } from "../context/AuthContext";
 import CardHistoryTimeline from "../components/CardHistoryTimeline";
 import { vaultTierBadge, formatEdition, rarityDisplay } from "../utils/tierStyles";
+import { motionLabel } from "../constants/animationMotions";
+import { isAnimatedCard } from "../utils/animationCard";
+import AnimatedBadge from "../components/AnimatedBadge";
 import { CARD_IMAGE_FRAME } from "../utils/cardImageStyles";
 
 function formatCreatedAt(iso) {
@@ -136,11 +139,12 @@ export default function CardDetailPage() {
                 className={`animate-pulseGlow relative overflow-hidden rounded-2xl border-2 bg-black/40 p-1 ${badge?.glow ?? ""}`}
               >
                 <CardImage
-                  imageUrl={card.image_url}
+                  card={card}
                   alt={card.player_name}
                   cacheBust={card.created_at}
                   frameClassName={`${CARD_IMAGE_FRAME} shadow-2xl`}
                   className="rounded-xl"
+                  forcePlay={isAnimatedCard(card)}
                 />
               </div>
             </div>
@@ -158,7 +162,11 @@ export default function CardDetailPage() {
                 <span className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs text-slate-300">
                   {rarityDisplay(card.rarity)}
                 </span>
+                {isAnimatedCard(card) ? <AnimatedBadge /> : null}
               </div>
+              {card.animation_motion ? (
+                <p className="text-sm text-slate-500">Motion: {motionLabel(card.animation_motion)}</p>
+              ) : null}
 
               <dl className="grid gap-3 rounded-2xl border border-white/10 bg-cardBg p-4 text-sm sm:grid-cols-2">
                 <div>

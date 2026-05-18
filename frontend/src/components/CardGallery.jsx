@@ -32,10 +32,12 @@ export default function CardGallery({ cards }) {
                     className="block"
                   >
                     <CardImage
-                      imageUrl={card.image_url}
+                      card={card}
                       alt={card.player_name || "Card"}
                       cacheBust={card.created_at}
                       frameClassName="flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/30"
+                      playOnHover
+                      forcePlay={Boolean(card.is_animated)}
                     />
                   </Link>
                   <div className="absolute right-2 top-2">

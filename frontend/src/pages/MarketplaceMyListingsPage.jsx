@@ -207,9 +207,11 @@ export default function MarketplaceMyListingsPage() {
                       className="block w-full max-w-[140px] shrink-0 overflow-hidden rounded-xl border border-white/10"
                     >
                       <CardImage
-                        imageUrl={listing.image_url}
+                        card={listing}
                         alt={listing.player_name}
                         frameClassName="flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/30"
+                        playOnHover
+                        forcePlay={Boolean(listing.is_animated)}
                       />
                     </Link>
                     <div className="min-w-0 flex-1">

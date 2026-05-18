@@ -15,9 +15,11 @@ export default function MarketplaceCardGridItem({ listing }) {
       className={`group flex flex-col rounded-2xl border border-white/10 bg-cardBg p-3 shadow-lg transition duration-300 hover:border-white/20 hover:scale-[1.02] ${badge.glow}`}
     >
       <CardImage
-        imageUrl={listing.image_url}
+        card={listing}
         alt={listing.player_name}
         frameClassName={CARD_IMAGE_FRAME}
+        playOnHover
+        forcePlay={Boolean(listing.is_animated)}
       />
       <div className="mt-3 flex flex-1 flex-col space-y-1.5 px-1">
         <div className="flex flex-wrap items-center gap-2">
