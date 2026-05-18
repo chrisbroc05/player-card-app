@@ -266,7 +266,6 @@ export default function MyCollectionPage() {
                       alt={card.player_name}
                       cacheBust={card.created_at}
                       playOnHover
-                      forcePlay={isAnimatedCard(card)}
                     />
                     {stackCount ? (
                       <span className="absolute left-2 top-2 z-10 rounded-md border border-white/15 bg-black/70 px-2 py-0.5 text-[11px] font-semibold text-slate-200 backdrop-blur-sm">

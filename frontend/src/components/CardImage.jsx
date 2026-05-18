@@ -42,15 +42,16 @@ export default function CardImage({
   forcePlay = false,
   showAnimatedBadge = true,
   showInProgressOverlay = true,
-  /** "grid" (default) | "detail" — detail shows full card without cropping */
+  /** "grid" (default) | "detail" — both use 2:3 contain; detail allows taller max width */
   variant = "grid",
 }) {
-  const [failed, setFailed] = useState(false);
+  const [imgFailed, setImgFailed] = useState(false);
   const [videoFailed, setVideoFailed] = useState(false);
   const [hovered, setHovered] = useState(false);
   const videoRef = useRef(null);
   const isMobile = useIsMobileViewport();
   const isDetail = variant === "detail";
+  const isGridBrowse = variant === "grid" && playOnHover;
 
   const fields = resolveCardFields(card, {
     imageUrl,
@@ -59,7 +60,7 @@ export default function CardImage({
     animationStatus,
   });
 
-  const showVideo =
+  const hasVideo =
     isAnimatedCard(fields) && fields.animatedVideoUrl && !videoFailed && !isAnimationInProgress(fields);
   const inProgress = showInProgressOverlay && isAnimationInProgress(fields);
 
@@ -72,10 +73,20 @@ export default function CardImage({
 
   const videoSrc = useMemo(() => toApiUrl(fields.animatedVideoUrl), [fields.animatedVideoUrl]);
 
-  const shouldPlayVideo = showVideo && (forcePlay || isMobile || !playOnHover || hovered);
+  // Grid tiles: static poster matches static cards; video only on hover (desktop).
+  // Detail / post-gen: play video when forcePlay.
+  const shouldPlayVideo = hasVideo && (
+    isGridBrowse
+      ? hovered && !isMobile
+      : forcePlay || (!playOnHover && !isGridBrowse)
+  );
+
+  const showStaticPoster = Boolean(imgSrc && !imgFailed);
+  const showVideoLayer = hasVideo && shouldPlayVideo;
 
   const mediaClass = [
     isDetail ? CARD_IMAGE_MEDIA_DETAIL : CARD_IMAGE_MEDIA_CLASS,
+    "h-full w-full object-contain",
     className,
   ]
     .filter(Boolean)
@@ -83,7 +94,7 @@ export default function CardImage({
 
   useEffect(() => {
     const el = videoRef.current;
-    if (!el || !showVideo) return;
+    if (!el || !hasVideo) return;
     if (shouldPlayVideo) {
       el.play().catch(() => {});
     } else {
@@ -94,55 +105,64 @@ export default function CardImage({
         /* ignore */
       }
     }
-  }, [shouldPlayVideo, showVideo, videoSrc]);
-
-  let content;
-  if (showVideo) {
-    content = (
-      <video
-        ref={videoRef}
-        src={videoSrc}
-        className={mediaClass}
-        autoPlay={shouldPlayVideo}
-        loop
-        muted
-        playsInline
-        preload="metadata"
-        aria-label={alt || "Animated card"}
-        onError={() => setVideoFailed(true)}
-      />
-    );
-  } else if (failed || !imgSrc) {
-    content = <PlaceholderInner alt={alt} className={className} isDetail={isDetail} />;
-  } else {
-    content = (
-      <img
-        src={imgSrc}
-        alt={alt || "Card"}
-        className={mediaClass}
-        loading="lazy"
-        decoding="async"
-        onError={() => setFailed(true)}
-      />
-    );
-  }
+  }, [shouldPlayVideo, hasVideo, videoSrc]);
 
   const resolvedFrame =
     frameClassName ||
     (variant === "grid"
-      ? showVideo
+      ? hasVideo
         ? CARD_IMAGE_FRAME_ANIMATED
         : CARD_IMAGE_FRAME
-      : "");
+      : isDetail
+        ? CARD_IMAGE_FRAME
+        : "");
+
+  let inner;
+  if (!showStaticPoster && !hasVideo) {
+    inner = <PlaceholderInner alt={alt} className={className} isDetail={isDetail} />;
+  } else {
+    inner = (
+      <>
+        {showStaticPoster ? (
+          <img
+            src={imgSrc}
+            alt={alt || "Card"}
+            className={`${mediaClass} ${showVideoLayer ? "opacity-0" : ""}`}
+            loading="lazy"
+            decoding="async"
+            onError={() => setImgFailed(true)}
+          />
+        ) : null}
+        {hasVideo ? (
+          <video
+            ref={videoRef}
+            src={videoSrc}
+            className={`${mediaClass} absolute inset-0 ${
+              showVideoLayer ? "z-[1] opacity-100" : "pointer-events-none z-0 opacity-0"
+            }`}
+            autoPlay={showVideoLayer}
+            loop
+            muted
+            playsInline
+            preload="metadata"
+            aria-label={alt || "Animated card"}
+            onError={() => setVideoFailed(true)}
+          />
+        ) : null}
+      </>
+    );
+  }
 
   const media = (
     <div
-      className={`relative flex h-full w-full items-center justify-center ${isDetail ? "min-h-[260px]" : ""}`}
-      onMouseEnter={playOnHover && !isMobile ? () => setHovered(true) : undefined}
-      onMouseLeave={playOnHover && !isMobile ? () => setHovered(false) : undefined}
+      className={`relative flex h-full w-full items-center justify-center ${
+        isDetail ? "mx-auto w-full max-w-md" : ""
+      }`}
+      onMouseEnter={isGridBrowse && !isMobile ? () => setHovered(true) : undefined}
+      onMouseLeave={isGridBrowse && !isMobile ? () => setHovered(false) : undefined}
     >
-      {content}
-      {showAnimatedBadge && showVideo ? (
+      {inner}
+      {showAnimatedBadge && hasVideo ? (
         <span className="absolute right-2 top-2 z-10">
           <AnimatedBadge />
         </span>

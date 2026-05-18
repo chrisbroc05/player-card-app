@@ -235,7 +235,7 @@ export default function MarketplaceMyOffersPage() {
 
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                     <Link to={"/marketplace/" + encodeURIComponent(offer.card_id)} className="block w-full max-w-[100px] shrink-0">
-                      <CardImage card={offer} alt={offer.player_name} frameClassName={CARD_IMAGE_FRAME_XS} forcePlay={Boolean(offer.is_animated)} />
+                      <CardImage card={offer} alt={offer.player_name} frameClassName={CARD_IMAGE_FRAME_XS} />
                     </Link>
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-white">{offer.player_name}</p>

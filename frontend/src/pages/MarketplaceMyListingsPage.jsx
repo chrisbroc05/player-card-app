@@ -211,7 +211,6 @@ export default function MarketplaceMyListingsPage() {
                         alt={listing.player_name}
                         frameClassName="flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/30"
                         playOnHover
-                        forcePlay={Boolean(listing.is_animated)}
                       />
                     </Link>
                     <div className="min-w-0 flex-1">

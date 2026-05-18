@@ -20,7 +20,6 @@ export default function MarketplaceCardGridItem({ listing }) {
         alt={listing.player_name}
         frameClassName={isAnimatedCard(listing) ? CARD_IMAGE_FRAME_ANIMATED : CARD_IMAGE_FRAME}
         playOnHover
-        forcePlay={Boolean(listing.is_animated)}
       />
       <div className="mt-3 flex flex-1 flex-col space-y-1.5 px-1">
         <div className="flex flex-wrap items-center gap-2">

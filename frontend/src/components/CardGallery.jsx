@@ -39,7 +39,6 @@ export default function CardGallery({ cards }) {
                       cacheBust={card.created_at}
                       frameClassName={isAnimatedCard(card) ? CARD_IMAGE_FRAME_ANIMATED : CARD_IMAGE_FRAME}
                       playOnHover
-                      forcePlay={Boolean(card.is_animated)}
                     />
                   </Link>
                   <div className="absolute right-2 top-2">

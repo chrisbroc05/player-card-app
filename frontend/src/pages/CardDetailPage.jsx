@@ -134,19 +134,15 @@ export default function CardDetailPage() {
           </div>
         ) : (
           <div className="animate-fadeUp">
-            <div className="mx-auto max-w-lg">
-              <div
-                className={`animate-pulseGlow relative rounded-2xl border-2 bg-black/40 ${badge?.glow ?? ""}`}
-              >
-                <CardImage
-                  card={card}
-                  alt={card.player_name}
-                  cacheBust={card.created_at}
-                  frameClassName={CARD_IMAGE_FRAME_DETAIL}
-                  variant="detail"
-                  forcePlay={isAnimatedCard(card)}
-                />
-              </div>
+            <div className={`mx-auto max-w-lg animate-pulseGlow ${badge?.glow ?? ""}`}>
+              <CardImage
+                card={card}
+                alt={card.player_name}
+                cacheBust={card.created_at}
+                frameClassName={CARD_IMAGE_FRAME_DETAIL}
+                variant="detail"
+                forcePlay={isAnimatedCard(card)}
+              />
             </div>
 
             <div className="mx-auto mt-10 max-w-xl space-y-6 text-center sm:text-left">

@@ -16,8 +16,10 @@ logger = logging.getLogger(__name__)
 RUNWAY_API_BASE = (os.environ.get("RUNWAY_API_BASE") or "https://api.dev.runwayml.com/v1").rstrip("/")
 RUNWAY_API_VERSION = (os.environ.get("RUNWAY_API_VERSION") or "2024-11-06").strip()
 RUNWAY_IMAGE_TO_VIDEO_MODEL = (os.environ.get("RUNWAY_IMAGE_TO_VIDEO_MODEL") or "gen4.5").strip()
-POLL_INTERVAL_SECONDS = 5
-MAX_POLL_ATTEMPTS = 24
+POLL_INTERVAL_SECONDS = int(os.environ.get("RUNWAY_POLL_INTERVAL_SECONDS", "5"))
+MAX_POLL_ATTEMPTS = int(os.environ.get("RUNWAY_MAX_POLL_ATTEMPTS", "72"))
+# Trading-card portrait (~3:4); closer to 2:3 collectibles than 9:16 phone video
+RUNWAY_VIDEO_RATIO = (os.environ.get("RUNWAY_VIDEO_RATIO") or "832:1104").strip()
 
 
 def _api_key() -> str:
@@ -42,7 +44,7 @@ async def _start_image_to_video(client: httpx.AsyncClient, image_url: str, promp
         "model": RUNWAY_IMAGE_TO_VIDEO_MODEL,
         "promptImage": image_url,
         "promptText": prompt,
-        "ratio": "720:1280",
+        "ratio": RUNWAY_VIDEO_RATIO,
         "duration": 3,
     }
     url = f"{RUNWAY_API_BASE}/image_to_video"
@@ -122,7 +124,7 @@ async def _generate_animation_once(
     public_path = f"/animations/{safe_id}.mp4"
 
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=30.0)) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(300.0, connect=30.0)) as client:
             task_id = await _start_image_to_video(client, absolute_image, motion_prompt)
             task_data = await _poll_task(client, task_id)
             output_url = _extract_output_url(task_data)

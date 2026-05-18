@@ -65,7 +65,7 @@ export default function AnimationLoadingScreen({
     let cancelled = false;
     const iv = setInterval(async () => {
       if (cancelled) return;
-      if (Date.now() - startRef.current > 180000) {
+      if (Date.now() - startRef.current > 420000) {
         setTimedOut(true);
         clearInterval(iv);
         return;

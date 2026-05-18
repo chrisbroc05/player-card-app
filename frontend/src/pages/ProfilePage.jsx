@@ -306,7 +306,6 @@ export default function ProfilePage() {
                       card={profile.rarest_card}
                       alt={profile.rarest_card.player_name}
                       frameClassName={CARD_IMAGE_FRAME_SM}
-                      forcePlay={isAnimatedCard(profile.rarest_card)}
                     />
                   </div>
                   <dl className="mt-4 space-y-1 text-sm">
