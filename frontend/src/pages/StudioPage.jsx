@@ -20,11 +20,16 @@ const STEPS = [
   "Player Details",
   "Upload Photo",
   "Choose Card Type",
-  "Choose Theme",
   "Choose Motion",
+  "Choose Theme",
   "Generate Preview",
   "Approve Card",
 ];
+
+const STEP_MOTION = 5;
+const STEP_THEME = 6;
+const STEP_GENERATE = 7;
+const STEP_APPROVE = 8;
 
 const TIER_UI = {
   rookie: {
@@ -220,12 +225,18 @@ export default function StudioPage() {
   const canGoStep4 = Boolean(imageFile);
   const isAnimatedCardType = cardType === "animated";
   const canCreateOrder = Boolean(
-    currentStep >= 5 &&
+    currentStep >= STEP_THEME &&
       orderCustomerName.trim() &&
       orderCustomerEmail.trim() &&
       !isCreating &&
       !isGenerating
   );
+
+  useEffect(() => {
+    if (!isAnimatedCardType && currentStep === STEP_MOTION) {
+      setCurrentStep(STEP_THEME);
+    }
+  }, [isAnimatedCardType, currentStep]);
 
   useEffect(() => {
     return () => {
@@ -268,7 +279,7 @@ export default function StudioPage() {
   }, [selectedPreviewUrl, previewCards]);
 
   useEffect(() => {
-    if (currentStep !== 8 || !activeOrder?.final_card_url) return;
+    if (currentStep !== STEP_APPROVE || !activeOrder?.final_card_url) return;
     const match = (activeOrder.generated_cards || []).find((g) => g.image_url === activeOrder.final_card_url);
     if (!match?.card_id) return;
     let cancelled = false;
@@ -388,7 +399,7 @@ export default function StudioPage() {
       setCurrentOrderId(orderData.id);
       setMessage(`Order #${orderData.id} created. Generate your previews next.`);
       await Promise.all([fetchMyCards(), fetchOrders()]);
-      setCurrentStep(isAnimatedCardType ? 6 : 7);
+      setCurrentStep(STEP_GENERATE);
     } catch (err) {
       setError(err.message || "Failed to create order.");
     } finally {
@@ -475,7 +486,7 @@ export default function StudioPage() {
         await startCardAnimation(cardId);
         return;
       }
-      setCurrentStep(8);
+      setCurrentStep(STEP_APPROVE);
     } catch (err) {
       setError(err.message || "Failed to approve preview.");
     } finally {
@@ -493,13 +504,18 @@ export default function StudioPage() {
     }
     setAnimationLoadingCardId(null);
     setAnimationFailed(false);
-    setCurrentStep(8);
+    setCurrentStep(STEP_APPROVE);
     await Promise.all([fetchMyCards(), fetchOrders()]);
   }
 
   function handleOpenCompleteOrderModal() {
     if (!currentOrderId) return setError("Create an order first.");
     if (!selectedPreviewUrl && !generatedCardUrl) return setError("Generate and select a preview first.");
+    if (isAnimatedCardType && !selectedMotionId) {
+      setError("Select a motion for your animated card first.");
+      setCurrentStep(STEP_MOTION);
+      return;
+    }
     setShowCompleteModal(true);
   }
 
@@ -566,6 +582,7 @@ export default function StudioPage() {
             <div className="mb-4 flex flex-wrap gap-2">
               {STEPS.map((label, i) => {
                 const step = i + 1;
+                if (step === STEP_MOTION && !isAnimatedCardType) return null;
                 return (
                   <button
                     key={label}
@@ -737,7 +754,13 @@ export default function StudioPage() {
 
             {currentStep === 4 ? (
               <div className="grid gap-4">
-                <CardTypeStep value={cardType} onChange={setCardType} />
+                <CardTypeStep
+                  value={cardType}
+                  onChange={(type) => {
+                    setCardType(type);
+                    if (type === "standard") setSelectedMotionId("");
+                  }}
+                />
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -748,16 +771,16 @@ export default function StudioPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setCurrentStep(5)}
+                    onClick={() => setCurrentStep(isAnimatedCardType ? STEP_MOTION : STEP_THEME)}
                     className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto"
                   >
-                    Continue to Theme
+                    {isAnimatedCardType ? "Continue to Motion" : "Continue to Theme"}
                   </button>
                 </div>
               </div>
             ) : null}
 
-            {currentStep === 5 ? (
+            {currentStep === STEP_THEME ? (
               <div className="grid gap-8">
                 <ThemeLibraryPicker
                   categories={themeCategories}
@@ -803,6 +826,9 @@ export default function StudioPage() {
                       Card type:{" "}
                       {isAnimatedCardType ? "Animated (+$10.00)" : "Standard"}
                     </p>
+                    {isAnimatedCardType && selectedMotionId ? (
+                      <p>Motion: {motionLabel(selectedMotionId)}</p>
+                    ) : null}
                     <p>Theme: {selectedThemeLabel}</p>
                     <p>Player: {displayName || `${firstName} ${lastName}`.trim() || "TBD"}</p>
                   </div>
@@ -810,10 +836,10 @@ export default function StudioPage() {
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => setCurrentStep(4)}
+                    onClick={() => setCurrentStep(isAnimatedCardType ? STEP_MOTION : 4)}
                     className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
                   >
-                    Back to Card Type
+                    {isAnimatedCardType ? "Back to Motion" : "Back to Card Type"}
                   </button>
                   <button
                     type="button"
@@ -827,30 +853,31 @@ export default function StudioPage() {
               </div>
             ) : null}
 
-            
-            {currentStep === 6 ? (
+            {currentStep === STEP_MOTION && isAnimatedCardType ? (
               <div className="grid gap-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-white">Choose Your Player&apos;s Motion</h3>
-                  <p className="mt-1 text-sm text-slate-400">
-                    Select how your player moves in the animation
-                  </p>
+                <div className="grid gap-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">Choose Your Player&apos;s Motion</h3>
+                    <p className="mt-1 text-sm text-slate-400">
+                      Select how your player moves in the animation
+                    </p>
+                  </div>
+                  <MotionSelectionGrid
+                    value={selectedMotionId}
+                    onChange={(id) => {
+                      setSelectedMotionId(id);
+                      setMotionStepError("");
+                    }}
+                    error={motionStepError}
+                  />
                 </div>
-                <MotionSelectionGrid
-                  value={selectedMotionId}
-                  onChange={(id) => {
-                    setSelectedMotionId(id);
-                    setMotionStepError("");
-                  }}
-                  error={motionStepError}
-                />
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => setCurrentStep(5)}
+                    onClick={() => setCurrentStep(4)}
                     className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
                   >
-                    Back to Theme
+                    Back to Card Type
                   </button>
                   <button
                     type="button"
@@ -859,17 +886,17 @@ export default function StudioPage() {
                         setMotionStepError("Please select a motion to continue.");
                         return;
                       }
-                      setCurrentStep(7);
+                      setCurrentStep(STEP_THEME);
                     }}
                     className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto"
                   >
-                    Continue to Generate
+                    Continue to Theme
                   </button>
                 </div>
               </div>
             ) : null}
 
-{currentStep === 7 ? (
+            {currentStep === STEP_GENERATE ? (
               <div className="grid gap-4">
                 <div className="rounded-xl border border-white/10 bg-cardBg2 p-3 text-sm text-slate-300">
                   Active Order ID: <span className="font-medium text-white">{currentOrderId ?? "None yet"}</span> ·{" "}
@@ -892,14 +919,18 @@ export default function StudioPage() {
                   disabled={!currentOrderId || isPreviewLimitReached || Boolean(orderActionKey)}
                   className={`inline-flex min-h-[46px] w-full items-center justify-center rounded-xl px-4 py-2.5 text-sm font-medium text-white transition-all sm:w-auto disabled:opacity-50 ${tierTheme.loading}`}
                 >
-                  {orderActionKey === `generate-${currentOrderId}` ? "Generating..." : "Generate Card Preview"}
+                  {orderActionKey === `generate-${currentOrderId}`
+                    ? "Generating..."
+                    : isAnimatedCardType
+                      ? "Generate Card Artwork"
+                      : "Generate Card Preview"}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setCurrentStep(isAnimatedCardType ? 6 : 5)}
+                  onClick={() => setCurrentStep(STEP_THEME)}
                   className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100 sm:w-auto"
                 >
-                  Back to Theme & Details
+                  Back to Theme
                 </button>
                 {isGenerating ? (
                   <div className={`rounded-xl border px-3 py-2 ${tierTheme.loading}`}>
@@ -938,12 +969,12 @@ export default function StudioPage() {
                     </button>
                   ))}
                 </div>
-                {savedCardDetail && previewCards.length > 0 ? (
+                {savedCardDetail && previewCards.length > 0 && !isAnimatedCardType ? (
                   <PostGenerationPanel
                     detail={savedCardDetail}
                     onViewCollection={() => navigate("/my-collection")}
                     isLoggedIn={Boolean(user)}
-                    showQuantityFlow={isOrderDelivered || currentStep >= 8}
+                    showQuantityFlow={isOrderDelivered || currentStep >= STEP_APPROVE}
                     token={token || ""}
                     onRefreshDetail={refreshSavedCardDetail}
                     onCardsUpdated={fetchMyCards}
@@ -955,24 +986,25 @@ export default function StudioPage() {
                   disabled={!selectedPreviewUrl && !generatedCardUrl}
                   className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonTeal px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:opacity-50"
                 >
-                  Complete Order
+                  {isAnimatedCardType ? "Create Animated Card" : "Complete Order"}
                 </button>
               </div>
             ) : null}
 
-            {currentStep === 8 ? (
+            {currentStep === STEP_APPROVE ? (
               <div className="grid gap-6">
                 {savedCardDetail ? (
                   <PostGenerationPanel
                     detail={savedCardDetail}
                     onViewCollection={() => navigate("/my-collection")}
                     isLoggedIn={Boolean(user)}
-                    showQuantityFlow={isOrderDelivered || currentStep >= 8}
+                    showQuantityFlow={isOrderDelivered || currentStep >= STEP_APPROVE}
                     token={token || ""}
                     onRefreshDetail={refreshSavedCardDetail}
                     onCardsUpdated={fetchMyCards}
                   />
                 ) : null}
+                {!isAnimatedCardType ? (
                 <div className="rounded-xl border border-emerald-300/35 bg-emerald-400/10 p-4">
                   <p className="text-base font-semibold text-emerald-100">Card Delivered</p>
                   <p className="mt-1 text-sm text-emerald-50/90">
@@ -996,6 +1028,14 @@ export default function StudioPage() {
                     </a>
                   </div>
                 </div>
+                ) : (
+                <div className="rounded-xl border border-violet-300/35 bg-violet-400/10 p-4">
+                  <p className="text-base font-semibold text-violet-100">Animated Card Ready</p>
+                  <p className="mt-1 text-sm text-violet-50/90">
+                    Your animated card is live in your collection.
+                  </p>
+                </div>
+                )}
               </div>
             ) : null}
               </>
@@ -1010,9 +1050,13 @@ export default function StudioPage() {
       {showCompleteModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-3 py-4 sm:px-4">
           <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/10 bg-cardBg p-4 shadow-2xl shadow-black/50 sm:p-6">
-            <h3 className="text-lg font-semibold text-white">Approve Final Card</h3>
+            <h3 className="text-lg font-semibold text-white">
+              {isAnimatedCardType ? "Create Your Animated Card" : "Approve Final Card"}
+            </h3>
             <p className="mt-1 text-sm text-slate-300">
-              Confirm this preview as your final card and complete delivery.
+              {isAnimatedCardType
+                ? "We will finalize your card artwork and start AI motion generation right away."
+                : "Confirm this preview as your final card and complete delivery."}
             </p>
             <div className="mt-4 grid gap-4 sm:grid-cols-[170px_1fr]">
               <div className="overflow-hidden rounded-xl border border-white/10 bg-cardBg2">

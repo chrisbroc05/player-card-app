@@ -42,7 +42,7 @@ async def _start_image_to_video(client: httpx.AsyncClient, image_url: str, promp
         "model": RUNWAY_IMAGE_TO_VIDEO_MODEL,
         "promptImage": image_url,
         "promptText": prompt,
-        "ratio": "768:1024",
+        "ratio": "720:1280",
         "duration": 3,
     }
     url = f"{RUNWAY_API_BASE}/image_to_video"
