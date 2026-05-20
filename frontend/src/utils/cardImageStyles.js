@@ -11,11 +11,18 @@ export const CARD_IMAGE_FRAME_ANIMATED =
 export const CARD_MEDIA_SLOT =
   "relative h-full w-full overflow-hidden rounded-[inherit]";
 
+/** Immediate parent of every animated <video> — never apply hover scale here */
+export const CARD_VIDEO_WRAPPER =
+  "relative h-full w-full overflow-hidden rounded-[inherit]";
+
+/** Grid overlay: fills media slot when video plays on hover */
+export const CARD_VIDEO_WRAPPER_OVERLAY = `${CARD_VIDEO_WRAPPER} absolute inset-0`;
+
 /** Static PNG in grid/thumbnail */
 export const CARD_IMAGE_MEDIA_CLASS =
   "block h-full w-full max-h-full max-w-full object-contain object-center rounded-[inherit] drop-shadow-[0_6px_20px_rgba(0,0,0,0.55)]";
 
-/** Grid hover video — centered inside slot, never crops */
+/** Grid / vault / marketplace thumbnail video */
 export const CARD_VIDEO_GRID_CLASS = "card-animated-video";
 
 /** Detail page video — full portrait card, no crop */

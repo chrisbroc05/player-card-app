@@ -31,6 +31,10 @@ export default function AnimateCardModal({ card, open, onClose, onConfirm, busy 
         <p className="mt-2 text-sm text-slate-300">
           Add AI-generated motion to this card for <span className="font-semibold text-violet-200">$10.00</span>
         </p>
+        <p className="mt-2 text-sm text-slate-400">
+          Your animated card will be added to your collection as a new card. Your original static card will remain
+          unchanged.
+        </p>
 
         <div className="mx-auto mt-4 max-w-[140px]">
           <CardImage card={card} alt={card.player_name} frameClassName="aspect-[2/3] w-full overflow-hidden rounded-lg border border-white/10" />

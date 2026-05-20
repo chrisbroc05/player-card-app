@@ -10,11 +10,12 @@ from sqlalchemy.orm import Session
 
 from animation_tasks import process_animation
 from auth import get_current_user
-from card_repo import get_card_by_card_id
+from card_repo import create_animated_upgrade_card, get_card_by_card_id
 from data.animation_motions import get_motion_by_id, list_motions_public
 from database import get_db
 from email_service import _absolute_image_url
-from models import Card, User, utcnow
+from marketplace_repo import cancel_pending_marketplace_offers_for_card
+from models import Card, MarketplaceOffer, TradeOffer, User, utcnow
 
 router = APIRouter()
 
@@ -122,20 +123,18 @@ def animate_card_upgrade(
     current_user: User = Depends(get_current_user),
 ):
     # TODO: Gate this endpoint behind payment (ANIMATED_CARD_PRICE) when billing is integrated.
-    card = _resolve_card(db, card_id)
-    _validate_animate_request(card, current_user, body.motion_id)
+    source = _resolve_card(db, card_id)
+    _validate_animate_request(source, current_user, body.motion_id)
 
-    now = utcnow()
-    card.animation_status = "pending"
-    card.animation_motion = body.motion_id
-    card.animation_requested_at = now
-    card.animation_completed_at = None
-    card.animated_video_url = None
-    card.is_animated = False
-    db.commit()
+    new_card = create_animated_upgrade_card(db, source=source, motion_id=body.motion_id)
 
-    background_tasks.add_task(process_animation, card.card_id, body.motion_id)
-    return {"success": True, "card_id": card.card_id, "status": "pending"}
+    background_tasks.add_task(process_animation, new_card.card_id, body.motion_id)
+    return {
+        "success": True,
+        "card_id": new_card.card_id,
+        "source_card_id": source.card_id,
+        "status": new_card.animation_status or "pending",
+    }
 
 
 @router.get("/{card_id}/animation-status")
@@ -148,3 +147,39 @@ def get_animation_status(
     if card.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="You do not own this card")
     return _animation_status_payload(card)
+
+
+def _validate_delete_request(card: Card, current_user: User) -> None:
+    if card.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not own this card")
+    if (card.status or "active") == "pending_trade":
+        raise HTTPException(
+            status_code=400,
+            detail="This card cannot be deleted while a trade is in progress. Cancel the trade first.",
+        )
+    if card.listed_on_marketplace:
+        raise HTTPException(
+            status_code=400,
+            detail="Remove this card from Free Agency before deleting it.",
+        )
+
+
+@router.delete("/{card_id}")
+def delete_card(
+    card_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Permanently delete a card owned by the authenticated user."""
+    card = _resolve_card(db, card_id)
+    _validate_delete_request(card, current_user)
+
+    deleted_id = card.card_id
+    cancel_pending_marketplace_offers_for_card(db, card.card_id)
+    db.query(MarketplaceOffer).filter(MarketplaceOffer.card_id == card.card_id).delete(
+        synchronize_session=False
+    )
+    db.query(TradeOffer).filter(TradeOffer.card_id == card.id).delete(synchronize_session=False)
+    db.delete(card)
+    db.commit()
+    return {"success": True, "card_id": deleted_id}

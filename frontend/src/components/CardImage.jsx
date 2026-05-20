@@ -7,6 +7,8 @@ import {
   CARD_MEDIA_SLOT,
   CARD_VIDEO_DETAIL_CLASS,
   CARD_VIDEO_GRID_CLASS,
+  CARD_VIDEO_WRAPPER,
+  CARD_VIDEO_WRAPPER_OVERLAY,
 } from "../utils/cardImageStyles";
 import { isAnimatedCard, isAnimationInProgress } from "../utils/animationCard";
 import { useIsMobileViewport } from "../hooks/usePrefersReducedMotion";
@@ -112,18 +114,20 @@ export default function CardImage({
     inner = <PlaceholderInner alt={alt} className={className} isDetail={isDetail} />;
   } else if (isDetail && showVideoLayer) {
     inner = (
-      <video
-        ref={videoRef}
-        src={videoSrc}
-        className={[CARD_VIDEO_DETAIL_CLASS, className].filter(Boolean).join(" ")}
-        autoPlay
-        loop
-        muted
-        playsInline
-        preload="metadata"
-        aria-label={alt || "Animated card"}
-        onError={() => setVideoFailed(true)}
-      />
+      <div className={CARD_VIDEO_WRAPPER}>
+        <video
+          ref={videoRef}
+          src={videoSrc}
+          className={[CARD_VIDEO_DETAIL_CLASS, className].filter(Boolean).join(" ")}
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="metadata"
+          aria-label={alt || "Animated card"}
+          onError={() => setVideoFailed(true)}
+        />
+      </div>
     );
   } else if (isDetail) {
     inner = showStaticPoster ? (
@@ -151,7 +155,7 @@ export default function CardImage({
         ) : null}
         {hasVideo ? (
           <div
-            className={`absolute inset-0 flex items-center justify-center overflow-hidden rounded-[inherit] ${
+            className={`${CARD_VIDEO_WRAPPER_OVERLAY} ${
               showVideoLayer ? "z-[1]" : "pointer-events-none z-0 invisible"
             }`}
             aria-hidden={!showVideoLayer}

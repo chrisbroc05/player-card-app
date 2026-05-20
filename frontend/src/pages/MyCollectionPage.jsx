@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
@@ -8,7 +8,11 @@ import { CardSharePopover } from "../components/ShareCard";
 import { useAuth } from "../context/AuthContext";
 import MarketplaceListingActions from "../components/MarketplaceListingActions";
 import AnimateCardModal from "../components/AnimateCardModal";
+import AnimationFailedScreen from "../components/AnimationFailedScreen";
+import AnimationLoadingScreen from "../components/AnimationLoadingScreen";
 import AnimationProgressBanner from "../components/AnimationProgressBanner";
+import CollectionToast from "../components/CollectionToast";
+import DeleteCardModal from "../components/DeleteCardModal";
 import { authFetch, formatApiError } from "../utils/authFetch";
 import { canAnimateCard, isAnimatedCard, isAnimationInProgress } from "../utils/animationCard";
 import { vaultTierBadge, rarityDisplay } from "../utils/tierStyles";
@@ -24,7 +28,14 @@ export default function MyCollectionPage() {
   const [marketplaceBusyId, setMarketplaceBusyId] = useState("");
   const [animateModalCard, setAnimateModalCard] = useState(null);
   const [animateBusyId, setAnimateBusyId] = useState("");
+  const [animationLoadingCardId, setAnimationLoadingCardId] = useState(null);
+  const [animationUpgradeFailed, setAnimationUpgradeFailed] = useState(false);
+  const [animationFailedCardId, setAnimationFailedCardId] = useState(null);
+  const animationLoadingCardIdRef = useRef(null);
   const [bannerDismissed, setBannerDismissed] = useState({});
+  const [deleteModalCard, setDeleteModalCard] = useState(null);
+  const [deleteBusyId, setDeleteBusyId] = useState("");
+  const [toast, setToast] = useState({ message: "", variant: "success" });
 
   const loadCards = useCallback(async () => {
     if (!token) return;
@@ -165,14 +176,35 @@ export default function MyCollectionPage() {
       if (unauthorized) throw new Error("Session expired.");
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not start animation."));
+      const newCardId = data?.card_id;
+      if (!newCardId) throw new Error("Animation started but no card id was returned.");
       setAnimateModalCard(null);
-      await loadCards();
+      setAnimationUpgradeFailed(false);
+      setAnimationFailedCardId(null);
+      animationLoadingCardIdRef.current = newCardId;
+      setAnimationLoadingCardId(newCardId);
     } catch (e) {
       setError(e.message || "Could not start animation.");
     } finally {
       setAnimateBusyId("");
     }
   }
+
+  const handleAnimationUpgradeComplete = useCallback(async () => {
+    await loadCards();
+    animationLoadingCardIdRef.current = null;
+    setAnimationLoadingCardId(null);
+    setAnimationUpgradeFailed(false);
+    showToast("Your animated card was added to your collection!");
+  }, [loadCards]);
+
+  const handleAnimationUpgradeFailed = useCallback(() => {
+    setAnimationFailedCardId(animationLoadingCardIdRef.current);
+    setAnimationUpgradeFailed(true);
+    animationLoadingCardIdRef.current = null;
+    setAnimationLoadingCardId(null);
+    loadCards();
+  }, [loadCards]);
 
   function renderAnimationBanner(card) {
     const st = (card.animation_status || "").toLowerCase();
@@ -187,6 +219,49 @@ export default function MyCollectionPage() {
       return <AnimationProgressBanner variant="failed" />;
     }
     return null;
+  }
+
+  function showToast(message, variant = "success") {
+    setToast({ message, variant });
+    window.setTimeout(() => setToast({ message: "", variant: "success" }), 2500);
+  }
+
+  function canDeleteCard(card) {
+    if (!user?.id || card.owner_id !== user.id) return false;
+    if ((card.status || "active") === "pending_trade") return false;
+    if (listingByCardId[card.card_id]) return false;
+    return true;
+  }
+
+  async function confirmDeleteCard() {
+    const card = deleteModalCard;
+    if (!token || !card?.card_id) return;
+    setDeleteBusyId(card.card_id);
+    setError("");
+    try {
+      const { res, unauthorized } = await authFetch(
+        token,
+        `/cards/${encodeURIComponent(card.card_id)}`,
+        { method: "DELETE" }
+      );
+      if (unauthorized) throw new Error("Session expired.");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not delete card."));
+      setCards((prev) => prev.filter((c) => c.card_id !== card.card_id));
+      setListingByCardId((prev) => {
+        const next = { ...prev };
+        delete next[card.card_id];
+        return next;
+      });
+      setDeleteModalCard(null);
+      showToast("Card deleted successfully");
+      refreshNavBadges?.();
+    } catch (e) {
+      setDeleteModalCard(null);
+      showToast(e.message || "Could not delete card.", "error");
+    } finally {
+      setDeleteBusyId("");
+    }
   }
 
   async function cancelTradeForCard(card) {
@@ -231,7 +306,32 @@ export default function MyCollectionPage() {
           <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{error}</div>
         ) : null}
 
-        {initializing || loading ? (
+        {animationUpgradeFailed ? (
+          <section className="animate-fadeUp rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6">
+            <AnimationFailedScreen cardId={animationFailedCardId} />
+            <div className="mt-2 text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setAnimationUpgradeFailed(false);
+                  setAnimationFailedCardId(null);
+                }}
+                className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-white/20 px-5 text-sm font-medium text-slate-200 transition hover:border-white/30 hover:bg-white/5"
+              >
+                Back to collection
+              </button>
+            </div>
+          </section>
+        ) : animationLoadingCardId ? (
+          <section className="animate-fadeUp rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6">
+            <AnimationLoadingScreen
+              cardId={animationLoadingCardId}
+              token={token}
+              onCompleted={handleAnimationUpgradeComplete}
+              onFailed={handleAnimationUpgradeFailed}
+            />
+          </section>
+        ) : initializing || loading ? (
           <div className="flex min-h-[240px] items-center justify-center">
             <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/15 border-t-neonBlue" />
           </div>
@@ -251,6 +351,7 @@ export default function MyCollectionPage() {
             {displayRows.map(({ card, stackCount }) => {
               const badge = vaultTierBadge(card.tier);
               const pending = (card.status || "active") === "pending_trade";
+              const showDelete = canDeleteCard(card);
               return (
                 <article
                   key={card.card_id}
@@ -331,6 +432,17 @@ export default function MyCollectionPage() {
                       onList={(price) => listCardOnMarketplace(card.card_id, price)}
                       onUnlist={() => unlistCardFromMarketplace(card.card_id)}
                     />
+                    {showDelete ? (
+                      <button
+                        type="button"
+                        onClick={() => setDeleteModalCard(card)}
+                        className="mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium text-rose-400/90 transition hover:bg-rose-500/10 hover:text-rose-300"
+                        aria-label={`Delete ${card.player_name}`}
+                      >
+                        <TrashIcon />
+                        Delete
+                      </button>
+                    ) : null}
                   </div>
                 </article>
               );
@@ -347,7 +459,35 @@ export default function MyCollectionPage() {
         onConfirm={(motionId) => startAnimateUpgrade(animateModalCard, motionId)}
       />
 
+      <DeleteCardModal
+        card={deleteModalCard}
+        open={Boolean(deleteModalCard)}
+        busy={Boolean(deleteBusyId)}
+        onClose={() => setDeleteModalCard(null)}
+        onConfirm={confirmDeleteCard}
+      />
+
+      <CollectionToast message={toast.message} variant={toast.variant} />
+
       <AppFooter />
     </div>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      className="h-3.5 w-3.5"
+      aria-hidden="true"
+    >
+      <path
+        fillRule="evenodd"
+        d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 9.24A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-9.24.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.495.06l.375 6.75a.75.75 0 101.495.06l-.375-6.75zm4.34.06a.75.75 0 10-1.495-.06l-.375 6.75a.75.75 0 001.495.06l.375-6.75z"
+        clipRule="evenodd"
+      />
+    </svg>
   );
 }

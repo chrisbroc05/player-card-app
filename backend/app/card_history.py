@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session, aliased
 
+from card_repo import animated_upgrade_source_card_id
 from marketplace_repo import float_from_decimal
 from models import Card, MarketplaceOffer, TradeOffer, User
 
@@ -30,11 +31,16 @@ def build_card_history(db: Session, card: Card) -> list[dict]:
 
     creator_name = _user_display(db, card.creator_user_id, card.owner_name or "Unknown")
     if card.created_at:
+        source_id = animated_upgrade_source_card_id(card)
+        if source_id:
+            description = f"Animated edition created from static card {source_id}"
+        else:
+            description = f"Card created by {creator_name}"
         events.append(
             {
                 "event_type": "created",
                 "event_date": _iso(card.created_at),
-                "description": f"Card created by {creator_name}",
+                "description": description,
                 "actor": creator_name,
             }
         )
