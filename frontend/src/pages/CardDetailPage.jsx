@@ -134,7 +134,7 @@ export default function CardDetailPage() {
           </div>
         ) : (
           <div className="animate-fadeUp">
-            <div className={`mx-auto max-w-lg animate-pulseGlow ${badge?.glow ?? ""}`}>
+            <div className={`mx-auto max-w-lg ${badge?.glow ?? ""}`}>
               <CardImage
                 card={card}
                 alt={card.player_name}

@@ -4,7 +4,9 @@ import {
   CARD_IMAGE_FRAME,
   CARD_IMAGE_FRAME_ANIMATED,
   CARD_IMAGE_MEDIA_CLASS,
-  CARD_IMAGE_MEDIA_DETAIL,
+  CARD_MEDIA_SLOT,
+  CARD_VIDEO_DETAIL_CLASS,
+  CARD_VIDEO_GRID_CLASS,
 } from "../utils/cardImageStyles";
 import { isAnimatedCard, isAnimationInProgress } from "../utils/animationCard";
 import { useIsMobileViewport } from "../hooks/usePrefersReducedMotion";
@@ -42,7 +44,7 @@ export default function CardImage({
   forcePlay = false,
   showAnimatedBadge = true,
   showInProgressOverlay = true,
-  /** "grid" (default) | "detail" — both use 2:3 contain; detail allows taller max width */
+  /** "grid" (default) | "detail" */
   variant = "grid",
 }) {
   const [imgFailed, setImgFailed] = useState(false);
@@ -73,24 +75,14 @@ export default function CardImage({
 
   const videoSrc = useMemo(() => toApiUrl(fields.animatedVideoUrl), [fields.animatedVideoUrl]);
 
-  // Grid tiles: static poster matches static cards; video only on hover (desktop).
-  // Detail / post-gen: play video when forcePlay.
-  const shouldPlayVideo = hasVideo && (
-    isGridBrowse
-      ? hovered && !isMobile
-      : forcePlay || (!playOnHover && !isGridBrowse)
-  );
+  const shouldPlayVideo =
+    hasVideo &&
+    (isGridBrowse ? hovered && !isMobile : forcePlay || (!playOnHover && !isGridBrowse));
 
   const showStaticPoster = Boolean(imgSrc && !imgFailed);
   const showVideoLayer = hasVideo && shouldPlayVideo;
 
-  const mediaClass = [
-    isDetail ? CARD_IMAGE_MEDIA_DETAIL : CARD_IMAGE_MEDIA_CLASS,
-    "h-full w-full object-contain",
-    className,
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const imgClass = [CARD_IMAGE_MEDIA_CLASS, className].filter(Boolean).join(" ");
 
   useEffect(() => {
     const el = videoRef.current;
@@ -113,13 +105,37 @@ export default function CardImage({
       ? hasVideo
         ? CARD_IMAGE_FRAME_ANIMATED
         : CARD_IMAGE_FRAME
-      : isDetail
-        ? CARD_IMAGE_FRAME
-        : "");
+      : "");
 
   let inner;
   if (!showStaticPoster && !hasVideo) {
     inner = <PlaceholderInner alt={alt} className={className} isDetail={isDetail} />;
+  } else if (isDetail && showVideoLayer) {
+    inner = (
+      <video
+        ref={videoRef}
+        src={videoSrc}
+        className={[CARD_VIDEO_DETAIL_CLASS, className].filter(Boolean).join(" ")}
+        autoPlay
+        loop
+        muted
+        playsInline
+        preload="metadata"
+        aria-label={alt || "Animated card"}
+        onError={() => setVideoFailed(true)}
+      />
+    );
+  } else if (isDetail) {
+    inner = showStaticPoster ? (
+      <img
+        src={imgSrc}
+        alt={alt || "Card"}
+        className={imgClass}
+        loading="lazy"
+        decoding="async"
+        onError={() => setImgFailed(true)}
+      />
+    ) : null;
   } else {
     inner = (
       <>
@@ -127,27 +143,32 @@ export default function CardImage({
           <img
             src={imgSrc}
             alt={alt || "Card"}
-            className={`${mediaClass} ${showVideoLayer ? "opacity-0" : ""}`}
+            className={`${imgClass} ${showVideoLayer ? "invisible" : ""}`}
             loading="lazy"
             decoding="async"
             onError={() => setImgFailed(true)}
           />
         ) : null}
         {hasVideo ? (
-          <video
-            ref={videoRef}
-            src={videoSrc}
-            className={`${mediaClass} absolute inset-0 ${
-              showVideoLayer ? "z-[1] opacity-100" : "pointer-events-none z-0 opacity-0"
+          <div
+            className={`absolute inset-0 flex items-center justify-center overflow-hidden rounded-[inherit] ${
+              showVideoLayer ? "z-[1]" : "pointer-events-none z-0 invisible"
             }`}
-            autoPlay={showVideoLayer}
-            loop
-            muted
-            playsInline
-            preload="metadata"
-            aria-label={alt || "Animated card"}
-            onError={() => setVideoFailed(true)}
-          />
+            aria-hidden={!showVideoLayer}
+          >
+            <video
+              ref={videoRef}
+              src={videoSrc}
+              className={CARD_VIDEO_GRID_CLASS}
+              autoPlay={showVideoLayer}
+              loop
+              muted
+              playsInline
+              preload="metadata"
+              aria-label={alt || "Animated card"}
+              onError={() => setVideoFailed(true)}
+            />
+          </div>
         ) : null}
       </>
     );
@@ -155,9 +176,7 @@ export default function CardImage({
 
   const media = (
     <div
-      className={`relative flex h-full w-full items-center justify-center ${
-        isDetail ? "mx-auto w-full max-w-md" : ""
-      }`}
+      className={CARD_MEDIA_SLOT}
       onMouseEnter={isGridBrowse && !isMobile ? () => setHovered(true) : undefined}
       onMouseLeave={isGridBrowse && !isMobile ? () => setHovered(false) : undefined}
     >
@@ -168,7 +187,7 @@ export default function CardImage({
         </span>
       ) : null}
       {inProgress ? (
-        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/55 backdrop-blur-[2px]">
+        <div className="absolute inset-0 z-20 flex items-center justify-center overflow-hidden rounded-[inherit] bg-black/55 backdrop-blur-[2px]">
           <span className="animate-pulse rounded-lg border border-violet-400/40 bg-violet-500/20 px-3 py-2 text-xs font-semibold text-violet-100">
             Animation in progress...
           </span>

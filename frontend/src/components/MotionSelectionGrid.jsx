@@ -65,7 +65,6 @@ export default function MotionSelectionGrid({ value, onChange, compact = false, 
                     <p className={`pr-6 text-sm font-medium ${selected ? "text-violet-100" : "text-white"}`}>
                       {m.label}
                     </p>
-                    <p className="mt-1 text-[10px] uppercase tracking-wide text-slate-500">{m.category}</p>
                   </button>
                 );
               })}

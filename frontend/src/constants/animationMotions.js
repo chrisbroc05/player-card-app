@@ -1,24 +1,32 @@
-/** Motion catalog — ids must match backend data/animation_motions.py */
+/** Motion catalog — ids and labels must match backend data/animation_motions.py */
 
 export const ANIMATION_MOTION_LABELS = {
   pitch_windup: "Winding Up and Throwing",
   pitch_delivery: "Full Pitch Delivery",
+  pitch_strikeout_roar: "Strikeout Roar",
   hit_homerun: "Powerful Home Run Swing",
   hit_stance: "Batting Stance and Follow Through",
+  hit_walkup: "Walk-Up Swagger",
+  hit_bat_flip: "Bat Flip",
   field_dive: "Diving Catch",
+  field_dive_celebrate: "Diving Catch Celebration",
   field_sprint: "Sprinting to Field a Ball",
-  celebrate_fist: "Pumping Fist in Celebration",
+  catch_framing_throw: "Catcher Framing and Pop Throw",
+  celebrate_homerun_trot: "Home Run Trot",
   celebrate_crowd: "Pointing to the Crowd",
-  celebrate_run: "Running Full Speed",
+  celebrate_fist: "Pumping Fist",
   celebrate_energy: "Explosive Celebratory Moment",
+  celebrate_run: "Running Full Speed",
 };
 
+/** Display order for motion picker group headers */
 export const ANIMATION_MOTION_CATEGORIES = [
   "Pitching",
   "Hitting",
   "Fielding",
+  "Catching",
   "Celebration",
-  "General Athletic",
+  "Athletic",
 ];
 
 export function motionLabel(motionId) {
@@ -32,7 +40,7 @@ export function groupMotionsByCategory(motions) {
     groups[cat] = [];
   }
   for (const m of motions || []) {
-    const cat = m.category || "General Athletic";
+    const cat = m.category || "Athletic";
     if (!groups[cat]) groups[cat] = [];
     groups[cat].push(m);
   }

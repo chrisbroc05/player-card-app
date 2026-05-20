@@ -258,13 +258,14 @@ export default function MyCollectionPage() {
                     pending ? "opacity-70" : "hover:scale-[1.02]"
                   }`}
                 >
-                  <div
-                    className={`relative ${isAnimatedCard(card) ? CARD_IMAGE_FRAME_ANIMATED : CARD_IMAGE_FRAME}`}
-                  >
+                  <div className="relative">
                     <CardImage
                       card={card}
                       alt={card.player_name}
                       cacheBust={card.created_at}
+                      frameClassName={
+                        isAnimatedCard(card) ? CARD_IMAGE_FRAME_ANIMATED : CARD_IMAGE_FRAME
+                      }
                       playOnHover
                     />
                     {stackCount ? (
