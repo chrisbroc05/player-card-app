@@ -73,7 +73,7 @@ def build_card_history(db: Session, card: Card) -> list[dict]:
             {
                 "event_type": "listed",
                 "event_date": _iso(card.listed_at),
-                "description": f"Listed on Free Agency for ${price:.2f}",
+                "description": f"Listed on Free Agency Marketplace for ${price:.2f}",
                 "actor": owner_name,
             }
         )

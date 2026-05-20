@@ -13,12 +13,12 @@ const STATUS_LINES = [
 ];
 
 const TIPS = [
-  "Animated cards sell for more on Free Agency",
+  "Animated cards sell for more on Free Agency Marketplace",
   "Share your animated card to social at launch",
   "Only you can create this exact card",
   "Animated cards are rare — most players stick to standard",
   "The lower your print run, the more valuable your animation",
-  "Pro tip: list your animated card on Free Agency to earn credits",
+  "Pro tip: list your animated card on Free Agency Marketplace to earn credits",
 ];
 
 export default function AnimationLoadingScreen({

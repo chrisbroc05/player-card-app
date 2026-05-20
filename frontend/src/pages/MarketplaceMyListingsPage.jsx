@@ -166,7 +166,7 @@ export default function MarketplaceMyListingsPage() {
       <main className="mx-auto w-full max-w-4xl px-3 py-8 sm:px-6 lg:px-8">
         <div className="mb-6">
           <h1 className="text-2xl font-semibold text-white sm:text-3xl">My Listings</h1>
-          <p className="mt-2 text-sm text-slate-400">Cards listed on Free Agency and incoming offers.</p>
+          <p className="mt-2 text-sm text-slate-400">Cards listed on Free Agency Marketplace and incoming offers.</p>
         </div>
         <MarketplaceSubNav />
         {error ? (

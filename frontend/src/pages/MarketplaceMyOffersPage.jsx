@@ -25,7 +25,7 @@ const STATUS_TABS = [
 ];
 
 const EMPTY_BY_FILTER = {
-  all: { title: "You haven't made any offers yet.", hint: "Browse Free Agency to make an offer on a listed card." },
+  all: { title: "You haven't made any offers yet.", hint: "Browse Free Agency Marketplace to make an offer on a listed card." },
   pending: { title: "No pending offers.", hint: null },
   accepted: { title: "No accepted offers yet.", hint: null },
   declined: { title: "No declined offers.", hint: null },
@@ -152,7 +152,7 @@ export default function MarketplaceMyOffersPage() {
       <main className="mx-auto w-full max-w-4xl px-3 py-8 sm:px-6 lg:px-8">
         <div className="mb-6">
           <h1 className="text-2xl font-semibold text-white sm:text-3xl">My Offers</h1>
-          <p className="mt-2 text-sm text-slate-400">Offers you have submitted on Free Agency.</p>
+          <p className="mt-2 text-sm text-slate-400">Offers you have submitted on Free Agency Marketplace.</p>
         </div>
         <MarketplaceSubNav />
 

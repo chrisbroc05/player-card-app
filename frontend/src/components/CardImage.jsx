@@ -5,9 +5,10 @@ import {
   CARD_IMAGE_FRAME_ANIMATED,
   CARD_IMAGE_MEDIA_CLASS,
   CARD_MEDIA_SLOT,
+  CARD_MEDIA_SLOT_DETAIL,
   CARD_VIDEO_DETAIL_CLASS,
+  CARD_VIDEO_DETAIL_WRAPPER,
   CARD_VIDEO_GRID_CLASS,
-  CARD_VIDEO_WRAPPER,
   CARD_VIDEO_WRAPPER_OVERLAY,
 } from "../utils/cardImageStyles";
 import { isAnimatedCard, isAnimationInProgress } from "../utils/animationCard";
@@ -114,7 +115,7 @@ export default function CardImage({
     inner = <PlaceholderInner alt={alt} className={className} isDetail={isDetail} />;
   } else if (isDetail && showVideoLayer) {
     inner = (
-      <div className={CARD_VIDEO_WRAPPER}>
+      <div className={CARD_VIDEO_DETAIL_WRAPPER}>
         <video
           ref={videoRef}
           src={videoSrc}
@@ -147,28 +148,24 @@ export default function CardImage({
           <img
             src={imgSrc}
             alt={alt || "Card"}
-            className={`${imgClass} ${showVideoLayer ? "invisible" : ""}`}
+            className={`${imgClass} transition-opacity duration-200 ${
+              showVideoLayer ? "opacity-0" : "opacity-100"
+            }`}
             loading="lazy"
             decoding="async"
             onError={() => setImgFailed(true)}
           />
         ) : null}
-        {hasVideo ? (
-          <div
-            className={`${CARD_VIDEO_WRAPPER_OVERLAY} ${
-              showVideoLayer ? "z-[1]" : "pointer-events-none z-0 invisible"
-            }`}
-            aria-hidden={!showVideoLayer}
-          >
+        {hasVideo && showVideoLayer ? (
+          <div className={CARD_VIDEO_WRAPPER_OVERLAY} aria-hidden={false}>
             <video
               ref={videoRef}
               src={videoSrc}
               className={CARD_VIDEO_GRID_CLASS}
-              autoPlay={showVideoLayer}
               loop
               muted
               playsInline
-              preload="metadata"
+              preload="auto"
               aria-label={alt || "Animated card"}
               onError={() => setVideoFailed(true)}
             />
@@ -180,7 +177,7 @@ export default function CardImage({
 
   const media = (
     <div
-      className={CARD_MEDIA_SLOT}
+      className={isDetail ? CARD_MEDIA_SLOT_DETAIL : CARD_MEDIA_SLOT}
       onMouseEnter={isGridBrowse && !isMobile ? () => setHovered(true) : undefined}
       onMouseLeave={isGridBrowse && !isMobile ? () => setHovered(false) : undefined}
     >

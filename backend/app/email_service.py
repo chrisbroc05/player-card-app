@@ -570,14 +570,14 @@ def send_marketplace_offer_declined_email(
         player = html_module.escape(card_player_name)
         sub_inner = (
             f"The owner declined your offer of <span style=\"color:#ffd700;font-weight:700;\">{amt}</span> "
-            f"for {player}. You can browse more cards on Free Agency."
+            f"for {player}. You can browse more cards on Free Agency Marketplace."
         )
         parts = [
             _heading("Offer declined"),
             _subtext_html(sub_inner),
             _card_info_box(card_player_name, card_tier, card_rarity, card_image_url),
             _divider(),
-            _cta_button(marketplace_url, "Browse Free Agency →"),
+            _cta_button(marketplace_url, "Browse Free Agency Marketplace →"),
         ]
         html = _email_shell("".join(parts))
         subject = f"Your offer on {card_player_name} was declined"
@@ -615,7 +615,7 @@ def send_marketplace_listing_expired_email(
     try:
         player = html_module.escape(card_player_name)
         sub_inner = (
-            f"Your {player} card was listed on Free Agency for 30 days and has been removed. "
+            f"Your {player} card was listed on Free Agency Marketplace for 30 days and has been removed. "
             "You can relist it anytime from your collection."
         )
         parts = [
@@ -645,13 +645,13 @@ def send_marketplace_offer_expired_buyer_email(
         sub_inner = (
             f"Your offer of <span style=\"color:#ffd700;font-weight:700;\">{amt}</span> on the "
             f"{player} card expired after 14 days without a response from the seller. "
-            "You can make a new offer anytime on Free Agency."
+            "You can make a new offer anytime on Free Agency Marketplace."
         )
         parts = [
             _heading("Offer expired"),
             _subtext_html(sub_inner),
             _divider(),
-            _cta_button(marketplace_url, "Browse Free Agency →"),
+            _cta_button(marketplace_url, "Browse Free Agency Marketplace →"),
         ]
         html = _email_shell("".join(parts))
         subject = f"Your offer on {card_player_name} has expired"
@@ -732,7 +732,7 @@ def send_marketplace_counter_declined_seller_email(
         amt = html_module.escape(_money_label(counter_amount))
         sub_inner = (
             f"The buyer declined your counter of <span style=\"color:#ffd700;font-weight:700;\">{amt}</span> "
-            f"on {player}. The card remains listed on Free Agency."
+            f"on {player}. The card remains listed on Free Agency Marketplace."
         )
         parts = [
             _heading("Counter-offer declined"),

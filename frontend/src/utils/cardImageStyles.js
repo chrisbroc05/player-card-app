@@ -11,12 +11,19 @@ export const CARD_IMAGE_FRAME_ANIMATED =
 export const CARD_MEDIA_SLOT =
   "relative h-full w-full overflow-hidden rounded-[inherit]";
 
+/** Detail page slot — no clip so full portrait card is visible */
+export const CARD_MEDIA_SLOT_DETAIL = "relative w-full";
+
 /** Immediate parent of every animated <video> — never apply hover scale here */
 export const CARD_VIDEO_WRAPPER =
   "relative h-full w-full overflow-hidden rounded-[inherit]";
 
-/** Grid overlay: fills media slot when video plays on hover */
-export const CARD_VIDEO_WRAPPER_OVERLAY = `${CARD_VIDEO_WRAPPER} absolute inset-0`;
+/** Grid overlay: centered video on hover only */
+export const CARD_VIDEO_WRAPPER_OVERLAY =
+  "absolute inset-0 z-[1] flex items-center justify-center overflow-hidden rounded-[inherit]";
+
+/** Detail page — video sizes the frame; no height collapse */
+export const CARD_VIDEO_DETAIL_WRAPPER = "relative w-full";
 
 /** Static PNG in grid/thumbnail */
 export const CARD_IMAGE_MEDIA_CLASS =
@@ -28,9 +35,9 @@ export const CARD_VIDEO_GRID_CLASS = "card-animated-video";
 /** Detail page video — full portrait card, no crop */
 export const CARD_VIDEO_DETAIL_CLASS = "card-animated-video-detail";
 
-/** Detail page frame — no forced aspect; video uses 5:7 */
+/** Detail page frame — fits full portrait card without clipping */
 export const CARD_IMAGE_FRAME_DETAIL =
-  "relative mx-auto w-full max-w-sm overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-slate-800/80 via-black/50 to-slate-900/90 p-2 sm:max-w-md sm:p-3";
+  "relative mx-auto flex w-full max-w-sm flex-col items-center justify-center rounded-2xl border border-white/10 bg-gradient-to-b from-slate-800/80 via-black/50 to-slate-900/90 p-2 sm:max-w-md sm:p-3";
 
 export const CARD_IMAGE_MEDIA_DETAIL = CARD_IMAGE_MEDIA_CLASS;
 

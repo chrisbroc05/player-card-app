@@ -144,7 +144,7 @@ function MarketplaceBrowseLayout({
       <main className="mx-auto w-full max-w-6xl px-3 py-8 sm:px-6 lg:px-8">
         <div className="mb-6 text-center sm:text-left">
           <p className="text-[10px] font-medium uppercase tracking-[0.25em] text-teal-500/80">Future Legends</p>
-          <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Free Agency</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Free Agency Marketplace</h1>
           <p className="mt-2 text-sm text-slate-400">Browse listed cards and make offers to buy from other collectors.</p>
         </div>
         <MarketplaceSubNav />

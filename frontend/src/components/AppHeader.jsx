@@ -48,7 +48,7 @@ export default function AppHeader() {
                 onMarketplace ? "bg-teal-500/20 text-neonTeal" : "text-slate-400 hover:text-white"
               }`}
             >
-              Free Agency
+              Free Agency Marketplace
               {user && pendingIncomingMarketplaceCount > 0 ? (
                 <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[#ef4444] px-1 text-[10px] font-bold leading-none text-white shadow-sm">
                   {pendingIncomingMarketplaceCount > 9 ? "9+" : pendingIncomingMarketplaceCount}

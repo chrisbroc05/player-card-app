@@ -386,7 +386,7 @@ export default function AdminDashboard() {
                 {stats.marketplace_stats ? (
                   <>
                     <div>
-                      <h3 className="mb-3 text-sm font-semibold text-teal-200/90">Free Agency (marketplace)</h3>
+                      <h3 className="mb-3 text-sm font-semibold text-teal-200/90">Free Agency Marketplace</h3>
                       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                         {kpi("Listed cards", stats.marketplace_stats.total_listed)}
                         {kpi("Total offers", stats.marketplace_stats.total_offers)}

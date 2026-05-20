@@ -160,7 +160,7 @@ def _validate_delete_request(card: Card, current_user: User) -> None:
     if card.listed_on_marketplace:
         raise HTTPException(
             status_code=400,
-            detail="Remove this card from Free Agency before deleting it.",
+            detail="Remove this card from Free Agency Marketplace before deleting it.",
         )
 
 

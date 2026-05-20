@@ -99,7 +99,7 @@ export default function MarketplaceCardDetailPage() {
       <AppHeader />
       <main className="mx-auto w-full max-w-4xl px-3 py-8 sm:px-6 lg:px-8">
         <Link to="/marketplace" className="text-sm text-neonTeal hover:text-teal-200">
-          &larr; Back to Free Agency
+          &larr; Back to Free Agency Marketplace
         </Link>
 
         {loading ? (

@@ -1,4 +1,4 @@
-/** Free Agency marketplace helpers */
+/** Free Agency Marketplace helpers */
 
 export function formatMoney(amount) {
   const n = Number(amount);
