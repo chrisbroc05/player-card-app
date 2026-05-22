@@ -46,3 +46,10 @@ export const CARD_IMAGE_FRAME_SM =
 
 export const CARD_IMAGE_FRAME_XS =
   "relative flex aspect-[2/3] w-full max-w-[100px] items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-gradient-to-b from-slate-800/90 to-black/70 p-1";
+
+/** Marketplace thumbnail grid — compact 2:3 tile */
+export const CARD_IMAGE_FRAME_THUMB =
+  "relative flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-gradient-to-b from-slate-800/90 via-black/60 to-slate-900/95 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]";
+
+export const CARD_IMAGE_FRAME_THUMB_ANIMATED =
+  `${CARD_IMAGE_FRAME_THUMB} ring-1 ring-violet-400/30 shadow-[0_0_16px_rgba(139,92,246,0.14)]`;

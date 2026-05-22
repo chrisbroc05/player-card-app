@@ -4,6 +4,8 @@ import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import MarketplaceSubNav from "../components/MarketplaceSubNav";
 import CardImage from "../components/CardImage";
+import TradeCardPicker from "../components/TradeCardPicker";
+import TradeCardsThumbRow from "../components/TradeCardsThumbRow";
 import { useAuth } from "../context/AuthContext";
 import { authFetch, formatApiError } from "../utils/authFetch";
 import {
@@ -35,6 +37,7 @@ export default function MarketplaceMyListingsPage() {
   const [relistBusyId, setRelistBusyId] = useState("");
   const [counterFormOfferId, setCounterFormOfferId] = useState(null);
   const [counterAmount, setCounterAmount] = useState("");
+  const [counterTradeCardIds, setCounterTradeCardIds] = useState([]);
   const [counterBusyId, setCounterBusyId] = useState(null);
 
   const load = useCallback(async () => {
@@ -93,20 +96,31 @@ export default function MarketplaceMyListingsPage() {
     }
   }
 
-  async function sendCounter(offerId) {
+  async function sendCounter(offer) {
     if (!token) return;
-    const n = Number(counterAmount);
-    if (!Number.isFinite(n) || n < 1.0) {
-      setError("Counter amount must be at least $1.00");
-      return;
+    const isTrade = (offer.offer_type || "cash") === "card_trade";
+    let body;
+    if (isTrade) {
+      if (counterTradeCardIds.length < 1) {
+        setError("Select at least one card for your counter offer");
+        return;
+      }
+      body = { trade_card_ids: counterTradeCardIds };
+    } else {
+      const n = Number(counterAmount);
+      if (!Number.isFinite(n) || n < 1.0) {
+        setError("Counter amount must be at least $1.00");
+        return;
+      }
+      body = { counter_amount: n };
     }
-    setCounterBusyId(offerId);
+    setCounterBusyId(offer.offer_id);
     setError("");
     try {
-      const { res, unauthorized } = await authFetch(token, `/marketplace/offer/${offerId}/counter`, {
+      const { res, unauthorized } = await authFetch(token, `/marketplace/offer/${offer.offer_id}/counter`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ counter_amount: n }),
+        body: JSON.stringify(body),
       });
       if (unauthorized) {
         setError("Session expired. Please sign in again.");
@@ -116,6 +130,7 @@ export default function MarketplaceMyListingsPage() {
       if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not send counter."));
       setCounterFormOfferId(null);
       setCounterAmount("");
+      setCounterTradeCardIds([]);
       await load();
       refreshNavBadges?.();
     } catch (e) {
@@ -255,7 +270,11 @@ export default function MarketplaceMyListingsPage() {
                   </div>
                   {cardOffers.length > 0 ? (
                     <ul className="mt-4 space-y-3 border-t border-white/10 pt-4">
-                      {cardOffers.map((offer) => (
+                      {cardOffers.map((offer) => {
+                        const isTrade = (offer.offer_type || "cash") === "card_trade";
+                        const offeredCards = offer.trade_cards_offered || [];
+                        const counterCards = offer.trade_cards_counter || [];
+                        return (
                         <li
                           key={offer.offer_id}
                           className="rounded-xl border border-white/10 bg-cardBg2 p-3 sm:flex sm:flex-col sm:gap-3"
@@ -263,11 +282,26 @@ export default function MarketplaceMyListingsPage() {
                           <div className="sm:flex sm:items-start sm:justify-between sm:gap-4">
                             <div className="min-w-0">
                               <p className="font-medium text-white">{offer.buyer_display_name}</p>
-                              <p className="text-lg font-semibold text-neonTeal">{formatMoney(offer.offer_amount)}</p>
-                              <p className="text-xs text-slate-500">
-                                Royalty: {formatMoney(offer.royalty_amount)}
-                                {offer.message ? ` · “${offer.message}”` : ""}
-                              </p>
+                              {isTrade ? (
+                                <>
+                                  <p className="text-sm font-semibold text-amber-200">
+                                    Card Trade Offer — {offeredCards.length} card
+                                    {offeredCards.length === 1 ? "" : "s"} offered
+                                  </p>
+                                  <TradeCardsThumbRow cards={offeredCards} className="mt-2" />
+                                </>
+                              ) : (
+                                <>
+                                  <p className="text-lg font-semibold text-neonTeal">{formatMoney(offer.offer_amount)}</p>
+                                  <p className="text-xs text-slate-500">
+                                    Royalty: {formatMoney(offer.royalty_amount)}
+                                    {offer.message ? ` · “${offer.message}”` : ""}
+                                  </p>
+                                </>
+                              )}
+                              {isTrade && offer.message ? (
+                                <p className="mt-1 text-xs text-slate-500">“{offer.message}”</p>
+                              ) : null}
                               {offer.status === "pending" && offer.days_remaining != null && offer.expires_at ? (
                                 <p className={`mt-2 text-xs ${offerExpiresLineClass(offer.days_remaining)}`}>
                                   {offerExpiresLabel(offer.days_remaining)}
@@ -278,34 +312,64 @@ export default function MarketplaceMyListingsPage() {
 
                           {offer.counter_status === "pending" ? (
                             <div className="mt-3 rounded-lg border border-teal-500/25 bg-teal-500/10 px-3 py-2 text-sm text-teal-100">
-                              <p>
-                                Counter sent: <span className="font-semibold text-white">{formatMoney(offer.counter_amount)}</span>
-                              </p>
-                              <p className="mt-1 text-xs text-slate-400">Awaiting buyer response</p>
+                              {isTrade ? (
+                                <>
+                                  <p className="font-medium text-white">Counter sent — awaiting buyer response</p>
+                                  <TradeCardsThumbRow cards={counterCards} className="mt-2" />
+                                </>
+                              ) : (
+                                <>
+                                  <p>
+                                    Counter sent:{" "}
+                                    <span className="font-semibold text-white">{formatMoney(offer.counter_amount)}</span>
+                                  </p>
+                                  <p className="mt-1 text-xs text-slate-400">Awaiting buyer response</p>
+                                </>
+                              )}
                             </div>
                           ) : null}
 
                           {offer.counter_status == null ? (
                             counterFormOfferId === offer.offer_id ? (
                               <div className="mt-3 space-y-2 rounded-lg border border-white/15 bg-cardBg p-3">
-                                <label className="text-xs font-medium text-slate-400">Your counter amount ($)</label>
-                                <input
-                                  type="number"
-                                  min="1"
-                                  step="0.01"
-                                  value={counterAmount}
-                                  onChange={(e) => setCounterAmount(e.target.value)}
-                                  className="min-h-[40px] w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-white"
-                                  placeholder="1.00"
-                                />
-                                <p className="text-xs text-slate-500">
-                                  Buyer will see your counter and can accept or decline
-                                </p>
+                                {isTrade ? (
+                                  <>
+                                    <p className="text-xs font-medium text-slate-400">
+                                      Select cards from your collection to send to the buyer
+                                    </p>
+                                    <TradeCardPicker
+                                      token={token}
+                                      selectedIds={counterTradeCardIds}
+                                      onSelectedIdsChange={setCounterTradeCardIds}
+                                      excludeCardIds={[listing.card_id]}
+                                      pickerLabel="Cards you are willing to trade to the buyer"
+                                    />
+                                  </>
+                                ) : (
+                                  <>
+                                    <label className="text-xs font-medium text-slate-400">Your counter amount ($)</label>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      step="0.01"
+                                      value={counterAmount}
+                                      onChange={(e) => setCounterAmount(e.target.value)}
+                                      className="min-h-[40px] w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-white"
+                                      placeholder="1.00"
+                                    />
+                                    <p className="text-xs text-slate-500">
+                                      Buyer will see your counter and can accept or decline
+                                    </p>
+                                  </>
+                                )}
                                 <div className="flex flex-wrap gap-2">
                                   <button
                                     type="button"
-                                    disabled={counterBusyId === offer.offer_id}
-                                    onClick={() => sendCounter(offer.offer_id)}
+                                    disabled={
+                                      counterBusyId === offer.offer_id ||
+                                      (isTrade && counterTradeCardIds.length < 1)
+                                    }
+                                    onClick={() => sendCounter(offer)}
                                     className="min-h-[40px] rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
                                   >
                                     {counterBusyId === offer.offer_id ? "Sending…" : "Send Counter"}
@@ -316,6 +380,7 @@ export default function MarketplaceMyListingsPage() {
                                     onClick={() => {
                                       setCounterFormOfferId(null);
                                       setCounterAmount("");
+                                      setCounterTradeCardIds([]);
                                     }}
                                     className="min-h-[40px] rounded-lg border border-white/20 px-4 text-sm text-slate-300"
                                   >
@@ -347,6 +412,7 @@ export default function MarketplaceMyListingsPage() {
                                   onClick={() => {
                                     setCounterFormOfferId(offer.offer_id);
                                     setCounterAmount("");
+                                    setCounterTradeCardIds([]);
                                   }}
                                   className="min-h-[40px] rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 text-sm font-medium text-amber-200 disabled:opacity-50"
                                 >
@@ -356,7 +422,7 @@ export default function MarketplaceMyListingsPage() {
                             )
                           ) : null}
                         </li>
-                      ))}
+                      );})}
                     </ul>
                   ) : null}
                 </article>

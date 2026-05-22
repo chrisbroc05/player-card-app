@@ -16,8 +16,11 @@ from email_service import (
 from marketplace_repo import (
     cancel_pending_marketplace_offers_for_card,
     clear_marketplace_listing,
+    clear_priority_listing,
     float_from_decimal,
 )
+from parent_email_utils import parent_email_for_notify
+from marketplace_trade_repo import OFFER_TYPE_CARD_TRADE, release_trade_cards_for_offer
 from models import Card, MarketplaceOffer, User, utcnow
 
 logger = logging.getLogger(__name__)
@@ -28,6 +31,7 @@ def run_marketplace_expiration_pass() -> None:
     db = SessionLocal()
     try:
         now = utcnow()
+        _expire_priority_listings(db, now)
         _expire_listings(db, now)
         _expire_offers(db, now)
     except Exception:
@@ -35,6 +39,23 @@ def run_marketplace_expiration_pass() -> None:
         db.rollback()
     finally:
         db.close()
+
+
+def _expire_priority_listings(db: Session, now) -> None:
+    rows = (
+        db.query(Card)
+        .filter(
+            Card.is_priority_listing.is_(True),
+            Card.priority_expires_at.isnot(None),
+            Card.priority_expires_at < now,
+        )
+        .all()
+    )
+    for card in rows:
+        clear_priority_listing(card)
+    if rows:
+        db.commit()
+    logger.info("Marketplace expiration: %s priority boost(s) ended", len(rows))
 
 
 def _expire_listings(db: Session, now) -> None:
@@ -60,6 +81,7 @@ def _expire_listings(db: Session, now) -> None:
                     owner.display_name,
                     card.player_name,
                     f"{frontend_url()}/my-collection",
+                    parent_email=parent_email_for_notify(owner),
                 )
             except Exception:
                 logger.exception("Listing expired email failed for card %s", card.card_id)
@@ -80,6 +102,8 @@ def _expire_offers(db: Session, now) -> None:
     )
     n = 0
     for offer in pending:
+        if (offer.offer_type or "").strip().lower() == OFFER_TYPE_CARD_TRADE:
+            release_trade_cards_for_offer(db, offer.id)
         offer.status = "expired"
         offer.updated_at = now
         card = get_card_by_card_id(db, offer.card_id)
@@ -94,6 +118,7 @@ def _expire_offers(db: Session, now) -> None:
                     float_from_decimal(offer.offer_amount),
                     f"{frontend_url()}/marketplace",
                     offer.id,
+                    parent_email=parent_email_for_notify(buyer),
                 )
             except Exception:
                 logger.exception("Offer expired email failed for offer %s", offer.id)

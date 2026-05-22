@@ -152,7 +152,7 @@ export function AuthProvider({ children }) {
   );
 
   const register = useCallback(
-    async (email, displayName, password, inviteCode) => {
+    async (email, displayName, password, inviteCode, parentEmail) => {
       const payload = {
         email: email.trim(),
         display_name: displayName.trim(),
@@ -160,6 +160,9 @@ export function AuthProvider({ children }) {
       };
       if (inviteCode !== undefined) {
         payload.invite_code = inviteCode;
+      }
+      if (parentEmail) {
+        payload.parent_email = parentEmail.trim();
       }
       const res = await fetch(`${API_BASE_URL}/auth/register`, {
         method: "POST",

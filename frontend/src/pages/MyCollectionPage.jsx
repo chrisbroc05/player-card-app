@@ -66,7 +66,7 @@ export default function MyCollectionPage() {
     }
   }, [token]);
 
-  async function listCardOnMarketplace(cardId, askingPrice) {
+  async function listCardOnMarketplace(cardId, askingPrice, isPriority = false) {
     if (!token) return;
     setMarketplaceBusyId(cardId);
     setError("");
@@ -74,7 +74,7 @@ export default function MyCollectionPage() {
       const { res, unauthorized } = await authFetch(token, "/marketplace/list", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ card_id: cardId, asking_price: askingPrice }),
+        body: JSON.stringify({ card_id: cardId, asking_price: askingPrice, is_priority: Boolean(isPriority) }),
       });
       if (unauthorized) throw new Error("Session expired.");
       const data = await res.json().catch(() => ({}));
@@ -429,7 +429,7 @@ export default function MyCollectionPage() {
                       card={card}
                       listingInfo={listingByCardId[card.card_id]}
                       busy={marketplaceBusyId === card.card_id}
-                      onList={(price) => listCardOnMarketplace(card.card_id, price)}
+                      onList={(price, isPriority) => listCardOnMarketplace(card.card_id, price, isPriority)}
                       onUnlist={() => unlistCardFromMarketplace(card.card_id)}
                     />
                     {showDelete ? (

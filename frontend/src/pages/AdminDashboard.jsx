@@ -206,7 +206,8 @@ export default function AdminDashboard() {
       if (!q) return true;
       return (
         (u.display_name || "").toLowerCase().includes(q) ||
-        (u.email || "").toLowerCase().includes(q)
+        (u.email || "").toLowerCase().includes(q) ||
+        (u.parent_email || "").toLowerCase().includes(q)
       );
     });
     const { key, dir } = userSort;
@@ -583,6 +584,7 @@ export default function AdminDashboard() {
                     {[
                       ["display_name", "Display name"],
                       ["email", "Email"],
+                      ["parent_email", "Parent Email"],
                       ["card_count", "Cards"],
                       ["trades_sent", "Trades sent"],
                       ["trades_received", "Trades received"],
@@ -600,7 +602,7 @@ export default function AdminDashboard() {
                 <tbody>
                   {filteredSortedUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="p-6 text-center text-slate-500">
+                      <td colSpan={7} className="p-6 text-center text-slate-500">
                         No users found.
                       </td>
                     </tr>
@@ -609,6 +611,7 @@ export default function AdminDashboard() {
                       <tr key={u.id} className="border-b border-white/5 hover:bg-white/[0.02]">
                         <td className="p-3 text-slate-100">{u.display_name}</td>
                         <td className="p-3 text-slate-400">{u.email}</td>
+                        <td className="p-3 text-slate-400">{u.parent_email || "—"}</td>
                         <td className="p-3 text-slate-300">{u.card_count}</td>
                         <td className="p-3 text-slate-300">{u.trades_sent}</td>
                         <td className="p-3 text-slate-300">{u.trades_received}</td>

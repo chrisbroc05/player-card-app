@@ -380,6 +380,7 @@ def admin_users(
             "id": u.id,
             "display_name": u.display_name,
             "email": u.email,
+            "parent_email": u.parent_email or "",
             "created_at": _iso(u.created_at),
             "card_count": card_counts.get(u.id, 0),
             "trades_sent": sent_counts.get(u.id, 0),

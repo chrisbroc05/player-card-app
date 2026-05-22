@@ -11,6 +11,7 @@ from email_service import (
     send_animation_complete_email,
     send_animation_failed_email,
 )
+from parent_email_utils import parent_email_for_notify
 from models import Card, User, utcnow
 from services.runway_service import generate_animation
 
@@ -55,6 +56,7 @@ async def process_animation(card_id: str, motion_id: str) -> None:
                     player_name,
                     f"{frontend_url()}/card/{card.card_id}",
                     card_id,
+                    parent_email=parent_email_for_notify(owner),
                 )
             return
 
@@ -71,6 +73,7 @@ async def process_animation(card_id: str, motion_id: str) -> None:
                 player_name,
                 f"{frontend_url()}/my-collection",
                 card_id,
+                parent_email=parent_email_for_notify(owner),
             )
     except Exception:
         logger.exception("process_animation crashed for card %s", card_id)

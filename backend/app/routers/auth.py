@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
@@ -12,9 +12,16 @@ from sqlalchemy.orm import Session
 from auth import get_current_user
 from database import get_db
 from marketplace_repo import float_from_decimal
+from parent_email_utils import normalize_optional_parent_email
 from models import Card, MarketplaceOffer, TradeOffer, User
 
 router = APIRouter()
+
+
+class UpdateProfileBody(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    parent_email: str | None = Field(default=None, max_length=320)
 
 
 class RarestCardOut(BaseModel):
@@ -54,6 +61,7 @@ class UserProfileResponse(BaseModel):
 
     display_name: str
     email: str
+    parent_email: str | None = Field(default=None)
     member_since: str
     total_cards_owned: int
     total_cards_ever_created: int
@@ -216,6 +224,7 @@ def get_profile(
     return UserProfileResponse(
         display_name=user.display_name,
         email=user.email,
+        parent_email=user.parent_email,
         member_since=_member_since_label(created),
         total_cards_owned=total_cards_owned,
         total_cards_ever_created=total_cards_ever_created,
@@ -226,3 +235,18 @@ def get_profile(
         rarest_card=rarest_out,
         marketplace_stats=marketplace_stats,
     )
+
+
+@router.post("/update-profile")
+def update_profile(
+    body: UpdateProfileBody,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    try:
+        user.parent_email = normalize_optional_parent_email(body.parent_email)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid parent email address")
+    db.commit()
+    db.refresh(user)
+    return {"success": True, "parent_email": user.parent_email}

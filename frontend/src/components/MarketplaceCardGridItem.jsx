@@ -1,26 +1,85 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import CardImage from "./CardImage";
+import AnimatedBadge from "./AnimatedBadge";
+import PriorityBadge, { isPriorityListing } from "./PriorityBadge";
 import { vaultTierBadge } from "../utils/tierStyles";
 import { formatMoney, listingExpiresLabel, listingExpiresSubtextClass } from "../utils/marketplace";
-import { CARD_IMAGE_FRAME, CARD_IMAGE_FRAME_ANIMATED } from "../utils/cardImageStyles";
+import {
+  CARD_IMAGE_FRAME,
+  CARD_IMAGE_FRAME_ANIMATED,
+  CARD_IMAGE_FRAME_THUMB,
+  CARD_IMAGE_FRAME_THUMB_ANIMATED,
+} from "../utils/cardImageStyles";
 import { isAnimatedCard } from "../utils/animationCard";
 
-export default function MarketplaceCardGridItem({ listing }) {
+/** @param {"list" | "compact"} [variant] — list = current marketplace cards; compact = thumbnail grid */
+export default function MarketplaceCardGridItem({ listing, variant = "list" }) {
   const badge = vaultTierBadge(listing.tier);
   const cardPath = `/marketplace/${encodeURIComponent(listing.card_id)}`;
+  const animated = isAnimatedCard(listing);
+  const priority = isPriorityListing(listing);
+
+  if (variant === "compact") {
+    return (
+      <Link
+        to={cardPath}
+        className={`group flex flex-col rounded-xl border border-white/10 bg-cardBg p-2 shadow-md transition duration-200 hover:border-white/20 hover:scale-[1.02] ${badge.glow}`}
+      >
+        <div className="relative">
+          <CardImage
+            card={listing}
+            alt={listing.player_name}
+            frameClassName={animated ? CARD_IMAGE_FRAME_THUMB_ANIMATED : CARD_IMAGE_FRAME_THUMB}
+            playOnHover
+            showAnimatedBadge={false}
+          />
+          <div className="pointer-events-none absolute left-1 top-1 z-10 flex flex-col gap-1">
+            {priority ? <PriorityBadge /> : null}
+          </div>
+          {animated ? (
+            <span className="pointer-events-none absolute right-1 top-1 z-10">
+              <AnimatedBadge />
+            </span>
+          ) : null}
+        </div>
+        <div className="mt-2 space-y-1 px-0.5">
+          <p className="truncate text-xs font-semibold text-white">{listing.player_name}</p>
+          <div className="flex flex-wrap items-center justify-between gap-1">
+            <span className={`rounded-full border px-1.5 py-0.5 text-[9px] font-semibold ${badge.pill}`}>
+              {badge.label}
+            </span>
+            <p className="text-xs font-bold text-neonTeal">{formatMoney(listing.asking_price)}</p>
+          </div>
+        </div>
+      </Link>
+    );
+  }
 
   return (
     <Link
       to={cardPath}
       className={`group flex flex-col rounded-2xl border border-white/10 bg-cardBg p-3 shadow-lg transition duration-300 hover:border-white/20 hover:scale-[1.02] ${badge.glow}`}
     >
-      <CardImage
-        card={listing}
-        alt={listing.player_name}
-        frameClassName={isAnimatedCard(listing) ? CARD_IMAGE_FRAME_ANIMATED : CARD_IMAGE_FRAME}
-        playOnHover
-      />
+      <div className="relative">
+        <CardImage
+          card={listing}
+          alt={listing.player_name}
+          frameClassName={animated ? CARD_IMAGE_FRAME_ANIMATED : CARD_IMAGE_FRAME}
+          playOnHover
+          showAnimatedBadge={false}
+        />
+        {priority ? (
+          <span className="pointer-events-none absolute left-2 top-2 z-10">
+            <PriorityBadge />
+          </span>
+        ) : null}
+        {animated ? (
+          <span className="pointer-events-none absolute right-2 top-2 z-10">
+            <AnimatedBadge />
+          </span>
+        ) : null}
+      </div>
       <div className="mt-3 flex flex-1 flex-col space-y-1.5 px-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${badge.pill}`}>

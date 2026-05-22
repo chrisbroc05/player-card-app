@@ -1,5 +1,53 @@
 /** Free Agency Marketplace helpers */
 
+export const PRIORITY_LISTING_FEE = 2;
+
+export function isActivePriorityListing(listing) {
+  if (!listing) return false;
+  if (!listing.is_priority_listing) return false;
+  const exp = listing.priority_expires_at;
+  if (!exp) return true;
+  const t = new Date(exp).getTime();
+  return Number.isFinite(t) && t > Date.now();
+}
+
+/** Priority rows first, then standard rows with user sort. */
+export function sortMarketplaceBrowseRows(rows, sortKey, sortOrder) {
+  const priority = [];
+  const standard = [];
+  for (const row of rows) {
+    if (isActivePriorityListing(row)) priority.push(row);
+    else standard.push(row);
+  }
+
+  const desc = sortOrder !== "asc";
+  const cmp = (a, b) => {
+    let va;
+    let vb;
+    if (sortKey === "asking_price") {
+      va = Number(a.asking_price) || 0;
+      vb = Number(b.asking_price) || 0;
+    } else if (sortKey === "player_name") {
+      va = (a.player_name || "").toLowerCase();
+      vb = (b.player_name || "").toLowerCase();
+    } else {
+      va = new Date(a.listed_at || 0).getTime();
+      vb = new Date(b.listed_at || 0).getTime();
+    }
+    if (va < vb) return desc ? 1 : -1;
+    if (va > vb) return desc ? -1 : 1;
+    return 0;
+  };
+
+  priority.sort((a, b) => {
+    const va = new Date(a.priority_listed_at || a.listed_at || 0).getTime();
+    const vb = new Date(b.priority_listed_at || b.listed_at || 0).getTime();
+    return vb - va;
+  });
+  standard.sort(cmp);
+  return [...priority, ...standard];
+}
+
 export function formatMoney(amount) {
   const n = Number(amount);
   if (!Number.isFinite(n)) return "$0.00";

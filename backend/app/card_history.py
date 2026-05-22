@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session, aliased
 
 from card_repo import animated_upgrade_source_card_id
 from marketplace_repo import float_from_decimal
-from models import Card, MarketplaceOffer, TradeOffer, User
+from marketplace_trade_repo import OFFER_TYPE_CARD_TRADE, TRADE_SIDE_BUYER, TRADE_SIDE_SELLER
+from models import Card, MarketplaceOffer, MarketplaceTradeCard, TradeOffer, User
 
 
 def _iso(dt: datetime | None) -> str:
@@ -90,13 +91,66 @@ def build_card_history(db: Session, card: Card) -> list[dict]:
     )
     for offer, buyer in sale_rows:
         when = offer.updated_at or offer.created_at
-        amount = float_from_decimal(offer.offer_amount)
+        ot = (offer.offer_type or "").strip().lower()
+        if ot == OFFER_TYPE_CARD_TRADE:
+            n = (
+                db.query(MarketplaceTradeCard)
+                .filter(
+                    MarketplaceTradeCard.offer_id == offer.id,
+                    MarketplaceTradeCard.side == TRADE_SIDE_BUYER,
+                )
+                .count()
+            )
+            desc = (
+                f"Traded to {buyer.display_name} via marketplace card trade "
+                f"({n} card{'s' if n != 1 else ''} offered)"
+            )
+        else:
+            amount = float_from_decimal(offer.offer_amount)
+            desc = f"Sold to {buyer.display_name} for ${amount:.2f}"
         events.append(
             {
                 "event_type": "sold",
                 "event_date": _iso(when),
-                "description": f"Sold to {buyer.display_name} for ${amount:.2f}",
+                "description": desc,
                 "actor": buyer.display_name,
+            }
+        )
+
+    trade_in_rows = (
+        db.query(MarketplaceTradeCard, MarketplaceOffer, User)
+        .join(MarketplaceOffer, MarketplaceTradeCard.offer_id == MarketplaceOffer.id)
+        .join(User, MarketplaceOffer.buyer_id == User.id)
+        .filter(
+            MarketplaceTradeCard.card_id == card.id,
+            MarketplaceOffer.status == "accepted",
+            MarketplaceOffer.offer_type == OFFER_TYPE_CARD_TRADE,
+        )
+        .order_by(MarketplaceOffer.updated_at.asc())
+        .all()
+    )
+    for tc_row, offer, buyer in trade_in_rows:
+        listing = db.query(Card).filter(Card.card_id == offer.card_id).first()
+        listing_name = listing.player_name if listing else offer.card_id
+        when = offer.updated_at or offer.created_at
+        if tc_row.side == TRADE_SIDE_BUYER:
+            seller = db.query(User).filter(User.id == offer.seller_id).first()
+            actor = seller.display_name if seller else "Seller"
+            desc = (
+                f"Traded to {actor} via marketplace card trade for {listing_name} "
+                f"({buyer.display_name}'s offer)"
+            )
+        else:
+            desc = (
+                f"Received from seller counter via marketplace card trade for {listing_name}"
+            )
+            actor = buyer.display_name
+        events.append(
+            {
+                "event_type": "traded",
+                "event_date": _iso(when),
+                "description": desc,
+                "actor": actor,
             }
         )
 

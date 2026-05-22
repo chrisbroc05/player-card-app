@@ -187,6 +187,11 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        <section className="mt-8 rounded-2xl border border-white/10 bg-cardBg p-6">
+          <h2 className="text-lg font-semibold text-white">Account settings</h2>
+          <ParentEmailSettings token={token} profile={profile} onSaved={loadProfile} />
+        </section>
+
         <section className="mt-8">
           <h2 className="sr-only">Your stats</h2>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -395,5 +400,73 @@ export default function ProfilePage() {
 
       <AppFooter />
     </div>
+  );
+}
+
+function ParentEmailSettings({ token, profile, onSaved }) {
+  const [parentEmail, setParentEmail] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setParentEmail(profile?.parent_email || "");
+  }, [profile?.parent_email]);
+
+  async function handleSave(e) {
+    e.preventDefault();
+    setError("");
+    setMessage("");
+    const trimmed = parentEmail.trim();
+    if (trimmed && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setError("Please enter a valid parent email address.");
+      return;
+    }
+    if (!token) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/update-profile`, {
+        method: "POST",
+        headers: { ...authHeaders(token), "Content-Type": "application/json" },
+        body: JSON.stringify({ parent_email: trimmed || null }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not save settings."));
+      setMessage("Parent email saved.");
+      await onSaved?.();
+    } catch (err) {
+      setError(err.message || "Save failed.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSave} className="mt-4 max-w-md space-y-3">
+      <div>
+        <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          Parent or Guardian Email
+        </label>
+        <input
+          type="email"
+          value={parentEmail}
+          onChange={(e) => setParentEmail(e.target.value)}
+          placeholder="parent@email.com"
+          className="mt-1 min-h-[44px] w-full rounded-lg border border-white/15 bg-cardBg2 px-3 py-2 text-slate-100 placeholder:text-slate-500"
+        />
+        <p className="mt-1 text-xs text-slate-500">
+          If provided, a parent or guardian will receive copies of important account notifications.
+        </p>
+      </div>
+      <button
+        type="submit"
+        disabled={saving}
+        className="min-h-[40px] rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+      >
+        {saving ? "Saving…" : "Save"}
+      </button>
+      {error ? <p className="text-sm text-rose-300">{error}</p> : null}
+      {message ? <p className="text-sm text-emerald-300">{message}</p> : null}
+    </form>
   );
 }

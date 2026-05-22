@@ -22,6 +22,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False, index=True)
     display_name: Mapped[str] = mapped_column(String(200), nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    parent_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     cards: Mapped[list["Card"]] = relationship(
@@ -61,6 +62,9 @@ class Card(Base):
     asking_price: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     listed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     listing_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_priority_listing: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    priority_listed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    priority_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_animated: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     animated_video_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     animation_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
@@ -97,6 +101,7 @@ class MarketplaceOffer(Base):
     buyer_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     seller_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     offer_amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    offer_type: Mapped[str] = mapped_column(String(32), default="cash", nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="pending", nullable=False)
     royalty_amount: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     message: Mapped[str | None] = mapped_column(String(2000), nullable=True)
@@ -114,6 +119,33 @@ class MarketplaceOffer(Base):
     )
     buyer: Mapped["User"] = relationship("User", foreign_keys=[buyer_id])
     seller: Mapped["User"] = relationship("User", foreign_keys=[seller_id])
+    trade_cards: Mapped[list["MarketplaceTradeCard"]] = relationship(
+        "MarketplaceTradeCard",
+        back_populates="offer",
+        cascade="all, delete-orphan",
+    )
+
+
+class MarketplaceTradeCard(Base):
+    __tablename__ = "marketplace_trade_cards"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    offer_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("marketplace_offers.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    card_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("cards.id"),
+        nullable=False,
+        index=True,
+    )
+    side: Mapped[str] = mapped_column(String(32), nullable=False)
+
+    offer: Mapped["MarketplaceOffer"] = relationship("MarketplaceOffer", back_populates="trade_cards")
+    card: Mapped["Card"] = relationship("Card", foreign_keys=[card_id])
 
 
 class TradeOffer(Base):

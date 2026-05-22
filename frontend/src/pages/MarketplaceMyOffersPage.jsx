@@ -4,6 +4,7 @@ import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import MarketplaceSubNav from "../components/MarketplaceSubNav";
 import CardImage from "../components/CardImage";
+import TradeCardsThumbRow from "../components/TradeCardsThumbRow";
 import { useAuth } from "../context/AuthContext";
 import { authFetch, formatApiError } from "../utils/authFetch";
 import {
@@ -42,14 +43,19 @@ function statusBadgeLabel(status) {
 function footerNote(offer) {
   const st = (offer.status || "").toLowerCase();
   const cs = offer.counter_status;
+  const isTrade = (offer.offer_type || "cash") === "card_trade";
   if (st === "expired") return "Offer expired with no response";
   if (st === "accepted" && cs === "accepted") {
-    return `Accepted seller counter of ${formatMoney(offer.counter_amount)}`;
+    return isTrade
+      ? "Accepted seller's card trade counter"
+      : `Accepted seller counter of ${formatMoney(offer.counter_amount)}`;
   }
   if (st === "declined" && cs === "declined") {
-    return `You declined the seller's counter of ${formatMoney(offer.counter_amount)}`;
+    return isTrade
+      ? "You declined the seller's card trade counter"
+      : `You declined the seller's counter of ${formatMoney(offer.counter_amount)}`;
   }
-  if (st === "accepted") return "Card added to your collection";
+  if (st === "accepted") return isTrade ? "Card trade completed — card added to your collection" : "Card added to your collection";
   if (st === "declined") return "Offer was declined by the seller";
   if (st === "cancelled") return "You cancelled this offer";
   return null;
@@ -196,7 +202,10 @@ export default function MarketplaceMyOffersPage() {
           <ul className="space-y-4">
             {filteredOffers.map((offer) => {
               const statusClass = offerStatusStyle(offer.status);
-              const compare = compareOfferToAsking(offer.offer_amount, offer.asking_price);
+              const isTrade = (offer.offer_type || "cash") === "card_trade";
+              const offeredCards = offer.trade_cards_offered || [];
+              const counterCards = offer.trade_cards_counter || [];
+              const compare = !isTrade ? compareOfferToAsking(offer.offer_amount, offer.asking_price) : null;
               const statusKey = (offer.status || "").toLowerCase();
               const pending = statusKey === "pending";
               const counterPending = pending && offer.counter_status === "pending";
@@ -206,10 +215,20 @@ export default function MarketplaceMyOffersPage() {
                 <li key={offer.offer_id} className="rounded-2xl border border-white/10 bg-cardBg p-4">
                   {counterPending ? (
                     <div className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/15 px-4 py-3">
-                      <p className="text-sm font-semibold text-amber-100">
-                        The seller countered with {formatMoney(offer.counter_amount)}
-                      </p>
-                      <p className="mt-1 text-xs text-amber-200/90">Accept or decline to continue.</p>
+                      {isTrade ? (
+                        <>
+                          <p className="text-sm font-semibold text-amber-100">Seller&apos;s Counter Offer</p>
+                          <p className="mt-1 text-xs text-amber-200/90">Accept or decline to continue.</p>
+                          <TradeCardsThumbRow cards={counterCards} className="mt-3" />
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-sm font-semibold text-amber-100">
+                            The seller countered with {formatMoney(offer.counter_amount)}
+                          </p>
+                          <p className="mt-1 text-xs text-amber-200/90">Accept or decline to continue.</p>
+                        </>
+                      )}
                       <div className="mt-3 flex flex-wrap gap-2">
                         <button
                           type="button"
@@ -219,7 +238,9 @@ export default function MarketplaceMyOffersPage() {
                         >
                           {actionKey === `cacc-${offer.offer_id}`
                             ? "Accepting…"
-                            : `Accept Counter (${formatMoney(offer.counter_amount)})`}
+                            : isTrade
+                              ? "Accept Counter"
+                              : `Accept Counter (${formatMoney(offer.counter_amount)})`}
                         </button>
                         <button
                           type="button"
@@ -240,11 +261,20 @@ export default function MarketplaceMyOffersPage() {
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-white">{offer.player_name}</p>
                       <p className="font-mono text-xs text-slate-500">{offer.card_id}</p>
-                      <p className="mt-1 text-lg font-semibold text-neonTeal">{formatMoney(offer.offer_amount)}</p>
-                      <p className="text-xs text-slate-500">
-                        Asking {formatMoney(offer.asking_price)}
-                        {compare ? " · " + compare : ""}
-                      </p>
+                      {isTrade ? (
+                        <>
+                          <p className="mt-1 text-sm font-semibold text-amber-200">Card Trade Offer</p>
+                          <TradeCardsThumbRow cards={offeredCards} className="mt-2" />
+                        </>
+                      ) : (
+                        <>
+                          <p className="mt-1 text-lg font-semibold text-neonTeal">{formatMoney(offer.offer_amount)}</p>
+                          <p className="text-xs text-slate-500">
+                            Asking {formatMoney(offer.asking_price)}
+                            {compare ? " · " + compare : ""}
+                          </p>
+                        </>
+                      )}
                       <span
                         className={
                           "mt-2 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold capitalize " + statusClass

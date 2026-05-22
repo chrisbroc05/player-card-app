@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import CardImage from "../components/CardImage";
+import TradeCardPicker from "../components/TradeCardPicker";
 import { API_BASE_URL } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import { authFetch, formatApiError } from "../utils/authFetch";
@@ -21,7 +22,9 @@ export default function MarketplaceCardDetailPage() {
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [offerMode, setOfferMode] = useState("cash");
   const [offerAmount, setOfferAmount] = useState("");
+  const [tradeCardIds, setTradeCardIds] = useState([]);
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [offerError, setOfferError] = useState("");
@@ -60,21 +63,41 @@ export default function MarketplaceCardDetailPage() {
       navigate("/login", { state: { from: `/marketplace/${cardId}` } });
       return;
     }
-    const n = Number(offerAmount);
-    if (!Number.isFinite(n) || n < 0.01) {
-      setOfferError("Offer amount must be at least $0.01");
-      return;
+
+    const isTrade = offerMode === "card_trade";
+    let body;
+
+    if (isTrade) {
+      if (tradeCardIds.length < 1) {
+        setOfferError("Select at least one card to offer in trade");
+        return;
+      }
+      body = {
+        card_id: listing.card_id,
+        offer_type: "card_trade",
+        trade_card_ids: tradeCardIds,
+        message: message.trim() || null,
+      };
+    } else {
+      const n = Number(offerAmount);
+      if (!Number.isFinite(n) || n < 0.01) {
+        setOfferError("Offer amount must be at least $0.01");
+        return;
+      }
+      body = {
+        card_id: listing.card_id,
+        offer_type: "cash",
+        offer_amount: n,
+        message: message.trim() || null,
+      };
     }
+
     setSubmitting(true);
     try {
       const { res, unauthorized } = await authFetch(token, "/marketplace/offer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          card_id: listing.card_id,
-          offer_amount: n,
-          message: message.trim() || null,
-        }),
+        body: JSON.stringify(body),
       });
       if (unauthorized) {
         navigate("/login", { state: { from: `/marketplace/${cardId}` } });
@@ -82,8 +105,13 @@ export default function MarketplaceCardDetailPage() {
       }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not submit offer."));
-      setOfferSuccess("Offer submitted! The seller will be notified by email.");
+      setOfferSuccess(
+        isTrade
+          ? "Trade offer submitted! The seller will be notified by email."
+          : "Offer submitted! The seller will be notified by email."
+      );
       setOfferAmount("");
+      setTradeCardIds([]);
       setMessage("");
       refreshNavBadges?.();
       await load();
@@ -152,9 +180,14 @@ export default function MarketplaceCardDetailPage() {
               <OfferPanel
                 isOwner={isOwner}
                 user={user}
+                token={token}
                 listing={listing}
+                offerMode={offerMode}
+                setOfferMode={setOfferMode}
                 offerAmount={offerAmount}
                 setOfferAmount={setOfferAmount}
+                tradeCardIds={tradeCardIds}
+                setTradeCardIds={setTradeCardIds}
                 message={message}
                 setMessage={setMessage}
                 royaltyPreview={royaltyPreview}
@@ -176,9 +209,14 @@ export default function MarketplaceCardDetailPage() {
 function OfferPanel({
   isOwner,
   user,
+  token,
   listing,
+  offerMode,
+  setOfferMode,
   offerAmount,
   setOfferAmount,
+  tradeCardIds,
+  setTradeCardIds,
   message,
   setMessage,
   royaltyPreview,
@@ -200,6 +238,9 @@ function OfferPanel({
     );
   }
 
+  const isTrade = offerMode === "card_trade";
+  const canSubmitTrade = tradeCardIds.length >= 1;
+
   return (
     <form onSubmit={onSubmit} className="rounded-xl border border-teal-500/25 bg-teal-500/5 p-4 space-y-3">
       <h2 className="text-lg font-semibold text-white">Make an offer</h2>
@@ -212,21 +253,52 @@ function OfferPanel({
         </p>
       ) : (
         <>
-          <div>
-            <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Offer amount ($)</label>
-            <input
-              type="number"
-              min="0.01"
-              step="0.01"
-              value={offerAmount}
-              onChange={(e) => setOfferAmount(e.target.value)}
-              className="mt-1 min-h-[44px] w-full rounded-lg border border-white/15 bg-cardBg px-3 py-2 text-slate-100"
-            />
-            <p className="mt-1 text-xs text-slate-500">Enter your offer amount</p>
-            <p className="mt-1 text-xs text-slate-500">
-              Platform royalty (2%): {formatMoney(royaltyPreview)} · Asking: {formatMoney(listing.asking_price)}
-            </p>
+          <div className="flex rounded-lg border border-white/15 bg-cardBg p-0.5">
+            <button
+              type="button"
+              onClick={() => setOfferMode("cash")}
+              className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition ${
+                !isTrade ? "bg-teal-500/25 text-neonTeal" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              Cash Offer
+            </button>
+            <button
+              type="button"
+              onClick={() => setOfferMode("card_trade")}
+              className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition ${
+                isTrade ? "bg-teal-500/25 text-neonTeal" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              Card Trade
+            </button>
           </div>
+
+          {isTrade ? (
+            <TradeCardPicker
+              token={token}
+              selectedIds={tradeCardIds}
+              onSelectedIdsChange={setTradeCardIds}
+              excludeCardIds={[listing.card_id]}
+            />
+          ) : (
+            <div>
+              <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Offer amount ($)</label>
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={offerAmount}
+                onChange={(e) => setOfferAmount(e.target.value)}
+                className="mt-1 min-h-[44px] w-full rounded-lg border border-white/15 bg-cardBg px-3 py-2 text-slate-100"
+              />
+              <p className="mt-1 text-xs text-slate-500">Enter your offer amount</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Platform royalty (2%): {formatMoney(royaltyPreview)} · Asking: {formatMoney(listing.asking_price)}
+              </p>
+            </div>
+          )}
+
           <div>
             <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Message (optional)</label>
             <textarea
@@ -239,10 +311,10 @@ function OfferPanel({
           </div>
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || (isTrade && !canSubmitTrade)}
             className="min-h-[48px] w-full rounded-xl bg-neonTeal font-semibold text-slate-950 disabled:opacity-50"
           >
-            {submitting ? "Submitting…" : "Submit offer"}
+            {submitting ? "Submitting…" : isTrade ? "Submit Trade Offer" : "Submit offer"}
           </button>
         </>
       )}

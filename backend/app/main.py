@@ -65,7 +65,7 @@ from marketplace_scheduler import (
     shutdown_marketplace_scheduler,
     start_marketplace_scheduler,
 )  # noqa: E402
-from schema_migrations import run_schema_migrations_after_models  # noqa: E402
+from parent_email_utils import normalize_optional_parent_email  # noqa: E402
 from trade_routes import router as trade_router  # noqa: E402
 from routers.admin import router as admin_router  # noqa: E402
 from routers.auth import router as auth_user_router  # noqa: E402
@@ -1255,6 +1255,7 @@ class RegisterBody(BaseModel):
     display_name: str = Field(..., min_length=1, max_length=200)
     password: str = Field(..., min_length=8, max_length=128)
     invite_code: str | None = Field(default=None, max_length=200)
+    parent_email: str | None = Field(default=None, max_length=320)
 
 
 class BetaStatusResponse(BaseModel):
@@ -1376,10 +1377,15 @@ def auth_register(body: RegisterBody, db: Session = Depends(get_db)):
     email = body.email.strip().lower()
     if db.query(User).filter(User.email == email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
+    try:
+        parent_email = normalize_optional_parent_email(body.parent_email)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid parent email address")
     user = User(
         email=email,
         display_name=body.display_name.strip(),
         hashed_password=hash_password(body.password),
+        parent_email=parent_email,
     )
     db.add(user)
     db.commit()

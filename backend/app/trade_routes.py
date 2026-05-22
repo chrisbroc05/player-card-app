@@ -21,6 +21,7 @@ from email_service import (
     send_trade_offer_email,
 )
 from database import get_db
+from parent_email_utils import parent_email_for_notify
 from models import Card, TradeOffer, User
 from marketplace_repo import cancel_pending_marketplace_offers_for_card, clear_marketplace_listing
 from trade_repo import (
@@ -180,6 +181,7 @@ def trades_send(
         offer.message,
         f"{frontend_url()}/trades",
         new_id,
+        parent_email=parent_email_for_notify(recipient),
     )
     return _offer_to_response(db, offer)
 
@@ -231,6 +233,7 @@ def trades_accept(
         card_image_url,
         f"{frontend_url()}/my-collection",
         trade_id,
+        parent_email=parent_email_for_notify(sender),
     )
     return card_to_dict(card, db)
 
@@ -276,6 +279,7 @@ def trades_decline(
         card_image_url,
         f"{frontend_url()}/my-collection",
         trade_id,
+        parent_email=parent_email_for_notify(sender),
     )
     return _offer_to_response(db, offer)
 
@@ -320,5 +324,6 @@ def trades_cancel(
         card_rarity,
         card_image_url,
         trade_id,
+        parent_email=parent_email_for_notify(recipient),
     )
     return _offer_to_response(db, offer)

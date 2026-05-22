@@ -10,6 +10,7 @@ export default function RegisterPage() {
   const { register, user, initializing } = useAuth();
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
+  const [parentEmail, setParentEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [inviteCode, setInviteCode] = useState("");
@@ -56,9 +57,13 @@ export default function RegisterPage() {
       setError("Passwords do not match.");
       return;
     }
+    if (parentEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail.trim())) {
+      setError("Please enter a valid parent email address.");
+      return;
+    }
     setSubmitting(true);
     try {
-      await register(email, displayName, password, betaMode ? inviteCode : undefined);
+      await register(email, displayName, password, betaMode ? inviteCode : undefined, parentEmail.trim() || undefined);
       navigate("/my-collection", { replace: true });
     } catch (err) {
       const msg = err?.message || "Registration failed";
@@ -123,6 +128,22 @@ export default function RegisterPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 className="mt-1 min-h-[46px] w-full rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 text-slate-100"
               />
+            </div>
+            <div>
+              <label className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                Parent or Guardian Email (optional)
+              </label>
+              <input
+                type="email"
+                autoComplete="email"
+                value={parentEmail}
+                onChange={(e) => setParentEmail(e.target.value)}
+                placeholder="parent@email.com"
+                className="mt-1 min-h-[46px] w-full rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 text-slate-100 placeholder:text-slate-500"
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                If provided, a parent or guardian will receive copies of important account notifications.
+              </p>
             </div>
             {betaMode ? (
               <div>

@@ -146,6 +146,87 @@ def run_schema_migrations_after_models(engine: Engine) -> None:
                 )
             else:
                 conn.execute(text("ALTER TABLE cards ADD COLUMN animation_completed_at DATETIME"))
+        if "is_priority_listing" not in cols:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN IF NOT EXISTS is_priority_listing BOOLEAN "
+                        "NOT NULL DEFAULT FALSE"
+                    )
+                )
+            else:
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN is_priority_listing BOOLEAN NOT NULL DEFAULT 0"
+                    )
+                )
+        if "priority_listed_at" not in cols:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN IF NOT EXISTS priority_listed_at "
+                        "TIMESTAMP WITH TIME ZONE"
+                    )
+                )
+            else:
+                conn.execute(text("ALTER TABLE cards ADD COLUMN priority_listed_at DATETIME"))
+        if "priority_expires_at" not in cols:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN IF NOT EXISTS priority_expires_at "
+                        "TIMESTAMP WITH TIME ZONE"
+                    )
+                )
+            else:
+                conn.execute(text("ALTER TABLE cards ADD COLUMN priority_expires_at DATETIME"))
+
+        if "marketplace_offers" in insp.get_table_names():
+            mcols = {c["name"] for c in insp.get_columns("marketplace_offers")}
+            if "offer_type" not in mcols:
+                if dialect == "postgresql":
+                    conn.execute(
+                        text(
+                            "ALTER TABLE marketplace_offers ADD COLUMN IF NOT EXISTS offer_type "
+                            "VARCHAR(32) NOT NULL DEFAULT 'cash'"
+                        )
+                    )
+                else:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE marketplace_offers ADD COLUMN offer_type VARCHAR(32) "
+                            "NOT NULL DEFAULT 'cash'"
+                        )
+                    )
+
+        tables = set(insp.get_table_names())
+        if "marketplace_trade_cards" not in tables:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE IF NOT EXISTS marketplace_trade_cards (
+                            id SERIAL PRIMARY KEY,
+                            offer_id INTEGER NOT NULL REFERENCES marketplace_offers(id) ON DELETE CASCADE,
+                            card_id INTEGER NOT NULL REFERENCES cards(id),
+                            side VARCHAR(32) NOT NULL
+                        )
+                        """
+                    )
+                )
+            else:
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE marketplace_trade_cards (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            offer_id INTEGER NOT NULL REFERENCES marketplace_offers(id),
+                            card_id INTEGER NOT NULL REFERENCES cards(id),
+                            side VARCHAR(32) NOT NULL
+                        )
+                        """
+                    )
+                )
 
         if "marketplace_offers" in insp.get_table_names():
             mcols = {c["name"] for c in insp.get_columns("marketplace_offers")}
@@ -227,3 +308,15 @@ def run_schema_migrations_after_models(engine: Engine) -> None:
                         "WHERE status = 'pending' AND expires_at IS NULL"
                     )
                 )
+
+        if "users" in insp.get_table_names():
+            ucols = {c["name"] for c in insp.get_columns("users")}
+            if "parent_email" not in ucols:
+                if dialect == "postgresql":
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS parent_email VARCHAR(320)"
+                        )
+                    )
+                else:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN parent_email VARCHAR(320)"))

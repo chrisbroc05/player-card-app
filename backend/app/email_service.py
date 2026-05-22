@@ -289,19 +289,41 @@ def _warning_banner() -> str:
     return _content_row(inner)
 
 
-def _send_resend_html(to: str, subject: str, html: str, trade_id: int | None, kind: str) -> None:
+def _notification_recipients(primary: str, parent_email: str | None) -> list[str]:
+    """Primary recipient plus optional parent copy (deduped)."""
+    recipients: list[str] = []
+    primary_clean = (primary or "").strip()
+    if primary_clean:
+        recipients.append(primary_clean)
+    parent = (parent_email or "").strip().lower()
+    primary_l = primary_clean.lower()
+    if parent and parent != primary_l and parent not in {r.lower() for r in recipients}:
+        recipients.append(parent)
+    return recipients
+
+
+def _send_resend_html(
+    to: str,
+    subject: str,
+    html: str,
+    trade_id: int | None,
+    kind: str,
+    *,
+    parent_email: str | None = None,
+) -> None:
     key = (os.environ.get("RESEND_API_KEY") or "").strip()
     if not key:
         logger.warning("RESEND_API_KEY unset; skipping %s email to %s", kind, to)
         return
     resend.api_key = key
-    params: dict[str, Any] = {
-        "from": _from_email(),
-        "to": [to],
-        "subject": subject,
-        "html": html,
-    }
-    resend.Emails.send(params)
+    for recipient in _notification_recipients(to, parent_email):
+        params: dict[str, Any] = {
+            "from": _from_email(),
+            "to": [recipient],
+            "subject": subject,
+            "html": html,
+        }
+        resend.Emails.send(params)
 
 
 def send_trade_offer_email(
@@ -315,6 +337,8 @@ def send_trade_offer_email(
     trade_message: str | None,
     trades_url: str,
     trade_id: int,
+    *,
+    parent_email: str | None = None,
 ) -> None:
     try:
         sn_plain = html_module.escape(sender_name)
@@ -342,7 +366,7 @@ def send_trade_offer_email(
         )
         html = _email_shell("".join(parts))
         subject = f"⚡ {sender_name} sent you a Future Legends card!"
-        _send_resend_html(recipient_email, subject, html, trade_id, "trade_offer")
+        _send_resend_html(recipient_email, subject, html, trade_id, "trade_offer", parent_email=parent_email)
     except Exception as e:
         logger.error("Email failed for trade %s: %s", trade_id, e)
 
@@ -357,6 +381,8 @@ def send_trade_accepted_email(
     card_image_url: str | None,
     collection_url: str,
     trade_id: int,
+    *,
+    parent_email: str | None = None,
 ) -> None:
     try:
         rn = html_module.escape(recipient_name)
@@ -377,7 +403,7 @@ def send_trade_accepted_email(
         ]
         html = _email_shell("".join(parts))
         subject = f"✅ {recipient_name} accepted your card!"
-        _send_resend_html(sender_email, subject, html, trade_id, "trade_accepted")
+        _send_resend_html(sender_email, subject, html, trade_id, "trade_accepted", parent_email=parent_email)
     except Exception as e:
         logger.error("Email failed for trade %s: %s", trade_id, e)
 
@@ -392,6 +418,8 @@ def send_trade_declined_email(
     card_image_url: str | None,
     collection_url: str,
     trade_id: int,
+    *,
+    parent_email: str | None = None,
 ) -> None:
     try:
         rn = html_module.escape(recipient_name)
@@ -412,7 +440,7 @@ def send_trade_declined_email(
         ]
         html = _email_shell("".join(parts))
         subject = f"❌ {recipient_name} declined your trade"
-        _send_resend_html(sender_email, subject, html, trade_id, "trade_declined")
+        _send_resend_html(sender_email, subject, html, trade_id, "trade_declined", parent_email=parent_email)
     except Exception as e:
         logger.error("Email failed for trade %s: %s", trade_id, e)
 
@@ -426,6 +454,8 @@ def send_trade_cancelled_email(
     card_rarity: str,
     card_image_url: str | None,
     trade_id: int,
+    *,
+    parent_email: str | None = None,
 ) -> None:
     try:
         sn = html_module.escape(sender_name)
@@ -445,13 +475,33 @@ def send_trade_cancelled_email(
         ]
         html = _email_shell("".join(parts))
         subject = f"🚫 {sender_name} cancelled their trade offer"
-        _send_resend_html(recipient_email, subject, html, trade_id, "trade_cancelled")
+        _send_resend_html(recipient_email, subject, html, trade_id, "trade_cancelled", parent_email=parent_email)
     except Exception as e:
         logger.error("Email failed for trade %s: %s", trade_id, e)
 
 
 def _money_label(amount: float) -> str:
     return f"${amount:,.2f}"
+
+
+def _trade_cards_email_block(summary: str) -> str:
+    if not (summary or "").strip():
+        return ""
+    text = html_module.escape(summary.strip())
+    return (
+        '<p style="margin:12px 0 0;font-size:14px;line-height:1.5;color:#cbd5e1;">'
+        f"<strong>Cards offered:</strong> {text}</p>"
+    )
+
+
+def _counter_trade_cards_email_block(summary: str) -> str:
+    if not (summary or "").strip():
+        return ""
+    text = html_module.escape(summary.strip())
+    return (
+        '<p style="margin:12px 0 0;font-size:14px;line-height:1.5;color:#cbd5e1;">'
+        f"<strong>Seller counter cards:</strong> {text}</p>"
+    )
 
 
 def send_marketplace_offer_received_email(
@@ -465,25 +515,40 @@ def send_marketplace_offer_received_email(
     offer_amount: float,
     offers_url: str,
     offer_id: int,
+    *,
+    is_card_trade: bool = False,
+    trade_cards_summary: str = "",
+    counter_trade_summary: str = "",
+    parent_email: str | None = None,
 ) -> None:
     try:
         bn = html_module.escape(buyer_name)
         player = html_module.escape(card_player_name)
-        amt = html_module.escape(_money_label(offer_amount))
-        sub_inner = (
-            f"{bn} made an offer of <span style=\"color:#ffd700;font-weight:700;\">{amt}</span> "
-            f"on your {player} card. View and respond to the offer in your Future Legends account."
-        )
+        if is_card_trade:
+            sub_inner = (
+                f"{bn} submitted a <span style=\"color:#ffd700;font-weight:700;\">Card Trade Offer</span> "
+                f"on your {player} card. View and respond in your Future Legends account."
+            )
+            heading = "New Card Trade Offer"
+            subject = f"Card trade offer on your {card_player_name} card"
+        else:
+            amt = html_module.escape(_money_label(offer_amount))
+            sub_inner = (
+                f"{bn} made an offer of <span style=\"color:#ffd700;font-weight:700;\">{amt}</span> "
+                f"on your {player} card. View and respond to the offer in your Future Legends account."
+            )
+            heading = "New marketplace offer"
+            subject = f"Someone wants your {card_player_name} card!"
         parts = [
-            _heading("New marketplace offer"),
+            _heading(heading),
             _subtext_html(sub_inner),
+            _trade_cards_email_block(trade_cards_summary),
             _card_info_box(card_player_name, card_tier, card_rarity, card_image_url),
             _divider(),
             _cta_button(offers_url, "View incoming offers →"),
         ]
         html = _email_shell("".join(parts))
-        subject = f"Someone wants your {card_player_name} card!"
-        _send_resend_html(owner_email, subject, html, offer_id, "marketplace_offer_received")
+        _send_resend_html(owner_email, subject, html, offer_id, "marketplace_offer_received", parent_email=parent_email)
     except Exception as e:
         logger.error("Email failed for marketplace offer %s: %s", offer_id, e)
 
@@ -498,24 +563,41 @@ def send_marketplace_offer_accepted_buyer_email(
     offer_amount: float,
     collection_url: str,
     offer_id: int,
+    *,
+    is_card_trade: bool = False,
+    trade_cards_summary: str = "",
+    counter_trade_summary: str = "",
+    parent_email: str | None = None,
 ) -> None:
     try:
-        amt = html_module.escape(_money_label(offer_amount))
         player = html_module.escape(card_player_name)
-        sub_inner = (
-            f"Your offer of <span style=\"color:#ffd700;font-weight:700;\">{amt}</span> for the "
-            f"{player} card was accepted. The card is now in your collection."
-        )
+        if is_card_trade:
+            sub_inner = (
+                f"Your <span style=\"color:#ffd700;font-weight:700;\">Card Trade Offer</span> for the "
+                f"{player} card was accepted. The card is now in your collection."
+            )
+            trade_block = _trade_cards_email_block(trade_cards_summary)
+            counter_block = _counter_trade_cards_email_block(counter_trade_summary)
+        else:
+            amt = html_module.escape(_money_label(offer_amount))
+            sub_inner = (
+                f"Your offer of <span style=\"color:#ffd700;font-weight:700;\">{amt}</span> for the "
+                f"{player} card was accepted. The card is now in your collection."
+            )
+            trade_block = ""
+            counter_block = ""
         parts = [
             _heading("Your offer was accepted! 🎉"),
             _subtext_html(sub_inner),
+            trade_block,
+            counter_block,
             _card_info_box(card_player_name, card_tier, card_rarity, card_image_url),
             _divider(),
             _cta_button(collection_url, "View My Collection →"),
         ]
         html = _email_shell("".join(parts))
-        subject = "Your offer was accepted! 🎉"
-        _send_resend_html(buyer_email, subject, html, offer_id, "marketplace_offer_accepted")
+        subject = "Your card trade was accepted! 🎉" if is_card_trade else "Your offer was accepted! 🎉"
+        _send_resend_html(buyer_email, subject, html, offer_id, "marketplace_offer_accepted", parent_email=parent_email)
     except Exception as e:
         logger.error("Email failed for marketplace offer %s: %s", offer_id, e)
 
@@ -531,25 +613,43 @@ def send_marketplace_sale_confirmed_seller_email(
     offer_amount: float,
     collection_url: str,
     offer_id: int,
+    *,
+    is_card_trade: bool = False,
+    trade_cards_summary: str = "",
+    counter_trade_summary: str = "",
+    parent_email: str | None = None,
 ) -> None:
     try:
         bn = html_module.escape(buyer_name)
-        amt = html_module.escape(_money_label(offer_amount))
         player = html_module.escape(card_player_name)
-        sub_inner = (
-            f"Sale confirmed — {bn} purchased your {player} card for "
-            f"<span style=\"color:#ffd700;font-weight:700;\">{amt}</span>."
-        )
+        if is_card_trade:
+            sub_inner = (
+                f"Card trade completed — {bn} traded for your {player} card. "
+                "You received the offered cards in your collection."
+            )
+            trade_block = _trade_cards_email_block(trade_cards_summary)
+            heading = "Card trade confirmed"
+            subject = f"Card trade confirmed — {card_player_name}"
+        else:
+            amt = html_module.escape(_money_label(offer_amount))
+            sub_inner = (
+                f"Sale confirmed — {bn} purchased your {player} card for "
+                f"<span style=\"color:#ffd700;font-weight:700;\">{amt}</span>."
+            )
+            trade_block = ""
+            heading = "Sale confirmed"
+            subject = f"Sale confirmed — {card_player_name}"
         parts = [
-            _heading("Sale confirmed"),
+            _heading(heading),
+            _subtext_html(sub_inner),
+            trade_block,
             _subtext_html(sub_inner),
             _card_info_box(card_player_name, card_tier, card_rarity, card_image_url),
             _divider(),
             _cta_button(collection_url, "Open Future Legends →"),
         ]
         html = _email_shell("".join(parts))
-        subject = f"Sale confirmed — {card_player_name}"
-        _send_resend_html(seller_email, subject, html, offer_id, "marketplace_sale_confirmed")
+        _send_resend_html(seller_email, subject, html, offer_id, "marketplace_sale_confirmed", parent_email=parent_email)
     except Exception as e:
         logger.error("Email failed for marketplace offer %s: %s", offer_id, e)
 
@@ -564,24 +664,40 @@ def send_marketplace_offer_declined_email(
     offer_amount: float,
     marketplace_url: str,
     offer_id: int,
+    *,
+    is_card_trade: bool = False,
+    trade_cards_summary: str = "",
+    counter_trade_summary: str = "",
+    parent_email: str | None = None,
 ) -> None:
     try:
-        amt = html_module.escape(_money_label(offer_amount))
         player = html_module.escape(card_player_name)
-        sub_inner = (
-            f"The owner declined your offer of <span style=\"color:#ffd700;font-weight:700;\">{amt}</span> "
-            f"for {player}. You can browse more cards on Free Agency Marketplace."
-        )
+        if is_card_trade:
+            sub_inner = (
+                f"The owner declined your <span style=\"color:#ffd700;font-weight:700;\">Card Trade Offer</span> "
+                f"for {player}. Your offered cards are available again in your collection."
+            )
+            trade_block = _trade_cards_email_block(trade_cards_summary)
+            subject = f"Your card trade offer on {card_player_name} was declined"
+        else:
+            amt = html_module.escape(_money_label(offer_amount))
+            sub_inner = (
+                f"The owner declined your offer of <span style=\"color:#ffd700;font-weight:700;\">{amt}</span> "
+                f"for {player}. You can browse more cards on Free Agency Marketplace."
+            )
+            trade_block = ""
+            subject = f"Your offer on {card_player_name} was declined"
         parts = [
-            _heading("Offer declined"),
+            _heading("Offer declined" if not is_card_trade else "Card trade offer declined"),
+            _subtext_html(sub_inner),
+            trade_block,
             _subtext_html(sub_inner),
             _card_info_box(card_player_name, card_tier, card_rarity, card_image_url),
             _divider(),
             _cta_button(marketplace_url, "Browse Free Agency Marketplace →"),
         ]
         html = _email_shell("".join(parts))
-        subject = f"Your offer on {card_player_name} was declined"
-        _send_resend_html(buyer_email, subject, html, offer_id, "marketplace_offer_declined")
+        _send_resend_html(buyer_email, subject, html, offer_id, "marketplace_offer_declined", parent_email=parent_email)
     except Exception as e:
         logger.error("Email failed for marketplace offer %s: %s", offer_id, e)
 
@@ -591,6 +707,8 @@ def send_marketplace_offer_cancelled_email(
     buyer_name: str,
     card_player_name: str,
     offer_id: int,
+    *,
+    parent_email: str | None = None,
 ) -> None:
     try:
         player = html_module.escape(card_player_name)
@@ -601,7 +719,7 @@ def send_marketplace_offer_cancelled_email(
         ]
         html = _email_shell("".join(parts))
         subject = "Offer cancelled"
-        _send_resend_html(buyer_email, subject, html, offer_id, "marketplace_offer_cancelled")
+        _send_resend_html(buyer_email, subject, html, offer_id, "marketplace_offer_cancelled", parent_email=parent_email)
     except Exception as e:
         logger.error("Email failed for marketplace offer %s: %s", offer_id, e)
 
@@ -611,6 +729,8 @@ def send_marketplace_listing_expired_email(
     owner_name: str,
     card_player_name: str,
     collection_url: str,
+    *,
+    parent_email: str | None = None,
 ) -> None:
     try:
         player = html_module.escape(card_player_name)
@@ -626,7 +746,7 @@ def send_marketplace_listing_expired_email(
         ]
         html = _email_shell("".join(parts))
         subject = f"Your listing for {card_player_name} has expired"
-        _send_resend_html(owner_email, subject, html, 0, "marketplace_listing_expired")
+        _send_resend_html(owner_email, subject, html, 0, "marketplace_listing_expired", parent_email=parent_email)
     except Exception as e:
         logger.error("Listing expired email failed for %s: %s", owner_email, e)
 
@@ -638,6 +758,8 @@ def send_marketplace_offer_expired_buyer_email(
     offer_amount: float,
     marketplace_url: str,
     offer_id: int,
+    *,
+    parent_email: str | None = None,
 ) -> None:
     try:
         player = html_module.escape(card_player_name)
@@ -655,7 +777,7 @@ def send_marketplace_offer_expired_buyer_email(
         ]
         html = _email_shell("".join(parts))
         subject = f"Your offer on {card_player_name} has expired"
-        _send_resend_html(buyer_email, subject, html, offer_id, "marketplace_offer_expired")
+        _send_resend_html(buyer_email, subject, html, offer_id, "marketplace_offer_expired", parent_email=parent_email)
     except Exception as e:
         logger.error("Email failed for marketplace offer %s: %s", offer_id, e)
 
@@ -668,25 +790,46 @@ def send_marketplace_counter_sent_buyer_email(
     counter_amount: float,
     my_offers_url: str,
     offer_id: int,
+    *,
+    is_card_trade: bool = False,
+    trade_cards_summary: str = "",
+    counter_trade_summary: str = "",
+    parent_email: str | None = None,
 ) -> None:
     try:
         player = html_module.escape(card_player_name)
-        orig = html_module.escape(_money_label(original_amount))
-        ctr = html_module.escape(_money_label(counter_amount))
-        sub_inner = (
-            f"You offered <span style=\"color:#ffd700;font-weight:700;\">{orig}</span> on the {player} card. "
-            f"The seller has countered with <span style=\"color:#ffd700;font-weight:700;\">{ctr}</span>. "
-            "Log in to accept or decline the counter."
-        )
+        if is_card_trade:
+            sub_inner = (
+                f"The seller sent a <span style=\"color:#ffd700;font-weight:700;\">Card Trade Counter</span> "
+                f"on your offer for {player}. Log in to accept or decline."
+            )
+            trade_block = _trade_cards_email_block(trade_cards_summary)
+            counter_block = _counter_trade_cards_email_block(counter_trade_summary)
+            heading = "Seller Card Trade Counter"
+            subject = f"Card trade counter on {card_player_name}"
+        else:
+            orig = html_module.escape(_money_label(original_amount))
+            ctr = html_module.escape(_money_label(counter_amount))
+            sub_inner = (
+                f"You offered <span style=\"color:#ffd700;font-weight:700;\">{orig}</span> on the {player} card. "
+                f"The seller has countered with <span style=\"color:#ffd700;font-weight:700;\">{ctr}</span>. "
+                "Log in to accept or decline the counter."
+            )
+            trade_block = ""
+            counter_block = ""
+            heading = "Seller counter-offer"
+            subject = f"The seller countered your offer on {card_player_name}"
         parts = [
-            _heading("Seller counter-offer"),
+            _heading(heading),
+            _subtext_html(sub_inner),
+            trade_block,
+            counter_block,
             _subtext_html(sub_inner),
             _divider(),
             _cta_button(my_offers_url, "View My Offers →"),
         ]
         html = _email_shell("".join(parts))
-        subject = f"The seller countered your offer on {card_player_name}"
-        _send_resend_html(buyer_email, subject, html, offer_id, "marketplace_counter_sent")
+        _send_resend_html(buyer_email, subject, html, offer_id, "marketplace_counter_sent", parent_email=parent_email)
     except Exception as e:
         logger.error("Email failed for marketplace offer %s: %s", offer_id, e)
 
@@ -698,23 +841,43 @@ def send_marketplace_counter_accepted_seller_email(
     counter_amount: float,
     collection_url: str,
     offer_id: int,
+    *,
+    is_card_trade: bool = False,
+    trade_cards_summary: str = "",
+    counter_trade_summary: str = "",
+    parent_email: str | None = None,
 ) -> None:
     try:
         player = html_module.escape(card_player_name)
-        amt = html_module.escape(_money_label(counter_amount))
-        sub_inner = (
-            f"Your counter of <span style=\"color:#ffd700;font-weight:700;\">{amt}</span> for {player} "
-            "was accepted. The card has been transferred to the buyer."
-        )
+        if is_card_trade:
+            sub_inner = (
+                f"Your <span style=\"color:#ffd700;font-weight:700;\">Card Trade Counter</span> for {player} "
+                "was accepted. Cards have been transferred."
+            )
+            trade_block = _trade_cards_email_block(trade_cards_summary)
+            counter_block = _counter_trade_cards_email_block(counter_trade_summary)
+            heading = "Card trade counter accepted! 🎉"
+        else:
+            amt = html_module.escape(_money_label(counter_amount))
+            sub_inner = (
+                f"Your counter of <span style=\"color:#ffd700;font-weight:700;\">{amt}</span> for {player} "
+                "was accepted. The card has been transferred to the buyer."
+            )
+            trade_block = ""
+            counter_block = ""
+            heading = "Counter-offer accepted! 🎉"
         parts = [
-            _heading("Counter-offer accepted! 🎉"),
+            _heading(heading),
+            _subtext_html(sub_inner),
+            trade_block,
+            counter_block,
             _subtext_html(sub_inner),
             _divider(),
             _cta_button(collection_url, "Open My Collection →"),
         ]
         html = _email_shell("".join(parts))
         subject = "Your counter-offer was accepted! 🎉"
-        _send_resend_html(seller_email, subject, html, offer_id, "marketplace_counter_accepted_seller")
+        _send_resend_html(seller_email, subject, html, offer_id, "marketplace_counter_accepted_seller", parent_email=parent_email)
     except Exception as e:
         logger.error("Email failed for marketplace offer %s: %s", offer_id, e)
 
@@ -726,23 +889,43 @@ def send_marketplace_counter_declined_seller_email(
     counter_amount: float,
     my_listings_url: str,
     offer_id: int,
+    *,
+    is_card_trade: bool = False,
+    trade_cards_summary: str = "",
+    counter_trade_summary: str = "",
+    parent_email: str | None = None,
 ) -> None:
     try:
         player = html_module.escape(card_player_name)
-        amt = html_module.escape(_money_label(counter_amount))
-        sub_inner = (
-            f"The buyer declined your counter of <span style=\"color:#ffd700;font-weight:700;\">{amt}</span> "
-            f"on {player}. The card remains listed on Free Agency Marketplace."
-        )
+        if is_card_trade:
+            sub_inner = (
+                f"The buyer declined your <span style=\"color:#ffd700;font-weight:700;\">Card Trade Counter</span> "
+                f"on {player}. Offered and counter cards are available again."
+            )
+            trade_block = _trade_cards_email_block(trade_cards_summary)
+            counter_block = _counter_trade_cards_email_block(counter_trade_summary)
+            heading = "Card trade counter declined"
+        else:
+            amt = html_module.escape(_money_label(counter_amount))
+            sub_inner = (
+                f"The buyer declined your counter of <span style=\"color:#ffd700;font-weight:700;\">{amt}</span> "
+                f"on {player}. The card remains listed on Free Agency Marketplace."
+            )
+            trade_block = ""
+            counter_block = ""
+            heading = "Counter-offer declined"
         parts = [
-            _heading("Counter-offer declined"),
+            _heading(heading),
+            _subtext_html(sub_inner),
+            trade_block,
+            counter_block,
             _subtext_html(sub_inner),
             _divider(),
             _cta_button(my_listings_url, "My Listings →"),
         ]
         html = _email_shell("".join(parts))
         subject = "Your counter-offer was declined"
-        _send_resend_html(seller_email, subject, html, offer_id, "marketplace_counter_declined_seller")
+        _send_resend_html(seller_email, subject, html, offer_id, "marketplace_counter_declined_seller", parent_email=parent_email)
     except Exception as e:
         logger.error("Email failed for marketplace offer %s: %s", offer_id, e)
 
@@ -753,6 +936,8 @@ def send_animation_complete_email(
     card_player_name: str,
     card_url: str,
     card_id: str,
+    *,
+    parent_email: str | None = None,
 ) -> None:
     try:
         player = html_module.escape(card_player_name)
@@ -768,7 +953,7 @@ def send_animation_complete_email(
         ]
         html = _email_shell("".join(parts))
         subject = "Your animated card is ready! 🎬"
-        _send_resend_html(owner_email, subject, html, 0, f"animation_complete_{card_id}")
+        _send_resend_html(owner_email, subject, html, 0, f"animation_complete_{card_id}", parent_email=parent_email)
     except Exception as e:
         logger.error("Animation complete email failed for card %s: %s", card_id, e)
 
@@ -779,6 +964,8 @@ def send_animation_failed_email(
     card_player_name: str,
     collection_url: str,
     card_id: str,
+    *,
+    parent_email: str | None = None,
 ) -> None:
     try:
         player = html_module.escape(card_player_name)
@@ -794,6 +981,6 @@ def send_animation_failed_email(
         ]
         html = _email_shell("".join(parts))
         subject = "There was an issue animating your card"
-        _send_resend_html(owner_email, subject, html, 0, f"animation_failed_{card_id}")
+        _send_resend_html(owner_email, subject, html, 0, f"animation_failed_{card_id}", parent_email=parent_email)
     except Exception as e:
         logger.error("Animation failed email failed for card %s: %s", card_id, e)

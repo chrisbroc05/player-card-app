@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from datetime import timedelta
+from decimal import Decimal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
@@ -25,6 +27,8 @@ from email_service import (
     send_marketplace_sale_confirmed_seller_email,
 )
 from marketplace_repo import (
+    PRIORITY_LISTING_FEE,
+    apply_priority_listing,
     cancel_pending_marketplace_offers_for_card,
     clear_marketplace_listing,
     compute_royalty_amount,
@@ -35,10 +39,27 @@ from marketplace_repo import (
     get_listed_card_or_none,
     listing_active_filter,
     listing_dict,
+    log_priority_listing_pending_charge,
+    partition_and_sort_marketplace_rows,
 )
-from models import Card, MarketplaceOffer, User, utcnow
+from marketplace_trade_repo import (
+    OFFER_TYPE_CARD_TRADE,
+    OFFER_TYPE_CASH,
+    TRADE_SIDE_BUYER,
+    TRADE_SIDE_SELLER,
+    attach_trade_cards,
+    cancel_pending_offers_with_trade_release,
+    execute_card_trade_accept,
+    format_trade_cards_email_lines,
+    offer_trade_fields,
+    release_trade_cards_for_offer,
+    validate_trade_card_ids_for_user,
+)
+from models import Card, MarketplaceOffer, MarketplaceTradeCard, User, utcnow
+from parent_email_utils import parent_email_for_notify
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 _CARD_ID_PATH_PATTERN = re.compile(r"^FL-(\d{4})-(\d{6})$", re.IGNORECASE)
 
@@ -108,6 +129,7 @@ class ListCardBody(BaseModel):
 
     card_id: str = Field(..., min_length=12, max_length=40)
     asking_price: float = Field(..., gt=0)
+    is_priority: bool = Field(default=False)
 
 
 class UnlistCardBody(BaseModel):
@@ -120,14 +142,42 @@ class SubmitOfferBody(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     card_id: str = Field(..., min_length=12, max_length=40)
-    offer_amount: float = Field(..., ge=0.01)
+    offer_amount: float | None = Field(default=None, ge=0)
     message: str | None = Field(default=None, max_length=2000)
+    offer_type: str = Field(default="cash")
+    trade_card_ids: list[str] = Field(default_factory=list)
 
 
 class CounterOfferBody(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
-    counter_amount: float = Field(..., gt=0)
+    counter_amount: float | None = Field(default=None, gt=0)
+    trade_card_ids: list[str] = Field(default_factory=list)
+
+
+def _normalized_offer_type(raw: str) -> str:
+    t = (raw or OFFER_TYPE_CASH).strip().lower()
+    if t == OFFER_TYPE_CARD_TRADE:
+        return OFFER_TYPE_CARD_TRADE
+    return OFFER_TYPE_CASH
+
+
+def _is_card_trade_offer(offer: MarketplaceOffer) -> bool:
+    return (offer.offer_type or OFFER_TYPE_CASH).strip().lower() == OFFER_TYPE_CARD_TRADE
+
+
+def _email_trade_extras(db: Session, offer: MarketplaceOffer) -> dict:
+    fields = offer_trade_fields(db, offer)
+    is_trade = fields["offer_type"] == OFFER_TYPE_CARD_TRADE
+    return {
+        "is_card_trade": is_trade,
+        "trade_cards_summary": format_trade_cards_email_lines(fields["trade_cards_offered"])
+        if is_trade
+        else "",
+        "counter_trade_summary": format_trade_cards_email_lines(fields["trade_cards_counter"])
+        if is_trade
+        else "",
+    }
 
 
 @router.post("/list")
@@ -156,14 +206,29 @@ def marketplace_list(
     card.asking_price = price
     card.listed_at = now
     card.listing_expires_at = now + timedelta(days=30)
+
+    priority_fee_pending = None
+    if body.is_priority:
+        apply_priority_listing(card, now=now)
+        log_priority_listing_pending_charge(card_id=card.card_id, user_id=current_user.id)
+        priority_fee_pending = float(PRIORITY_LISTING_FEE)
+        logger.info(
+            "Priority boost enabled for card %s (payment stub — Stripe not connected)",
+            card.card_id,
+        )
+
     db.commit()
     db.refresh(card)
     le = card.listing_expires_at.isoformat() if card.listing_expires_at else ""
+    pe = card.priority_expires_at.isoformat() if card.priority_expires_at else ""
     return {
         "success": True,
         "card_id": card.card_id,
         "asking_price": float_from_decimal(price),
         "listing_expires_at": le,
+        "is_priority_listing": bool(card.is_priority_listing),
+        "priority_expires_at": pe,
+        "priority_fee_pending": priority_fee_pending,
     }
 
 
@@ -218,18 +283,14 @@ def marketplace_listings(
         q = q.filter(Card.grad_year == str(grad_year))
 
     sort_key = (sort_by or "listed_at").strip().lower()
-    order_desc = (sort_order or "desc").strip().lower() != "asc"
-    order_fn = desc if order_desc else asc
-
-    if sort_key == "asking_price":
-        q = q.order_by(order_fn(Card.asking_price))
-    elif sort_key == "player_name":
-        q = q.order_by(order_fn(Card.player_name))
-    else:
-        q = q.order_by(order_fn(Card.listed_at))
-
     rows = q.all()
-    return [listing_dict(card, od or "—") for card, od in rows]
+    ordered = partition_and_sort_marketplace_rows(
+        rows,
+        sort_by=sort_key,
+        sort_order=sort_order or "desc",
+        now=now,
+    )
+    return [listing_dict(card, od or "—") for card, od in ordered]
 
 
 @router.get("/listings/{card_id}")
@@ -272,14 +333,34 @@ def marketplace_submit_offer(
     if existing is not None:
         raise HTTPException(status_code=400, detail="You already have a pending offer on this card")
 
-    amount = decimal_from_float(body.offer_amount)
-    royalty = compute_royalty_amount(amount)
+    offer_type = _normalized_offer_type(body.offer_type)
     now = utcnow()
+
+    if offer_type == OFFER_TYPE_CARD_TRADE:
+        try:
+            trade_cards = validate_trade_card_ids_for_user(
+                db,
+                user_id=current_user.id,
+                trade_card_ids=body.trade_card_ids,
+                exclude_listing_card_id=card.card_id,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        amount = Decimal("0.00")
+        royalty = Decimal("0.00")
+    else:
+        if body.offer_amount is None or body.offer_amount < 0.01:
+            raise HTTPException(status_code=400, detail="Offer amount must be at least $0.01")
+        amount = decimal_from_float(body.offer_amount)
+        royalty = compute_royalty_amount(amount)
+        trade_cards = []
+
     offer = MarketplaceOffer(
         card_id=card.card_id,
         buyer_id=current_user.id,
         seller_id=card.owner_id,
         offer_amount=amount,
+        offer_type=offer_type,
         royalty_amount=royalty,
         status="pending",
         message=(body.message or "").strip() or None,
@@ -288,11 +369,23 @@ def marketplace_submit_offer(
         updated_at=now,
     )
     db.add(offer)
+    db.flush()
+
+    if offer_type == OFFER_TYPE_CARD_TRADE:
+        attach_trade_cards(
+            db,
+            offer_id=offer.id,
+            side=TRADE_SIDE_BUYER,
+            cards=trade_cards,
+            lock_pending_trade=True,
+        )
+
     db.commit()
     db.refresh(offer)
 
     owner = db.query(User).filter(User.id == card.owner_id).first()
     if owner:
+        extras = _email_trade_extras(db, offer)
         background_tasks.add_task(
             send_marketplace_offer_received_email,
             owner.email,
@@ -305,11 +398,14 @@ def marketplace_submit_offer(
             float_from_decimal(amount),
             f"{frontend_url()}/marketplace/my-listings",
             offer.id,
+            **extras,
+            parent_email=parent_email_for_notify(owner),
         )
 
     return {
         "success": True,
         "offer_id": offer.id,
+        "offer_type": offer_type,
         "royalty_amount": float_from_decimal(royalty),
         "expires_at": offer.expires_at.isoformat() if offer.expires_at else "",
     }
@@ -346,23 +442,23 @@ def marketplace_accept_offer(
     now = utcnow()
     offer.status = "accepted"
     offer.updated_at = now
+    extras = _email_trade_extras(db, offer)
 
-    others = (
-        db.query(MarketplaceOffer)
-        .filter(
-            MarketplaceOffer.card_id == card.card_id,
-            MarketplaceOffer.status == "pending",
-            MarketplaceOffer.id != offer.id,
+    if _is_card_trade_offer(offer):
+        try:
+            execute_card_trade_accept(db, offer, card, include_seller_counter=False)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+    else:
+        cancel_pending_offers_with_trade_release(
+            db,
+            listing_card_id=card.card_id,
+            except_offer_id=offer.id,
+            now=now,
         )
-        .all()
-    )
-    for other in others:
-        other.status = "cancelled"
-        other.updated_at = now
-
-    card.owner_id = buyer.id
-    card.owner_name = buyer.display_name
-    clear_marketplace_listing(card)
+        card.owner_id = buyer.id
+        card.owner_name = buyer.display_name
+        clear_marketplace_listing(card)
 
     db.commit()
     db.refresh(offer)
@@ -380,6 +476,8 @@ def marketplace_accept_offer(
         amount_f,
         collection_url,
         offer.id,
+        **extras,
+        parent_email=parent_email_for_notify(buyer),
     )
     background_tasks.add_task(
         send_marketplace_sale_confirmed_seller_email,
@@ -393,6 +491,8 @@ def marketplace_accept_offer(
         amount_f,
         collection_url,
         offer.id,
+        **extras,
+        parent_email=parent_email_for_notify(current_user),
     )
 
     return {"success": True, "offer_id": offer.id, "card_id": card.card_id}
@@ -411,6 +511,9 @@ def marketplace_decline_offer(
     if card is None or card.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Only the card owner can decline this offer")
 
+    if _is_card_trade_offer(offer):
+        release_trade_cards_for_offer(db, offer.id, sides=[TRADE_SIDE_BUYER])
+
     offer.status = "declined"
     offer.updated_at = utcnow()
     db.commit()
@@ -418,6 +521,7 @@ def marketplace_decline_offer(
 
     buyer = db.query(User).filter(User.id == offer.buyer_id).first()
     if buyer and card:
+        extras = _email_trade_extras(db, offer)
         background_tasks.add_task(
             send_marketplace_offer_declined_email,
             buyer.email,
@@ -429,6 +533,8 @@ def marketplace_decline_offer(
             float_from_decimal(offer.offer_amount),
             f"{frontend_url()}/marketplace",
             offer.id,
+            **extras,
+            parent_email=parent_email_for_notify(buyer),
         )
 
     return {"success": True, "offer_id": offer.id}
@@ -451,6 +557,8 @@ def marketplace_cancel_offer(
         )
 
     card = get_card_by_card_id(db, offer.card_id)
+    if _is_card_trade_offer(offer):
+        release_trade_cards_for_offer(db, offer.id, sides=[TRADE_SIDE_BUYER])
     offer.status = "cancelled"
     offer.updated_at = utcnow()
     db.commit()
@@ -463,6 +571,7 @@ def marketplace_cancel_offer(
             current_user.display_name,
             card.player_name,
             offer.id,
+            parent_email=parent_email_for_notify(current_user),
         )
 
     return {"success": True, "offer_id": offer.id}
@@ -483,36 +592,77 @@ def marketplace_offer_counter(
     if offer.counter_status is not None:
         raise HTTPException(status_code=400, detail="A counter-offer was already submitted for this offer")
 
-    if body.counter_amount < 1.0:
-        raise HTTPException(status_code=400, detail="Counter amount must be at least $1.00")
-
-    ctr = decimal_from_float(body.counter_amount)
-    if ctr == offer.offer_amount:
-        raise HTTPException(status_code=400, detail="Counter amount must differ from the buyer's offer")
-
     now = utcnow()
-    offer.counter_amount = ctr
+
+    if _is_card_trade_offer(offer):
+        if body.counter_amount is not None and body.counter_amount > 0:
+            raise HTTPException(status_code=400, detail="Use card trade counter for this offer")
+        try:
+            counter_cards = validate_trade_card_ids_for_user(
+                db,
+                user_id=current_user.id,
+                trade_card_ids=body.trade_card_ids,
+                exclude_listing_card_id=card.card_id,
+                exclude_offer_id=offer.id,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        db.query(MarketplaceTradeCard).filter(
+            MarketplaceTradeCard.offer_id == offer.id,
+            MarketplaceTradeCard.side == TRADE_SIDE_SELLER,
+        ).delete(synchronize_session=False)
+        attach_trade_cards(
+            db,
+            offer_id=offer.id,
+            side=TRADE_SIDE_SELLER,
+            cards=counter_cards,
+            lock_pending_trade=True,
+        )
+        offer.counter_amount = Decimal("0.00")
+        offer.royalty_amount = Decimal("0.00")
+        ctr_f = 0.0
+        orig_f = 0.0
+    else:
+        if body.trade_card_ids:
+            raise HTTPException(status_code=400, detail="Use cash counter for this offer")
+        if body.counter_amount is None or body.counter_amount < 1.0:
+            raise HTTPException(status_code=400, detail="Counter amount must be at least $1.00")
+        ctr = decimal_from_float(body.counter_amount)
+        if ctr == offer.offer_amount:
+            raise HTTPException(status_code=400, detail="Counter amount must differ from the buyer's offer")
+        offer.counter_amount = ctr
+        offer.royalty_amount = compute_royalty_amount(ctr)
+        ctr_f = float_from_decimal(ctr)
+        orig_f = float_from_decimal(offer.offer_amount)
+
     offer.counter_at = now
     offer.counter_status = "pending"
-    offer.royalty_amount = compute_royalty_amount(ctr)
     offer.updated_at = now
     db.commit()
     db.refresh(offer)
 
     buyer = db.query(User).filter(User.id == offer.buyer_id).first()
     if buyer:
+        extras = _email_trade_extras(db, offer)
         background_tasks.add_task(
             send_marketplace_counter_sent_buyer_email,
             buyer.email,
             buyer.display_name,
             card.player_name,
-            float_from_decimal(offer.offer_amount),
-            float_from_decimal(ctr),
+            orig_f,
+            ctr_f,
             f"{frontend_url()}/marketplace/my-offers",
             offer.id,
+            **extras,
+            parent_email=parent_email_for_notify(buyer),
         )
 
-    return {"success": True, "offer_id": offer.id, "counter_amount": float_from_decimal(ctr)}
+    return {
+        "success": True,
+        "offer_id": offer.id,
+        "counter_amount": ctr_f,
+        "offer_type": offer.offer_type,
+    }
 
 
 @router.post("/offer/{offer_id}/counter/accept")
@@ -540,30 +690,31 @@ def marketplace_offer_counter_accept(
     now = utcnow()
     offer.counter_status = "accepted"
     offer.status = "accepted"
-    offer.offer_amount = offer.counter_amount
+    if not _is_card_trade_offer(offer):
+        offer.offer_amount = offer.counter_amount
     offer.updated_at = now
+    extras = _email_trade_extras(db, offer)
 
-    others = (
-        db.query(MarketplaceOffer)
-        .filter(
-            MarketplaceOffer.card_id == card.card_id,
-            MarketplaceOffer.status == "pending",
-            MarketplaceOffer.id != offer.id,
+    if _is_card_trade_offer(offer):
+        try:
+            execute_card_trade_accept(db, offer, card, include_seller_counter=True)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+    else:
+        cancel_pending_offers_with_trade_release(
+            db,
+            listing_card_id=card.card_id,
+            except_offer_id=offer.id,
+            now=now,
         )
-        .all()
-    )
-    for other in others:
-        other.status = "cancelled"
-        other.updated_at = now
-
-    card.owner_id = buyer.id
-    card.owner_name = buyer.display_name
-    clear_marketplace_listing(card)
+        card.owner_id = buyer.id
+        card.owner_name = buyer.display_name
+        clear_marketplace_listing(card)
 
     db.commit()
     db.refresh(offer)
 
-    amount_f = float_from_decimal(offer.offer_amount)
+    amount_f = float_from_decimal(offer.counter_amount or offer.offer_amount)
     collection_url = f"{frontend_url()}/my-collection"
     background_tasks.add_task(
         send_marketplace_offer_accepted_buyer_email,
@@ -576,6 +727,8 @@ def marketplace_offer_counter_accept(
         amount_f,
         collection_url,
         offer.id,
+        **extras,
+        parent_email=parent_email_for_notify(buyer),
     )
     background_tasks.add_task(
         send_marketplace_counter_accepted_seller_email,
@@ -585,6 +738,8 @@ def marketplace_offer_counter_accept(
         amount_f,
         collection_url,
         offer.id,
+        **extras,
+        parent_email=parent_email_for_notify(seller),
     )
 
     return {"success": True, "offer_id": offer.id, "card_id": card.card_id}
@@ -607,14 +762,20 @@ def marketplace_offer_counter_decline(
     seller = db.query(User).filter(User.id == offer.seller_id).first()
 
     now = utcnow()
+    if _is_card_trade_offer(offer):
+        release_trade_cards_for_offer(db, offer.id)
+    else:
+        release_trade_cards_for_offer(db, offer.id, sides=[TRADE_SIDE_SELLER])
+        offer.royalty_amount = compute_royalty_amount(offer.offer_amount)
+
     offer.counter_status = "declined"
     offer.status = "declined"
-    offer.royalty_amount = compute_royalty_amount(offer.offer_amount)
     offer.updated_at = now
     db.commit()
     db.refresh(offer)
 
     if seller and card:
+        extras = _email_trade_extras(db, offer)
         background_tasks.add_task(
             send_marketplace_counter_declined_seller_email,
             seller.email,
@@ -623,6 +784,8 @@ def marketplace_offer_counter_decline(
             float_from_decimal(offer.counter_amount) if offer.counter_amount else 0.0,
             f"{frontend_url()}/marketplace/my-listings",
             offer.id,
+            **extras,
+            parent_email=parent_email_for_notify(seller),
         )
 
     return {"success": True, "offer_id": offer.id}
@@ -679,6 +842,7 @@ def marketplace_my_offers(
             "owner_display_name": owner_dn,
         }
         row.update(_offer_extra_fields(offer))
+        row.update(offer_trade_fields(db, offer))
         out.append(row)
     return out
 
@@ -712,6 +876,7 @@ def marketplace_incoming_offers(
             "buyer_email": buyer.email,
         }
         row.update(_offer_extra_fields(offer))
+        row.update(offer_trade_fields(db, offer))
         out.append(row)
     return out
 
