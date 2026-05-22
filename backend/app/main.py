@@ -66,6 +66,7 @@ from marketplace_scheduler import (
     start_marketplace_scheduler,
 )  # noqa: E402
 from parent_email_utils import normalize_optional_parent_email  # noqa: E402
+from schema_migrations import run_schema_migrations_after_models  # noqa: E402
 from trade_routes import router as trade_router  # noqa: E402
 from routers.admin import router as admin_router  # noqa: E402
 from routers.auth import router as auth_user_router  # noqa: E402
