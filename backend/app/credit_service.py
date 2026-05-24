@@ -7,6 +7,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from database import SessionLocal
 from models import CreditLedger, User, utcnow
 
 TX_TOP_UP = "top_up"
@@ -97,36 +98,41 @@ def get_balance(db: Session, user_id: int) -> Decimal:
 
 
 def add_credits(
-    db: Session,
     user_id: int,
     amount: Decimal | float,
     transaction_type: str,
     reference_id: str | None = None,
     note: str | None = None,
     *,
-    commit: bool = True,
+    db: Session | None = None,
 ) -> CreditLedger:
     """Add credits to a user balance and record a ledger entry."""
     amt = _decimal_amount(amount)
     if amt <= Decimal("0.00"):
         raise InvalidCreditAmountError("Amount must be greater than zero")
 
-    user = _lock_user(db, user_id)
-    new_balance = _user_balance(user) + amt
-    user.credit_balance = new_balance
-    row = _append_ledger_row(
-        db,
-        user_id=user_id,
-        amount=amt,
-        balance_after=new_balance,
-        transaction_type=transaction_type,
-        reference_id=reference_id,
-        note=note,
-    )
-    if commit:
-        db.commit()
-        db.refresh(row)
-    return row
+    own_session = db is None
+    session = db if db is not None else SessionLocal()
+    try:
+        user = _lock_user(session, user_id)
+        new_balance = _user_balance(user) + amt
+        user.credit_balance = new_balance
+        row = _append_ledger_row(
+            session,
+            user_id=user_id,
+            amount=amt,
+            balance_after=new_balance,
+            transaction_type=transaction_type,
+            reference_id=reference_id,
+            note=note,
+        )
+        if own_session:
+            session.commit()
+            session.refresh(row)
+        return row
+    finally:
+        if own_session:
+            session.close()
 
 
 def deduct_credits(
@@ -281,7 +287,14 @@ def apply_stripe_checkout_credits(
     amount_dollars: Decimal | float,
 ) -> None:
     """Credit recipient after Stripe Checkout; idempotent per session id."""
+    print(
+        f"[credit_service] apply_stripe_checkout_credits session={session_id} "
+        f"purchaser={purchaser_user_id} recipient={recipient_user_id} amount={amount_dollars}",
+        flush=True,
+    )
+
     if _stripe_session_already_processed(db, session_id):
+        print(f"[credit_service] session already processed: {session_id}", flush=True)
         return
 
     amt = _decimal_amount(amount_dollars)
@@ -293,15 +306,20 @@ def apply_stripe_checkout_credits(
     if recipient is None:
         raise UserNotFoundError(f"Recipient user not found: {recipient_user_id}")
 
+    print(
+        f"[credit_service] add_credits user_id={recipient_user_id} amount={amt} "
+        f"type={'gift' if is_gift else 'top_up'}",
+        flush=True,
+    )
     add_credits(
-        db,
         recipient_user_id,
         amt,
         TX_GIFT if is_gift else TX_TOP_UP,
         reference_id=session_id,
         note="Credits loaded via Stripe",
-        commit=False,
+        db=db,
     )
+    print(f"[credit_service] add_credits completed for user_id={recipient_user_id}", flush=True)
 
     if is_gift:
         record_ledger_only(
@@ -312,8 +330,7 @@ def apply_stripe_checkout_credits(
             reference_id=session_id,
             note=f"Gift credits sent to {recipient.display_name}",
         )
-
-    db.commit()
+        print(f"[credit_service] gift ledger row recorded for purchaser={purchaser_user_id}", flush=True)
 
 
 def get_ledger(
