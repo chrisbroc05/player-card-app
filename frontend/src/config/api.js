@@ -16,6 +16,8 @@ export const API_BASE_URL =
   normalizeApiBase(import.meta.env.VITE_API_BASE_URL) ||
   (isLocalhostHost() ? LOCAL_API_BASE_URL : PROD_API_BASE_URL);
 
+export const STRIPE_PUBLISHABLE_KEY = (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "").trim();
+
 export const AUTH_TOKEN_STORAGE_KEY = "fl_access_token";
 export const ADMIN_TOKEN_STORAGE_KEY = "adminToken";
 

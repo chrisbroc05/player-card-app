@@ -62,6 +62,7 @@ class UserProfileResponse(BaseModel):
     display_name: str
     email: str
     parent_email: str | None = Field(default=None)
+    credit_balance: float = 0.0
     member_since: str
     total_cards_owned: int
     total_cards_ever_created: int
@@ -225,6 +226,7 @@ def get_profile(
         display_name=user.display_name,
         email=user.email,
         parent_email=user.parent_email,
+        credit_balance=float_from_decimal(user.credit_balance),
         member_since=_member_since_label(created),
         total_cards_owned=total_cards_owned,
         total_cards_ever_created=total_cards_ever_created,

@@ -320,3 +320,54 @@ def run_schema_migrations_after_models(engine: Engine) -> None:
                     )
                 else:
                     conn.execute(text("ALTER TABLE users ADD COLUMN parent_email VARCHAR(320)"))
+            if "credit_balance" not in ucols:
+                if dialect == "postgresql":
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS credit_balance "
+                            "NUMERIC(10,2) NOT NULL DEFAULT 0.00"
+                        )
+                    )
+                else:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ADD COLUMN credit_balance NUMERIC(10,2) NOT NULL DEFAULT 0.00"
+                        )
+                    )
+
+        tables = set(insp.get_table_names())
+        if "credit_ledger" not in tables:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE IF NOT EXISTS credit_ledger (
+                            id SERIAL PRIMARY KEY,
+                            user_id INTEGER NOT NULL REFERENCES users(id),
+                            amount NUMERIC(10,2) NOT NULL,
+                            balance_after NUMERIC(10,2) NOT NULL,
+                            transaction_type VARCHAR(32) NOT NULL,
+                            reference_id VARCHAR(128),
+                            note TEXT,
+                            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                        )
+                        """
+                    )
+                )
+            else:
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE credit_ledger (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            user_id INTEGER NOT NULL REFERENCES users(id),
+                            amount NUMERIC(10,2) NOT NULL,
+                            balance_after NUMERIC(10,2) NOT NULL,
+                            transaction_type VARCHAR(32) NOT NULL,
+                            reference_id VARCHAR(128),
+                            note TEXT,
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """
+                    )
+                )

@@ -1,6 +1,7 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { formatMoney } from "../utils/marketplace";
 
 export default function AppHeader() {
   const location = useLocation();
@@ -12,6 +13,7 @@ export default function AppHeader() {
   const onMyCollection = location.pathname.startsWith("/my-collection");
   const onTrades = location.pathname.startsWith("/trades");
   const onProfile = location.pathname.startsWith("/profile");
+  const onCredits = location.pathname.startsWith("/credits");
 
   return (
     <header className="border-b border-white/10 bg-cardBg/50 backdrop-blur">
@@ -78,6 +80,24 @@ export default function AppHeader() {
                     {pendingIncomingTradesCount > 9 ? "9+" : pendingIncomingTradesCount}
                   </span>
                 ) : null}
+              </Link>
+              <Link
+                to="/credits"
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition sm:text-sm ${
+                  onCredits
+                    ? "border-teal-500/40 bg-teal-500/15 text-neonTeal"
+                    : "border-white/15 text-slate-300 hover:border-teal-500/30 hover:text-white"
+                }`}
+                title="Your credit balance"
+              >
+                <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 12m15 0v3a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15v-3"
+                  />
+                </svg>
+                <span className="tabular-nums">{formatMoney(user.credit_balance ?? 0)}</span>
               </Link>
               <Link
                 to="/profile"

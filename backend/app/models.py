@@ -23,6 +23,7 @@ class User(Base):
     display_name: Mapped[str] = mapped_column(String(200), nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     parent_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    credit_balance: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("0.00"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     cards: Mapped[list["Card"]] = relationship(
@@ -30,6 +31,31 @@ class User(Base):
         back_populates="owner",
         foreign_keys="Card.owner_id",
     )
+    credit_ledger_entries: Mapped[list["CreditLedger"]] = relationship(
+        "CreditLedger",
+        back_populates="user",
+        foreign_keys="CreditLedger.user_id",
+    )
+
+
+class CreditLedger(Base):
+    __tablename__ = "credit_ledger"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=False,
+        index=True,
+    )
+    amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    balance_after: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    transaction_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    reference_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    user: Mapped["User"] = relationship("User", back_populates="credit_ledger_entries", foreign_keys=[user_id])
 
 
 class Card(Base):

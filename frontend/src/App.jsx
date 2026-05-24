@@ -13,6 +13,7 @@ import MarketplacePage from "./pages/MarketplacePage";
 import MarketplaceCardDetailPage from "./pages/MarketplaceCardDetailPage";
 import MarketplaceMyListingsPage from "./pages/MarketplaceMyListingsPage";
 import MarketplaceMyOffersPage from "./pages/MarketplaceMyOffersPage";
+import CreditsPage from "./pages/CreditsPage";
 
 export default function App() {
   return (
@@ -38,6 +39,7 @@ export default function App() {
       <Route path="/marketplace" element={<MarketplacePage />} />
       <Route path="/trades" element={<TradesPage />} />
       <Route path="/profile" element={<ProfilePage />} />
+      <Route path="/credits" element={<CreditsPage />} />
     </Routes>
   );
 }

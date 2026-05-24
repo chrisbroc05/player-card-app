@@ -17,6 +17,10 @@ Optional:
   RENDER_DEPLOY_TIMEOUT_SECONDS (defaults to 1200)
   RENDER_POLL_INTERVAL_SECONDS (defaults to 10)
 
+Backend on Render should also set:
+  PAYMENTS_ENABLED=false
+    Gate credit/payment API routes until Stripe is wired (503 when false).
+
 Backend on Render: card PNGs and uploads live under APP_DATA_DIR (e.g. /var/render/data
 with subdirs cards/ and uploads/). Without a persistent disk, redeploys clear files while
 Postgres still has URLs — add a Render Disk and set APP_DATA_DIR to the mount path.

@@ -62,12 +62,30 @@ export function AuthProvider({ children }) {
     }
   }, [token]);
 
+  const refreshUser = useCallback(async (authToken) => {
+    const t = (authToken ?? token ?? localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) ?? "").trim();
+    if (!t) {
+      setUser(null);
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/me`, {
+        headers: { ...authHeaders(t) },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setUser(data);
+    } catch {
+      /* keep existing user on transient failure */
+    }
+  }, [token]);
+
   const refreshNavBadges = useCallback(
     async (authToken) => {
       const t = authToken ?? token;
-      await Promise.all([refreshIncomingTradeCount(t), refreshIncomingMarketplaceCount(t)]);
+      await Promise.all([refreshIncomingTradeCount(t), refreshIncomingMarketplaceCount(t), refreshUser(t)]);
     },
-    [token, refreshIncomingTradeCount, refreshIncomingMarketplaceCount]
+    [token, refreshIncomingTradeCount, refreshIncomingMarketplaceCount, refreshUser]
   );
 
   const logout = useCallback(() => {
@@ -189,6 +207,7 @@ export function AuthProvider({ children }) {
       refreshIncomingTradeCount,
       refreshIncomingMarketplaceCount,
       refreshNavBadges,
+      refreshUser,
       login,
       logout,
       register,
@@ -202,6 +221,7 @@ export function AuthProvider({ children }) {
       refreshIncomingTradeCount,
       refreshIncomingMarketplaceCount,
       refreshNavBadges,
+      refreshUser,
       login,
       logout,
       register,
