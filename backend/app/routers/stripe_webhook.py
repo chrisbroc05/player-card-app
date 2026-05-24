@@ -8,6 +8,7 @@ import traceback
 
 import stripe
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from credit_service import InvalidCreditAmountError, UserNotFoundError, apply_stripe_checkout_credits
@@ -18,116 +19,74 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def _log(step: str, **details) -> None:
-    msg = f"[stripe webhook] {step}"
-    if details:
-        msg = f"{msg} | {details}"
-    logger.info(msg)
-    print(msg, flush=True)
-
-
-def _session_metadata(session: object) -> dict:
-    if isinstance(session, dict):
-        raw = session.get("metadata") or {}
-    elif hasattr(session, "get"):
-        raw = session.get("metadata") or {}
-    else:
-        raw = getattr(session, "metadata", None) or {}
-    if raw is None:
-        return {}
-    if isinstance(raw, dict):
-        return raw
-    return dict(raw)
-
-
-def _session_id(session: object) -> str:
-    if isinstance(session, dict):
-        return str(session.get("id") or "")
-    if hasattr(session, "get"):
-        return str(session.get("id") or "")
-    return str(getattr(session, "id", "") or "")
+@router.get("/test")
+def webhook_router_test():
+    """Temporary reachability check — confirms router is mounted at /webhooks/test."""
+    return {"status": "webhook router is reachable"}
 
 
 @router.post("/stripe")
 async def stripe_webhook(request: Request):
-    _log("endpoint hit")
-
-    payload = await request.body()
-    sig_header = request.headers.get("stripe-signature")
-    secret = (os.environ.get("STRIPE_WEBHOOK_SECRET") or "").strip()
-    if not secret:
-        logger.error("STRIPE_WEBHOOK_SECRET is not configured")
-        raise HTTPException(status_code=400, detail="Webhook not configured")
+    print("WEBHOOK HIT - stripe webhook endpoint reached", flush=True)
 
     try:
-        event = stripe.Webhook.construct_event(payload, sig_header, secret)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid payload") from None
-    except stripe.error.SignatureVerificationError:
-        raise HTTPException(status_code=400, detail="Invalid signature") from None
+        payload = await request.body()
+        sig_header = request.headers.get("stripe-signature")
+        secret = (os.environ.get("STRIPE_WEBHOOK_SECRET") or "").strip()
+        if not secret:
+            logger.error("STRIPE_WEBHOOK_SECRET is not configured")
+            raise HTTPException(status_code=400, detail="Webhook not configured")
 
-    event_type = event.get("type") if hasattr(event, "get") else getattr(event, "type", None)
-    _log("event received", event_type=event_type)
-
-    if event_type == "checkout.session.completed":
-        session = event["data"]["object"]
+        print("WEBHOOK - verifying signature", flush=True)
         try:
+            event = stripe.Webhook.construct_event(payload, sig_header, secret)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid payload") from None
+        except stripe.error.SignatureVerificationError:
+            raise HTTPException(status_code=400, detail="Invalid signature") from None
+        print("WEBHOOK - signature verified", flush=True)
+
+        print("WEBHOOK - event type:", event["type"], flush=True)
+
+        if event["type"] == "checkout.session.completed":
+            session = event["data"]["object"]
+            print("WEBHOOK - metadata:", session.get("metadata"), flush=True)
+
+            session_id = session.get("id") or ""
+            metadata = session.get("metadata") or {}
+
+            user_id = int(metadata.get("user_id"))
+            amount_dollars = float(metadata.get("amount_dollars"))
+            recipient_user_id = metadata.get("recipient_user_id")
+            if recipient_user_id:
+                recipient_user_id = int(recipient_user_id)
+            else:
+                recipient_user_id = None
+
+            recipient_id = recipient_user_id if recipient_user_id is not None else user_id
+
+            print("WEBHOOK - calling add_credits", flush=True)
             with Session(engine) as db:
-                _handle_checkout_completed(db, session)
+                apply_stripe_checkout_credits(
+                    db,
+                    session_id=session_id,
+                    purchaser_user_id=user_id,
+                    recipient_user_id=recipient_id,
+                    amount_dollars=amount_dollars,
+                )
+                print("WEBHOOK - add_credits complete", flush=True)
+                print("WEBHOOK - committing db", flush=True)
                 db.commit()
-                _log("database commit completed")
-        except Exception:
-            tb = traceback.format_exc()
-            logger.exception("Stripe checkout.session.completed handler failed")
-            print(f"[stripe webhook] EXCEPTION:\n{tb}", flush=True)
+            print("WEBHOOK - done", flush=True)
 
-    return {"received": True}
-
-
-def _handle_checkout_completed(db: Session, session: object) -> None:
-    session_id = _session_id(session)
-    metadata = _session_metadata(session)
-    _log("session metadata extracted", session_id=session_id, metadata=metadata)
-
-    if not session_id:
-        _log("aborting: missing session id")
-        return
-
-    try:
-        user_id = int(metadata.get("user_id"))
-        amount_dollars = float(metadata.get("amount_dollars"))
-    except (TypeError, ValueError) as e:
-        _log("aborting: invalid user_id or amount_dollars", error=str(e), metadata=metadata)
-        return
-
-    recipient_user_id = metadata.get("recipient_user_id")
-    if recipient_user_id:
-        try:
-            recipient_user_id = int(recipient_user_id)
-        except (TypeError, ValueError):
-            _log("invalid recipient_user_id, treating as self top-up", raw=metadata.get("recipient_user_id"))
-            recipient_user_id = None
-    else:
-        recipient_user_id = None
-
-    recipient_id = recipient_user_id if recipient_user_id is not None else user_id
-    _log(
-        "calling apply_stripe_checkout_credits",
-        user_id=user_id,
-        recipient_id=recipient_id,
-        amount_dollars=amount_dollars,
-        session_id=session_id,
-    )
-
-    try:
-        apply_stripe_checkout_credits(
-            db,
-            session_id=session_id,
-            purchaser_user_id=user_id,
-            recipient_user_id=recipient_id,
-            amount_dollars=amount_dollars,
-        )
-        _log("apply_stripe_checkout_credits finished", session_id=session_id)
-    except (InvalidCreditAmountError, UserNotFoundError) as e:
-        _log("apply_stripe_checkout_credits failed", session_id=session_id, error=str(e))
+        return {"received": True}
+    except HTTPException:
         raise
+    except (InvalidCreditAmountError, UserNotFoundError) as e:
+        print("WEBHOOK ERROR:", str(e), flush=True)
+        traceback.print_exc()
+        return JSONResponse(status_code=200, content={"status": "error logged"})
+    except Exception as e:
+        print("WEBHOOK ERROR:", str(e), flush=True)
+        traceback.print_exc()
+        return JSONResponse(status_code=200, content={"status": "error logged"})
