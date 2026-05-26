@@ -24,6 +24,10 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     parent_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
     credit_balance: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("0.00"), nullable=False)
+    stripe_account_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    stripe_account_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    stripe_onboarding_complete: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    stripe_payouts_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     cards: Mapped[list["Card"]] = relationship(

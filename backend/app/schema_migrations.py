@@ -334,6 +334,45 @@ def run_schema_migrations_after_models(engine: Engine) -> None:
                             "ALTER TABLE users ADD COLUMN credit_balance NUMERIC(10,2) NOT NULL DEFAULT 0.00"
                         )
                     )
+            if "stripe_account_id" not in ucols:
+                if dialect == "postgresql":
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_account_id VARCHAR(255)"
+                        )
+                    )
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_account_status VARCHAR(32)"
+                        )
+                    )
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS "
+                            "stripe_onboarding_complete BOOLEAN NOT NULL DEFAULT false"
+                        )
+                    )
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS "
+                            "stripe_payouts_enabled BOOLEAN NOT NULL DEFAULT false"
+                        )
+                    )
+                else:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN stripe_account_id VARCHAR(255)"))
+                    conn.execute(text("ALTER TABLE users ADD COLUMN stripe_account_status VARCHAR(32)"))
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ADD COLUMN stripe_onboarding_complete "
+                            "BOOLEAN NOT NULL DEFAULT 0"
+                        )
+                    )
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ADD COLUMN stripe_payouts_enabled "
+                            "BOOLEAN NOT NULL DEFAULT 0"
+                        )
+                    )
 
         tables = set(insp.get_table_names())
         if "credit_ledger" not in tables:

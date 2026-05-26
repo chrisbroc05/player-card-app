@@ -72,6 +72,7 @@ from trade_routes import router as trade_router  # noqa: E402
 from routers.admin import router as admin_router  # noqa: E402
 from routers.auth import router as auth_user_router  # noqa: E402
 from routers.cards import router as cards_animation_router  # noqa: E402
+from routers.connect import router as connect_router  # noqa: E402
 from routers.credits import router as credits_router  # noqa: E402
 from routers.marketplace import router as marketplace_router  # noqa: E402
 from routers.stripe_webhook import router as stripe_webhook_router  # noqa: E402
@@ -138,6 +139,7 @@ app.include_router(trade_router, prefix="/trades", tags=["trades"])
 app.include_router(admin_router, prefix="/admin", tags=["admin"])
 app.include_router(auth_user_router, prefix="/auth", tags=["auth"])
 app.include_router(credits_router, prefix="/credits", tags=["credits"])
+app.include_router(connect_router, prefix="/connect", tags=["connect"])
 app.include_router(users_router, prefix="/users", tags=["users"])
 app.include_router(stripe_webhook_router, prefix="/webhooks", tags=["webhooks"])
 app.include_router(marketplace_router, prefix="/marketplace", tags=["marketplace"])

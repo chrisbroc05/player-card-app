@@ -63,6 +63,9 @@ class UserProfileResponse(BaseModel):
     email: str
     parent_email: str | None = Field(default=None)
     credit_balance: float = 0.0
+    stripe_account_status: str | None = Field(default=None)
+    stripe_onboarding_complete: bool = False
+    stripe_payouts_enabled: bool = False
     member_since: str
     total_cards_owned: int
     total_cards_ever_created: int
@@ -227,6 +230,9 @@ def get_profile(
         email=user.email,
         parent_email=user.parent_email,
         credit_balance=float_from_decimal(user.credit_balance),
+        stripe_account_status=user.stripe_account_status,
+        stripe_onboarding_complete=bool(user.stripe_onboarding_complete),
+        stripe_payouts_enabled=bool(user.stripe_payouts_enabled),
         member_since=_member_since_label(created),
         total_cards_owned=total_cards_owned,
         total_cards_ever_created=total_cards_ever_created,

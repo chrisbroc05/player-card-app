@@ -78,6 +78,30 @@ async def stripe_webhook(request: Request):
 
                     print(f"WEBHOOK SUCCESS - new balance: {new_balance}", flush=True)
 
+        elif event.type == "account.updated":
+            account_id = event.account
+            account_obj = event["data"]["object"]._to_dict_recursive()
+            payouts_enabled = bool(account_obj.get("payouts_enabled"))
+
+            print(
+                f"CONNECT - account {account_id} updated, payouts enabled: {payouts_enabled}",
+                flush=True,
+            )
+
+            with Session(engine) as db:
+                user = db.query(User).filter(User.stripe_account_id == account_id).first()
+                if user:
+                    user.stripe_account_status = "active"
+                    user.stripe_onboarding_complete = True
+                    user.stripe_payouts_enabled = payouts_enabled
+                    db.commit()
+                    print(
+                        f"CONNECT - user {user.id} updated, payouts enabled: {payouts_enabled}",
+                        flush=True,
+                    )
+                else:
+                    print(f"CONNECT - no user found for account {account_id}", flush=True)
+
         return {"received": True}
 
     except Exception as e:

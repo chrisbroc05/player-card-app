@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import CardImage from "../components/CardImage";
@@ -89,10 +89,12 @@ const iconTrophy = (
 
 export default function ProfilePage() {
   const { token, user, initializing } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [profile, setProfile] = useState(null);
   const [animatedCardsOwned, setAnimatedCardsOwned] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [connectBanner, setConnectBanner] = useState("");
 
   const loadProfile = useCallback(async () => {
     if (!token) return;
@@ -128,6 +130,18 @@ export default function ProfilePage() {
     if (!token || initializing) return;
     loadProfile();
   }, [token, initializing, loadProfile]);
+
+  useEffect(() => {
+    const connect = searchParams.get("connect");
+    if (connect === "complete") {
+      setConnectBanner("success");
+      loadProfile();
+      setSearchParams({}, { replace: true });
+    } else if (connect === "refresh") {
+      setConnectBanner("refresh");
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams, loadProfile]);
 
   if (!initializing && !user) {
     return <Navigate to="/login" replace />;
@@ -166,6 +180,17 @@ export default function ProfilePage() {
           </div>
         ) : null}
 
+        {connectBanner === "success" ? (
+          <div className="mb-6 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+            Bank account connected successfully! You can now receive payouts.
+          </div>
+        ) : null}
+        {connectBanner === "refresh" ? (
+          <div className="mb-6 rounded-xl border border-sky-500/40 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">
+            Please complete your account verification to enable payouts.
+          </div>
+        ) : null}
+
         <div className="flex flex-col gap-6 rounded-2xl border border-white/10 bg-cardBg p-6 shadow-xl shadow-black/30 sm:flex-row sm:items-center sm:gap-8 sm:p-8">
           <div
             className="mx-auto flex h-24 w-24 shrink-0 items-center justify-center rounded-full text-3xl font-bold text-white shadow-lg sm:mx-0 sm:h-28 sm:w-28"
@@ -190,6 +215,11 @@ export default function ProfilePage() {
         <section className="mt-8 rounded-2xl border border-white/10 bg-cardBg p-6">
           <h2 className="text-lg font-semibold text-white">Account settings</h2>
           <ParentEmailSettings token={token} profile={profile} onSaved={loadProfile} />
+        </section>
+
+        <section className="mt-8 rounded-2xl border border-white/10 bg-cardBg p-6">
+          <h2 className="text-lg font-semibold text-white">Payout Settings</h2>
+          <PayoutSettings token={token} profile={profile} loading={loading} />
         </section>
 
         <section className="mt-8">
@@ -468,5 +498,131 @@ function ParentEmailSettings({ token, profile, onSaved }) {
       {error ? <p className="text-sm text-rose-300">{error}</p> : null}
       {message ? <p className="text-sm text-emerald-300">{message}</p> : null}
     </form>
+  );
+}
+
+function PayoutSettings({ token, profile, loading }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const connected =
+    profile?.stripe_onboarding_complete === true && profile?.stripe_payouts_enabled === true;
+  const pending =
+    !connected &&
+    profile?.stripe_account_status === "pending" &&
+    profile?.stripe_onboarding_complete !== true;
+
+  async function startOnboarding() {
+    if (!token) return;
+    setError("");
+    setBusy(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/connect/onboarding-link`, {
+        method: "POST",
+        headers: { ...authHeaders(token) },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 503) {
+        throw new Error(formatApiError(data?.detail, "Payments not yet enabled"));
+      }
+      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not start bank connection."));
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      throw new Error("No onboarding URL returned.");
+    } catch (e) {
+      setError(e.message || "Connection failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function openDashboard() {
+    if (!token) return;
+    setError("");
+    setBusy(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/connect/dashboard-link`, {
+        method: "POST",
+        headers: { ...authHeaders(token) },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not open payout dashboard."));
+      if (data.url) {
+        window.open(data.url, "_blank", "noopener,noreferrer");
+        return;
+      }
+      throw new Error("No dashboard URL returned.");
+    } catch (e) {
+      setError(e.message || "Dashboard link failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (loading) {
+    return <p className="mt-4 text-sm text-slate-500">Loading payout settings…</p>;
+  }
+
+  if (connected) {
+    return (
+      <div className="mt-4 space-y-4">
+        <span className="inline-flex rounded-full border border-emerald-500/40 bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-200">
+          Bank Account Connected
+        </span>
+        <p className="text-sm text-slate-400">
+          Payouts enabled. Earnings from card sales will be available to withdraw.
+        </p>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={openDashboard}
+          className="min-h-[44px] rounded-xl border border-teal-500/40 bg-teal-500/10 px-4 text-sm font-semibold text-neonTeal disabled:opacity-50"
+        >
+          {busy ? "Opening…" : "Manage Payout Settings"}
+        </button>
+        {error ? <p className="text-sm text-rose-300">{error}</p> : null}
+      </div>
+    );
+  }
+
+  if (pending) {
+    return (
+      <div className="mt-4 space-y-4">
+        <span className="inline-flex rounded-full border border-amber-500/40 bg-amber-500/15 px-3 py-1 text-xs font-semibold text-amber-200">
+          Verification Pending
+        </span>
+        <p className="text-sm text-slate-400">
+          Stripe is reviewing your account. This usually takes 1-2 business days.
+        </p>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={startOnboarding}
+          className="min-h-[44px] rounded-xl bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+        >
+          {busy ? "Redirecting…" : "Complete Verification"}
+        </button>
+        {error ? <p className="text-sm text-rose-300">{error}</p> : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 space-y-4">
+      <p className="text-sm text-slate-400">
+        Connect your bank account to withdraw earnings from card sales.
+      </p>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={startOnboarding}
+        className="min-h-[44px] rounded-xl bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+      >
+        {busy ? "Redirecting…" : "Connect Bank Account"}
+      </button>
+      {error ? <p className="text-sm text-rose-300">{error}</p> : null}
+    </div>
   );
 }
