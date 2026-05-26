@@ -43,8 +43,8 @@ async def stripe_webhook(request: Request):
         print("WEBHOOK - event type:", event.type, flush=True)
 
         if event.type == "checkout.session.completed":
-            session = event.data.object
-            metadata = dict(session.metadata or {})
+            session = event["data"]["object"].to_dict_recursive()
+            metadata = session.get("metadata") or {}
 
             print("WEBHOOK - metadata:", metadata, flush=True)
 
@@ -70,7 +70,7 @@ async def stripe_webhook(request: Request):
                         amount=amount,
                         balance_after=new_balance,
                         transaction_type="top_up",
-                        reference_id=session.id,
+                        reference_id=session.get("id"),
                         note="Credits loaded via Stripe",
                     )
                     db.add(entry)
