@@ -43,7 +43,7 @@ async def stripe_webhook(request: Request):
         print("WEBHOOK - event type:", event.type, flush=True)
 
         if event.type == "checkout.session.completed":
-            session = event["data"]["object"].to_dict_recursive()
+            session = event["data"]["object"]._to_dict_recursive()
             metadata = session.get("metadata") or {}
 
             print("WEBHOOK - metadata:", metadata, flush=True)
