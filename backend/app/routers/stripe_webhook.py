@@ -40,11 +40,11 @@ async def stripe_webhook(request: Request):
             sig_header,
             os.environ.get("STRIPE_WEBHOOK_SECRET"),
         )
-        print("WEBHOOK - event type:", event["type"], flush=True)
+        print("WEBHOOK - event type:", event.type, flush=True)
 
-        if event["type"] == "checkout.session.completed":
-            session = event["data"]["object"]
-            metadata = session.get("metadata", {})
+        if event.type == "checkout.session.completed":
+            session = event.data.object
+            metadata = dict(session.metadata or {})
 
             print("WEBHOOK - metadata:", metadata, flush=True)
 
@@ -70,7 +70,7 @@ async def stripe_webhook(request: Request):
                         amount=amount,
                         balance_after=new_balance,
                         transaction_type="top_up",
-                        reference_id=session.get("id"),
+                        reference_id=session.id,
                         note="Credits loaded via Stripe",
                     )
                     db.add(entry)
