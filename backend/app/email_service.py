@@ -982,6 +982,41 @@ def send_marketplace_counter_declined_seller_email(
         logger.error("Email failed for marketplace offer %s: %s", offer_id, e)
 
 
+def send_withdrawal_confirmation_email(
+    user_email: str,
+    user_name: str,
+    withdrawal_amount: float,
+    new_credit_balance: float,
+    *,
+    parent_email: str | None = None,
+) -> None:
+    try:
+        amt = html_module.escape(_money_label(withdrawal_amount))
+        bal = html_module.escape(_money_label(new_credit_balance))
+        sub_inner = (
+            f"A withdrawal of <span style=\"color:#ffd700;font-weight:700;\">{amt}</span> "
+            "has been initiated to your connected bank account.<br><br>"
+            "Funds typically arrive in 2-3 business days.<br><br>"
+            f"Your new credit balance: <span style=\"color:#00ffcc;font-weight:700;\">{bal}</span>"
+        )
+        parts = [
+            _heading("Withdrawal initiated"),
+            _subtext_html(sub_inner),
+        ]
+        html = _email_shell("".join(parts))
+        subject = "Your withdrawal is on the way — Future Legends"
+        _send_resend_html(
+            user_email,
+            subject,
+            html,
+            0,
+            f"withdrawal_{withdrawal_amount}_{new_credit_balance}",
+            parent_email=parent_email,
+        )
+    except Exception as e:
+        logger.error("Withdrawal confirmation email failed for %s: %s", user_email, e)
+
+
 def send_animation_complete_email(
     owner_email: str,
     owner_name: str,

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Navigate, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import { useAuth } from "../context/AuthContext";
@@ -53,10 +53,25 @@ export default function CreditsPage() {
   const [ledgerLoading, setLedgerLoading] = useState(true);
   const [paymentsDisabled, setPaymentsDisabled] = useState(false);
   const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [withdrawBusy, setWithdrawBusy] = useState(false);
+  const [withdrawError, setWithdrawError] = useState("");
+  const [payoutsEnabled, setPayoutsEnabled] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [error, setError] = useState("");
   const [banner, setBanner] = useState("");
 
   const balance = user?.credit_balance ?? 0;
+
+  const parsedWithdrawAmount = useMemo(() => {
+    const n = Number(withdrawAmount);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }, [withdrawAmount]);
+
+  const withdrawValid =
+    parsedWithdrawAmount != null &&
+    parsedWithdrawAmount >= 5 &&
+    parsedWithdrawAmount <= balance;
 
   const resolvedAmount = useMemo(() => {
     if (selectedAmount != null) return selectedAmount;
@@ -93,6 +108,32 @@ export default function CreditsPage() {
   }, [token, initializing, loadLedger]);
 
   useEffect(() => {
+    if (!token || initializing) {
+      setProfileLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setProfileLoading(true);
+      try {
+        const { res } = await authFetch(token, "/auth/profile");
+        if (cancelled) return;
+        if (res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setPayoutsEnabled(data.stripe_payouts_enabled === true);
+        }
+      } catch {
+        if (!cancelled) setPayoutsEnabled(false);
+      } finally {
+        if (!cancelled) setProfileLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token, initializing]);
+
+  useEffect(() => {
     if (searchParams.get("success") === "true") {
       setBanner("Credits added to your account successfully!");
       refreshUser?.();
@@ -124,6 +165,48 @@ export default function CreditsPage() {
     }, 300);
     return () => clearTimeout(handle);
   }, [giftQuery, token]);
+
+  async function submitWithdrawal() {
+    if (!token) return;
+    setWithdrawError("");
+    const n = parsedWithdrawAmount;
+    if (n == null || n < 5) {
+      setWithdrawError("Minimum withdrawal is $5.00");
+      return;
+    }
+    if (n > balance) {
+      setWithdrawError("Insufficient credits");
+      return;
+    }
+    setWithdrawBusy(true);
+    try {
+      const { res, unauthorized } = await authFetch(token, "/credits/withdraw", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount_dollars: n }),
+      });
+      if (unauthorized) {
+        setWithdrawError("Session expired. Please sign in again.");
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 503) {
+        setPaymentsDisabled(true);
+        throw new Error(formatApiError(data?.detail, "Payments not yet enabled"));
+      }
+      if (!res.ok) {
+        throw new Error(formatApiError(data?.detail, "Withdrawal failed."));
+      }
+      setBanner("Withdrawal initiated! Funds typically arrive in 2-3 business days.");
+      setWithdrawAmount("");
+      refreshUser?.();
+      loadLedger();
+    } catch (e) {
+      setWithdrawError(e.message || "Withdrawal failed.");
+    } finally {
+      setWithdrawBusy(false);
+    }
+  }
 
   async function startCheckout(recipientUserId) {
     if (!token) return;
@@ -254,6 +337,92 @@ export default function CreditsPage() {
           >
             {checkoutBusy ? "Redirecting to Stripe…" : "Load Credits"}
           </button>
+        </section>
+
+        <section className="mb-8 rounded-2xl border border-white/10 bg-cardBg p-5">
+          <h2 className="text-lg font-semibold text-white">Withdraw Earnings</h2>
+          {profileLoading ? (
+            <div className="mt-6 flex justify-center py-6">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-neonTeal" />
+            </div>
+          ) : balance <= 0 ? (
+            <p className="mt-3 text-sm text-slate-400">
+              You have no credits to withdraw. Sell cards on the marketplace to earn credits.
+            </p>
+          ) : payoutsEnabled ? (
+            <>
+              <p className="mt-1 text-sm text-slate-400">Transfer your credit balance to your connected bank account.</p>
+              <p className="mt-4 text-xs font-medium uppercase tracking-wide text-slate-500">Available to withdraw</p>
+              <p className="mt-1 text-3xl font-bold tabular-nums text-neonTeal">{formatMoney(balance)}</p>
+
+              {withdrawError ? (
+                <div className="mt-4 rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+                  {withdrawError}
+                </div>
+              ) : null}
+
+              <div className="mt-4">
+                <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Withdrawal amount
+                </label>
+                <div className="relative mt-1">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+                  <input
+                    type="number"
+                    min="5"
+                    max={balance}
+                    step="0.01"
+                    disabled={paymentsDisabled || withdrawBusy}
+                    value={withdrawAmount}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (raw === "") {
+                        setWithdrawAmount("");
+                        setWithdrawError("");
+                        return;
+                      }
+                      const n = Number(raw);
+                      if (Number.isFinite(n) && n > balance) {
+                        setWithdrawError("Amount cannot exceed your balance");
+                      } else {
+                        setWithdrawError("");
+                      }
+                      setWithdrawAmount(raw);
+                    }}
+                    placeholder="5.00"
+                    className="min-h-[44px] w-full rounded-xl border border-white/15 bg-cardBg2 py-2 pl-7 pr-3 text-slate-100"
+                  />
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  Minimum $5.00 · Maximum {formatMoney(balance)}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                disabled={paymentsDisabled || withdrawBusy || !withdrawValid}
+                onClick={submitWithdrawal}
+                className="mt-5 min-h-[48px] w-full rounded-xl bg-neonTeal font-semibold text-slate-950 disabled:opacity-50"
+              >
+                {withdrawBusy ? "Processing withdrawal…" : "Withdraw to Bank"}
+              </button>
+              <p className="mt-3 text-center text-xs text-slate-500">
+                Funds typically arrive in 2-3 business days
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="mt-3 text-sm text-slate-400">
+                Connect your bank account to withdraw your earnings.
+              </p>
+              <Link
+                to="/profile"
+                className="mt-5 flex min-h-[48px] w-full items-center justify-center rounded-xl border border-teal-500/40 bg-teal-500/10 font-semibold text-neonTeal"
+              >
+                Connect Bank Account
+              </Link>
+            </>
+          )}
         </section>
 
         <section className="mb-8 rounded-2xl border border-white/10 bg-cardBg p-5">

@@ -1,22 +1,34 @@
-"""Credit balance, ledger, and Stripe Checkout."""
+"""Credit balance, ledger, Stripe Checkout, and withdrawals."""
 
 from __future__ import annotations
 
+import os
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+import stripe
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from auth import get_current_user
-from credit_service import get_balance, get_ledger
+from credit_service import (
+    InsufficientCreditsError,
+    TX_WITHDRAWAL,
+    deduct_credits,
+    get_balance,
+    get_ledger,
+)
 from database import get_db
+from email_service import send_withdrawal_confirmation_email
 from marketplace_repo import float_from_decimal
 from models import User
+from parent_email_utils import parent_email_for_notify
 from payments_config import require_payments_enabled
 from stripe_checkout import MIN_CHECKOUT_DOLLARS, create_credit_checkout_session
 
 router = APIRouter()
+
+MIN_WITHDRAWAL_DOLLARS = Decimal("5.00")
 
 
 class CheckoutBody(BaseModel):
@@ -24,6 +36,12 @@ class CheckoutBody(BaseModel):
 
     amount_dollars: float = Field(..., gt=0)
     recipient_user_id: int | None = Field(default=None)
+
+
+class WithdrawBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    amount_dollars: float = Field(..., gt=0)
 
 
 @router.get("/balance")
@@ -79,3 +97,74 @@ def credits_checkout(
         raise HTTPException(status_code=503, detail=str(e)) from e
 
     return {"checkout_url": checkout_url}
+
+
+@router.post("/withdraw")
+def credits_withdraw(
+    body: WithdrawBody,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    require_payments_enabled()
+
+    if not user.stripe_payouts_enabled:
+        raise HTTPException(
+            status_code=400,
+            detail="No payout account connected. Please connect your bank account first.",
+        )
+
+    stripe_account_id = (user.stripe_account_id or "").strip()
+    if not stripe_account_id:
+        raise HTTPException(
+            status_code=400,
+            detail="No payout account connected. Please connect your bank account first.",
+        )
+
+    amt = Decimal(str(body.amount_dollars)).quantize(Decimal("0.01"))
+    if amt < MIN_WITHDRAWAL_DOLLARS:
+        raise HTTPException(status_code=400, detail="Minimum withdrawal is $5.00")
+
+    try:
+        row = deduct_credits(
+            user.id,
+            amt,
+            TX_WITHDRAWAL,
+            note="Withdrawal to connected bank account",
+            db=db,
+            commit=False,
+        )
+    except InsufficientCreditsError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Insufficient credits") from None
+
+    new_balance = float_from_decimal(row.balance_after)
+    amount_cents = int(amt * 100)
+
+    try:
+        stripe.api_key = (os.environ.get("STRIPE_SECRET_KEY") or "").strip()
+        stripe.Transfer.create(
+            amount=amount_cents,
+            currency="usd",
+            destination=stripe_account_id,
+        )
+    except Exception as e:
+        db.rollback()
+        print(f"WITHDRAWAL TRANSFER ERROR: {e}", flush=True)
+        raise HTTPException(
+            status_code=400,
+            detail="Withdrawal failed. Please try again or contact support.",
+        ) from None
+
+    db.commit()
+
+    background_tasks.add_task(
+        send_withdrawal_confirmation_email,
+        user.email,
+        user.display_name,
+        float(amt),
+        new_balance,
+        parent_email=parent_email_for_notify(user),
+    )
+
+    return {"credit_balance": new_balance, "message": "Withdrawal initiated"}

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import AppFooter from "../components/AppFooter";
 import { ADMIN_TOKEN_STORAGE_KEY, API_BASE_URL, adminHeaders } from "../config/api";
 import { motionLabel } from "../constants/animationMotions";
+import { formatMoney } from "../utils/marketplace";
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -10,7 +11,54 @@ const TABS = [
   { id: "cards", label: "Cards" },
   { id: "trades", label: "Trades" },
   { id: "marketplace", label: "Marketplace" },
+  { id: "financials", label: "Financials" },
 ];
+
+const LEDGER_PAGE_SIZE = 25;
+
+const LEDGER_TYPE_OPTIONS = [
+  { value: "all", label: "All types" },
+  { value: "top_up", label: "Top-up" },
+  { value: "gift", label: "Gift" },
+  { value: "card_sale", label: "Card sale" },
+  { value: "card_purchase", label: "Card purchase" },
+  { value: "withdrawal", label: "Withdrawal" },
+  { value: "generation", label: "Generation" },
+  { value: "animation", label: "Animation" },
+  { value: "royalty", label: "Royalty" },
+  { value: "refund", label: "Refund" },
+];
+
+function txBadgeClass(type) {
+  const t = (type || "").toLowerCase();
+  const map = {
+    top_up: "border-emerald-500/40 bg-emerald-500/15 text-emerald-200",
+    card_sale: "border-blue-500/40 bg-blue-500/15 text-blue-200",
+    card_purchase: "border-orange-500/40 bg-orange-500/15 text-orange-200",
+    withdrawal: "border-rose-500/40 bg-rose-500/15 text-rose-200",
+    generation: "border-purple-500/40 bg-purple-500/15 text-purple-200",
+    animation: "border-purple-500/40 bg-purple-500/15 text-purple-200",
+    royalty: "border-slate-500/40 bg-slate-500/15 text-slate-300",
+    gift: "border-teal-500/40 bg-teal-500/15 text-teal-200",
+  };
+  return map[t] || "border-white/15 bg-white/5 text-slate-300";
+}
+
+function formatLedgerType(type) {
+  const t = (type || "").toLowerCase();
+  const labels = {
+    top_up: "Top-up",
+    gift: "Gift",
+    card_sale: "Card sale",
+    card_purchase: "Card purchase",
+    withdrawal: "Withdrawal",
+    generation: "Generation",
+    animation: "Animation",
+    royalty: "Royalty",
+    refund: "Refund",
+  };
+  return labels[t] || type || "—";
+}
 
 function formatApiError(detail, fallback) {
   if (!detail) return fallback;
@@ -38,24 +86,33 @@ export default function AdminDashboard() {
   const [inviteDraft, setInviteDraft] = useState("");
   const [inviteMsg, setInviteMsg] = useState("");
 
+  const [tradeStatusFilter, setTradeStatusFilter] = useState("all");
+  const [marketplaceStatusFilter, setMarketplaceStatusFilter] = useState("all");
+
+  const [ledgerEntries, setLedgerEntries] = useState([]);
+  const [ledgerTotal, setLedgerTotal] = useState(0);
+  const [ledgerOffset, setLedgerOffset] = useState(0);
+  const [ledgerTypeFilter, setLedgerTypeFilter] = useState("all");
+  const [royaltiesEntries, setRoyaltiesEntries] = useState([]);
+  const [royaltiesTotal, setRoyaltiesTotal] = useState(0);
+  const [royaltiesSum, setRoyaltiesSum] = useState(0);
+  const [royaltiesOffset, setRoyaltiesOffset] = useState(0);
+
   const [loading, setLoading] = useState({
     overview: true,
     users: true,
     cards: true,
     trades: true,
     marketplace: true,
+    financialsLedger: false,
+    financialsRoyalties: false,
   });
   const [errors, setErrors] = useState({});
-
   const [userSort, setUserSort] = useState({ key: "display_name", dir: "asc" });
   const [userSearch, setUserSearch] = useState("");
-
   const [cardTierFilter, setCardTierFilter] = useState("all");
   const [cardAnimatedOnly, setCardAnimatedOnly] = useState(false);
   const [cardSearch, setCardSearch] = useState("");
-
-  const [tradeStatusFilter, setTradeStatusFilter] = useState("all");
-  const [marketplaceStatusFilter, setMarketplaceStatusFilter] = useState("all");
 
   const clearAdminAndRedirect = useCallback(() => {
     localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
@@ -166,6 +223,56 @@ export default function AdminDashboard() {
     setLoading((s) => ({ ...s, marketplace: false }));
   }, [adminFetch]);
 
+  const loadFinancialsLedger = useCallback(async () => {
+    setLoading((s) => ({ ...s, financialsLedger: true }));
+    setErrors((e) => ({ ...e, financialsLedger: "" }));
+    const params = new URLSearchParams({
+      limit: String(LEDGER_PAGE_SIZE),
+      offset: String(ledgerOffset),
+    });
+    if (ledgerTypeFilter !== "all") {
+      params.set("transaction_type", ledgerTypeFilter);
+    }
+    const res = await adminFetch(`/admin/financials/ledger?${params}`);
+    if (!res) return;
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setErrors((e) => ({
+        ...e,
+        financialsLedger: formatApiError(data?.detail, "Failed to load ledger."),
+      }));
+      setLoading((s) => ({ ...s, financialsLedger: false }));
+      return;
+    }
+    setLedgerEntries(Array.isArray(data.entries) ? data.entries : []);
+    setLedgerTotal(Number(data.total_count) || 0);
+    setLoading((s) => ({ ...s, financialsLedger: false }));
+  }, [adminFetch, ledgerOffset, ledgerTypeFilter]);
+
+  const loadFinancialsRoyalties = useCallback(async () => {
+    setLoading((s) => ({ ...s, financialsRoyalties: true }));
+    setErrors((e) => ({ ...e, financialsRoyalties: "" }));
+    const params = new URLSearchParams({
+      limit: String(LEDGER_PAGE_SIZE),
+      offset: String(royaltiesOffset),
+    });
+    const res = await adminFetch(`/admin/financials/royalties?${params}`);
+    if (!res) return;
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setErrors((e) => ({
+        ...e,
+        financialsRoyalties: formatApiError(data?.detail, "Failed to load royalties."),
+      }));
+      setLoading((s) => ({ ...s, financialsRoyalties: false }));
+      return;
+    }
+    setRoyaltiesEntries(Array.isArray(data.entries) ? data.entries : []);
+    setRoyaltiesTotal(Number(data.total_count) || 0);
+    setRoyaltiesSum(Number(data.total_royalties) || 0);
+    setLoading((s) => ({ ...s, financialsRoyalties: false }));
+  }, [adminFetch, royaltiesOffset]);
+
   useEffect(() => {
     loadInvite();
     loadStats();
@@ -174,6 +281,16 @@ export default function AdminDashboard() {
     loadTrades();
     loadMarketplace();
   }, [loadInvite, loadStats, loadUsers, loadCards, loadTrades, loadMarketplace]);
+
+  useEffect(() => {
+    if (tab !== "financials") return;
+    loadFinancialsLedger();
+  }, [tab, loadFinancialsLedger]);
+
+  useEffect(() => {
+    if (tab !== "financials") return;
+    loadFinancialsRoyalties();
+  }, [tab, loadFinancialsRoyalties]);
 
   async function handleInviteUpdate(e) {
     e.preventDefault();
@@ -218,6 +335,9 @@ export default function AdminDashboard() {
       if (key === "created_at") {
         va = new Date(va || 0).getTime();
         vb = new Date(vb || 0).getTime();
+      } else if (key === "credit_balance") {
+        va = Number(va) || 0;
+        vb = Number(vb) || 0;
       } else if (typeof va === "number") {
         /* ok */
       } else {
@@ -274,6 +394,40 @@ export default function AdminDashboard() {
       {sub ? <p className="mt-1 text-xs text-slate-500">{sub}</p> : null}
     </div>
   );
+
+  const paginationControls = (offset, total, pageSize, setOffset, loadingKey) => {
+    const page = Math.floor(offset / pageSize) + 1;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const atStart = offset <= 0;
+    const atEnd = offset + pageSize >= total;
+    return (
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-400">
+        <p>
+          {total === 0 ? "No entries" : `${total} total · Page ${page} of ${totalPages}`}
+        </p>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            disabled={atStart || loading[loadingKey]}
+            onClick={() => setOffset(Math.max(0, offset - pageSize))}
+            className="rounded-lg border border-white/15 px-3 py-1.5 text-slate-200 disabled:opacity-40"
+          >
+            Previous
+          </button>
+          <button
+            type="button"
+            disabled={atEnd || loading[loadingKey]}
+            onClick={() => setOffset(offset + pageSize)}
+            className="rounded-lg border border-white/15 px-3 py-1.5 text-slate-200 disabled:opacity-40"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const fin = stats?.financial_summary;
 
   const invitePanel = (
     <section className="mb-6 rounded-xl border border-amber-500/25 bg-amber-500/5 p-4 sm:p-5">
@@ -384,6 +538,19 @@ export default function AdminDashboard() {
                   {kpi("Trades accepted", stats.trades_accepted)}
                   {kpi("Trades declined", stats.trades_declined)}
                 </div>
+                {fin ? (
+                  <div>
+                    <h3 className="mb-3 text-sm font-semibold text-emerald-200/90">Financial Overview</h3>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {kpi("Total Platform Volume", formatMoney(fin.total_volume))}
+                      {kpi("Total Royalties Earned", formatMoney(fin.total_royalties))}
+                      {kpi("Total Credits in Circulation", formatMoney(fin.total_credits_in_circulation))}
+                      {kpi("Total Withdrawals", formatMoney(fin.total_withdrawals))}
+                      {kpi("Stripe Connected Sellers", fin.stripe_connected_sellers ?? 0)}
+                      {kpi("Average Sale Price", formatMoney(fin.average_sale_price))}
+                    </div>
+                  </div>
+                ) : null}
                 {stats.marketplace_stats ? (
                   <>
                     <div>
@@ -588,6 +755,7 @@ export default function AdminDashboard() {
                       ["card_count", "Cards"],
                       ["trades_sent", "Trades sent"],
                       ["trades_received", "Trades received"],
+                      ["credit_balance", "Credit Balance"],
                       ["created_at", "Member since"],
                     ].map(([key, label]) => (
                       <th key={key} className="p-3">
@@ -597,12 +765,13 @@ export default function AdminDashboard() {
                         </button>
                       </th>
                     ))}
+                    <th className="p-3 font-medium">Stripe Connected</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredSortedUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="p-6 text-center text-slate-500">
+                      <td colSpan={9} className="p-6 text-center text-slate-500">
                         No users found.
                       </td>
                     </tr>
@@ -615,7 +784,15 @@ export default function AdminDashboard() {
                         <td className="p-3 text-slate-300">{u.card_count}</td>
                         <td className="p-3 text-slate-300">{u.trades_sent}</td>
                         <td className="p-3 text-slate-300">{u.trades_received}</td>
+                        <td className="p-3 tabular-nums text-slate-200">{formatMoney(u.credit_balance ?? 0)}</td>
                         <td className="p-3 text-slate-500">{u.created_at?.slice(0, 10) || "—"}</td>
+                        <td className="p-3">
+                          {u.stripe_payouts_enabled ? (
+                            <span className="font-medium text-emerald-300">Yes</span>
+                          ) : (
+                            <span className="text-slate-500">No</span>
+                          )}
+                        </td>
                       </tr>
                     ))
                   )}
@@ -884,6 +1061,152 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+          </div>
+        ) : null}
+
+        {tab === "financials" ? (
+          <div className="space-y-10">
+            <section>
+              <h2 className="text-lg font-semibold text-white">Ledger Feed</h2>
+              {errors.financialsLedger ? (
+                <p className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
+                  {errors.financialsLedger}
+                </p>
+              ) : null}
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <label className="text-xs uppercase tracking-wide text-slate-500">Type</label>
+                <select
+                  value={ledgerTypeFilter}
+                  onChange={(e) => {
+                    setLedgerTypeFilter(e.target.value);
+                    setLedgerOffset(0);
+                  }}
+                  className="min-h-[42px] rounded-lg border border-white/15 bg-cardBg2 px-3 text-sm"
+                >
+                  {LEDGER_TYPE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-sm text-slate-400">
+                  {ledgerTotal} {ledgerTotal === 1 ? "entry" : "entries"}
+                </p>
+              </div>
+              {loading.financialsLedger ? (
+                <p className="mt-4 text-sm text-slate-400">Loading ledger…</p>
+              ) : null}
+              <div className="mt-4 overflow-x-auto rounded-xl border border-white/10 bg-cardBg">
+                <table className="w-full min-w-[960px] text-left text-sm">
+                  <thead className="border-b border-white/10 bg-cardBg2 text-xs uppercase tracking-wide text-slate-500">
+                    <tr>
+                      {["User", "Type", "Amount", "Balance After", "Note", "Reference ID", "Date"].map((h) => (
+                        <th key={h} className="p-3 font-medium">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ledgerEntries.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="p-6 text-center text-slate-500">
+                          No ledger entries found.
+                        </td>
+                      </tr>
+                    ) : (
+                      ledgerEntries.map((row) => {
+                        const amt = Number(row.amount);
+                        const positive = amt >= 0;
+                        return (
+                          <tr key={row.id} className="border-b border-white/5 hover:bg-white/[0.02]">
+                            <td className="p-3 text-slate-200">{row.display_name}</td>
+                            <td className="p-3">
+                              <span
+                                className={`inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium ${txBadgeClass(row.transaction_type)}`}
+                              >
+                                {formatLedgerType(row.transaction_type)}
+                              </span>
+                            </td>
+                            <td
+                              className={`p-3 tabular-nums font-semibold ${positive ? "text-emerald-300" : "text-rose-300"}`}
+                            >
+                              {positive ? "+" : ""}
+                              {formatMoney(amt)}
+                            </td>
+                            <td className="p-3 tabular-nums text-slate-300">{formatMoney(row.balance_after)}</td>
+                            <td className="max-w-[200px] truncate p-3 text-xs text-slate-500" title={row.note}>
+                              {row.note || "—"}
+                            </td>
+                            <td className="p-3 font-mono text-xs text-slate-500">{row.reference_id || "—"}</td>
+                            <td className="p-3 text-xs text-slate-500">{row.created_at?.slice(0, 16) || "—"}</td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {paginationControls(ledgerOffset, ledgerTotal, LEDGER_PAGE_SIZE, setLedgerOffset, "financialsLedger")}
+            </section>
+
+            <section>
+              <h2 className="text-lg font-semibold text-white">Royalties</h2>
+              <p className="mt-3 text-2xl font-bold tabular-nums text-neonTeal">
+                Total Royalties Earned: {formatMoney(royaltiesSum)}
+              </p>
+              {errors.financialsRoyalties ? (
+                <p className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
+                  {errors.financialsRoyalties}
+                </p>
+              ) : null}
+              {loading.financialsRoyalties ? (
+                <p className="mt-4 text-sm text-slate-400">Loading royalties…</p>
+              ) : null}
+              <div className="mt-4 overflow-x-auto rounded-xl border border-white/10 bg-cardBg">
+                <table className="w-full min-w-[900px] text-left text-sm">
+                  <thead className="border-b border-white/10 bg-cardBg2 text-xs uppercase tracking-wide text-slate-500">
+                    <tr>
+                      {["Card", "Seller", "Buyer", "Sale Amount", "Royalty Earned (2%)", "Date"].map((h) => (
+                        <th key={h} className="p-3 font-medium">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {royaltiesEntries.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="p-6 text-center text-slate-500">
+                          No royalty records found.
+                        </td>
+                      </tr>
+                    ) : (
+                      royaltiesEntries.map((row) => (
+                        <tr key={row.offer_id} className="border-b border-white/5 hover:bg-white/[0.02]">
+                          <td className="p-3">
+                            <span className="block text-slate-200">{row.player_name}</span>
+                            <span className="font-mono text-xs text-neonTeal/90">{row.card_id}</span>
+                          </td>
+                          <td className="p-3 text-slate-300">{row.seller_display_name}</td>
+                          <td className="p-3 text-slate-300">{row.buyer_display_name}</td>
+                          <td className="p-3 tabular-nums text-slate-200">{formatMoney(row.sale_amount)}</td>
+                          <td className="p-3 tabular-nums text-amber-200">{formatMoney(row.royalty_amount)}</td>
+                          <td className="p-3 text-xs text-slate-500">{row.date?.slice(0, 16) || "—"}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {paginationControls(
+                royaltiesOffset,
+                royaltiesTotal,
+                LEDGER_PAGE_SIZE,
+                setRoyaltiesOffset,
+                "financialsRoyalties"
+              )}
+            </section>
           </div>
         ) : null}
       </main>

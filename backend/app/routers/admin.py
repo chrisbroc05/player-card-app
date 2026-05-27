@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import bcrypt
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel, ConfigDict, Field
@@ -21,7 +21,7 @@ from auth import ALGORITHM, SECRET_KEY
 from beta_config import beta_mode_active, get_beta_invite_code, set_beta_invite_code
 from database import get_db
 from marketplace_repo import float_from_decimal, listing_active_filter
-from models import Card, MarketplaceOffer, TradeOffer, User, utcnow
+from models import Card, CreditLedger, MarketplaceOffer, TradeOffer, User, utcnow
 
 router = APIRouter()
 admin_security = HTTPBearer(auto_error=False)
@@ -104,6 +104,46 @@ def _iso(dt: datetime | None) -> str:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt.isoformat()
+
+
+def _compute_financial_summary(db: Session) -> dict[str, float | int]:
+    total_volume = float_from_decimal(
+        db.query(func.coalesce(func.sum(CreditLedger.amount), 0))
+        .filter(CreditLedger.transaction_type == "card_sale")
+        .scalar()
+    )
+    total_royalties = float_from_decimal(
+        db.query(func.coalesce(func.sum(MarketplaceOffer.royalty_amount), 0))
+        .filter(
+            MarketplaceOffer.status == "accepted",
+            MarketplaceOffer.royalty_amount > 0,
+        )
+        .scalar()
+    )
+    total_credits_in_circulation = float_from_decimal(
+        db.query(func.coalesce(func.sum(User.credit_balance), 0)).scalar()
+    )
+    total_withdrawals = float_from_decimal(
+        db.query(func.coalesce(func.sum(func.abs(CreditLedger.amount)), 0))
+        .filter(CreditLedger.transaction_type == "withdrawal")
+        .scalar()
+    )
+    stripe_connected_sellers = int(
+        db.query(func.count(User.id)).filter(User.stripe_payouts_enabled.is_(True)).scalar() or 0
+    )
+    average_sale_price = float_from_decimal(
+        db.query(func.coalesce(func.avg(MarketplaceOffer.offer_amount), 0))
+        .filter(MarketplaceOffer.status == "accepted")
+        .scalar()
+    )
+    return {
+        "total_volume": total_volume,
+        "total_royalties": total_royalties,
+        "total_credits_in_circulation": total_credits_in_circulation,
+        "total_withdrawals": total_withdrawals,
+        "stripe_connected_sellers": stripe_connected_sellers,
+        "average_sale_price": average_sale_price,
+    }
 
 
 def _map_tier_key(db_tier: str) -> str | None:
@@ -320,6 +360,7 @@ def admin_stats(
         "total_users": total_users,
         "total_cards": total_cards,
         "total_trades": total_trades,
+        "financial_summary": _compute_financial_summary(db),
         "trades_accepted": trades_accepted,
         "trades_declined": trades_declined,
         "trades_pending": trades_pending,
@@ -385,9 +426,122 @@ def admin_users(
             "card_count": card_counts.get(u.id, 0),
             "trades_sent": sent_counts.get(u.id, 0),
             "trades_received": recv_counts.get(u.id, 0),
+            "credit_balance": float_from_decimal(u.credit_balance),
+            "stripe_payouts_enabled": bool(u.stripe_payouts_enabled),
         }
         for u in users
     ]
+
+
+@router.get("/financials/summary")
+def admin_financials_summary(
+    db: Session = Depends(get_db),
+    _admin: dict[str, Any] = Depends(require_admin),
+):
+    return _compute_financial_summary(db)
+
+
+@router.get("/financials/ledger")
+def admin_financials_ledger(
+    limit: int = Query(default=25, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    transaction_type: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _admin: dict[str, Any] = Depends(require_admin),
+):
+    q = db.query(CreditLedger, User.display_name).join(User, CreditLedger.user_id == User.id)
+    if transaction_type:
+        tx = transaction_type.strip().lower()
+        if tx:
+            q = q.filter(CreditLedger.transaction_type == tx)
+
+    total_count = int(q.count())
+    rows = (
+        q.order_by(CreditLedger.created_at.desc(), CreditLedger.id.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    entries = [
+        {
+            "id": row.id,
+            "user_id": row.user_id,
+            "display_name": display_name or "—",
+            "amount": float_from_decimal(row.amount),
+            "balance_after": float_from_decimal(row.balance_after),
+            "transaction_type": row.transaction_type,
+            "reference_id": row.reference_id or "",
+            "note": row.note or "",
+            "created_at": _iso(row.created_at),
+        }
+        for row, display_name in rows
+    ]
+    return {
+        "entries": entries,
+        "total_count": total_count,
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+@router.get("/financials/royalties")
+def admin_financials_royalties(
+    limit: int = Query(default=25, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    _admin: dict[str, Any] = Depends(require_admin),
+):
+    base_filter = (
+        MarketplaceOffer.status == "accepted",
+        MarketplaceOffer.royalty_amount > 0,
+    )
+    total_royalties = float_from_decimal(
+        db.query(func.coalesce(func.sum(MarketplaceOffer.royalty_amount), 0))
+        .filter(*base_filter)
+        .scalar()
+    )
+    total_count = int(
+        db.query(func.count(MarketplaceOffer.id)).filter(*base_filter).scalar() or 0
+    )
+
+    Buyer = User
+    Seller = User
+    rows = (
+        db.query(
+            MarketplaceOffer,
+            Card.player_name,
+            Seller.display_name,
+            Buyer.display_name,
+        )
+        .join(Card, MarketplaceOffer.card_id == Card.card_id)
+        .join(Seller, MarketplaceOffer.seller_id == Seller.id)
+        .join(Buyer, MarketplaceOffer.buyer_id == Buyer.id)
+        .filter(*base_filter)
+        .order_by(MarketplaceOffer.updated_at.desc(), MarketplaceOffer.id.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    entries = [
+        {
+            "offer_id": offer.id,
+            "card_id": offer.card_id,
+            "player_name": player_name or "",
+            "seller_display_name": seller_dn or "—",
+            "buyer_display_name": buyer_dn or "—",
+            "sale_amount": float_from_decimal(offer.offer_amount),
+            "royalty_amount": float_from_decimal(offer.royalty_amount),
+            "date": _iso(offer.updated_at or offer.created_at),
+        }
+        for offer, player_name, seller_dn, buyer_dn in rows
+    ]
+    return {
+        "entries": entries,
+        "total_royalties": total_royalties,
+        "total_count": total_count,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 @router.get("/cards")
