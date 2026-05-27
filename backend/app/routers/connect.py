@@ -15,6 +15,12 @@ from stripe_connect import create_dashboard_link, create_onboarding_link, ensure
 router = APIRouter()
 
 
+@router.get("/test")
+def connect_router_test():
+    """Temporary reachability check — confirms router is mounted at /connect/test."""
+    return {"status": "connect router reachable"}
+
+
 class ConnectAccountResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

@@ -3,7 +3,7 @@ import { Link, Navigate, useSearchParams } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import CardImage from "../components/CardImage";
-import { API_BASE_URL, authHeaders } from "../config/api";
+import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY, authHeaders } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import { formatMoney } from "../utils/marketplace";
 import { CARD_IMAGE_FRAME_SM } from "../utils/cardImageStyles";
@@ -513,26 +513,50 @@ function PayoutSettings({ token, profile, loading }) {
     profile?.stripe_onboarding_complete !== true;
 
   async function startOnboarding() {
-    if (!token) return;
+    const authToken = (token || localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) || "").trim();
+    console.log("Connect token available:", Boolean(authToken));
+    if (!authToken) {
+      const msg = "Not signed in. Please log in again.";
+      console.error("Connect button error: no auth token");
+      setError(msg);
+      alert(msg);
+      return;
+    }
     setError("");
     setBusy(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/connect/onboarding-link`, {
+      const url = `${API_BASE_URL}/connect/onboarding-link`;
+      console.log("Connect request URL:", url);
+      const response = await fetch(url, {
         method: "POST",
-        headers: { ...authHeaders(token) },
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          "Content-Type": "application/json",
+        },
       });
-      const data = await res.json().catch(() => ({}));
-      if (res.status === 503) {
+
+      console.log("Connect response status:", response.status);
+      const data = await response.json().catch(() => ({}));
+      console.log("Connect response data:", data);
+
+      if (response.status === 503) {
         throw new Error(formatApiError(data?.detail, "Payments not yet enabled"));
       }
-      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not start bank connection."));
+      if (!response.ok) {
+        throw new Error(formatApiError(data?.detail, "Could not start bank connection."));
+      }
       if (data.url) {
         window.location.href = data.url;
         return;
       }
-      throw new Error("No onboarding URL returned.");
-    } catch (e) {
-      setError(e.message || "Connection failed.");
+      console.error("No URL in response:", data);
+      alert(`Error: ${JSON.stringify(data)}`);
+      setError("No onboarding URL returned.");
+    } catch (err) {
+      console.error("Connect button error:", err);
+      const msg = err?.message || "Request failed";
+      alert(`Request failed: ${msg}`);
+      setError(msg);
     } finally {
       setBusy(false);
     }
