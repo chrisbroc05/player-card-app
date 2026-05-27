@@ -36,7 +36,9 @@ def ensure_connect_account(db: Session, user: User) -> str:
         type="express",
         country="US",
         email=user.email,
+        business_profile={"url": os.environ.get("FRONTEND_URL")},
         capabilities={"transfers": {"requested": True}},
+        tos_acceptance={"service_agreement": "recipient"},
     )
     user.stripe_account_id = account.id
     user.stripe_account_status = STATUS_PENDING
@@ -57,6 +59,10 @@ def create_onboarding_link(db: Session, user: User) -> str:
         account=account_id,
         refresh_url=f"{base}/profile?connect=refresh",
         return_url=f"{base}/profile?connect=complete",
+        collection_options={
+            "fields": "eventually_due",
+            "future_requirements": "include",
+        },
     )
     url = link.url
     if not url:
