@@ -8,8 +8,7 @@ from fastapi import HTTPException
 
 
 def payments_enabled() -> bool:
-    raw = (os.environ.get("PAYMENTS_ENABLED") or "false").strip().lower()
-    return raw in ("true", "1", "yes", "on")
+    return os.environ.get("PAYMENTS_ENABLED", "false").strip().lower() == "true"
 
 
 def require_payments_enabled() -> None:

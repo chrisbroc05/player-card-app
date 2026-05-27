@@ -130,6 +130,7 @@ async def lifespan(_app: FastAPI):
     run_marketplace_expiration_pass()
     start_marketplace_scheduler()
     print(f"[startup] UPLOAD_DIR={UPLOAD_DIR} CARD_DIR={CARD_DIR} (writable={os.access(CARD_DIR, os.W_OK)})")
+    print("FRONTEND_URL:", os.environ.get("FRONTEND_URL"), flush=True)
     yield
     shutdown_marketplace_scheduler()
 

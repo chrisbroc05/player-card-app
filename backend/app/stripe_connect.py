@@ -7,7 +7,6 @@ import os
 import stripe
 from sqlalchemy.orm import Session
 
-from email_service import frontend_url
 from models import User
 
 STATUS_PENDING = "pending"
@@ -32,11 +31,14 @@ def ensure_connect_account(db: Session, user: User) -> str:
         return user.stripe_account_id
 
     _configure_stripe()
+    frontend = (os.environ.get("FRONTEND_URL") or "").strip().rstrip("/")
+    if not frontend:
+        raise RuntimeError("FRONTEND_URL is not configured")
     account = stripe.Account.create(
         type="express",
         country="US",
         email=user.email,
-        business_profile={"url": os.environ.get("FRONTEND_URL")},
+        business_profile={"url": frontend},
         capabilities={"transfers": {"requested": True}},
         tos_acceptance={"service_agreement": "recipient"},
     )
@@ -51,18 +53,17 @@ def ensure_connect_account(db: Session, user: User) -> str:
 
 def create_onboarding_link(db: Session, user: User) -> str:
     """Ensure Connect account exists and return Stripe Account Link URL."""
-    account_id = ensure_connect_account(db, user)
+    stripe_account_id = ensure_connect_account(db, user)
     _configure_stripe()
-    base = frontend_url()
+    frontend = (os.environ.get("FRONTEND_URL") or "").strip().rstrip("/")
+    if not frontend:
+        raise RuntimeError("FRONTEND_URL is not configured")
     link = stripe.AccountLink.create(
+        account=stripe_account_id,
+        refresh_url=f"{frontend}/profile?connect=refresh",
+        return_url=f"{frontend}/profile?connect=complete",
         type="account_onboarding",
-        account=account_id,
-        refresh_url=f"{base}/profile?connect=refresh",
-        return_url=f"{base}/profile?connect=complete",
-        collection_options={
-            "fields": "eventually_due",
-            "future_requirements": "include",
-        },
+        collection_options={"fields": "eventually_due"},
     )
     url = link.url
     if not url:

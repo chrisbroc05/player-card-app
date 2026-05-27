@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import traceback
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
@@ -51,12 +53,18 @@ def connect_onboarding_link(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    require_payments_enabled()
     try:
+        require_payments_enabled()
         url = create_onboarding_link(db, user)
+        return ConnectUrlResponse(url=url)
+    except HTTPException:
+        raise
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
-    return ConnectUrlResponse(url=url)
+    except Exception as e:
+        print("CONNECT ONBOARDING ERROR:", str(e), flush=True)
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/dashboard-link", response_model=ConnectUrlResponse)
