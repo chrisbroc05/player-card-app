@@ -43,6 +43,7 @@ from auth import (  # noqa: E402
     hash_password,
     verify_password,
 )
+from credit_service import InsufficientCreditsError, deduct_credits  # noqa: E402
 from card_history import build_card_history  # noqa: E402
 from card_repo import (  # noqa: E402
     PRINT_RUN_ALLOWED_QUANTITIES,
@@ -98,6 +99,14 @@ def _app_data_root() -> Path:
 def _upload_and_card_dirs() -> tuple[Path, Path]:
     root = _app_data_root()
     return root / "uploads", root / "cards"
+
+
+def _card_generation_price() -> float:
+    raw = (os.environ.get("CARD_GENERATION_PRICE") or "5.00").strip()
+    try:
+        return max(0.01, float(raw))
+    except ValueError:
+        return 5.00
 
 
 UPLOAD_DIR, CARD_DIR = _upload_and_card_dirs()
@@ -1942,6 +1951,21 @@ def generate_card(
     player_row, source_path = _resolve_player_and_source_path(player_id)
     _ensure_card_generation_limit(db, player_id, cards_to_generate=1)
 
+    price = _card_generation_price()
+    try:
+        deduct_credits(
+            user_id=current_user.id,
+            amount=price,
+            transaction_type="generation",
+            note=f"Card generation - {tier} tier",
+            db=db,
+        )
+    except InsufficientCreditsError as e:
+        raise HTTPException(
+            status_code=400,
+            detail="Insufficient credits. Please add credits to your account at /credits",
+        ) from e
+
     if use_ai:
         try:
             result = _generate_card_openai(player_row, player_id, source_path, tier=tier, special_theme=special_theme)
@@ -1982,6 +2006,20 @@ def generate_card_set(
     """
     player_row, source_path = _resolve_player_and_source_path(player_id)
     _ensure_card_generation_limit(db, player_id, cards_to_generate=3)
+    price = _card_generation_price() * 3
+    try:
+        deduct_credits(
+            user_id=current_user.id,
+            amount=price,
+            transaction_type="generation",
+            note="Card generation - set",
+            db=db,
+        )
+    except InsufficientCreditsError as e:
+        raise HTTPException(
+            status_code=400,
+            detail="Insufficient credits. Please add credits to your account at /credits",
+        ) from e
     cards: list[dict] = []
     for tier in ("base", "rare", "legendary"):
         try:

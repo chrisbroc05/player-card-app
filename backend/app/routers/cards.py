@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
@@ -11,6 +12,7 @@ from sqlalchemy.orm import Session
 from animation_tasks import process_animation
 from auth import get_current_user
 from card_repo import create_animated_upgrade_card, get_card_by_card_id
+from credit_service import InsufficientCreditsError, deduct_credits
 from data.animation_motions import get_motion_by_id, list_motions_public
 from database import get_db
 from email_service import _absolute_image_url
@@ -122,9 +124,26 @@ def animate_card_upgrade(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # TODO: Gate this endpoint behind payment (ANIMATED_CARD_PRICE) when billing is integrated.
     source = _resolve_card(db, card_id)
     _validate_animate_request(source, current_user, body.motion_id)
+    raw_price = (os.environ.get("ANIMATED_CARD_PRICE") or "5.00").strip()
+    try:
+        upgrade_price = max(0.01, float(raw_price))
+    except ValueError:
+        upgrade_price = 5.00
+    try:
+        deduct_credits(
+            user_id=current_user.id,
+            amount=upgrade_price,
+            transaction_type="animation",
+            note=f"Animated card upgrade - {source.player_name}",
+            db=db,
+        )
+    except InsufficientCreditsError as e:
+        raise HTTPException(
+            status_code=400,
+            detail="Insufficient credits. Please add credits to your account at /credits",
+        ) from e
 
     new_card = create_animated_upgrade_card(db, source=source, motion_id=body.motion_id)
 

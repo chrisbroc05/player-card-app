@@ -29,6 +29,7 @@ export default function MarketplaceCardDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [offerError, setOfferError] = useState("");
   const [offerSuccess, setOfferSuccess] = useState("");
+  const [buyerBalance, setBuyerBalance] = useState(null);
 
   const load = useCallback(async () => {
     if (!cardId) return;
@@ -51,12 +52,37 @@ export default function MarketplaceCardDetailPage() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadBalance() {
+      if (!user || !token || !listing || listing.owner_id === user.id) {
+        setBuyerBalance(null);
+        return;
+      }
+      try {
+        const { res } = await authFetch(token, "/credits/balance");
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled && res.ok) {
+          setBuyerBalance(Number(data.credit_balance) || 0);
+        } else if (!cancelled) {
+          setBuyerBalance(Number(user.credit_balance) || 0);
+        }
+      } catch {
+        if (!cancelled) setBuyerBalance(Number(user.credit_balance) || 0);
+      }
+    }
+    loadBalance();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, token, listing]);
+
   const royaltyPreview = computeRoyaltyPreview(offerAmount);
   const badge = listing ? vaultTierBadge(listing.tier) : null;
   const isOwner = user && listing && listing.owner_id === user.id;
 
-  async function handleSubmitOffer(e) {
-    e.preventDefault();
+  async function handleSubmitOffer(e, forcedCashAmount = null) {
+    e?.preventDefault?.();
     setOfferError("");
     setOfferSuccess("");
     if (!user || !token) {
@@ -79,9 +105,13 @@ export default function MarketplaceCardDetailPage() {
         message: message.trim() || null,
       };
     } else {
-      const n = Number(offerAmount);
+      const n = Number(forcedCashAmount ?? offerAmount);
       if (!Number.isFinite(n) || n < 0.01) {
         setOfferError("Offer amount must be at least $0.01");
+        return;
+      }
+      if (buyerBalance != null && n > buyerBalance) {
+        setOfferError("Insufficient credits — Add credits to your account");
         return;
       }
       body = {
@@ -194,7 +224,9 @@ export default function MarketplaceCardDetailPage() {
                 offerError={offerError}
                 offerSuccess={offerSuccess}
                 submitting={submitting}
+                buyerBalance={buyerBalance}
                 onSubmit={handleSubmitOffer}
+                onBuyAtAsking={() => handleSubmitOffer(null, Number(listing.asking_price))}
                 onLogin={() => navigate("/login", { state: { from: `/marketplace/${cardId}` } })}
               />
             </div>
@@ -223,7 +255,9 @@ function OfferPanel({
   offerError,
   offerSuccess,
   submitting,
+  buyerBalance,
   onSubmit,
+  onBuyAtAsking,
   onLogin,
 }) {
   if (isOwner) {
@@ -240,6 +274,8 @@ function OfferPanel({
 
   const isTrade = offerMode === "card_trade";
   const canSubmitTrade = tradeCardIds.length >= 1;
+  const askingPrice = Number(listing?.asking_price || 0);
+  const insufficientAtAsking = !isTrade && buyerBalance != null && buyerBalance < askingPrice;
 
   return (
     <form onSubmit={onSubmit} className="rounded-xl border border-teal-500/25 bg-teal-500/5 p-4 space-y-3">
@@ -253,6 +289,12 @@ function OfferPanel({
         </p>
       ) : (
         <>
+          {buyerBalance != null ? (
+            <p className="rounded-lg border border-white/10 bg-cardBg2 px-3 py-2 text-sm text-slate-300">
+              Your balance: <span className="font-semibold text-neonTeal">{formatMoney(buyerBalance)}</span>
+            </p>
+          ) : null}
+
           <div className="flex rounded-lg border border-white/15 bg-cardBg p-0.5">
             <button
               type="button"
@@ -283,6 +325,14 @@ function OfferPanel({
             />
           ) : (
             <div>
+              <button
+                type="button"
+                disabled={submitting || insufficientAtAsking}
+                onClick={onBuyAtAsking}
+                className="mb-3 min-h-[44px] w-full rounded-xl border border-teal-500/40 bg-teal-500/10 px-4 text-sm font-semibold text-neonTeal disabled:opacity-50"
+              >
+                Buy at Asking Price ({formatMoney(listing.asking_price)})
+              </button>
               <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Offer amount ($)</label>
               <input
                 type="number"
@@ -296,6 +346,24 @@ function OfferPanel({
               <p className="mt-1 text-xs text-slate-500">
                 Platform royalty (2%): {formatMoney(royaltyPreview)} · Asking: {formatMoney(listing.asking_price)}
               </p>
+              {insufficientAtAsking ? (
+                <p className="mt-2 text-xs text-amber-200">
+                  Insufficient credits — Add credits to your account{" "}
+                  <Link to="/credits" className="text-neonTeal underline">
+                    here
+                  </Link>
+                </p>
+              ) : null}
+              {!isTrade &&
+              buyerBalance != null &&
+              Number(offerAmount || 0) > buyerBalance ? (
+                <p className="mt-2 text-xs text-amber-200">
+                  Insufficient credits — Add credits to your account{" "}
+                  <Link to="/credits" className="text-neonTeal underline">
+                    here
+                  </Link>
+                </p>
+              ) : null}
             </div>
           )}
 
@@ -311,7 +379,11 @@ function OfferPanel({
           </div>
           <button
             type="submit"
-            disabled={submitting || (isTrade && !canSubmitTrade)}
+            disabled={
+              submitting ||
+              (isTrade && !canSubmitTrade) ||
+              (!isTrade && buyerBalance != null && Number(offerAmount || 0) > buyerBalance)
+            }
             className="min-h-[48px] w-full rounded-xl bg-neonTeal font-semibold text-slate-950 disabled:opacity-50"
           >
             {submitting ? "Submitting…" : isTrade ? "Submit Trade Offer" : "Submit offer"}

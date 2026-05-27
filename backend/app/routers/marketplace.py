@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 from datetime import timedelta
 from decimal import Decimal
 
+import stripe
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import asc, desc, func, or_
@@ -14,6 +16,11 @@ from sqlalchemy.orm import Session
 
 from auth import get_current_user
 from card_repo import get_card_by_card_id
+from credit_service import (
+    InsufficientCreditsError,
+    add_credits,
+    deduct_credits,
+)
 from database import get_db
 from email_service import (
     frontend_url,
@@ -178,6 +185,63 @@ def _email_trade_extras(db: Session, offer: MarketplaceOffer) -> dict:
         if is_trade
         else "",
     }
+
+
+def _settle_cash_offer_credits(
+    db: Session,
+    *,
+    offer: MarketplaceOffer,
+    card: Card,
+    buyer_id: int,
+    seller_id: int,
+    amount_decimal: Decimal,
+) -> tuple[User, User, float, float, float, float, float]:
+    buyer = db.query(User).filter(User.id == buyer_id).first()
+    if buyer is None:
+        raise HTTPException(status_code=400, detail="Buyer account not found")
+    seller = db.query(User).filter(User.id == seller_id).first()
+    if seller is None:
+        raise HTTPException(status_code=400, detail="Seller account not found")
+
+    offer_amount = float_from_decimal(amount_decimal)
+    if float(buyer.credit_balance or 0) < offer_amount:
+        raise HTTPException(status_code=400, detail="Buyer has insufficient credits")
+
+    royalty_amount_f = round(offer_amount * 0.02, 2)
+    seller_receives_f = round(offer_amount - royalty_amount_f, 2)
+
+    try:
+        buyer_row = deduct_credits(
+            user_id=buyer.id,
+            amount=offer_amount,
+            transaction_type="card_purchase",
+            reference_id=str(offer.id),
+            note=f"Purchased {card.player_name} ({card.card_id})",
+            db=db,
+            commit=False,
+        )
+    except InsufficientCreditsError as e:
+        raise HTTPException(status_code=400, detail="Buyer has insufficient credits") from e
+
+    seller_row = add_credits(
+        user_id=seller.id,
+        amount=seller_receives_f,
+        transaction_type="card_sale",
+        reference_id=str(offer.id),
+        note=f"Sold {card.player_name} ({card.card_id})",
+        db=db,
+    )
+
+    offer.royalty_amount = decimal_from_float(royalty_amount_f)
+    return (
+        buyer,
+        seller,
+        offer_amount,
+        royalty_amount_f,
+        seller_receives_f,
+        float_from_decimal(buyer_row.balance_after),
+        float_from_decimal(seller_row.balance_after),
+    )
 
 
 @router.post("/list")
@@ -435,21 +499,40 @@ def marketplace_accept_offer(
     if card.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Only the card owner can accept this offer")
 
-    buyer = db.query(User).filter(User.id == offer.buyer_id).first()
-    if buyer is None:
-        raise HTTPException(status_code=400, detail="Buyer account not found")
-
     now = utcnow()
     offer.status = "accepted"
     offer.updated_at = now
     extras = _email_trade_extras(db, offer)
+    buyer_balance_after = None
+    seller_balance_after = None
+    royalty_amount_f = 0.0
+    seller_receives_f = 0.0
 
     if _is_card_trade_offer(offer):
+        buyer = db.query(User).filter(User.id == offer.buyer_id).first()
+        if buyer is None:
+            raise HTTPException(status_code=400, detail="Buyer account not found")
         try:
             execute_card_trade_accept(db, offer, card, include_seller_counter=False)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e)) from e
     else:
+        (
+            buyer,
+            _seller_user,
+            _offer_amount_f,
+            royalty_amount_f,
+            seller_receives_f,
+            buyer_balance_after,
+            seller_balance_after,
+        ) = _settle_cash_offer_credits(
+            db,
+            offer=offer,
+            card=card,
+            buyer_id=offer.buyer_id,
+            seller_id=card.owner_id,
+            amount_decimal=offer.offer_amount,
+        )
         cancel_pending_offers_with_trade_release(
             db,
             listing_card_id=card.card_id,
@@ -465,6 +548,29 @@ def marketplace_accept_offer(
 
     amount_f = float_from_decimal(offer.offer_amount)
     collection_url = f"{frontend_url()}/my-collection"
+    payout_initiated = False
+
+    if (
+        not _is_card_trade_offer(offer)
+        and current_user.stripe_payouts_enabled
+        and (current_user.stripe_account_id or "").strip()
+    ):
+        try:
+            stripe.api_key = (os.environ.get("STRIPE_SECRET_KEY") or "").strip()
+            stripe.Transfer.create(
+                amount=int(seller_receives_f * 100),
+                currency="usd",
+                destination=current_user.stripe_account_id,
+                transfer_group=str(offer.id),
+            )
+            payout_initiated = True
+            print(
+                f"TRANSFER SUCCESS: ${seller_receives_f} to {current_user.stripe_account_id}",
+                flush=True,
+            )
+        except Exception as e:
+            print(f"TRANSFER ERROR: {str(e)}", flush=True)
+
     background_tasks.add_task(
         send_marketplace_offer_accepted_buyer_email,
         buyer.email,
@@ -476,6 +582,8 @@ def marketplace_accept_offer(
         amount_f,
         collection_url,
         offer.id,
+        amount_paid_credits=amount_f if not _is_card_trade_offer(offer) else None,
+        new_credit_balance=buyer_balance_after if not _is_card_trade_offer(offer) else None,
         **extras,
         parent_email=parent_email_for_notify(buyer),
     )
@@ -491,6 +599,10 @@ def marketplace_accept_offer(
         amount_f,
         collection_url,
         offer.id,
+        platform_fee=royalty_amount_f if not _is_card_trade_offer(offer) else None,
+        earnings=seller_receives_f if not _is_card_trade_offer(offer) else None,
+        new_credit_balance=seller_balance_after if not _is_card_trade_offer(offer) else None,
+        payout_initiated=payout_initiated if not _is_card_trade_offer(offer) else None,
         **extras,
         parent_email=parent_email_for_notify(current_user),
     )
@@ -682,10 +794,6 @@ def marketplace_offer_counter_accept(
     if card is None:
         raise HTTPException(status_code=404, detail="Card not found")
 
-    seller = db.query(User).filter(User.id == offer.seller_id).first()
-    if seller is None:
-        raise HTTPException(status_code=400, detail="Seller account not found")
-
     buyer = current_user
     now = utcnow()
     offer.counter_status = "accepted"
@@ -694,13 +802,38 @@ def marketplace_offer_counter_accept(
         offer.offer_amount = offer.counter_amount
     offer.updated_at = now
     extras = _email_trade_extras(db, offer)
+    buyer_balance_after = None
+    seller_balance_after = None
+    royalty_amount_f = 0.0
+    seller_receives_f = 0.0
 
     if _is_card_trade_offer(offer):
+        seller = db.query(User).filter(User.id == offer.seller_id).first()
+        if seller is None:
+            raise HTTPException(status_code=400, detail="Seller account not found")
         try:
             execute_card_trade_accept(db, offer, card, include_seller_counter=True)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e)) from e
     else:
+        counter_amt = offer.counter_amount or offer.offer_amount
+        (
+            _buyer_user,
+            seller,
+            _offer_amount_f,
+            royalty_amount_f,
+            seller_receives_f,
+            buyer_balance_after,
+            seller_balance_after,
+        ) = _settle_cash_offer_credits(
+            db,
+            offer=offer,
+            card=card,
+            buyer_id=buyer.id,
+            seller_id=offer.seller_id,
+            amount_decimal=counter_amt,
+        )
+        offer.offer_amount = counter_amt
         cancel_pending_offers_with_trade_release(
             db,
             listing_card_id=card.card_id,
@@ -716,6 +849,26 @@ def marketplace_offer_counter_accept(
 
     amount_f = float_from_decimal(offer.counter_amount or offer.offer_amount)
     collection_url = f"{frontend_url()}/my-collection"
+    payout_initiated = False
+
+    if (
+        not _is_card_trade_offer(offer)
+        and seller.stripe_payouts_enabled
+        and (seller.stripe_account_id or "").strip()
+    ):
+        try:
+            stripe.api_key = (os.environ.get("STRIPE_SECRET_KEY") or "").strip()
+            stripe.Transfer.create(
+                amount=int(seller_receives_f * 100),
+                currency="usd",
+                destination=seller.stripe_account_id,
+                transfer_group=str(offer.id),
+            )
+            payout_initiated = True
+            print(f"TRANSFER SUCCESS: ${seller_receives_f} to {seller.stripe_account_id}", flush=True)
+        except Exception as e:
+            print(f"TRANSFER ERROR: {str(e)}", flush=True)
+
     background_tasks.add_task(
         send_marketplace_offer_accepted_buyer_email,
         buyer.email,
@@ -727,6 +880,8 @@ def marketplace_offer_counter_accept(
         amount_f,
         collection_url,
         offer.id,
+        amount_paid_credits=amount_f if not _is_card_trade_offer(offer) else None,
+        new_credit_balance=buyer_balance_after if not _is_card_trade_offer(offer) else None,
         **extras,
         parent_email=parent_email_for_notify(buyer),
     )
@@ -738,6 +893,10 @@ def marketplace_offer_counter_accept(
         amount_f,
         collection_url,
         offer.id,
+        platform_fee=royalty_amount_f if not _is_card_trade_offer(offer) else None,
+        earnings=seller_receives_f if not _is_card_trade_offer(offer) else None,
+        new_credit_balance=seller_balance_after if not _is_card_trade_offer(offer) else None,
+        payout_initiated=payout_initiated if not _is_card_trade_offer(offer) else None,
         **extras,
         parent_email=parent_email_for_notify(seller),
     )

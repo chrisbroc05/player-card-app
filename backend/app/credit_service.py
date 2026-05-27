@@ -136,13 +136,13 @@ def add_credits(
 
 
 def deduct_credits(
-    db: Session,
     user_id: int,
     amount: Decimal | float,
     transaction_type: str,
     reference_id: str | None = None,
     note: str | None = None,
     *,
+    db: Session | None = None,
     commit: bool = True,
 ) -> CreditLedger:
     """Deduct credits from a user balance and record a negative ledger entry."""
@@ -150,15 +150,19 @@ def deduct_credits(
     if amt <= Decimal("0.00"):
         raise InvalidCreditAmountError("Amount must be greater than zero")
 
-    user = _lock_user(db, user_id)
+    own_session = db is None
+    session = db if db is not None else SessionLocal()
+    user = _lock_user(session, user_id)
     current = _user_balance(user)
     if current < amt:
+        if own_session:
+            session.close()
         raise InsufficientCreditsError("Insufficient credit balance")
 
     new_balance = current - amt
     user.credit_balance = new_balance
     row = _append_ledger_row(
-        db,
+        session,
         user_id=user_id,
         amount=-amt,
         balance_after=new_balance,
@@ -166,10 +170,14 @@ def deduct_credits(
         reference_id=reference_id,
         note=note,
     )
-    if commit:
-        db.commit()
-        db.refresh(row)
-    return row
+    try:
+        if own_session or commit:
+            session.commit()
+            session.refresh(row)
+        return row
+    finally:
+        if own_session:
+            session.close()
 
 
 def transfer_credits(

@@ -567,6 +567,8 @@ def send_marketplace_offer_accepted_buyer_email(
     is_card_trade: bool = False,
     trade_cards_summary: str = "",
     counter_trade_summary: str = "",
+    amount_paid_credits: float | None = None,
+    new_credit_balance: float | None = None,
     parent_email: str | None = None,
 ) -> None:
     try:
@@ -592,6 +594,12 @@ def send_marketplace_offer_accepted_buyer_email(
             trade_block,
             counter_block,
             _card_info_box(card_player_name, card_tier, card_rarity, card_image_url),
+            _subtext_plain(
+                f"Amount paid: {_money_label(amount_paid_credits)} in credits\n"
+                f"Your new credit balance: {_money_label(new_credit_balance)}"
+            )
+            if (not is_card_trade and amount_paid_credits is not None and new_credit_balance is not None)
+            else "",
             _divider(),
             _cta_button(collection_url, "View My Collection →"),
         ]
@@ -617,6 +625,10 @@ def send_marketplace_sale_confirmed_seller_email(
     is_card_trade: bool = False,
     trade_cards_summary: str = "",
     counter_trade_summary: str = "",
+    platform_fee: float | None = None,
+    earnings: float | None = None,
+    new_credit_balance: float | None = None,
+    payout_initiated: bool | None = None,
     parent_email: str | None = None,
 ) -> None:
     try:
@@ -645,6 +657,24 @@ def send_marketplace_sale_confirmed_seller_email(
             trade_block,
             _subtext_html(sub_inner),
             _card_info_box(card_player_name, card_tier, card_rarity, card_image_url),
+            _subtext_plain(
+                f"Sale amount: {_money_label(offer_amount)}\n"
+                f"Platform fee (2%): {_money_label(platform_fee)}\n"
+                f"Your earnings: {_money_label(earnings)} added to your balance\n"
+                f"Your new credit balance: {_money_label(new_credit_balance)}\n"
+                + (
+                    "A payout has been initiated to your connected bank account."
+                    if payout_initiated
+                    else ""
+                )
+            )
+            if (
+                not is_card_trade
+                and platform_fee is not None
+                and earnings is not None
+                and new_credit_balance is not None
+            )
+            else "",
             _divider(),
             _cta_button(collection_url, "Open Future Legends →"),
         ]
@@ -845,6 +875,10 @@ def send_marketplace_counter_accepted_seller_email(
     is_card_trade: bool = False,
     trade_cards_summary: str = "",
     counter_trade_summary: str = "",
+    platform_fee: float | None = None,
+    earnings: float | None = None,
+    new_credit_balance: float | None = None,
+    payout_initiated: bool | None = None,
     parent_email: str | None = None,
 ) -> None:
     try:
@@ -872,6 +906,24 @@ def send_marketplace_counter_accepted_seller_email(
             trade_block,
             counter_block,
             _subtext_html(sub_inner),
+            _subtext_plain(
+                f"Sale amount: {_money_label(counter_amount)}\n"
+                f"Platform fee (2%): {_money_label(platform_fee)}\n"
+                f"Your earnings: {_money_label(earnings)} added to your balance\n"
+                f"Your new credit balance: {_money_label(new_credit_balance)}\n"
+                + (
+                    "A payout has been initiated to your connected bank account."
+                    if payout_initiated
+                    else ""
+                )
+            )
+            if (
+                not is_card_trade
+                and platform_fee is not None
+                and earnings is not None
+                and new_credit_balance is not None
+            )
+            else "",
             _divider(),
             _cta_button(collection_url, "Open My Collection →"),
         ]
