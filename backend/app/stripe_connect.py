@@ -40,7 +40,6 @@ def ensure_connect_account(db: Session, user: User) -> str:
         email=user.email,
         business_profile={"url": frontend},
         capabilities={"transfers": {"requested": True}},
-        tos_acceptance={"service_agreement": "recipient"},
     )
     user.stripe_account_id = account.id
     user.stripe_account_status = STATUS_PENDING
