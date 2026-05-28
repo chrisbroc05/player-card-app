@@ -40,6 +40,18 @@ function formatLedgerDate(iso) {
   }
 }
 
+function ledgerTypeLabel(type) {
+  const t = (type || "").toLowerCase();
+  if (t === "withdrawal") {
+    return (
+      <span className="inline-block rounded-full border border-rose-500/40 bg-rose-500/15 px-2 py-0.5 text-[11px] font-medium text-rose-200">
+        {txTypeLabel(type)}
+      </span>
+    );
+  }
+  return <span className="font-medium text-white">{txTypeLabel(type)}</span>;
+}
+
 export default function CreditsPage() {
   const { user, token, initializing, refreshUser } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -56,6 +68,11 @@ export default function CreditsPage() {
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [withdrawBusy, setWithdrawBusy] = useState(false);
   const [withdrawError, setWithdrawError] = useState("");
+  const [withdrawConfirmOpen, setWithdrawConfirmOpen] = useState(false);
+  const [withdrawSuccessOpen, setWithdrawSuccessOpen] = useState(false);
+  const [withdrawErrorOpen, setWithdrawErrorOpen] = useState(false);
+  const [withdrawErrorModalMessage, setWithdrawErrorModalMessage] = useState("");
+  const [withdrawSuccessData, setWithdrawSuccessData] = useState(null);
   const [payoutsEnabled, setPayoutsEnabled] = useState(false);
   const [profileLoading, setProfileLoading] = useState(true);
   const [error, setError] = useState("");
@@ -166,8 +183,7 @@ export default function CreditsPage() {
     return () => clearTimeout(handle);
   }, [giftQuery, token]);
 
-  async function submitWithdrawal() {
-    if (!token) return;
+  function openWithdrawConfirm() {
     setWithdrawError("");
     const n = parsedWithdrawAmount;
     if (n == null || n < 5) {
@@ -178,6 +194,15 @@ export default function CreditsPage() {
       setWithdrawError("Insufficient credits");
       return;
     }
+    setWithdrawConfirmOpen(true);
+  }
+
+  async function submitWithdrawal() {
+    if (!token) return;
+    const n = parsedWithdrawAmount;
+    if (n == null || n < 5 || n > balance) return;
+
+    setWithdrawConfirmOpen(false);
     setWithdrawBusy(true);
     try {
       const { res, unauthorized } = await authFetch(token, "/credits/withdraw", {
@@ -186,7 +211,8 @@ export default function CreditsPage() {
         body: JSON.stringify({ amount_dollars: n }),
       });
       if (unauthorized) {
-        setWithdrawError("Session expired. Please sign in again.");
+        setWithdrawErrorModalMessage("Session expired. Please sign in again.");
+        setWithdrawErrorOpen(true);
         return;
       }
       const data = await res.json().catch(() => ({}));
@@ -195,14 +221,28 @@ export default function CreditsPage() {
         throw new Error(formatApiError(data?.detail, "Payments not yet enabled"));
       }
       if (!res.ok) {
-        throw new Error(formatApiError(data?.detail, "Withdrawal failed."));
+        throw new Error(
+          formatApiError(
+            data?.detail,
+            "Your withdrawal could not be processed. Please try again or contact support."
+          )
+        );
       }
-      setBanner("Withdrawal initiated! Funds typically arrive in 2-3 business days.");
+      const newBalance = Number(data.credit_balance);
       setWithdrawAmount("");
-      refreshUser?.();
-      loadLedger();
+      await Promise.all([refreshUser?.(), loadLedger()]);
+      setWithdrawSuccessData({
+        amount: n,
+        newBalance: Number.isFinite(newBalance) ? newBalance : balance - n,
+      });
+      setWithdrawSuccessOpen(true);
     } catch (e) {
-      setWithdrawError(e.message || "Withdrawal failed.");
+      await Promise.all([refreshUser?.(), loadLedger()]);
+      setWithdrawErrorModalMessage(
+        e.message ||
+          "Your withdrawal could not be processed. Please try again or contact support."
+      );
+      setWithdrawErrorOpen(true);
     } finally {
       setWithdrawBusy(false);
     }
@@ -401,7 +441,7 @@ export default function CreditsPage() {
               <button
                 type="button"
                 disabled={paymentsDisabled || withdrawBusy || !withdrawValid}
-                onClick={submitWithdrawal}
+                onClick={openWithdrawConfirm}
                 className="mt-5 min-h-[48px] w-full rounded-xl bg-neonTeal font-semibold text-slate-950 disabled:opacity-50"
               >
                 {withdrawBusy ? "Processing withdrawal…" : "Withdraw to Bank"}
@@ -519,7 +559,7 @@ export default function CreditsPage() {
                   >
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
-                        <p className="font-medium text-white">{txTypeLabel(row.transaction_type)}</p>
+                        {ledgerTypeLabel(row.transaction_type)}
                         {row.note ? <p className="mt-0.5 text-xs text-slate-500">{row.note}</p> : null}
                         <p className="mt-1 text-xs text-slate-600">{formatLedgerDate(row.created_at)}</p>
                       </div>
@@ -542,6 +582,116 @@ export default function CreditsPage() {
           Test card: 4242 4242 4242 4242 · any future expiry · any CVC
         </p>
       </main>
+
+      {withdrawConfirmOpen && parsedWithdrawAmount != null ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 sm:items-center sm:p-4">
+          <div
+            className="w-full max-w-md rounded-2xl border border-white/10 bg-cardBg p-5 shadow-2xl sm:p-6"
+            role="dialog"
+            aria-labelledby="withdraw-confirm-title"
+            aria-modal="true"
+          >
+            <h3 id="withdraw-confirm-title" className="text-lg font-semibold text-white">
+              Confirm Withdrawal
+            </h3>
+            <p className="mt-3 text-sm leading-relaxed text-slate-300">
+              You are about to withdraw{" "}
+              <span className="font-semibold text-white">{formatMoney(parsedWithdrawAmount)}</span> to
+              your connected bank account.
+            </p>
+            <p className="mt-3 text-xs leading-relaxed text-slate-500">
+              Funds typically arrive within 2-3 business days. This action cannot be undone.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={withdrawBusy}
+                onClick={() => setWithdrawConfirmOpen(false)}
+                className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-xl border border-white/20 px-4 text-sm font-medium text-slate-300 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={withdrawBusy}
+                onClick={submitWithdrawal}
+                className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-xl bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+              >
+                Confirm Withdrawal
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {withdrawSuccessOpen && withdrawSuccessData ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 sm:items-center sm:p-4">
+          <div
+            className="w-full max-w-md rounded-2xl border border-white/10 bg-cardBg p-5 shadow-2xl sm:p-6"
+            role="dialog"
+            aria-labelledby="withdraw-success-title"
+            aria-modal="true"
+          >
+            <h3 id="withdraw-success-title" className="text-center text-lg font-semibold text-white">
+              Withdrawal Initiated! 🎉
+            </h3>
+            <p className="mt-3 text-center text-sm leading-relaxed text-slate-300">
+              Your withdrawal of {formatMoney(withdrawSuccessData.amount)} has been sent to your
+              connected bank account.
+            </p>
+            <p className="mt-4 text-center text-3xl font-bold tabular-nums text-neonTeal">
+              {formatMoney(withdrawSuccessData.amount)}
+            </p>
+            <p className="mt-4 text-center text-xs leading-relaxed text-slate-500">
+              Funds typically arrive within 2-3 business days. You will receive a confirmation email
+              shortly.
+            </p>
+            <p className="mt-4 text-center text-sm text-slate-300">
+              Your new credit balance:{" "}
+              <span className="font-semibold tabular-nums text-white">
+                {formatMoney(withdrawSuccessData.newBalance)}
+              </span>
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setWithdrawSuccessOpen(false);
+                setWithdrawSuccessData(null);
+              }}
+              className="mt-6 min-h-[48px] w-full rounded-xl bg-neonTeal font-semibold text-slate-950"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {withdrawErrorOpen ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 sm:items-center sm:p-4">
+          <div
+            className="w-full max-w-md rounded-2xl border border-white/10 bg-cardBg p-5 shadow-2xl sm:p-6"
+            role="dialog"
+            aria-labelledby="withdraw-error-title"
+            aria-modal="true"
+          >
+            <h3 id="withdraw-error-title" className="text-lg font-semibold text-white">
+              Withdrawal Failed
+            </h3>
+            <p className="mt-3 text-sm leading-relaxed text-slate-300">
+              {withdrawErrorModalMessage ||
+                "Your withdrawal could not be processed. Please try again or contact support."}
+            </p>
+            <button
+              type="button"
+              onClick={() => setWithdrawErrorOpen(false)}
+              className="mt-6 min-h-[48px] w-full rounded-xl border border-white/20 font-medium text-slate-200"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <AppFooter />
     </div>
   );
