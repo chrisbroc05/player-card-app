@@ -43,7 +43,12 @@ from auth import (  # noqa: E402
     hash_password,
     verify_password,
 )
-from credit_service import InsufficientCreditsError, deduct_credits  # noqa: E402
+from credit_service import InsufficientCreditsError, TX_ANIMATION, TX_GENERATION, deduct_credits  # noqa: E402
+from card_pricing import (  # noqa: E402
+    animated_upgrade_price,
+    order_tier_from_card_tier,
+    tier_generation_price,
+)
 from card_history import build_card_history  # noqa: E402
 from card_repo import (  # noqa: E402
     PRINT_RUN_ALLOWED_QUANTITIES,
@@ -182,6 +187,7 @@ _EDIT_IMAGE_SIZE = 1024
 # AI trading card rarity (drives different visual intensity in prompts).
 CardTier = Literal["base", "rare", "legendary"]
 OrderTier = Literal["rookie", "all_star", "legends"]
+OrderCardType = Literal["standard", "animated"]
 OrderStatus = Literal[
     "new_order",
     "awaiting_review",
@@ -1202,6 +1208,7 @@ class OrderCreate(BaseModel):
 
     # Order details
     tier: OrderTier
+    card_type: OrderCardType = Field(default="standard")
     special_theme: str | None = Field(default=None, max_length=120)
     add_ons: list[str] = Field(default_factory=list)
     status: OrderStatus = "new_order"
@@ -1623,6 +1630,27 @@ def duplicate_cards(
             status_code=400,
             detail="Quantity must be one of: 1, 2, 5, 10.",
         )
+    current_run = int(orm.print_run or 1)
+    extra_copies = max(0, body.quantity - current_run)
+    if extra_copies > 0:
+        order_tier = order_tier_from_card_tier(orm.tier)
+        unit_price = tier_generation_price(order_tier)
+        total_charge = unit_price * extra_copies
+        if total_charge > 0:
+            try:
+                deduct_credits(
+                    user_id=current_user.id,
+                    amount=total_charge,
+                    transaction_type=TX_GENERATION,
+                    reference_id=orm.card_id,
+                    note=f"Additional card copies ({extra_copies}x) - {order_tier} tier",
+                    db=db,
+                )
+            except InsufficientCreditsError as exc:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Insufficient credits. Please add credits to your account at /credits",
+                ) from exc
     try:
         new_rows = expand_print_run_for_owner_image(db, template=orm, target_quantity=body.quantity)
     except ValueError as exc:
@@ -1675,6 +1703,7 @@ def create_order(
         player_team_name=body.player_team_name,
         player_image_url=body.player_image_url,
         tier=body.tier,
+        card_type=body.card_type,
         special_theme=body.special_theme,
         add_ons=body.add_ons,
         status=body.status,
@@ -1736,6 +1765,46 @@ def generate_card_for_order(
     preview_limit = int(order.get("preview_limit", _preview_limit_for_tier(order.get("tier", "rookie"))))
     if preview_count >= preview_limit:
         raise HTTPException(status_code=400, detail="Preview limit reached")
+
+    order_tier = str(order.get("tier", "rookie"))
+    card_type = str(order.get("card_type", "standard") or "standard")
+    player_label = _player_display_name(
+        {
+            "first_name": order.get("player_first_name", ""),
+            "last_name": order.get("player_last_name", ""),
+            "display_name": order.get("player_display_name"),
+        }
+    )
+
+    try:
+        if preview_count == 0:
+            if card_type == "animated":
+                charge = animated_upgrade_price()
+                if charge > 0:
+                    deduct_credits(
+                        user_id=current_user.id,
+                        amount=charge,
+                        transaction_type=TX_ANIMATION,
+                        reference_id=str(order_id),
+                        note=f"Animated card upgrade - {player_label}",
+                        db=db,
+                    )
+        else:
+            charge = tier_generation_price(order_tier)
+            if charge > 0:
+                deduct_credits(
+                    user_id=current_user.id,
+                    amount=charge,
+                    transaction_type=TX_GENERATION,
+                    reference_id=str(order_id),
+                    note=f"Card preview - {order_tier} tier",
+                    db=db,
+                )
+    except InsufficientCreditsError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="Insufficient credits. Please add credits to your account at /credits",
+        ) from exc
 
     player_row = {
         "first_name": order.get("player_first_name", ""),

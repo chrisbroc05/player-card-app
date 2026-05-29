@@ -6,30 +6,38 @@ import FeaturedCard from "../components/FeaturedCard";
 import CardGallery from "../components/CardGallery";
 import PostGenerationPanel from "../components/PostGenerationPanel";
 import StudioAuthGate from "../components/StudioAuthGate";
+import StudioCreditBalance from "../components/StudioCreditBalance";
+import GenerationCostSummary from "../components/GenerationCostSummary";
 import ThemeLibraryPicker from "../components/ThemeLibraryPicker";
 import CardTypeStep from "../components/CardTypeStep";
+import QuantitySelector from "../components/QuantitySelector";
 import MotionSelectionGrid from "../components/MotionSelectionGrid";
 import AnimationLoadingScreen from "../components/AnimationLoadingScreen";
 import AnimationFailedScreen from "../components/AnimationFailedScreen";
 import { motionLabel } from "../constants/animationMotions";
 import { API_BASE_URL, authHeaders, toApiUrl } from "../config/api";
 import { useAuth } from "../context/AuthContext";
+import { fetchGenerationPrice } from "../utils/cardPricing";
+import { formatMoney } from "../utils/marketplace";
 
-const STEPS = [
-  "Choose Tier",
-  "Player Details",
-  "Upload Photo",
-  "Choose Card Type",
-  "Choose Motion",
-  "Choose Theme",
-  "Generate Preview",
-  "Approve Card",
-];
+const STEP_PHOTO = 1;
+const STEP_DETAILS = 2;
+const STEP_TIER = 3;
+const STEP_THEME = 4;
+const STEP_CARD_TYPE = 5;
+const STEP_MOTION = 6;
+const STEP_REVIEW = 7;
+const TOTAL_WIZARD_STEPS = 7;
 
-const STEP_MOTION = 5;
-const STEP_THEME = 6;
-const STEP_GENERATE = 7;
-const STEP_APPROVE = 8;
+const WIZARD_STEP_LABELS = {
+  [STEP_PHOTO]: "Upload Photo",
+  [STEP_DETAILS]: "Player Details",
+  [STEP_TIER]: "Choose Tier",
+  [STEP_THEME]: "Choose Theme",
+  [STEP_CARD_TYPE]: "Choose Card Type",
+  [STEP_MOTION]: "Choose Motion",
+  [STEP_REVIEW]: "Review & Generate",
+};
 
 const TIER_UI = {
   rookie: {
@@ -76,10 +84,101 @@ const TIER_UI = {
   },
 };
 
-function stepChipClass(step, currentStep) {
-  if (step < currentStep) return "border-neonTeal/50 bg-neonTeal/20 text-teal-100";
-  if (step === currentStep) return "border-neonBlue/60 bg-neonBlue/20 text-neonBlue";
-  return "border-white/15 bg-cardBg2 text-slate-300";
+function playerNameFromForm(firstName, lastName, displayName) {
+  return (displayName.trim() || `${firstName.trim()} ${lastName.trim()}`.trim());
+}
+
+function isValidGradYear(value) {
+  const n = Number(value);
+  return Number.isInteger(n) && n >= 1950 && n <= 2100;
+}
+
+function validatePlayerDetails(firstName, lastName, displayName, teamName, position, jerseyNumber, gradYear) {
+  const errors = {};
+  const playerName = playerNameFromForm(firstName, lastName, displayName);
+  if (playerName.length < 2) {
+    errors.playerName = "Player name is required (minimum 2 characters)";
+  }
+  if (!teamName.trim()) errors.teamName = "Team name is required";
+  if (!position.trim()) errors.position = "Position is required";
+  if (!jerseyNumber.trim()) {
+    errors.jerseyNumber = "Jersey number is required";
+  } else if (!/^\d+$/.test(jerseyNumber.trim())) {
+    errors.jerseyNumber = "Jersey number must be a number";
+  }
+  if (!String(gradYear || "").trim()) {
+    errors.gradYear = "Grad year is required";
+  } else if (!isValidGradYear(gradYear)) {
+    errors.gradYear = "Enter a valid graduation year";
+  }
+  return { valid: Object.keys(errors).length === 0, errors };
+}
+
+function getNextWizardStep(step, isAnimated) {
+  if (step === STEP_CARD_TYPE && !isAnimated) return STEP_REVIEW;
+  return Math.min(step + 1, STEP_REVIEW);
+}
+
+function getPrevWizardStep(step, isAnimated) {
+  if (step === STEP_REVIEW && !isAnimated) return STEP_CARD_TYPE;
+  return Math.max(step - 1, STEP_PHOTO);
+}
+
+function fieldErrorClass(hasError) {
+  return hasError ? "border-rose-500/60 ring-1 ring-rose-500/30" : "border-white/15";
+}
+
+function WizardProgress({ currentStep, isAnimated, onGoToStep }) {
+  const progressPct = Math.round((currentStep / TOTAL_WIZARD_STEPS) * 100);
+  return (
+    <div className="mb-6 rounded-xl border border-white/10 bg-cardBg2 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          Step {currentStep} of {TOTAL_WIZARD_STEPS}
+        </p>
+        <p className="text-sm font-semibold text-white">{WIZARD_STEP_LABELS[currentStep]}</p>
+      </div>
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-neonBlue via-neonTeal to-neonBlue transition-all duration-300"
+          style={{ width: `${progressPct}%` }}
+        />
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {Array.from({ length: TOTAL_WIZARD_STEPS }, (_, i) => {
+          const step = i + 1;
+          if (step === STEP_MOTION && !isAnimated) return null;
+          const done = step < currentStep;
+          const active = step === currentStep;
+          const canClick = done && typeof onGoToStep === "function";
+          return (
+            <button
+              key={step}
+              type="button"
+              disabled={!canClick}
+              onClick={() => canClick && onGoToStep(step)}
+              className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] transition ${
+                done
+                  ? "border-neonTeal/40 bg-neonTeal/10 text-teal-100"
+                  : active
+                    ? "border-neonBlue/50 bg-neonBlue/15 text-neonBlue"
+                    : "border-white/10 bg-cardBg text-slate-500"
+              } ${canClick ? "cursor-pointer hover:border-neonTeal/60" : "cursor-default"}`}
+            >
+              <span
+                className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${
+                  done ? "bg-neonTeal text-slate-950" : active ? "bg-neonBlue text-slate-950" : "bg-white/10"
+                }`}
+              >
+                {done ? "✓" : step}
+              </span>
+              <span className="hidden sm:inline">{WIZARD_STEP_LABELS[step]}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function formatApiError(detail, fallback) {
@@ -104,7 +203,7 @@ function formatApiError(detail, fallback) {
 
 export default function StudioPage() {
   const navigate = useNavigate();
-  const { token, user, initializing } = useAuth();
+  const { token, user, initializing, refreshUser } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [dragActive, setDragActive] = useState(false);
 
@@ -130,7 +229,7 @@ export default function StudioPage() {
 
   const [orderCustomerName, setOrderCustomerName] = useState("Test User");
   const [orderCustomerEmail, setOrderCustomerEmail] = useState("test@email.com");
-  const [orderTier, setOrderTier] = useState("all_star");
+  const [orderTier, setOrderTier] = useState("");
   const [specialTheme, setSpecialTheme] = useState("");
 
   const [themeCategories, setThemeCategories] = useState([]);
@@ -140,15 +239,25 @@ export default function StudioPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [orderActionKey, setOrderActionKey] = useState("");
-  const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [savedCardDetail, setSavedCardDetail] = useState(null);
   const [cardType, setCardType] = useState("standard");
   const [selectedMotionId, setSelectedMotionId] = useState("");
   const [motionStepError, setMotionStepError] = useState("");
+  const [reviewSubPhase, setReviewSubPhase] = useState("setup");
+  const [photoStepError, setPhotoStepError] = useState("");
+  const [detailsErrors, setDetailsErrors] = useState({});
+  const [detailsShowErrors, setDetailsShowErrors] = useState(false);
+  const [tierStepError, setTierStepError] = useState("");
+  const [themeStepError, setThemeStepError] = useState("");
   const [animationLoadingCardId, setAnimationLoadingCardId] = useState(null);
   const [animationFailed, setAnimationFailed] = useState(false);
+  const [generationPricing, setGenerationPricing] = useState(null);
+  const [pricingError, setPricingError] = useState("");
+  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
+  const [previewConfigureOpen, setPreviewConfigureOpen] = useState(false);
+  const [addCollectionLoading, setAddCollectionLoading] = useState(false);
 
   const selectedTierLabel = (TIER_UI[orderTier] || TIER_UI.all_star).label;
   const selectedTierRarityLabel = (TIER_UI[orderTier] || TIER_UI.all_star).sub;
@@ -213,28 +322,118 @@ export default function StudioPage() {
     }
   }, []);
 
-  const canGoStep2 = Boolean(orderTier);
-  const canGoStep3 = Boolean(
-    firstName.trim() &&
-      (lastName.trim() || displayName.trim()) &&
-      jerseyNumber.trim() &&
-      position.trim() &&
-      gradYear &&
-      teamName.trim()
-  );
-  const canGoStep4 = Boolean(imageFile);
   const isAnimatedCardType = cardType === "animated";
+  const playerDisplayName = playerNameFromForm(firstName, lastName, displayName);
+  const creditBalance = Number(user?.credit_balance ?? 0);
+  const animatedUpgradeCost = Number(generationPricing?.animated_upgrade_price ?? 10);
+  const additionalPreviewCost = Number(generationPricing?.additional_preview_price ?? 0);
+  const firstGenerateDue = isAnimatedCardType ? animatedUpgradeCost : 0;
+  const canAffordFirstGenerate = creditBalance >= firstGenerateDue;
+  const canAffordRegenerate = creditBalance >= additionalPreviewCost;
+  const regenerateShortfall = Math.max(0, additionalPreviewCost - creditBalance);
+  const firstGenerateShortfall = Math.max(0, firstGenerateDue - creditBalance);
+  const cardTypeSummaryLabel = isAnimatedCardType ? "Animated" : "Standard";
+  const inCreationFlow = currentStep >= STEP_PHOTO && currentStep <= STEP_REVIEW;
+
+  const detailsValidation = useMemo(
+    () =>
+      validatePlayerDetails(
+        firstName,
+        lastName,
+        displayName,
+        teamName,
+        position,
+        jerseyNumber,
+        gradYear
+      ),
+    [firstName, lastName, displayName, teamName, position, jerseyNumber, gradYear]
+  );
+
+  const stepComplete = useMemo(
+    () => ({
+      [STEP_PHOTO]: Boolean(imageFile),
+      [STEP_DETAILS]: detailsValidation.valid,
+      [STEP_TIER]: Boolean(orderTier),
+      [STEP_THEME]: Boolean(specialTheme),
+      [STEP_CARD_TYPE]: Boolean(cardType),
+      [STEP_MOTION]: !isAnimatedCardType || Boolean(selectedMotionId),
+      [STEP_REVIEW]: true,
+    }),
+    [imageFile, detailsValidation.valid, orderTier, specialTheme, cardType, isAnimatedCardType, selectedMotionId]
+  );
+
+  const canAdvanceFromStep = stepComplete[currentStep] ?? false;
+
   const canCreateOrder = Boolean(
-    currentStep >= STEP_THEME &&
+    currentStep === STEP_REVIEW &&
+      reviewSubPhase === "setup" &&
       orderCustomerName.trim() &&
       orderCustomerEmail.trim() &&
       !isCreating &&
       !isGenerating
   );
 
+  function goToStep(step) {
+    if (step > currentStep) return;
+    setCurrentStep(step);
+  }
+
+  function tryAdvanceStep() {
+    if (currentStep === STEP_PHOTO) {
+      if (!imageFile) {
+        setPhotoStepError("Please upload a player photo to continue");
+        return;
+      }
+      setPhotoStepError("");
+      setCurrentStep(STEP_DETAILS);
+      return;
+    }
+    if (currentStep === STEP_DETAILS) {
+      setDetailsShowErrors(true);
+      setDetailsErrors(detailsValidation.errors);
+      if (!detailsValidation.valid) return;
+      setCurrentStep(STEP_TIER);
+      return;
+    }
+    if (currentStep === STEP_TIER) {
+      if (!orderTier) {
+        setTierStepError("Please select a tier");
+        return;
+      }
+      setTierStepError("");
+      setCurrentStep(STEP_THEME);
+      return;
+    }
+    if (currentStep === STEP_THEME) {
+      if (!specialTheme) {
+        setThemeStepError("Please select a theme");
+        return;
+      }
+      setThemeStepError("");
+      setCurrentStep(STEP_CARD_TYPE);
+      return;
+    }
+    if (currentStep === STEP_CARD_TYPE) {
+      setCurrentStep(getNextWizardStep(STEP_CARD_TYPE, isAnimatedCardType));
+      return;
+    }
+    if (currentStep === STEP_MOTION) {
+      if (!selectedMotionId) {
+        setMotionStepError("Please select a motion for your animated card");
+        return;
+      }
+      setMotionStepError("");
+      setCurrentStep(STEP_REVIEW);
+    }
+  }
+
+  function goBackStep() {
+    setCurrentStep(getPrevWizardStep(currentStep, isAnimatedCardType));
+  }
+
   useEffect(() => {
     if (!isAnimatedCardType && currentStep === STEP_MOTION) {
-      setCurrentStep(STEP_THEME);
+      setCurrentStep(STEP_REVIEW);
     }
   }, [isAnimatedCardType, currentStep]);
 
@@ -247,6 +446,53 @@ export default function StudioPage() {
   useEffect(() => {
     fetchThemes();
   }, [fetchThemes]);
+
+  useEffect(() => {
+    if (!orderTier) {
+      setGenerationPricing(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await fetchGenerationPrice(orderTier);
+        if (!cancelled) {
+          setGenerationPricing(data);
+          setPricingError("");
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setGenerationPricing(null);
+          setPricingError(e.message || "Could not load pricing.");
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [orderTier]);
+
+  useEffect(() => {
+    if (!user || !token) return undefined;
+    const onReview =
+      currentStep === STEP_REVIEW &&
+      (reviewSubPhase === "setup" || reviewSubPhase === "generate") &&
+      (firstGenerateShortfall > 0 || regenerateShortfall > 0 || reviewSubPhase === "generate");
+    if (!onReview && !inCreationFlow) return undefined;
+    const id = window.setInterval(() => {
+      refreshUser(token);
+    }, 10000);
+    return () => window.clearInterval(id);
+  }, [
+    user,
+    token,
+    currentStep,
+    reviewSubPhase,
+    firstGenerateShortfall,
+    regenerateShortfall,
+    inCreationFlow,
+    refreshUser,
+  ]);
 
   useEffect(() => {
     if (!previewCards.length) return;
@@ -279,7 +525,7 @@ export default function StudioPage() {
   }, [selectedPreviewUrl, previewCards]);
 
   useEffect(() => {
-    if (currentStep !== STEP_APPROVE || !activeOrder?.final_card_url) return;
+    if (currentStep !== STEP_REVIEW || reviewSubPhase !== "approve" || !activeOrder?.final_card_url) return;
     const match = (activeOrder.generated_cards || []).find((g) => g.image_url === activeOrder.final_card_url);
     if (!match?.card_id) return;
     let cancelled = false;
@@ -296,7 +542,7 @@ export default function StudioPage() {
     return () => {
       cancelled = true;
     };
-  }, [currentStep, activeOrder]);
+  }, [currentStep, reviewSubPhase, activeOrder]);
 
   async function fetchMyCards() {
     if (!token) {
@@ -364,50 +610,6 @@ export default function StudioPage() {
     return playerRes.json();
   }
 
-  async function handleCreatePlayerAndOrder() {
-    setIsCreating(true);
-    setOrderActionKey("create-order");
-    setMessage("");
-    setError("");
-    try {
-      const playerData = await createPlayerFromCurrentForm();
-      setPlayerId(playerData.id);
-      setCurrentPlayer(playerData);
-
-      const orderRes = await fetch(`${API_BASE_URL}/orders`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders(token) },
-        body: JSON.stringify({
-          customer_name: orderCustomerName.trim(),
-          customer_email: orderCustomerEmail.trim(),
-          player_first_name: playerData.first_name,
-          player_last_name: playerData.last_name,
-          player_display_name: playerData.display_name ?? null,
-          player_jersey_number: playerData.jersey_number,
-          player_position: playerData.position,
-          player_grad_year: playerData.grad_year,
-          player_team_name: playerData.team_name,
-          player_image_url: playerData.image_url,
-          tier: orderTier,
-          special_theme: specialTheme || null,
-          add_ons: [],
-        }),
-      });
-      const orderData = await orderRes.json();
-      if (!orderRes.ok) throw new Error(formatApiError(orderData?.detail, "Failed to create order."));
-
-      setCurrentOrderId(orderData.id);
-      setMessage(`Order #${orderData.id} created. Generate your previews next.`);
-      await Promise.all([fetchMyCards(), fetchOrders()]);
-      setCurrentStep(STEP_GENERATE);
-    } catch (err) {
-      setError(err.message || "Failed to create order.");
-    } finally {
-      setIsCreating(false);
-      setOrderActionKey("");
-    }
-  }
-
   async function handleGenerateForOrder(orderId) {
     setIsGenerating(true);
     setOrderActionKey(`generate-${orderId}`);
@@ -424,7 +626,7 @@ export default function StudioPage() {
       setSelectedPreviewUrl(data.image_url || "");
       setGeneratedTier(data.tier || "base");
       setMessage(`Preview generated for order #${orderId}.`);
-      await Promise.all([fetchMyCards(), fetchOrders()]);
+      await Promise.all([fetchMyCards(), fetchOrders(), refreshUser(token)]);
     } catch (err) {
       setError(err.message || "Failed to generate order card.");
     } finally {
@@ -433,10 +635,129 @@ export default function StudioPage() {
     }
   }
 
+  async function ensureOrderForGeneration() {
+    if (currentOrderId) return currentOrderId;
+    const playerData = await createPlayerFromCurrentForm();
+    setPlayerId(playerData.id);
+    setCurrentPlayer(playerData);
+
+    const orderRes = await fetch(`${API_BASE_URL}/orders`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders(token) },
+      body: JSON.stringify({
+        customer_name: orderCustomerName.trim(),
+        customer_email: orderCustomerEmail.trim(),
+        player_first_name: playerData.first_name,
+        player_last_name: playerData.last_name,
+        player_display_name: playerData.display_name ?? null,
+        player_jersey_number: playerData.jersey_number,
+        player_position: playerData.position,
+        player_grad_year: playerData.grad_year,
+        player_team_name: playerData.team_name,
+        player_image_url: playerData.image_url,
+        tier: orderTier,
+        card_type: cardType,
+        special_theme: specialTheme || null,
+        add_ons: [],
+      }),
+    });
+    const orderData = await orderRes.json();
+    if (!orderRes.ok) throw new Error(formatApiError(orderData?.detail, "Failed to create order."));
+    setCurrentOrderId(orderData.id);
+    await fetchOrders();
+    return orderData.id;
+  }
+
+  async function handleGenerateFirstPreview() {
+    if (isAnimatedCardType && !canAffordFirstGenerate) {
+      setError(`You need ${formatMoney(firstGenerateDue)} in credits to generate this card.`);
+      return;
+    }
+    setIsCreating(true);
+    setOrderActionKey("generate-first");
+    setMessage("");
+    setError("");
+    try {
+      const orderId = await ensureOrderForGeneration();
+      setReviewSubPhase("generate");
+      await handleGenerateForOrder(orderId);
+      setPreviewConfigureOpen(false);
+    } catch (err) {
+      setError(err.message || "Failed to start generation.");
+    } finally {
+      setIsCreating(false);
+      setOrderActionKey("");
+    }
+  }
+
   async function handleGeneratePreviewForCurrentOrder() {
     if (!currentOrderId) return setError("Create an order first.");
-    if (isPreviewLimitReached) return setError("You’ve reached your preview limit");
+    if (isPreviewLimitReached) return setError("You\u2019ve reached your preview limit");
+    if (activePreviewCount > 0 && !canAffordRegenerate) {
+      setError(`You need ${formatMoney(additionalPreviewCost)} to generate another preview.`);
+      setShowRegenerateConfirm(false);
+      return;
+    }
     await handleGenerateForOrder(currentOrderId);
+    setShowRegenerateConfirm(false);
+    setPreviewConfigureOpen(false);
+  }
+
+  async function handleConfirmAddToCollection(quantity) {
+    if (!currentOrderId) return setError("Create an order first.");
+    if (!selectedPreviewUrl && !generatedCardUrl) return setError("Select a preview first.");
+    const extraCopies = Math.max(0, quantity - 1);
+    const extraCost = additionalPreviewCost * extraCopies;
+    if (extraCost > creditBalance) {
+      setError(`You need ${formatMoney(extraCost)} in credits for ${extraCopies} additional ${extraCopies === 1 ? "copy" : "copies"}.`);
+      return;
+    }
+    setAddCollectionLoading(true);
+    setOrderActionKey(`approve-${currentOrderId}`);
+    setMessage("");
+    setError("");
+    try {
+      const res = await fetch(`${API_BASE_URL}/orders/${currentOrderId}/approve-preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders(token) },
+        body: JSON.stringify({ image_url: selectedPreviewUrl || generatedCardUrl || null }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(formatApiError(data?.detail, "Failed to add card to collection."));
+      if (data.final_card_url) setGeneratedCardUrl(data.final_card_url);
+
+      const sel = previewCards.find((p) => p.image_url === (selectedPreviewUrl || generatedCardUrl));
+      const cardId = sel?.card_id;
+      if (cardId) await fetchCardDetailById(cardId);
+
+      if (quantity > 1 && cardId) {
+        const dupRes = await fetch(`${API_BASE_URL}/cards/${encodeURIComponent(cardId)}/duplicate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders(token) },
+          body: JSON.stringify({ quantity }),
+        });
+        const dupData = await dupRes.json().catch(() => ({}));
+        if (!dupRes.ok) {
+          throw new Error(formatApiError(dupData?.detail, "Could not create additional copies."));
+        }
+        if (cardId) await fetchCardDetailById(cardId);
+      }
+
+      setMessage(`Order #${currentOrderId} completed and added to your collection.`);
+      await Promise.all([fetchOrders(), fetchMyCards(), refreshUser(token)]);
+
+      if (isAnimatedCardType && selectedMotionId && cardId) {
+        await startCardAnimation(cardId);
+        return;
+      }
+      setReviewSubPhase("approve");
+      setPreviewConfigureOpen(false);
+    } catch (err) {
+      setError(err.message || "Failed to add card to collection.");
+    } finally {
+      setAddCollectionLoading(false);
+      setOrderActionKey("");
+    }
   }
 
   async function fetchCardDetailById(cardId) {
@@ -461,39 +782,6 @@ export default function StudioPage() {
     setAnimationLoadingCardId(cardId);
   }
 
-  async function handleApprovePreviewForCurrentOrder() {
-    if (!currentOrderId) return setError("Create an order first.");
-    setOrderActionKey(`approve-${currentOrderId}`);
-    setMessage("");
-    setError("");
-    try {
-      const res = await fetch(`${API_BASE_URL}/orders/${currentOrderId}/approve-preview`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders(token) },
-        body: JSON.stringify({ image_url: selectedPreviewUrl || generatedCardUrl || null }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(formatApiError(data?.detail, "Failed to approve preview."));
-      if (data.final_card_url) setGeneratedCardUrl(data.final_card_url);
-      setMessage(`Order #${currentOrderId} completed and delivered.`);
-      await fetchOrders();
-
-      const sel = previewCards.find((p) => p.image_url === (selectedPreviewUrl || generatedCardUrl));
-      const cardId = sel?.card_id;
-      if (cardId) await fetchCardDetailById(cardId);
-
-      if (isAnimatedCardType && selectedMotionId && cardId) {
-        await startCardAnimation(cardId);
-        return;
-      }
-      setCurrentStep(STEP_APPROVE);
-    } catch (err) {
-      setError(err.message || "Failed to approve preview.");
-    } finally {
-      setOrderActionKey("");
-    }
-  }
-
   async function handleAnimationComplete() {
     if (animationLoadingCardId) {
       try {
@@ -504,19 +792,9 @@ export default function StudioPage() {
     }
     setAnimationLoadingCardId(null);
     setAnimationFailed(false);
-    setCurrentStep(STEP_APPROVE);
-    await Promise.all([fetchMyCards(), fetchOrders()]);
-  }
-
-  function handleOpenCompleteOrderModal() {
-    if (!currentOrderId) return setError("Create an order first.");
-    if (!selectedPreviewUrl && !generatedCardUrl) return setError("Generate and select a preview first.");
-    if (isAnimatedCardType && !selectedMotionId) {
-      setError("Select a motion for your animated card first.");
-      setCurrentStep(STEP_MOTION);
-      return;
-    }
-    setShowCompleteModal(true);
+    setReviewSubPhase("approve");
+    setCurrentStep(STEP_REVIEW);
+    await Promise.all([fetchMyCards(), fetchOrders(), refreshUser(token)]);
   }
 
   function handleDropFile(e) {
@@ -579,129 +857,26 @@ export default function StudioPage() {
           </section>
         ) : (
         <section className="animate-fadeUp rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6">
-            <div className="mb-4 flex flex-wrap gap-2">
-              {STEPS.map((label, i) => {
-                const step = i + 1;
-                if (step === STEP_MOTION && !isAnimatedCardType) return null;
-                return (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => setCurrentStep(step)}
-                    className={`rounded-lg border px-3 py-1.5 text-xs transition ${stepChipClass(
-                      step,
-                      currentStep
-                    )}`}
-                  >
-                    {step}. {label}
-                  </button>
-                );
-              })}
-            </div>
+            <WizardProgress
+              currentStep={currentStep}
+              isAnimated={isAnimatedCardType}
+              onGoToStep={goToStep}
+            />
 
-            {!user && currentStep >= 2 ? (
-              <StudioAuthGate onBackToTiers={() => setCurrentStep(1)} />
+            {user && inCreationFlow ? (
+              <div className="mb-6">
+                <StudioCreditBalance balance={creditBalance} />
+              </div>
+            ) : null}
+
+            {!user && currentStep >= STEP_DETAILS ? (
+              <StudioAuthGate
+                onBackToTiers={() => goToStep(STEP_PHOTO)}
+                backLabel="← Back to photo upload"
+              />
             ) : (
               <>
-            {currentStep === 1 ? (
-              <div className="grid gap-4 sm:grid-cols-3">
-                {[
-                  { value: "rookie", ...TIER_UI.rookie },
-                  { value: "all_star", ...TIER_UI.all_star },
-                  { value: "legends", ...TIER_UI.legends },
-                ].map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => {
-                      setOrderTier(opt.value);
-                      setCurrentStep(2);
-                    }}
-                    className={`group relative overflow-hidden rounded-xl border p-4 text-left transition-all duration-300 ${
-                      orderTier === opt.value
-                        ? opt.active
-                        : opt.card
-                    }`}
-                  >
-                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_0%,rgba(255,255,255,0.2),transparent_38%)] opacity-35 transition-opacity group-hover:opacity-55" />
-                    <p className="font-medium text-white">{opt.label}</p>
-                    <p className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[11px] ${opt.pill}`}>
-                      {opt.sub}
-                    </p>
-                    <p className="mt-2 text-xs text-slate-200/90">{opt.desc}</p>
-                  </button>
-                ))}
-              </div>
-            ) : null}
-
-            {currentStep === 2 ? (
-              <div className="grid gap-4">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <input
-                    className="min-h-[44px] rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5"
-                    placeholder="First Name"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                  />
-                  <input
-                    className="min-h-[44px] rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5"
-                    placeholder="Last Name"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                  />
-                  <input
-                    className="min-h-[44px] rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5"
-                    placeholder="Display Name (optional)"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                  />
-                  <input
-                    className="min-h-[44px] rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5"
-                    placeholder="Jersey Number"
-                    value={jerseyNumber}
-                    onChange={(e) => setJerseyNumber(e.target.value)}
-                  />
-                  <input
-                    className="min-h-[44px] rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5"
-                    placeholder="Position"
-                    value={position}
-                    onChange={(e) => setPosition(e.target.value)}
-                  />
-                  <input
-                    type="number"
-                    className="min-h-[44px] rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 sm:col-span-2"
-                    placeholder="Grad Year"
-                    value={gradYear}
-                    onChange={(e) => setGradYear(e.target.value)}
-                  />
-                  <input
-                    className="min-h-[44px] rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 sm:col-span-2"
-                    placeholder="Team Name"
-                    value={teamName}
-                    onChange={(e) => setTeamName(e.target.value)}
-                  />
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCurrentStep(1)}
-                    className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
-                  >
-                    Back to Tier
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!canGoStep3}
-                    onClick={() => setCurrentStep(3)}
-                    className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:opacity-50"
-                  >
-                    Continue to Photo Upload
-                  </button>
-                </div>
-              </div>
-            ) : null}
-
-            {currentStep === 3 ? (
+            {currentStep === STEP_PHOTO ? (
               <div className="grid gap-4">
                 <label
                   onDragOver={(e) => {
@@ -709,22 +884,34 @@ export default function StudioPage() {
                     setDragActive(true);
                   }}
                   onDragLeave={() => setDragActive(false)}
-                  onDrop={handleDropFile}
+                  onDrop={(e) => {
+                    handleDropFile(e);
+                    setPhotoStepError("");
+                  }}
                   className={`flex min-h-[180px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-4 text-center transition ${
                     dragActive
                       ? "border-neonBlue/70 bg-neonBlue/10"
-                      : "border-white/20 bg-cardBg2 hover:border-neonBlue/40"
+                      : photoStepError
+                        ? "border-rose-500/50 bg-rose-500/5"
+                        : "border-white/20 bg-cardBg2 hover:border-neonBlue/40"
                   }`}
                 >
                   <input
                     type="file"
                     accept="image/*"
                     className="hidden"
-                    onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                    onChange={(e) => {
+                      setImageFile(e.target.files?.[0] || null);
+                      setPhotoStepError("");
+                      setError("");
+                    }}
                   />
                   <p className="text-sm text-slate-200">Drag & drop player photo</p>
                   <p className="text-xs text-slate-400">or click to choose an image</p>
                 </label>
+                {photoStepError ? (
+                  <p className="text-sm text-rose-300">{photoStepError}</p>
+                ) : null}
                 {imagePreviewUrl ? (
                   <img
                     src={imagePreviewUrl}
@@ -735,16 +922,200 @@ export default function StudioPage() {
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => setCurrentStep(2)}
+                    disabled={!canAdvanceFromStep}
+                    onClick={tryAdvanceStep}
+                    className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
+                  >
+                    Continue to Player Details
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {currentStep === STEP_DETAILS ? (
+              <div className="grid gap-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <input
+                      className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 ${fieldErrorClass(detailsShowErrors && detailsErrors.playerName)}`}
+                      placeholder="First Name *"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <input
+                      className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 ${fieldErrorClass(detailsShowErrors && detailsErrors.playerName)}`}
+                      placeholder="Last Name *"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                    />
+                    {detailsShowErrors && detailsErrors.playerName ? (
+                      <p className="mt-1 text-xs text-rose-300">{detailsErrors.playerName}</p>
+                    ) : null}
+                  </div>
+                  <div className="sm:col-span-2">
+                    <input
+                      className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 ${fieldErrorClass(detailsShowErrors && detailsErrors.playerName)}`}
+                      placeholder="Display Name (optional — used as player name if set)"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <input
+                      className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 ${fieldErrorClass(detailsShowErrors && detailsErrors.jerseyNumber)}`}
+                      placeholder="Jersey Number *"
+                      value={jerseyNumber}
+                      onChange={(e) => setJerseyNumber(e.target.value)}
+                    />
+                    {detailsShowErrors && detailsErrors.jerseyNumber ? (
+                      <p className="mt-1 text-xs text-rose-300">{detailsErrors.jerseyNumber}</p>
+                    ) : null}
+                  </div>
+                  <div>
+                    <input
+                      className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 ${fieldErrorClass(detailsShowErrors && detailsErrors.position)}`}
+                      placeholder="Position *"
+                      value={position}
+                      onChange={(e) => setPosition(e.target.value)}
+                    />
+                    {detailsShowErrors && detailsErrors.position ? (
+                      <p className="mt-1 text-xs text-rose-300">{detailsErrors.position}</p>
+                    ) : null}
+                  </div>
+                  <div>
+                    <input
+                      type="number"
+                      className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 ${fieldErrorClass(detailsShowErrors && detailsErrors.gradYear)}`}
+                      placeholder="Grad Year *"
+                      value={gradYear}
+                      onChange={(e) => setGradYear(e.target.value)}
+                    />
+                    {detailsShowErrors && detailsErrors.gradYear ? (
+                      <p className="mt-1 text-xs text-rose-300">{detailsErrors.gradYear}</p>
+                    ) : null}
+                  </div>
+                  <div>
+                    <input
+                      className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 ${fieldErrorClass(detailsShowErrors && detailsErrors.teamName)}`}
+                      placeholder="Team Name *"
+                      value={teamName}
+                      onChange={(e) => setTeamName(e.target.value)}
+                    />
+                    {detailsShowErrors && detailsErrors.teamName ? (
+                      <p className="mt-1 text-xs text-rose-300">{detailsErrors.teamName}</p>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={goBackStep}
                     className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
                   >
-                    Back to Player Details
+                    Back
                   </button>
                   <button
                     type="button"
-                    disabled={!canGoStep4}
-                    onClick={() => setCurrentStep(4)}
-                    className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:opacity-50"
+                    disabled={!canAdvanceFromStep}
+                    onClick={tryAdvanceStep}
+                    className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
+                  >
+                    Continue to Tier Selection
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {currentStep === STEP_TIER ? (
+              <div className="grid gap-4">
+                {tierStepError ? (
+                  <p className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+                    {tierStepError}
+                  </p>
+                ) : null}
+                <div className="grid gap-4 sm:grid-cols-3">
+                  {[
+                    { value: "rookie", ...TIER_UI.rookie },
+                    { value: "all_star", ...TIER_UI.all_star },
+                    { value: "legends", ...TIER_UI.legends },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        setOrderTier(opt.value);
+                        setTierStepError("");
+                      }}
+                      className={`group relative overflow-hidden rounded-xl border p-4 text-left transition-all duration-300 ${
+                        orderTier === opt.value
+                          ? opt.active
+                          : tierStepError
+                            ? `${opt.card} ring-1 ring-rose-500/40`
+                            : opt.card
+                      }`}
+                    >
+                      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_0%,rgba(255,255,255,0.2),transparent_38%)] opacity-35 transition-opacity group-hover:opacity-55" />
+                      <p className="font-medium text-white">{opt.label}</p>
+                      <p className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[11px] ${opt.pill}`}>
+                        {opt.sub}
+                      </p>
+                      <p className="mt-2 text-xs text-slate-200/90">{opt.desc}</p>
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={goBackStep}
+                    className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!canAdvanceFromStep}
+                    onClick={tryAdvanceStep}
+                    className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
+                  >
+                    Continue to Theme Selection
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {currentStep === STEP_THEME ? (
+              <div className="grid gap-4">
+                {themeStepError ? (
+                  <p className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+                    {themeStepError}
+                  </p>
+                ) : null}
+                <ThemeLibraryPicker
+                  categories={themeCategories}
+                  loading={themesLoading}
+                  error={themesError}
+                  onRetry={fetchThemes}
+                  value={specialTheme}
+                  onChange={(id) => {
+                    setSpecialTheme(id);
+                    setThemeStepError("");
+                  }}
+                />
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={goBackStep}
+                    className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!canAdvanceFromStep}
+                    onClick={tryAdvanceStep}
+                    className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
                   >
                     Continue to Card Type
                   </button>
@@ -752,7 +1123,7 @@ export default function StudioPage() {
               </div>
             ) : null}
 
-            {currentStep === 4 ? (
+            {currentStep === STEP_CARD_TYPE ? (
               <div className="grid gap-4">
                 <CardTypeStep
                   value={cardType}
@@ -760,37 +1131,75 @@ export default function StudioPage() {
                     setCardType(type);
                     if (type === "standard") setSelectedMotionId("");
                   }}
+                  animatedUpgradePrice={generationPricing?.animated_upgrade_price ?? 10}
                 />
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => setCurrentStep(3)}
+                    onClick={goBackStep}
                     className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
                   >
-                    Back to Upload
+                    Back
                   </button>
                   <button
                     type="button"
-                    onClick={() => setCurrentStep(isAnimatedCardType ? STEP_MOTION : STEP_THEME)}
-                    className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto"
+                    disabled={!canAdvanceFromStep}
+                    onClick={tryAdvanceStep}
+                    className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
                   >
-                    {isAnimatedCardType ? "Continue to Motion" : "Continue to Theme"}
+                    {isAnimatedCardType ? "Continue to Motion Selection" : "Continue to Review"}
                   </button>
                 </div>
               </div>
             ) : null}
 
-            {currentStep === STEP_THEME ? (
-              <div className="grid gap-8">
-                <ThemeLibraryPicker
-                  categories={themeCategories}
-                  loading={themesLoading}
-                  error={themesError}
-                  onRetry={fetchThemes}
-                  value={specialTheme}
-                  onChange={setSpecialTheme}
+            {currentStep === STEP_MOTION && isAnimatedCardType ? (
+              <div className="grid gap-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Choose Your Player&apos;s Motion</h3>
+                  <p className="mt-1 text-sm text-slate-400">
+                    Select how your player moves in the animation
+                  </p>
+                </div>
+                <MotionSelectionGrid
+                  value={selectedMotionId}
+                  onChange={(id) => {
+                    setSelectedMotionId(id);
+                    setMotionStepError("");
+                  }}
+                  error={motionStepError}
                 />
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={goBackStep}
+                    className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!canAdvanceFromStep}
+                    onClick={tryAdvanceStep}
+                    className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
+                  >
+                    Continue to Review
+                  </button>
+                </div>
+              </div>
+            ) : null}
 
+            {currentStep === STEP_REVIEW && reviewSubPhase === "setup" ? (
+              <div className="grid gap-8">
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Review & Generate</h3>
+                  <p className="mt-1 text-sm text-slate-400">
+                    Confirm your choices. Your first preview is free — additional previews and copies use credits.
+                  </p>
+                  {pricingError ? (
+                    <p className="mt-2 text-sm text-rose-300">{pricingError}</p>
+                  ) : null}
+                </div>
                 <div className="grid gap-4 lg:grid-cols-2">
                   <div className="rounded-xl border border-white/10 bg-cardBg2 p-3">
                     <p className="text-sm font-medium text-white">Delivery Contact</p>
@@ -816,130 +1225,65 @@ export default function StudioPage() {
                       className="mt-1 min-h-[44px] w-full rounded-xl border border-white/15 bg-cardBg px-3 py-2.5"
                     />
                   </div>
-                  <div className="rounded-xl border border-white/10 bg-cardBg2 p-4 text-sm text-slate-300">
-                    <p className="font-medium text-white">Selection Summary</p>
-                    <p className="mt-2">
-                      Tier: {selectedTierLabel}{" "}
-                      <span className="text-slate-400">({selectedTierRarityLabel})</span>
-                    </p>
-                    <p>
-                      Card type:{" "}
-                      {isAnimatedCardType ? "Animated (+$10.00)" : "Standard"}
-                    </p>
-                    {isAnimatedCardType && selectedMotionId ? (
-                      <p>Motion: {motionLabel(selectedMotionId)}</p>
-                    ) : null}
-                    <p>Theme: {selectedThemeLabel}</p>
-                    <p>Player: {displayName || `${firstName} ${lastName}`.trim() || "TBD"}</p>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCurrentStep(isAnimatedCardType ? STEP_MOTION : 4)}
-                    className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
-                  >
-                    {isAnimatedCardType ? "Back to Motion" : "Back to Card Type"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCreatePlayerAndOrder}
-                    disabled={!canCreateOrder}
-                    className="inline-flex min-h-[46px] items-center justify-center rounded-xl bg-neonTeal px-4 py-2.5 text-sm font-medium text-slate-950 disabled:opacity-50"
-                  >
-                    {orderActionKey === "create-order" ? "Creating Player & Order..." : "Create Player & Order"}
-                  </button>
-                </div>
-              </div>
-            ) : null}
-
-            {currentStep === STEP_MOTION && isAnimatedCardType ? (
-              <div className="grid gap-4">
-                <div className="grid gap-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-white">Choose Your Player&apos;s Motion</h3>
-                    <p className="mt-1 text-sm text-slate-400">
-                      Select how your player moves in the animation
-                    </p>
-                  </div>
-                  <MotionSelectionGrid
-                    value={selectedMotionId}
-                    onChange={(id) => {
-                      setSelectedMotionId(id);
-                      setMotionStepError("");
-                    }}
-                    error={motionStepError}
+                  <GenerationCostSummary
+                    playerName={playerDisplayName}
+                    tierLabel={selectedTierLabel}
+                    cardTypeLabel={cardTypeSummaryLabel}
+                    isAnimated={isAnimatedCardType}
+                    pricing={generationPricing}
+                    creditBalance={creditBalance}
                   />
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => setCurrentStep(4)}
+                    onClick={goBackStep}
                     className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
                   >
-                    Back to Card Type
+                    Back
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (!selectedMotionId) {
-                        setMotionStepError("Please select a motion to continue.");
-                        return;
-                      }
-                      setCurrentStep(STEP_THEME);
-                    }}
-                    className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto"
+                    onClick={handleGenerateFirstPreview}
+                    disabled={
+                      !canCreateOrder ||
+                      !generationPricing ||
+                      (isAnimatedCardType && !canAffordFirstGenerate) ||
+                      Boolean(orderActionKey)
+                    }
+                    className="inline-flex min-h-[52px] flex-1 items-center justify-center rounded-xl bg-neonTeal px-6 py-3 text-base font-semibold text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400 sm:flex-none"
                   >
-                    Continue to Theme
+                    {orderActionKey === "generate-first"
+                      ? "Generating..."
+                      : isAnimatedCardType
+                        ? `Generate My Card — ${formatMoney(firstGenerateDue)}`
+                        : "Generate My Card — Free Preview"}
                   </button>
                 </div>
               </div>
             ) : null}
 
-            {currentStep === STEP_GENERATE ? (
-              <div className="grid gap-4">
-                <div className="rounded-xl border border-white/10 bg-cardBg2 p-3 text-sm text-slate-300">
-                  Active Order ID: <span className="font-medium text-white">{currentOrderId ?? "None yet"}</span> ·{" "}
-                  Remaining previews:{" "}
-                  <span className="font-medium text-white">
-                    {remainingPreviews}/{activePreviewLimit}
-                  </span>
-                </div>
-                <div className={`rounded-xl border p-3 text-xs text-slate-200 ${tierTheme.preview}`}>
-                  <p className="font-medium tracking-wide text-white">
-                    {tierTheme.label} {tierTheme.sub} Presentation
-                  </p>
-                  <p className="mt-1 text-slate-300">
-                    {tierTheme.desc} Framing, glow, and accents are tuned to this rarity tier.
-                  </p>
-                </div>
-                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/95">
-                  <p className="font-medium text-amber-50">Previews are for reference only</p>
-                  <p className="mt-1 text-xs text-amber-100/80">
-                    {isAnimatedCardType
-                      ? "Nothing is saved to your collection until you complete and create your animation. The preview artwork is used to generate your animated card."
-                      : "Nothing is saved to your collection until you click Complete Order & Add to Collection below."}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleGeneratePreviewForCurrentOrder}
-                  disabled={!currentOrderId || isPreviewLimitReached || Boolean(orderActionKey)}
-                  className={`inline-flex min-h-[46px] w-full items-center justify-center rounded-xl px-4 py-2.5 text-sm font-medium text-white transition-all sm:w-auto disabled:opacity-50 ${tierTheme.loading}`}
-                >
-                  {orderActionKey === `generate-${currentOrderId}`
-                    ? "Generating..."
-                    : isAnimatedCardType
-                      ? "Generate Card Artwork"
-                      : "Generate Card Preview"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCurrentStep(STEP_THEME)}
-                  className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100 sm:w-auto"
-                >
-                  Back to Theme
-                </button>
+            {currentStep === STEP_REVIEW && reviewSubPhase === "generate" ? (
+              <div className="grid gap-6">
+                <GenerationCostSummary
+                  playerName={playerDisplayName}
+                  tierLabel={selectedTierLabel}
+                  cardTypeLabel={cardTypeSummaryLabel}
+                  isAnimated={isAnimatedCardType}
+                  pricing={generationPricing}
+                  creditBalance={creditBalance}
+                />
+
+                {activePreviewCount > 0 ? (
+                  <div className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
+                    <p className="font-medium text-cyan-50">This is your free preview.</p>
+                    <p className="mt-1 text-xs text-cyan-100/90">
+                      Regenerate for {formatMoney(additionalPreviewCost)} per attempt if you&apos;d like a different
+                      result. Only the card you choose will be added to your collection.
+                    </p>
+                  </div>
+                ) : null}
+
                 {isGenerating ? (
                   <div className={`rounded-xl border px-3 py-2 ${tierTheme.loading}`}>
                     <div className="mb-2 flex items-center gap-2 text-xs text-violet-100">
@@ -952,53 +1296,186 @@ export default function StudioPage() {
                     <p className="mt-2 text-[11px] text-slate-200/90">Applying rarity framing, effects, and finish...</p>
                   </div>
                 ) : null}
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {previewCards.map((preview, idx) => (
-                    <button
-                      key={`${preview.image_url}-${idx}`}
-                      type="button"
-                      onClick={() => setSelectedPreviewUrl(preview.image_url)}
-                      className={`group relative overflow-hidden rounded-xl border text-left transition-all duration-300 ${
-                        selectedPreviewUrl === preview.image_url
-                          ? `${tierTheme.active} shadow-glowBlue`
-                          : `${tierTheme.card} hover:translate-y-[-1px]`
-                      }`}
-                    >
-                      <div className="pointer-events-none absolute inset-0 hidden bg-[radial-gradient(circle_at_80%_0%,rgba(255,255,255,0.2),transparent_35%)] opacity-30 group-hover:opacity-50 sm:block" />
-                      <img
-                        src={toApiUrl(preview.image_url)}
-                        alt={`Preview ${idx + 1}`}
-                        className="block aspect-[2/3] h-auto w-full object-contain"
-                      />
-                      <div className="bg-cardBg2 p-2 text-xs text-slate-300">
-                        <span className={`rounded-full border px-1.5 py-0.5 ${tierTheme.pill}`}>{tierTheme.sub}</span>{" "}
-                        Preview {idx + 1}
+
+                {previewCards.length === 0 && !isGenerating ? (
+                  <button
+                    type="button"
+                    onClick={handleGenerateFirstPreview}
+                    disabled={Boolean(orderActionKey)}
+                    className={`inline-flex min-h-[52px] w-full items-center justify-center rounded-xl px-6 py-3 text-base font-semibold text-white disabled:opacity-50 ${tierTheme.loading}`}
+                  >
+                    {isAnimatedCardType
+                      ? `Generate My Card — ${formatMoney(firstGenerateDue)}`
+                      : "Generate My Card — Free Preview"}
+                  </button>
+                ) : null}
+
+                {previewCards.length > 0 ? (
+                  <>
+                    {previewCards.length > 1 ? (
+                      <div className="rounded-xl border border-white/10 bg-cardBg2 px-4 py-3 text-center">
+                        <p className="text-base font-semibold text-white">
+                          Pick your favorite — only the card you choose will be added to your collection
+                        </p>
                       </div>
-                    </button>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={handleOpenCompleteOrderModal}
-                  disabled={!selectedPreviewUrl && !generatedCardUrl}
-                  className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonTeal px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:opacity-50"
-                >
-                  {isAnimatedCardType ? "Complete & Create Animation" : "Complete Order & Add to Collection"}
-                </button>
+                    ) : null}
+
+                    {!previewConfigureOpen ? (
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {previewCards.map((preview, idx) => (
+                          <div
+                            key={`${preview.image_url}-${idx}`}
+                            className={`overflow-hidden rounded-xl border transition-all duration-300 ${
+                              selectedPreviewUrl === preview.image_url
+                                ? `${tierTheme.active} shadow-glowBlue`
+                                : tierTheme.card
+                            }`}
+                          >
+                            <img
+                              src={toApiUrl(preview.image_url)}
+                              alt={`Preview ${idx + 1}`}
+                              className="block aspect-[2/3] h-auto w-full object-contain bg-black/20"
+                            />
+                            <div className="space-y-2 bg-cardBg2 p-3">
+                              <p className="text-xs text-slate-400">
+                                <span className={`rounded-full border px-1.5 py-0.5 ${tierTheme.pill}`}>
+                                  {tierTheme.sub}
+                                </span>{" "}
+                                Preview {idx + 1}
+                              </p>
+                              {previewCards.length > 1 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedPreviewUrl(preview.image_url);
+                                    setPreviewConfigureOpen(true);
+                                  }}
+                                  className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl bg-neonTeal px-4 py-2 text-sm font-semibold text-slate-950"
+                                >
+                                  Choose This Card
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedPreviewUrl(preview.image_url);
+                                    setPreviewConfigureOpen(true);
+                                  }}
+                                  className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-neonTeal px-4 py-2.5 text-sm font-semibold text-slate-950"
+                                >
+                                  Add This Card to My Collection
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {previewConfigureOpen ? (
+                      <div className="rounded-2xl border border-neonTeal/30 bg-cardBg2 p-4 sm:p-6">
+                        <p className="text-center text-sm font-medium text-white">Confirm your card</p>
+                        <div className="mx-auto mt-4 max-w-xs overflow-hidden rounded-xl border border-white/10">
+                          <img
+                            src={toApiUrl(selectedPreviewUrl || generatedCardUrl)}
+                            alt="Selected preview"
+                            className="block w-full object-contain"
+                          />
+                        </div>
+                        <QuantitySelector
+                          disabled={addCollectionLoading}
+                          loading={addCollectionLoading}
+                          copyUnitPrice={additionalPreviewCost}
+                          onConfirm={handleConfirmAddToCollection}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setPreviewConfigureOpen(false)}
+                          className="mt-3 w-full text-center text-sm text-slate-400 hover:text-slate-200"
+                        >
+                          ← Back to previews
+                        </button>
+                      </div>
+                    ) : null}
+
+                    {!previewConfigureOpen && previewCards.length === 1 ? (
+                      <div className="text-center">
+                        <p className="text-sm text-slate-400">
+                          Not happy with it? Generate another preview for {formatMoney(additionalPreviewCost)}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!canAffordRegenerate) {
+                              setError(
+                                `You need ${formatMoney(additionalPreviewCost)} to generate another preview.`
+                              );
+                              return;
+                            }
+                            setShowRegenerateConfirm(true);
+                          }}
+                          disabled={isPreviewLimitReached || Boolean(orderActionKey)}
+                          className="mt-3 inline-flex min-h-[44px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-5 py-2 text-sm font-medium text-slate-100 disabled:opacity-50"
+                        >
+                          Try Again — {formatMoney(additionalPreviewCost)}
+                        </button>
+                      </div>
+                    ) : null}
+
+                    {!previewConfigureOpen && previewCards.length > 1 && !isPreviewLimitReached ? (
+                      <div className="text-center">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!canAffordRegenerate) {
+                              setError(
+                                `You need ${formatMoney(additionalPreviewCost)} to generate another preview.`
+                              );
+                              return;
+                            }
+                            setShowRegenerateConfirm(true);
+                          }}
+                          disabled={Boolean(orderActionKey)}
+                          className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-5 py-2 text-sm font-medium text-slate-100 disabled:opacity-50"
+                        >
+                          Generate Another Preview — {formatMoney(additionalPreviewCost)}
+                        </button>
+                      </div>
+                    ) : null}
+
+                    {!canAffordRegenerate && activePreviewCount > 0 ? (
+                      <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-100">
+                        <p>
+                          You need {formatMoney(additionalPreviewCost)} to generate another preview.
+                        </p>
+                        <p className="mt-1">Your balance: {formatMoney(creditBalance)}</p>
+                        <a
+                          href="/credits"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-3 inline-flex min-h-[40px] items-center justify-center rounded-lg bg-neonTeal px-4 py-2 text-sm font-semibold text-slate-950"
+                        >
+                          Add Credits
+                        </a>
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
               </div>
             ) : null}
 
-            {currentStep === STEP_APPROVE ? (
+            {currentStep === STEP_REVIEW && reviewSubPhase === "approve" ? (
               <div className="grid gap-6">
                 {savedCardDetail ? (
                   <PostGenerationPanel
                     detail={savedCardDetail}
                     onViewCollection={() => navigate("/my-collection")}
                     isLoggedIn={Boolean(user)}
-                    showQuantityFlow={isOrderDelivered || currentStep >= STEP_APPROVE}
+                    showQuantityFlow={false}
                     token={token || ""}
                     onRefreshDetail={refreshSavedCardDetail}
                     onCardsUpdated={fetchMyCards}
+                    copyUnitPrice={additionalPreviewCost}
                   />
                 ) : null}
                 {!isAnimatedCardType ? (
@@ -1044,77 +1521,33 @@ export default function StudioPage() {
         {user ? <CardGallery cards={cards} /> : null}
       </main>
 
-      {showCompleteModal ? (
+      {showRegenerateConfirm ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-3 py-4 sm:px-4">
-          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/10 bg-cardBg p-4 shadow-2xl shadow-black/50 sm:p-6">
-            <h3 className="text-lg font-semibold text-white">
-              {isAnimatedCardType ? "Add Animated Card to Collection" : "Add Card to Collection"}
-            </h3>
-            <p className="mt-1 text-sm text-slate-300">
-              {isAnimatedCardType
-                ? "We will finalize your card artwork and start AI motion generation right away."
-                : "Confirm this preview as your final card and complete delivery."}
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-cardBg p-5 shadow-2xl shadow-black/50 sm:p-6">
+            <h3 className="text-lg font-semibold text-white">Generate another preview?</h3>
+            <p className="mt-2 text-sm text-slate-300">
+              Generate another preview for {formatMoney(additionalPreviewCost)}?
             </p>
-            <div className="mt-4 grid gap-4 sm:grid-cols-[170px_1fr]">
-              <div className="overflow-hidden rounded-xl border border-white/10 bg-cardBg2">
-                <img
-                  src={toApiUrl(selectedPreviewUrl || generatedCardUrl)}
-                  alt="Selected preview"
-                  className="block h-auto w-full object-contain"
-                />
-              </div>
-              <div className="space-y-2 text-sm text-slate-300">
-                <p>
-                  <span className="text-slate-400">Order ID:</span>{" "}
-                  <span className="font-medium text-white">{currentOrderId ?? "—"}</span>
-                </p>
-                <p>
-                  <span className="text-slate-400">Tier:</span>{" "}
-                  <span className="font-medium text-white">
-                    {selectedTierLabel} ({selectedTierRarityLabel})
-                  </span>
-                </p>
-                <p>
-                  <span className="text-slate-400">Theme:</span>{" "}
-                  <span className="font-medium text-white">{selectedThemeLabel}</span>
-                </p>
-                <p>
-                  <span className="text-slate-400">Card type:</span>{" "}
-                  <span className="font-medium text-white">
-                    {isAnimatedCardType ? "Animated (+$10.00)" : "Standard"}
-                  </span>
-                </p>
-                {isAnimatedCardType && selectedMotionId ? (
-                  <p>
-                    <span className="text-slate-400">Motion:</span>{" "}
-                    <span className="font-medium text-white">{motionLabel(selectedMotionId)}</span>
-                  </p>
-                ) : null}
-                <div className="rounded-lg border border-cyan-300/20 bg-cyan-400/10 px-3 py-2 text-xs text-cyan-100">
-                  {isAnimatedCardType
-                    ? "After confirmation, we will generate your animated card."
-                    : "After confirmation, the order is delivered automatically."}
-                </div>
-              </div>
-            </div>
+            <p className="mt-2 text-sm text-slate-400">
+              Your balance: <span className="font-semibold text-neonTeal">{formatMoney(creditBalance)}</span>
+            </p>
             <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setShowCompleteModal(false)}
-                className="min-h-[42px] rounded-lg border border-white/15 px-3 py-2 text-sm text-slate-200"
+                onClick={() => setShowRegenerateConfirm(false)}
+                className="min-h-[42px] rounded-lg border border-white/15 px-4 py-2 text-sm text-slate-200"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={async () => {
-                  await handleApprovePreviewForCurrentOrder();
-                  setShowCompleteModal(false);
-                }}
-                disabled={Boolean(orderActionKey)}
-                className="min-h-[42px] rounded-lg bg-neonTeal px-3 py-2 text-sm font-medium text-slate-950 disabled:opacity-50"
+                onClick={handleGeneratePreviewForCurrentOrder}
+                disabled={Boolean(orderActionKey) || !canAffordRegenerate}
+                className="min-h-[42px] rounded-lg bg-neonTeal px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50"
               >
-                Confirm & Complete Order
+                {orderActionKey === `generate-${currentOrderId}`
+                  ? "Generating..."
+                  : `Generate — ${formatMoney(additionalPreviewCost)}`}
               </button>
             </div>
           </div>

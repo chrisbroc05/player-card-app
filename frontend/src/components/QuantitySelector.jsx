@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { formatMoney } from "../utils/marketplace";
 
 const OPTIONS = [1, 2, 5, 10];
 
@@ -16,8 +17,11 @@ function priceHint(q) {
   return "Best value";
 }
 
-export default function QuantitySelector({ disabled, loading, onConfirm }) {
+export default function QuantitySelector({ disabled, loading, onConfirm, copyUnitPrice = 0 }) {
   const [selected, setSelected] = useState(1);
+  const unit = Number(copyUnitPrice) || 0;
+  const extraCopies = Math.max(0, selected - 1);
+  const extraCost = unit * extraCopies;
 
   return (
     <div className="mt-6 rounded-2xl border border-white/10 bg-[#111111]/90 p-4 sm:p-5">
@@ -59,6 +63,17 @@ export default function QuantitySelector({ disabled, loading, onConfirm }) {
       </div>
 
       <p className="mt-5 text-center text-sm leading-relaxed text-slate-300 sm:text-left">{summaryLine(selected)}</p>
+
+      {unit > 0 ? (
+        <p className="mt-2 text-center text-sm text-slate-400 sm:text-left">
+          Each additional copy: <span className="font-medium text-white">{formatMoney(unit)}</span>
+          {extraCopies > 0 ? (
+            <span className="block pt-1 text-neonTeal">
+              {extraCopies} extra {extraCopies === 1 ? "copy" : "copies"}: {formatMoney(extraCost)}
+            </span>
+          ) : null}
+        </p>
+      ) : null}
 
       <button
         type="button"

@@ -5,11 +5,12 @@ from __future__ import annotations
 import os
 import re
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from animation_tasks import process_animation
+from card_pricing import animated_upgrade_price, generation_price_payload, normalize_order_tier
 from auth import get_current_user
 from card_repo import create_animated_upgrade_card, get_card_by_card_id
 from credit_service import InsufficientCreditsError, deduct_credits
@@ -92,6 +93,12 @@ def list_animation_motions():
     return list_motions_public()
 
 
+@router.get("/generation-price")
+def get_generation_price(tier: str = Query(..., min_length=1, max_length=40)):
+    """Public pricing for card previews by order tier (no auth)."""
+    return generation_price_payload(normalize_order_tier(tier))
+
+
 @router.post("/{card_id}/animate")
 def animate_card(
     card_id: str,
@@ -126,11 +133,9 @@ def animate_card_upgrade(
 ):
     source = _resolve_card(db, card_id)
     _validate_animate_request(source, current_user, body.motion_id)
-    raw_price = (os.environ.get("ANIMATED_CARD_PRICE") or "5.00").strip()
-    try:
-        upgrade_price = max(0.01, float(raw_price))
-    except ValueError:
-        upgrade_price = 5.00
+    upgrade_price = animated_upgrade_price()
+    if upgrade_price <= 0:
+        upgrade_price = 10.00
     try:
         deduct_credits(
             user_id=current_user.id,

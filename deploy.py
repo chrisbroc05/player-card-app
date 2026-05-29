@@ -20,6 +20,11 @@ Optional:
 Backend on Render should also set:
   PAYMENTS_ENABLED=false
     Gate credit/payment API routes until Stripe is wired (503 when false).
+  CARD_PRICE_ROOKIE=2.00
+  CARD_PRICE_ALLSTAR=4.00
+  CARD_PRICE_LEGENDS=6.00
+  ANIMATED_CARD_PRICE=10.00
+    Animated card upgrade on first preview (Studio flow).
 
 Backend on Render: card PNGs and uploads live under APP_DATA_DIR (e.g. /var/render/data
 with subdirs cards/ and uploads/). Without a persistent disk, redeploys clear files while

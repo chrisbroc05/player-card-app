@@ -15,6 +15,7 @@ export default function PostGenerationPanel({
   token = "",
   onRefreshDetail,
   onCardsUpdated,
+  copyUnitPrice = 0,
 }) {
   const navigate = useNavigate();
   const [phase, setPhase] = useState("select");
@@ -124,7 +125,12 @@ export default function PostGenerationPanel({
               {qtyError}
             </p>
           ) : null}
-          <QuantitySelector disabled={!detail.card_id} loading={qtyLoading} onConfirm={handleQuantityConfirm} />
+          <QuantitySelector
+            disabled={!detail.card_id}
+            loading={qtyLoading}
+            onConfirm={handleQuantityConfirm}
+            copyUnitPrice={copyUnitPrice}
+          />
         </>
       ) : null}
 

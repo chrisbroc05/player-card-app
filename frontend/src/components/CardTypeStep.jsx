@@ -12,8 +12,12 @@ const ICON_ANIMATED = (
   </svg>
 );
 
-export default function CardTypeStep({ value, onChange }) {
+export default function CardTypeStep({ value, onChange, animatedUpgradePrice = 10 }) {
   const isAnimated = value === "animated";
+  const upgradeLabel =
+    Number(animatedUpgradePrice) > 0
+      ? `+ ${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(animatedUpgradePrice))}`
+      : "Included";
 
   return (
     <div className="grid gap-6">
@@ -56,7 +60,7 @@ export default function CardTypeStep({ value, onChange }) {
           <p className="mt-1 text-sm text-slate-400">
             Your player comes to life with 3 seconds of AI-generated motion
           </p>
-          <p className="mt-3 text-sm font-medium text-violet-200">+ $10.00</p>
+          <p className="mt-3 text-sm font-medium text-violet-200">{upgradeLabel}</p>
         </button>
       </div>
     </div>
