@@ -3,12 +3,17 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from models import Card, utcnow
+
+_CARD_ID_PATTERN = re.compile(r"^FL-\d{4}-\d{6}$", re.IGNORECASE)
 
 PRINT_RUN_ALLOWED_QUANTITIES = frozenset({1, 2, 5, 10})
 PENDING_CARD_TTL_HOURS = 24
@@ -416,6 +421,106 @@ def list_pending_preview_cards(db: Session, owner_id: int) -> list[Card]:
     )
 
 
+def _app_data_root() -> Path:
+    base = (os.environ.get("APP_DATA_DIR") or "").strip() or "./data"
+    return Path(base).expanduser().resolve()
+
+
+def _canonical_pending_card_id(card_id: str | None) -> str | None:
+    s = (card_id or "").strip()
+    if not _CARD_ID_PATTERN.match(s):
+        return None
+    parts = s.upper().split("-")
+    return f"FL-{parts[1]}-{parts[2]}"
+
+
+def _pending_preview_image_available(image_url: str | None) -> bool:
+    """True when the preview image URL is present and backed by a local file (if applicable)."""
+    s = (image_url or "").strip()
+    if not s:
+        return False
+    if s.startswith("http://") or s.startswith("https://"):
+        return True
+    root = _app_data_root()
+    filename = s.rsplit("/", 1)[-1]
+    if not filename:
+        return False
+    if "/media/cards/" in s or s.startswith("/media/cards/"):
+        return (root / "cards" / filename).is_file()
+    if "/uploads/" in s or s.startswith("/uploads/"):
+        return (root / "uploads" / filename).is_file()
+    return False
+
+
+def _pending_card_is_retrievable(db: Session, card: Card) -> bool:
+    key = _canonical_pending_card_id(card.card_id)
+    if key is None:
+        return False
+    row = get_card_by_card_id(db, key)
+    return row is not None and row.id == card.id and row.owner_id == card.owner_id
+
+
+def _pending_card_is_resumable(card: Card) -> bool:
+    """Studio resume flow requires a persisted session id or full draft metadata."""
+    session_id = (getattr(card, "preview_session_id", None) or "").strip()
+    if session_id:
+        return True
+    draft = _parse_draft_metadata(getattr(card, "draft_metadata", None))
+    player_image = (draft.get("player_image_url") or "").strip()
+    player_name = (draft.get("player_first_name") or draft.get("player_display_name") or "").strip()
+    return bool(player_image and player_name)
+
+
+def pending_card_validation_errors(db: Session, card: Card) -> list[str]:
+    """Human-readable reasons a preview card cannot be resumed."""
+    errors: list[str] = []
+    if (card.status or "") != "preview":
+        errors.append("not_preview")
+    if not card.owner_id:
+        errors.append("no_owner")
+    if not _canonical_pending_card_id(card.card_id):
+        errors.append("invalid_card_id")
+    if not (card.image_url or "").strip():
+        errors.append("missing_image_url")
+    elif not _pending_preview_image_available(card.image_url):
+        errors.append("image_unavailable")
+    if not (card.player_name or "").strip():
+        errors.append("missing_player_name")
+    if not _pending_card_is_retrievable(db, card):
+        errors.append("not_retrievable")
+    if not _pending_card_is_resumable(card):
+        errors.append("not_resumable")
+    return errors
+
+
+def discard_preview_cards(db: Session, cards: list[Card]) -> int:
+    """Mark preview rows discarded so they never surface as pending again."""
+    updated = 0
+    for card in cards:
+        if (card.status or "") != "preview":
+            continue
+        card.status = "discarded"
+        updated += 1
+    if updated:
+        db.commit()
+    return updated
+
+
+def validate_and_cleanup_pending_cards(db: Session, owner_id: int) -> list[Card]:
+    """Drop invalid or non-resumable preview rows (auto-discard) and return valid cards."""
+    cards = list_pending_preview_cards(db, owner_id)
+    valid: list[Card] = []
+    invalid: list[Card] = []
+    for card in cards:
+        if pending_card_validation_errors(db, card):
+            invalid.append(card)
+        else:
+            valid.append(card)
+    if invalid:
+        discard_preview_cards(db, invalid)
+    return valid
+
+
 def _group_pending_sessions(cards: list[Card]) -> dict[str, list[Card]]:
     groups: dict[str, list[Card]] = {}
     for card in cards:
@@ -426,18 +531,8 @@ def _group_pending_sessions(cards: list[Card]) -> dict[str, list[Card]]:
     return groups
 
 
-def get_latest_pending_session(db: Session, owner_id: int) -> dict | None:
-    """Return the most recent unfinished preview session for a user, if any."""
-    cards = list_pending_preview_cards(db, owner_id)
-    if not cards:
-        return None
-
-    groups = _group_pending_sessions(cards)
-    newest_session_key = max(
-        groups.keys(),
-        key=lambda k: _card_created_at(groups[k][0]),
-    )
-    session_cards = groups[newest_session_key]
+def _build_pending_session_payload(session_cards: list[Card], session_id: str) -> dict:
+    session_cards = sorted(session_cards, key=_card_created_at, reverse=True)
     anchor = session_cards[0]
     draft = _parse_draft_metadata(getattr(anchor, "draft_metadata", None))
     if not draft:
@@ -477,74 +572,53 @@ def get_latest_pending_session(db: Session, owner_id: int) -> dict | None:
 
     newest_created = _card_created_at(anchor)
     expires_at = newest_created + timedelta(hours=PENDING_CARD_TTL_HOURS)
-    session_id = (getattr(anchor, "preview_session_id", None) or "").strip() or newest_session_key
+    resolved_session_id = (getattr(anchor, "preview_session_id", None) or "").strip() or session_id
 
     return {
-        "preview_session_id": session_id,
+        "preview_session_id": resolved_session_id,
         "expires_at": expires_at.isoformat(),
         "draft": draft,
         "preview_count": len(previews),
         "preview_limit": 3,
         "previews": previews,
     }
+
+
+def get_latest_pending_session(db: Session, owner_id: int) -> dict | None:
+    """Return the most recent unfinished preview session for a user, if any."""
+    cards = validate_and_cleanup_pending_cards(db, owner_id)
+    if not cards:
+        return None
+
+    groups = _group_pending_sessions(cards)
+    newest_session_key = max(
+        groups.keys(),
+        key=lambda k: _card_created_at(groups[k][0]),
+    )
+    session_cards = groups[newest_session_key]
+    payload = _build_pending_session_payload(session_cards, newest_session_key)
+    if not payload.get("previews"):
+        discard_preview_cards(db, session_cards)
+        return None
+    return payload
 
 
 def get_pending_session_by_id(db: Session, owner_id: int, preview_session_id: str) -> dict | None:
     """Return a pending session by id, or None if expired/missing."""
+    validate_and_cleanup_pending_cards(db, owner_id)
     cards = pending_session_cards(db, owner_id=owner_id, preview_session_id=preview_session_id)
     if not cards:
         return None
 
-    cards.sort(key=_card_created_at, reverse=True)
-    anchor = cards[0]
-    draft = _parse_draft_metadata(getattr(anchor, "draft_metadata", None))
-    if not draft:
-        draft = {
-            "customer_name": anchor.owner_name or "",
-            "player_team_name": anchor.team_name or "",
-            "player_jersey_number": anchor.jersey_number or "",
-            "player_position": anchor.position or "",
-            "player_grad_year": int(anchor.grad_year or 2000),
-            "player_image_url": "",
-            "tier": _vault_tier_to_order_tier(anchor.tier),
-            "card_type": "standard",
-            "special_theme": anchor.special_theme,
-        }
-        if anchor.player_name:
-            parts = str(anchor.player_name).split(" ", 1)
-            draft["player_first_name"] = parts[0]
-            draft["player_last_name"] = parts[1] if len(parts) > 1 else "N/A"
+    invalid = [c for c in cards if pending_card_validation_errors(db, c)]
+    if invalid:
+        discard_preview_cards(db, invalid)
+    invalid_ids = {c.id for c in invalid}
+    cards = [c for c in cards if c.id not in invalid_ids]
+    if not cards:
+        return None
 
-    previews = []
-    for card in sorted(cards, key=_card_created_at):
-        previews.append(
-            {
-                "card_id": card.card_id,
-                "image_url": card.image_url,
-                "tier": card.rarity or "base",
-                "created_at": _card_created_at(card).isoformat(),
-                "edition_number": card.edition_number,
-                "print_run": card.print_run,
-                "owner_name": card.owner_name,
-                "player_name": card.player_name,
-                "team_name": card.team_name,
-                "special_theme": card.special_theme,
-                "rarity": card.rarity,
-            }
-        )
-
-    newest_created = _card_created_at(anchor)
-    expires_at = newest_created + timedelta(hours=PENDING_CARD_TTL_HOURS)
-    session_id = (getattr(anchor, "preview_session_id", None) or "").strip() or preview_session_id
-
-    return {
-        "preview_session_id": session_id,
-        "expires_at": expires_at.isoformat(),
-        "draft": draft,
-        "preview_count": len(previews),
-        "preview_limit": 3,
-        "previews": previews,
-    }
+    return _build_pending_session_payload(cards, preview_session_id)
 
 
 def discard_pending_session(
@@ -557,19 +631,23 @@ def discard_pending_session(
     if not preview_session_id:
         return 0
 
-    cards = list_pending_preview_cards(db, owner_id)
-    updated = 0
+    target = preview_session_id.strip()
+    cards = (
+        db.query(Card)
+        .filter(
+            Card.owner_id == owner_id,
+            Card.status == "preview",
+        )
+        .all()
+    )
+    to_discard: list[Card] = []
     for card in cards:
         card_session = (getattr(card, "preview_session_id", None) or "").strip() or _fallback_session_key(
             card
         )
-        if card_session != preview_session_id:
-            continue
-        card.status = "discarded"
-        updated += 1
-    if updated:
-        db.commit()
-    return updated
+        if card_session == target:
+            to_discard.append(card)
+    return discard_preview_cards(db, to_discard)
 
 
 def pending_session_cards(

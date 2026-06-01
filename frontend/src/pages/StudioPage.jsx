@@ -529,6 +529,29 @@ export default function StudioPage() {
     }
   }, [previewCards, selectedPreviewUrl]);
 
+  const dismissPendingPrompt = useCallback(() => {
+    setShowPendingPrompt(false);
+    setShowDiscardConfirm(false);
+    setPendingSession(null);
+  }, []);
+
+  const cleanupStalePending = useCallback(
+    async (sessionId) => {
+      if (token && sessionId) {
+        try {
+          await fetch(
+            `${API_BASE_URL}/cards/pending?preview_session_id=${encodeURIComponent(sessionId)}`,
+            { method: "DELETE", headers: { ...authHeaders(token) } }
+          );
+        } catch {
+          /* best-effort cleanup */
+        }
+      }
+      dismissPendingPrompt();
+    },
+    [token, dismissPendingPrompt]
+  );
+
   const fetchPendingSession = useCallback(async () => {
     if (!token) {
       setPendingSession(null);
@@ -541,6 +564,10 @@ export default function StudioPage() {
       if (!res.ok) return null;
       const data = await res.json();
       const session = data?.session || null;
+      if (!session?.previews?.length) {
+        setPendingSession(null);
+        return null;
+      }
       setPendingSession(session);
       return session;
     } catch {
@@ -551,7 +578,7 @@ export default function StudioPage() {
   useEffect(() => {
     if (initializing || !token) return;
     fetchPendingSession().then((session) => {
-      if (session) setShowPendingPrompt(true);
+      if (session?.previews?.length) setShowPendingPrompt(true);
     });
   }, [initializing, token, fetchPendingSession]);
 
@@ -598,6 +625,7 @@ export default function StudioPage() {
 
   async function handleResumePending() {
     if (!pendingSession || !token) return;
+    const sessionId = pendingSession.preview_session_id;
     setPendingActionLoading(true);
     setError("");
     setMessage("");
@@ -605,11 +633,29 @@ export default function StudioPage() {
       const res = await fetch(`${API_BASE_URL}/cards/pending/restore`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders(token) },
-        body: JSON.stringify({ preview_session_id: pendingSession.preview_session_id }),
+        body: JSON.stringify({ preview_session_id: sessionId }),
       });
       const order = await res.json();
       if (!res.ok) {
-        throw new Error(formatApiError(order?.detail, "Could not restore your unfinished card."));
+        await cleanupStalePending(sessionId);
+        return;
+      }
+
+      const latestPreview = pendingSession.previews?.[pendingSession.previews.length - 1];
+      if (latestPreview?.card_id) {
+        try {
+          const cardRes = await fetch(
+            `${API_BASE_URL}/cards/${encodeURIComponent(latestPreview.card_id)}`,
+            { headers: { ...authHeaders(token) } }
+          );
+          if (!cardRes.ok) {
+            await cleanupStalePending(sessionId);
+            return;
+          }
+        } catch {
+          await cleanupStalePending(sessionId);
+          return;
+        }
       }
 
       applyDraftToWizard(pendingSession.draft);
@@ -619,7 +665,6 @@ export default function StudioPage() {
       });
       setCurrentOrderId(order.id);
 
-      const latestPreview = pendingSession.previews?.[pendingSession.previews.length - 1];
       const previewUrl = latestPreview?.image_url || "";
       setSelectedPreviewUrl(previewUrl);
       setGeneratedCardUrl(previewUrl);
@@ -627,13 +672,11 @@ export default function StudioPage() {
       setCurrentStep(STEP_REVIEW);
       setReviewSubPhase("generate");
       setPreviewConfigureOpen(false);
-      setShowPendingPrompt(false);
-      setShowDiscardConfirm(false);
-      setPendingSession(null);
+      dismissPendingPrompt();
       setMessage("Welcome back — your preview is ready. No additional credits were charged.");
       await fetchOrders();
-    } catch (err) {
-      setError(err.message || "Could not restore your unfinished card.");
+    } catch {
+      await cleanupStalePending(sessionId);
     } finally {
       setPendingActionLoading(false);
     }
@@ -641,27 +684,21 @@ export default function StudioPage() {
 
   async function handleDiscardPending() {
     if (!pendingSession || !token) return;
+    const sessionId = pendingSession.preview_session_id;
     setPendingActionLoading(true);
     setError("");
     try {
-      const res = await fetch(
-        `${API_BASE_URL}/cards/pending?preview_session_id=${encodeURIComponent(pendingSession.preview_session_id)}`,
+      await fetch(
+        `${API_BASE_URL}/cards/pending?preview_session_id=${encodeURIComponent(sessionId)}`,
         {
           method: "DELETE",
           headers: { ...authHeaders(token) },
         }
       );
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(formatApiError(data?.detail, "Could not discard pending preview."));
-      }
-      setShowPendingPrompt(false);
-      setShowDiscardConfirm(false);
-      setPendingSession(null);
-      setMessage("Pending preview discarded.");
-    } catch (err) {
-      setError(err.message || "Could not discard pending preview.");
+    } catch {
+      /* dismiss even when discard fails */
     } finally {
+      dismissPendingPrompt();
       setPendingActionLoading(false);
     }
   }
@@ -991,7 +1028,7 @@ export default function StudioPage() {
           onDiscardRequest={() => setShowDiscardConfirm(true)}
           onDiscardConfirm={handleDiscardPending}
           onDiscardCancel={() => setShowDiscardConfirm(false)}
-          onDismiss={() => setShowPendingPrompt(false)}
+          onDismiss={dismissPendingPrompt}
         />
       ) : null}
 

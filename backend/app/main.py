@@ -1697,7 +1697,23 @@ def get_pending_cards(
     session = get_latest_pending_session(db, current_user.id)
     if session is None:
         return PendingCardsResponse(session=None)
-    return PendingCardsResponse(session=PendingCardSession.model_validate(session))
+    try:
+        validated = PendingCardSession.model_validate(session)
+    except Exception:
+        discard_pending_session(
+            db,
+            owner_id=current_user.id,
+            preview_session_id=session.get("preview_session_id"),
+        )
+        return PendingCardsResponse(session=None)
+    if not validated.previews:
+        discard_pending_session(
+            db,
+            owner_id=current_user.id,
+            preview_session_id=validated.preview_session_id,
+        )
+        return PendingCardsResponse(session=None)
+    return PendingCardsResponse(session=validated)
 
 
 @app.delete("/cards/pending")
@@ -1706,14 +1722,12 @@ def discard_pending_cards(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Discard all preview cards in an unfinished session."""
+    """Discard all preview cards in an unfinished session (idempotent)."""
     count = discard_pending_session(
         db,
         owner_id=current_user.id,
         preview_session_id=preview_session_id,
     )
-    if count == 0:
-        raise HTTPException(status_code=404, detail="No pending preview session found.")
     return {"success": True, "discarded_count": count}
 
 
@@ -1731,9 +1745,21 @@ def restore_pending_cards(
 
     session = get_pending_session_by_id(db, current_user.id, body.preview_session_id)
     if session is None:
+        discard_pending_session(
+            db,
+            owner_id=current_user.id,
+            preview_session_id=body.preview_session_id,
+        )
         raise HTTPException(status_code=404, detail="No pending preview session found.")
 
     draft = session["draft"]
+    if not session.get("previews"):
+        discard_pending_session(
+            db,
+            owner_id=current_user.id,
+            preview_session_id=body.preview_session_id,
+        )
+        raise HTTPException(status_code=404, detail="No pending preview session found.")
     generated_cards = [
         GeneratedOrderCard.model_validate(preview).model_dump() for preview in session["previews"]
     ]
