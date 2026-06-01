@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import json
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -10,6 +11,7 @@ from sqlalchemy.orm import Session
 from models import Card, utcnow
 
 PRINT_RUN_ALLOWED_QUANTITIES = frozenset({1, 2, 5, 10})
+PENDING_CARD_TTL_HOURS = 24
 
 
 def _year_prefix() -> str:
@@ -57,6 +59,8 @@ def create_card_row(
     owner_id: int | None,
     creator_user_id: int | None = None,
     status: str = "active",
+    preview_session_id: str | None = None,
+    draft_metadata: str | None = None,
     commit: bool = True,
 ) -> Card:
     creator = creator_user_id if creator_user_id is not None else owner_id
@@ -81,6 +85,8 @@ def create_card_row(
         owner_id=owner_id,
         creator_user_id=creator,
         status=(status or "active").strip() or "active",
+        preview_session_id=preview_session_id,
+        draft_metadata=draft_metadata,
     )
     db.add(row)
     if commit:
@@ -358,3 +364,224 @@ def list_cards_for_player_dicts(db: Session, player_id: int) -> list[dict]:
         .all()
     )
     return [card_to_dict(r, db) for r in rows]
+
+
+def _pending_cutoff() -> datetime:
+    return utcnow() - timedelta(hours=PENDING_CARD_TTL_HOURS)
+
+
+def _card_created_at(card: Card) -> datetime:
+    created = card.created_at
+    if created.tzinfo is None:
+        return created.replace(tzinfo=timezone.utc)
+    return created
+
+
+def _parse_draft_metadata(raw: str | None) -> dict:
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+        return data if isinstance(data, dict) else {}
+    except (json.JSONDecodeError, TypeError):
+        return {}
+
+
+def _vault_tier_to_order_tier(vault_tier: str) -> str:
+    mapping = {
+        "rookie": "rookie",
+        "allstar": "all_star",
+        "legends": "legends",
+    }
+    return mapping.get(str(vault_tier or "").lower(), "rookie")
+
+
+def _fallback_session_key(card: Card) -> str:
+    created = _card_created_at(card)
+    bucket = created.strftime("%Y%m%d%H")
+    return f"legacy-{card.player_id}-{bucket}"
+
+
+def list_pending_preview_cards(db: Session, owner_id: int) -> list[Card]:
+    cutoff = _pending_cutoff()
+    return (
+        db.query(Card)
+        .filter(
+            Card.owner_id == owner_id,
+            Card.status == "preview",
+            Card.created_at >= cutoff,
+        )
+        .order_by(Card.created_at.desc())
+        .all()
+    )
+
+
+def _group_pending_sessions(cards: list[Card]) -> dict[str, list[Card]]:
+    groups: dict[str, list[Card]] = {}
+    for card in cards:
+        key = (getattr(card, "preview_session_id", None) or "").strip() or _fallback_session_key(card)
+        groups.setdefault(key, []).append(card)
+    for key in groups:
+        groups[key].sort(key=_card_created_at, reverse=True)
+    return groups
+
+
+def get_latest_pending_session(db: Session, owner_id: int) -> dict | None:
+    """Return the most recent unfinished preview session for a user, if any."""
+    cards = list_pending_preview_cards(db, owner_id)
+    if not cards:
+        return None
+
+    groups = _group_pending_sessions(cards)
+    newest_session_key = max(
+        groups.keys(),
+        key=lambda k: _card_created_at(groups[k][0]),
+    )
+    session_cards = groups[newest_session_key]
+    anchor = session_cards[0]
+    draft = _parse_draft_metadata(getattr(anchor, "draft_metadata", None))
+    if not draft:
+        draft = {
+            "customer_name": anchor.owner_name or "",
+            "player_team_name": anchor.team_name or "",
+            "player_jersey_number": anchor.jersey_number or "",
+            "player_position": anchor.position or "",
+            "player_grad_year": int(anchor.grad_year or 2000),
+            "player_image_url": "",
+            "tier": _vault_tier_to_order_tier(anchor.tier),
+            "card_type": "standard",
+            "special_theme": anchor.special_theme,
+        }
+        if anchor.player_name:
+            parts = str(anchor.player_name).split(" ", 1)
+            draft["player_first_name"] = parts[0]
+            draft["player_last_name"] = parts[1] if len(parts) > 1 else "N/A"
+
+    previews = []
+    for card in sorted(session_cards, key=_card_created_at):
+        previews.append(
+            {
+                "card_id": card.card_id,
+                "image_url": card.image_url,
+                "tier": card.rarity or "base",
+                "created_at": _card_created_at(card).isoformat(),
+                "edition_number": card.edition_number,
+                "print_run": card.print_run,
+                "owner_name": card.owner_name,
+                "player_name": card.player_name,
+                "team_name": card.team_name,
+                "special_theme": card.special_theme,
+                "rarity": card.rarity,
+            }
+        )
+
+    newest_created = _card_created_at(anchor)
+    expires_at = newest_created + timedelta(hours=PENDING_CARD_TTL_HOURS)
+    session_id = (getattr(anchor, "preview_session_id", None) or "").strip() or newest_session_key
+
+    return {
+        "preview_session_id": session_id,
+        "expires_at": expires_at.isoformat(),
+        "draft": draft,
+        "preview_count": len(previews),
+        "preview_limit": 3,
+        "previews": previews,
+    }
+
+
+def get_pending_session_by_id(db: Session, owner_id: int, preview_session_id: str) -> dict | None:
+    """Return a pending session by id, or None if expired/missing."""
+    cards = pending_session_cards(db, owner_id=owner_id, preview_session_id=preview_session_id)
+    if not cards:
+        return None
+
+    cards.sort(key=_card_created_at, reverse=True)
+    anchor = cards[0]
+    draft = _parse_draft_metadata(getattr(anchor, "draft_metadata", None))
+    if not draft:
+        draft = {
+            "customer_name": anchor.owner_name or "",
+            "player_team_name": anchor.team_name or "",
+            "player_jersey_number": anchor.jersey_number or "",
+            "player_position": anchor.position or "",
+            "player_grad_year": int(anchor.grad_year or 2000),
+            "player_image_url": "",
+            "tier": _vault_tier_to_order_tier(anchor.tier),
+            "card_type": "standard",
+            "special_theme": anchor.special_theme,
+        }
+        if anchor.player_name:
+            parts = str(anchor.player_name).split(" ", 1)
+            draft["player_first_name"] = parts[0]
+            draft["player_last_name"] = parts[1] if len(parts) > 1 else "N/A"
+
+    previews = []
+    for card in sorted(cards, key=_card_created_at):
+        previews.append(
+            {
+                "card_id": card.card_id,
+                "image_url": card.image_url,
+                "tier": card.rarity or "base",
+                "created_at": _card_created_at(card).isoformat(),
+                "edition_number": card.edition_number,
+                "print_run": card.print_run,
+                "owner_name": card.owner_name,
+                "player_name": card.player_name,
+                "team_name": card.team_name,
+                "special_theme": card.special_theme,
+                "rarity": card.rarity,
+            }
+        )
+
+    newest_created = _card_created_at(anchor)
+    expires_at = newest_created + timedelta(hours=PENDING_CARD_TTL_HOURS)
+    session_id = (getattr(anchor, "preview_session_id", None) or "").strip() or preview_session_id
+
+    return {
+        "preview_session_id": session_id,
+        "expires_at": expires_at.isoformat(),
+        "draft": draft,
+        "preview_count": len(previews),
+        "preview_limit": 3,
+        "previews": previews,
+    }
+
+
+def discard_pending_session(
+    db: Session,
+    *,
+    owner_id: int,
+    preview_session_id: str | None = None,
+) -> int:
+    """Mark all preview cards in a session as discarded. Returns count updated."""
+    if not preview_session_id:
+        return 0
+
+    cards = list_pending_preview_cards(db, owner_id)
+    updated = 0
+    for card in cards:
+        card_session = (getattr(card, "preview_session_id", None) or "").strip() or _fallback_session_key(
+            card
+        )
+        if card_session != preview_session_id:
+            continue
+        card.status = "discarded"
+        updated += 1
+    if updated:
+        db.commit()
+    return updated
+
+
+def pending_session_cards(
+    db: Session,
+    *,
+    owner_id: int,
+    preview_session_id: str,
+) -> list[Card]:
+    cards = list_pending_preview_cards(db, owner_id)
+    return [
+        c
+        for c in cards
+        if ((getattr(c, "preview_session_id", None) or "").strip() or _fallback_session_key(c))
+        == preview_session_id
+    ]

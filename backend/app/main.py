@@ -1,5 +1,6 @@
 import base64
 import io
+import json
 import os
 import sys
 import urllib.request
@@ -55,13 +56,16 @@ from card_repo import (  # noqa: E402
     card_to_dict,
     count_cards_for_player,
     create_card_row,
+    discard_pending_session,
     expand_print_run_for_owner_image,
     get_card_by_card_id,
+    get_latest_pending_session,
     list_cards_by_image_url_dicts,
     list_cards_for_player_dicts,
     finalize_order_preview,
     list_my_cards_dicts,
     next_collectible_card_id,
+    get_pending_session_by_id,
 )
 from database import engine, get_db  # noqa: E402
 from beta_config import get_beta_invite_code  # noqa: E402
@@ -493,6 +497,34 @@ def _preview_limit_for_tier(order_tier: str) -> int:
     return 3
 
 
+def _draft_metadata_from_order(order: dict) -> str:
+    payload = {
+        "customer_name": order.get("customer_name") or "",
+        "customer_email": order.get("customer_email") or "",
+        "player_first_name": order.get("player_first_name") or "",
+        "player_last_name": order.get("player_last_name") or "",
+        "player_display_name": order.get("player_display_name"),
+        "player_jersey_number": order.get("player_jersey_number") or "",
+        "player_position": order.get("player_position") or "",
+        "player_grad_year": order.get("player_grad_year") or 2000,
+        "player_team_name": order.get("player_team_name") or order.get("player_team") or "",
+        "player_image_url": order.get("player_image_url") or "",
+        "tier": order.get("tier") or "rookie",
+        "card_type": order.get("card_type") or "standard",
+        "special_theme": order.get("special_theme"),
+        "selected_motion_id": order.get("selected_motion_id") or "",
+    }
+    return json.dumps(payload)
+
+
+def _preview_session_id_for_order(order: dict) -> str:
+    session_id = (order.get("preview_session_id") or "").strip()
+    if not session_id:
+        session_id = uuid4().hex
+        order["preview_session_id"] = session_id
+    return session_id
+
+
 def _normalize_rarity(tier: str) -> str:
     t = str(tier or "").lower()
     if t == "legendary":
@@ -566,6 +598,8 @@ def _store_generated_card(
     owner_id: int | None = None,
     predefined_card_id: str | None = None,
     status: str = "active",
+    preview_session_id: str | None = None,
+    draft_metadata: str | None = None,
 ) -> dict:
     """Persist generated card to PostgreSQL; returns API-shaped dict."""
     vt = vault_tier or _vault_tier_from_gen_tier(gen_tier)
@@ -593,6 +627,8 @@ def _store_generated_card(
         owner_id=owner_id,
         creator_user_id=owner_id,
         status=status,
+        preview_session_id=preview_session_id,
+        draft_metadata=draft_metadata,
     )
     return card_to_dict(row, db)
 
@@ -1274,6 +1310,7 @@ class OrderCreate(BaseModel):
     tier: OrderTier
     card_type: OrderCardType = Field(default="standard")
     special_theme: str | None = Field(default=None, max_length=120)
+    selected_motion_id: str | None = Field(default=None, max_length=64)
     add_ons: list[str] = Field(default_factory=list)
     status: OrderStatus = "new_order"
 
@@ -1316,6 +1353,9 @@ class Order(OrderCreate):
     preview_limit: int = Field(default=3, ge=1)
     final_card_url: str | None = Field(default=None, max_length=2000)
     delivered_at: str | None = None
+    preview_session_id: str | None = Field(default=None, max_length=128)
+    draft_metadata: str | None = None
+    selected_motion_id: str | None = Field(default=None, max_length=64)
 
 
 class OrderDeliverRequest(BaseModel):
@@ -1337,6 +1377,64 @@ class OrderApprovePreviewRequest(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
     image_url: str | None = Field(default=None, max_length=2000)
+
+
+class PendingPreviewCard(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    card_id: str
+    image_url: str
+    tier: str
+    created_at: str
+    edition_number: int = 1
+    print_run: int = 1
+    owner_name: str = "unassigned"
+    player_name: str = ""
+    team_name: str = ""
+    special_theme: str | None = None
+    rarity: str = "base"
+
+
+class PendingCardDraft(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    customer_name: str = ""
+    customer_email: str = ""
+    player_first_name: str = ""
+    player_last_name: str = ""
+    player_display_name: str | None = None
+    player_jersey_number: str = ""
+    player_position: str = ""
+    player_grad_year: int = 2000
+    player_team_name: str = ""
+    player_image_url: str = ""
+    tier: OrderTier = "rookie"
+    card_type: OrderCardType = "standard"
+    special_theme: str | None = None
+    selected_motion_id: str = ""
+
+
+class PendingCardSession(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    preview_session_id: str
+    expires_at: str
+    draft: PendingCardDraft
+    preview_count: int = Field(ge=0)
+    preview_limit: int = Field(default=3, ge=1)
+    previews: list[PendingPreviewCard] = Field(default_factory=list)
+
+
+class PendingCardsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    session: PendingCardSession | None = None
+
+
+class PendingRestoreRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    preview_session_id: str = Field(..., min_length=1, max_length=128)
 
 
 class RegisterBody(BaseModel):
@@ -1590,6 +1688,87 @@ def list_my_cards(
     return [CardVaultSummary.model_validate(r) for r in rows]
 
 
+@app.get("/cards/pending", response_model=PendingCardsResponse)
+def get_pending_cards(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return the user's most recent unfinished preview session, if any (24h retention)."""
+    session = get_latest_pending_session(db, current_user.id)
+    if session is None:
+        return PendingCardsResponse(session=None)
+    return PendingCardsResponse(session=PendingCardSession.model_validate(session))
+
+
+@app.delete("/cards/pending")
+def discard_pending_cards(
+    preview_session_id: str = Query(..., min_length=1, max_length=128),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Discard all preview cards in an unfinished session."""
+    count = discard_pending_session(
+        db,
+        owner_id=current_user.id,
+        preview_session_id=preview_session_id,
+    )
+    if count == 0:
+        raise HTTPException(status_code=404, detail="No pending preview session found.")
+    return {"success": True, "discarded_count": count}
+
+
+@app.post("/cards/pending/restore", response_model=Order)
+def restore_pending_cards(
+    body: PendingRestoreRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Rebuild an in-memory order from a persisted preview session so the user can
+    confirm or regenerate without paying again for existing previews.
+    """
+    global _next_order_id
+
+    session = get_pending_session_by_id(db, current_user.id, body.preview_session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="No pending preview session found.")
+
+    draft = session["draft"]
+    generated_cards = [
+        GeneratedOrderCard.model_validate(preview).model_dump() for preview in session["previews"]
+    ]
+
+    order = Order(
+        id=_next_order_id,
+        customer_name=draft.get("customer_name") or current_user.display_name,
+        customer_email=draft.get("customer_email") or current_user.email,
+        player_first_name=draft.get("player_first_name") or "",
+        player_last_name=draft.get("player_last_name") or "N/A",
+        player_display_name=draft.get("player_display_name"),
+        player_jersey_number=draft.get("player_jersey_number") or "",
+        player_position=draft.get("player_position") or "",
+        player_grad_year=int(draft.get("player_grad_year") or 2000),
+        player_team_name=draft.get("player_team_name") or "",
+        player_image_url=draft.get("player_image_url") or "",
+        tier=draft.get("tier") or "rookie",
+        card_type=draft.get("card_type") or "standard",
+        special_theme=draft.get("special_theme"),
+        add_ons=[],
+        status="awaiting_review",
+        created_at=datetime.now(timezone.utc).isoformat(),
+        generated_cards=generated_cards,
+        preview_count=int(session.get("preview_count") or len(generated_cards)),
+        preview_limit=int(session.get("preview_limit") or _preview_limit_for_tier(draft.get("tier") or "rookie")),
+        preview_session_id=session["preview_session_id"],
+        draft_metadata=json.dumps(draft),
+        selected_motion_id=draft.get("selected_motion_id") or None,
+    )
+    order_payload = order.model_dump()
+    _orders.append(order_payload)
+    _next_order_id += 1
+    return order
+
+
 @app.get("/cards/{card_id}/meta", response_model=CardShareMeta)
 def get_card_share_meta(card_id: str, db: Session = Depends(get_db)):
     """Public card fields + share URL/text for Open Graph / social clients."""
@@ -1768,6 +1947,7 @@ def create_order(
         tier=body.tier,
         card_type=body.card_type,
         special_theme=body.special_theme,
+        selected_motion_id=body.selected_motion_id,
         add_ons=body.add_ons,
         status=body.status,
         created_at=datetime.now(timezone.utc).isoformat(),
@@ -1894,6 +2074,11 @@ def generate_card_for_order(
 
     new_card_id = next_collectible_card_id(db)
     owner_id = current_user.id
+    preview_session_id = _preview_session_id_for_order(order)
+    draft_metadata = order.get("draft_metadata")
+    if not draft_metadata:
+        draft_metadata = _draft_metadata_from_order(order)
+        order["draft_metadata"] = draft_metadata
     vault_rec = _store_generated_card(
         db,
         _player_id_for_order(order),
@@ -1907,6 +2092,8 @@ def generate_card_for_order(
         owner_id=owner_id,
         predefined_card_id=new_card_id,
         status="preview",
+        preview_session_id=preview_session_id,
+        draft_metadata=draft_metadata,
     )
 
     generated = GeneratedOrderCard(

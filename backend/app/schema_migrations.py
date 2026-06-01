@@ -180,6 +180,22 @@ def run_schema_migrations_after_models(engine: Engine) -> None:
                 )
             else:
                 conn.execute(text("ALTER TABLE cards ADD COLUMN priority_expires_at DATETIME"))
+        if "preview_session_id" not in cols:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN IF NOT EXISTS preview_session_id VARCHAR(64)"
+                    )
+                )
+            else:
+                conn.execute(text("ALTER TABLE cards ADD COLUMN preview_session_id VARCHAR(64)"))
+        if "draft_metadata" not in cols:
+            if dialect == "postgresql":
+                conn.execute(
+                    text("ALTER TABLE cards ADD COLUMN IF NOT EXISTS draft_metadata TEXT")
+                )
+            else:
+                conn.execute(text("ALTER TABLE cards ADD COLUMN draft_metadata TEXT"))
 
         if "marketplace_offers" in insp.get_table_names():
             mcols = {c["name"] for c in insp.get_columns("marketplace_offers")}

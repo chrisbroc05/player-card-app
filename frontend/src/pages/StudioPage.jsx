@@ -14,6 +14,7 @@ import QuantitySelector from "../components/QuantitySelector";
 import MotionSelectionGrid from "../components/MotionSelectionGrid";
 import AnimationLoadingScreen from "../components/AnimationLoadingScreen";
 import AnimationFailedScreen from "../components/AnimationFailedScreen";
+import PendingCardResumePrompt from "../components/PendingCardResumePrompt";
 import { motionLabel } from "../constants/animationMotions";
 import { API_BASE_URL, authHeaders, toApiUrl } from "../config/api";
 import { useAuth } from "../context/AuthContext";
@@ -202,6 +203,22 @@ function formatApiError(detail, fallback) {
   return fallback;
 }
 
+function PreviewGenerationLoading({ tierLabel, tierTheme }) {
+  return (
+    <div className={`rounded-xl border px-4 py-6 ${tierTheme.loading}`}>
+      <div className="mb-3 flex items-center gap-2 text-sm text-violet-100">
+        <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-violet-300" />
+        Minting your {tierLabel} preview...
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-white/10">
+        <div className="h-full w-1/3 animate-pulse rounded-full bg-gradient-to-r from-neonBlue via-neonPurple to-neonTeal" />
+      </div>
+      <p className="mt-3 text-sm text-slate-200/90">Applying rarity framing, effects, and finish...</p>
+      <p className="mt-1 text-xs text-slate-400">This usually takes 30–60 seconds. Please keep this page open.</p>
+    </div>
+  );
+}
+
 export default function StudioPage() {
   const navigate = useNavigate();
   const { token, user, initializing, refreshUser } = useAuth();
@@ -260,6 +277,10 @@ export default function StudioPage() {
   const [previewConfigureOpen, setPreviewConfigureOpen] = useState(false);
   const [addCollectionLoading, setAddCollectionLoading] = useState(false);
   const [copyQuantity, setCopyQuantity] = useState(1);
+  const [pendingSession, setPendingSession] = useState(null);
+  const [showPendingPrompt, setShowPendingPrompt] = useState(false);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+  const [pendingActionLoading, setPendingActionLoading] = useState(false);
 
   const selectedTierLabel = (TIER_UI[orderTier] || TIER_UI.all_star).label;
   const selectedTierRarityLabel = (TIER_UI[orderTier] || TIER_UI.all_star).sub;
@@ -508,6 +529,143 @@ export default function StudioPage() {
     }
   }, [previewCards, selectedPreviewUrl]);
 
+  const fetchPendingSession = useCallback(async () => {
+    if (!token) {
+      setPendingSession(null);
+      return null;
+    }
+    try {
+      const res = await fetch(`${API_BASE_URL}/cards/pending`, {
+        headers: { ...authHeaders(token) },
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      const session = data?.session || null;
+      setPendingSession(session);
+      return session;
+    } catch {
+      return null;
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (initializing || !token) return;
+    fetchPendingSession().then((session) => {
+      if (session) setShowPendingPrompt(true);
+    });
+  }, [initializing, token, fetchPendingSession]);
+
+  useEffect(() => {
+    if (reviewSubPhase === "generate" && previewCards.length > 0) {
+      setShowPendingPrompt(false);
+    }
+  }, [reviewSubPhase, previewCards.length]);
+
+  useEffect(() => {
+    const hasUnfinishedPreview =
+      currentStep === STEP_REVIEW &&
+      reviewSubPhase === "generate" &&
+      previewCards.length > 0 &&
+      !isOrderDelivered;
+
+    if (!hasUnfinishedPreview) return undefined;
+
+    const handler = (event) => {
+      event.preventDefault();
+      event.returnValue =
+        "You have an unfinished card. If you leave, you can resume from your collection page.";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [currentStep, reviewSubPhase, previewCards.length, isOrderDelivered]);
+
+  function applyDraftToWizard(draft) {
+    if (!draft) return;
+    setFirstName(draft.player_first_name || "");
+    setLastName(draft.player_last_name || "");
+    setDisplayName(draft.player_display_name || "");
+    setJerseyNumber(draft.player_jersey_number || "");
+    setPosition(draft.player_position || "");
+    setGradYear(String(draft.player_grad_year || ""));
+    setTeamName(draft.player_team_name || "");
+    setOrderCustomerName(draft.customer_name || orderCustomerName);
+    setOrderCustomerEmail(draft.customer_email || orderCustomerEmail);
+    setOrderTier(draft.tier || "");
+    setCardType(draft.card_type || "standard");
+    setSpecialTheme(draft.special_theme || "");
+    setSelectedMotionId(draft.selected_motion_id || "");
+  }
+
+  async function handleResumePending() {
+    if (!pendingSession || !token) return;
+    setPendingActionLoading(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await fetch(`${API_BASE_URL}/cards/pending/restore`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders(token) },
+        body: JSON.stringify({ preview_session_id: pendingSession.preview_session_id }),
+      });
+      const order = await res.json();
+      if (!res.ok) {
+        throw new Error(formatApiError(order?.detail, "Could not restore your unfinished card."));
+      }
+
+      applyDraftToWizard(pendingSession.draft);
+      setOrders((prev) => {
+        const without = prev.filter((row) => row.id !== order.id);
+        return [...without, order];
+      });
+      setCurrentOrderId(order.id);
+
+      const latestPreview = pendingSession.previews?.[pendingSession.previews.length - 1];
+      const previewUrl = latestPreview?.image_url || "";
+      setSelectedPreviewUrl(previewUrl);
+      setGeneratedCardUrl(previewUrl);
+      setGeneratedTier(latestPreview?.tier || "base");
+      setCurrentStep(STEP_REVIEW);
+      setReviewSubPhase("generate");
+      setPreviewConfigureOpen(false);
+      setShowPendingPrompt(false);
+      setShowDiscardConfirm(false);
+      setPendingSession(null);
+      setMessage("Welcome back — your preview is ready. No additional credits were charged.");
+      await fetchOrders();
+    } catch (err) {
+      setError(err.message || "Could not restore your unfinished card.");
+    } finally {
+      setPendingActionLoading(false);
+    }
+  }
+
+  async function handleDiscardPending() {
+    if (!pendingSession || !token) return;
+    setPendingActionLoading(true);
+    setError("");
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/cards/pending?preview_session_id=${encodeURIComponent(pendingSession.preview_session_id)}`,
+        {
+          method: "DELETE",
+          headers: { ...authHeaders(token) },
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(formatApiError(data?.detail, "Could not discard pending preview."));
+      }
+      setShowPendingPrompt(false);
+      setShowDiscardConfirm(false);
+      setPendingSession(null);
+      setMessage("Pending preview discarded.");
+    } catch (err) {
+      setError(err.message || "Could not discard pending preview.");
+    } finally {
+      setPendingActionLoading(false);
+    }
+  }
+
   useEffect(() => {
     const sel = previewCards.find((p) => p.image_url === selectedPreviewUrl);
     if (!sel?.card_id) {
@@ -664,6 +822,7 @@ export default function StudioPage() {
         tier: orderTier,
         card_type: cardType,
         special_theme: specialTheme || null,
+        selected_motion_id: selectedMotionId || null,
         add_ons: [],
       }),
     });
@@ -698,15 +857,15 @@ export default function StudioPage() {
 
   async function handleGeneratePreviewForCurrentOrder() {
     if (!currentOrderId) return setError("Create an order first.");
-    if (isPreviewLimitReached) return setError("You\u2019ve reached your preview limit");
+    if (isPreviewLimitReached) return setError("You've reached your preview limit");
     if (activePreviewCount > 0 && !canAffordRegenerate) {
       setError(`You need ${formatMoney(additionalPreviewCost)} to generate another preview.`);
       setShowRegenerateConfirm(false);
       return;
     }
-    await handleGenerateForOrder(currentOrderId);
     setShowRegenerateConfirm(false);
     setPreviewConfigureOpen(false);
+    await handleGenerateForOrder(currentOrderId);
   }
 
   async function handleConfirmAddToCollection(quantity) {
@@ -750,6 +909,8 @@ export default function StudioPage() {
 
       setMessage(`Order #${currentOrderId} completed and added to your collection.`);
       await Promise.all([fetchOrders(), fetchMyCards(), refreshUser(token)]);
+      setPendingSession(null);
+      setShowPendingPrompt(false);
 
       if (isAnimatedCardType && selectedMotionId && cardId) {
         await startCardAnimation(cardId);
@@ -820,6 +981,19 @@ export default function StudioPage() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-appBg text-slate-100">
       <AppHeader />
+
+      {showPendingPrompt && pendingSession ? (
+        <PendingCardResumePrompt
+          session={pendingSession}
+          loading={pendingActionLoading}
+          showDiscardConfirm={showDiscardConfirm}
+          onResume={handleResumePending}
+          onDiscardRequest={() => setShowDiscardConfirm(true)}
+          onDiscardConfirm={handleDiscardPending}
+          onDiscardCancel={() => setShowDiscardConfirm(false)}
+          onDismiss={() => setShowPendingPrompt(false)}
+        />
+      ) : null}
 
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-3 py-6 sm:gap-8 sm:px-6 sm:py-8 lg:px-8">
         <section className="rounded-2xl border border-white/10 bg-cardBg p-3 shadow-xl shadow-black/30 sm:p-4">
@@ -1302,46 +1476,39 @@ export default function StudioPage() {
 
             {currentStep === STEP_REVIEW && reviewSubPhase === "generate" ? (
               <div className="grid gap-6">
-                <GenerationCostSummary
-                  playerName={playerDisplayName}
-                  teamName={teamName}
-                  position={position}
-                  jerseyNumber={jerseyNumber}
-                  gradYear={gradYear}
-                  tierLabel={selectedTierLabel}
-                  themeLabel={specialTheme ? selectedThemeLabel : ""}
-                  isAnimated={isAnimatedCardType}
-                  motionName={motionDisplayName}
-                  copyQuantity={copyQuantity}
-                  pricing={generationPricing}
-                  creditBalance={creditBalance}
-                  phase="pre-generate"
-                />
+                {!isGenerating ? (
+                  <>
+                    <GenerationCostSummary
+                      playerName={playerDisplayName}
+                      teamName={teamName}
+                      position={position}
+                      jerseyNumber={jerseyNumber}
+                      gradYear={gradYear}
+                      tierLabel={selectedTierLabel}
+                      themeLabel={specialTheme ? selectedThemeLabel : ""}
+                      isAnimated={isAnimatedCardType}
+                      motionName={motionDisplayName}
+                      copyQuantity={copyQuantity}
+                      pricing={generationPricing}
+                      creditBalance={creditBalance}
+                      phase="pre-generate"
+                    />
 
-                {activePreviewCount > 0 ? (
-                  <div className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
-                    <p className="font-medium text-cyan-50">This is your free preview.</p>
-                    <p className="mt-1 text-xs text-cyan-100/90">
-                      Regenerate for {formatMoney(additionalPreviewCost)} per attempt if you&apos;d like a different
-                      result. Only the card you choose will be added to your collection.
-                    </p>
-                  </div>
+                    {activePreviewCount > 0 ? (
+                      <div className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
+                        <p className="font-medium text-cyan-50">This is your free preview.</p>
+                        <p className="mt-1 text-xs text-cyan-100/90">
+                          Regenerate for {formatMoney(additionalPreviewCost)} per attempt if you&apos;d like a different
+                          result. Only the card you choose will be added to your collection.
+                        </p>
+                      </div>
+                    ) : null}
+                  </>
                 ) : null}
 
                 {isGenerating ? (
-                  <div className={`rounded-xl border px-3 py-2 ${tierTheme.loading}`}>
-                    <div className="mb-2 flex items-center gap-2 text-xs text-violet-100">
-                      <span className="h-2 w-2 animate-pulse rounded-full bg-violet-300" />
-                      Minting your {selectedTierLabel} preview...
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                      <div className="h-full w-1/3 animate-pulse rounded-full bg-gradient-to-r from-neonBlue via-neonPurple to-neonTeal" />
-                    </div>
-                    <p className="mt-2 text-[11px] text-slate-200/90">Applying rarity framing, effects, and finish...</p>
-                  </div>
-                ) : null}
-
-                {previewCards.length === 0 && !isGenerating ? (
+                  <PreviewGenerationLoading tierLabel={selectedTierLabel} tierTheme={tierTheme} />
+                ) : previewCards.length === 0 ? (
                   <button
                     type="button"
                     onClick={handleGenerateFirstPreview}
@@ -1352,9 +1519,7 @@ export default function StudioPage() {
                       ? `Generate My Card — ${formatMoney(firstGenerateDue)}`
                       : "Generate My Card — Free Preview"}
                   </button>
-                ) : null}
-
-                {previewCards.length > 0 ? (
+                ) : (
                   <>
                     {previewCards.length > 1 ? (
                       <div className="rounded-xl border border-white/10 bg-cardBg2 px-4 py-3 text-center">
@@ -1522,7 +1687,7 @@ export default function StudioPage() {
                       </div>
                     ) : null}
                   </>
-                ) : null}
+                )}
               </div>
             ) : null}
 
@@ -1604,12 +1769,10 @@ export default function StudioPage() {
               <button
                 type="button"
                 onClick={handleGeneratePreviewForCurrentOrder}
-                disabled={Boolean(orderActionKey) || !canAffordRegenerate}
+                disabled={!canAffordRegenerate}
                 className="min-h-[42px] rounded-lg bg-neonTeal px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50"
               >
-                {orderActionKey === `generate-${currentOrderId}`
-                  ? "Generating..."
-                  : `Generate — ${formatMoney(additionalPreviewCost)}`}
+                {`Generate — ${formatMoney(additionalPreviewCost)}`}
               </button>
             </div>
           </div>

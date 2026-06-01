@@ -101,6 +101,8 @@ class Card(Base):
     animation_motion: Mapped[str | None] = mapped_column(String(64), nullable=True)
     animation_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     animation_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    preview_session_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    draft_metadata: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     owner: Mapped["User | None"] = relationship(
         "User",
