@@ -18,6 +18,7 @@ import { motionLabel } from "../constants/animationMotions";
 import { API_BASE_URL, authHeaders, toApiUrl } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import { fetchGenerationPrice } from "../utils/cardPricing";
+import { copyChargeForQuantity, normalizeCopyTiers } from "../utils/copyPricing";
 import { formatMoney } from "../utils/marketplace";
 
 const STEP_PHOTO = 1;
@@ -258,6 +259,7 @@ export default function StudioPage() {
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
   const [previewConfigureOpen, setPreviewConfigureOpen] = useState(false);
   const [addCollectionLoading, setAddCollectionLoading] = useState(false);
+  const [copyQuantity, setCopyQuantity] = useState(1);
 
   const selectedTierLabel = (TIER_UI[orderTier] || TIER_UI.all_star).label;
   const selectedTierRarityLabel = (TIER_UI[orderTier] || TIER_UI.all_star).sub;
@@ -327,12 +329,16 @@ export default function StudioPage() {
   const creditBalance = Number(user?.credit_balance ?? 0);
   const animatedUpgradeCost = Number(generationPricing?.animated_upgrade_price ?? 10);
   const additionalPreviewCost = Number(generationPricing?.additional_preview_price ?? 0);
+  const copyPricingTiers = useMemo(
+    () => normalizeCopyTiers(generationPricing?.copy_pricing_tiers),
+    [generationPricing?.copy_pricing_tiers]
+  );
   const firstGenerateDue = isAnimatedCardType ? animatedUpgradeCost : 0;
   const canAffordFirstGenerate = creditBalance >= firstGenerateDue;
   const canAffordRegenerate = creditBalance >= additionalPreviewCost;
   const regenerateShortfall = Math.max(0, additionalPreviewCost - creditBalance);
   const firstGenerateShortfall = Math.max(0, firstGenerateDue - creditBalance);
-  const cardTypeSummaryLabel = isAnimatedCardType ? "Animated" : "Standard";
+  const motionDisplayName = isAnimatedCardType && selectedMotionId ? motionLabel(selectedMotionId) : "";
   const inCreationFlow = currentStep >= STEP_PHOTO && currentStep <= STEP_REVIEW;
 
   const detailsValidation = useMemo(
@@ -706,8 +712,7 @@ export default function StudioPage() {
   async function handleConfirmAddToCollection(quantity) {
     if (!currentOrderId) return setError("Create an order first.");
     if (!selectedPreviewUrl && !generatedCardUrl) return setError("Select a preview first.");
-    const extraCopies = Math.max(0, quantity - 1);
-    const extraCost = additionalPreviewCost * extraCopies;
+    const { extra: extraCopies, total: extraCost } = copyChargeForQuantity(quantity, 1, copyPricingTiers);
     if (extraCost > creditBalance) {
       setError(`You need ${formatMoney(extraCost)} in credits for ${extraCopies} additional ${extraCopies === 1 ? "copy" : "copies"}.`);
       return;
@@ -797,15 +802,19 @@ export default function StudioPage() {
     await Promise.all([fetchMyCards(), fetchOrders(), refreshUser(token)]);
   }
 
+  function handlePhotoFileSelect(file) {
+    if (!file || !file.type.startsWith("image/")) return;
+    setImageFile(file);
+    setPhotoStepError("");
+    setError("");
+    setMessage(`Photo uploaded: ${file.name}`);
+  }
+
   function handleDropFile(e) {
     e.preventDefault();
     setDragActive(false);
     const file = e.dataTransfer.files?.[0];
-    if (file && file.type.startsWith("image/")) {
-      setImageFile(file);
-      setMessage("Photo added.");
-      setError("");
-    }
+    if (file) handlePhotoFileSelect(file);
   }
 
   return (
@@ -878,47 +887,68 @@ export default function StudioPage() {
               <>
             {currentStep === STEP_PHOTO ? (
               <div className="grid gap-4">
-                <label
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragActive(true);
+                <input
+                  id="studio-photo-upload"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    handlePhotoFileSelect(e.target.files?.[0] || null);
+                    e.target.value = "";
                   }}
-                  onDragLeave={() => setDragActive(false)}
-                  onDrop={(e) => {
-                    handleDropFile(e);
-                    setPhotoStepError("");
-                  }}
-                  className={`flex min-h-[180px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-4 text-center transition ${
-                    dragActive
-                      ? "border-neonBlue/70 bg-neonBlue/10"
-                      : photoStepError
-                        ? "border-rose-500/50 bg-rose-500/5"
-                        : "border-white/20 bg-cardBg2 hover:border-neonBlue/40"
-                  }`}
-                >
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      setImageFile(e.target.files?.[0] || null);
-                      setPhotoStepError("");
-                      setError("");
-                    }}
-                  />
-                  <p className="text-sm text-slate-200">Drag & drop player photo</p>
-                  <p className="text-xs text-slate-400">or click to choose an image</p>
-                </label>
+                />
                 {photoStepError ? (
                   <p className="text-sm text-rose-300">{photoStepError}</p>
                 ) : null}
-                {imagePreviewUrl ? (
-                  <img
-                    src={imagePreviewUrl}
-                    alt="Upload preview"
-                    className="max-h-72 w-full rounded-xl border border-white/15 object-cover sm:max-h-96"
-                  />
-                ) : null}
+                {!imageFile ? (
+                  <label
+                    htmlFor="studio-photo-upload"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDragActive(true);
+                    }}
+                    onDragLeave={() => setDragActive(false)}
+                    onDrop={(e) => {
+                      handleDropFile(e);
+                      setPhotoStepError("");
+                    }}
+                    className={`flex min-h-[180px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-4 text-center transition ${
+                      dragActive
+                        ? "border-neonBlue/70 bg-neonBlue/10"
+                        : photoStepError
+                          ? "border-rose-500/50 bg-rose-500/5"
+                          : "border-white/20 bg-cardBg2 hover:border-neonBlue/40"
+                    }`}
+                  >
+                    <p className="text-sm text-slate-200">Drag & drop player photo</p>
+                    <p className="text-xs text-slate-400">or click to choose an image</p>
+                  </label>
+                ) : (
+                  <>
+                    <div className="flex min-h-[240px] items-center justify-center rounded-xl border border-white/15 bg-zinc-900/70 p-4 sm:min-h-[300px]">
+                      <img
+                        src={imagePreviewUrl}
+                        alt="Upload preview"
+                        className="max-h-[min(480px,60vh)] w-full object-contain"
+                      />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
+                      <span className="text-emerald-300" aria-hidden>
+                        ✓
+                      </span>
+                      <p className="text-sm text-emerald-100">
+                        <span className="font-medium text-emerald-50">Photo uploaded</span>
+                        <span className="text-emerald-200/90"> — {imageFile.name}</span>
+                      </p>
+                    </div>
+                    <label
+                      htmlFor="studio-photo-upload"
+                      className="inline-flex min-h-[44px] w-full cursor-pointer items-center justify-center rounded-xl border border-white/25 bg-transparent px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:border-white/40 hover:bg-white/5 sm:w-auto"
+                    >
+                      Replace Photo
+                    </label>
+                  </>
+                )}
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -1201,7 +1231,7 @@ export default function StudioPage() {
                   ) : null}
                 </div>
                 <div className="grid gap-4 lg:grid-cols-2">
-                  <div className="rounded-xl border border-white/10 bg-cardBg2 p-3">
+                  <div className="rounded-xl border border-white/10 bg-cardBg2 p-3 sm:p-4">
                     <p className="text-sm font-medium text-white">Delivery Contact</p>
                     <p className="mt-1 text-xs text-slate-400">
                       These details are attached to the order for fulfillment and delivery.
@@ -1227,11 +1257,18 @@ export default function StudioPage() {
                   </div>
                   <GenerationCostSummary
                     playerName={playerDisplayName}
+                    teamName={teamName}
+                    position={position}
+                    jerseyNumber={jerseyNumber}
+                    gradYear={gradYear}
                     tierLabel={selectedTierLabel}
-                    cardTypeLabel={cardTypeSummaryLabel}
+                    themeLabel={specialTheme ? selectedThemeLabel : ""}
                     isAnimated={isAnimatedCardType}
+                    motionName={motionDisplayName}
+                    copyQuantity={copyQuantity}
                     pricing={generationPricing}
                     creditBalance={creditBalance}
+                    phase="pre-generate"
                   />
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -1267,11 +1304,18 @@ export default function StudioPage() {
               <div className="grid gap-6">
                 <GenerationCostSummary
                   playerName={playerDisplayName}
+                  teamName={teamName}
+                  position={position}
+                  jerseyNumber={jerseyNumber}
+                  gradYear={gradYear}
                   tierLabel={selectedTierLabel}
-                  cardTypeLabel={cardTypeSummaryLabel}
+                  themeLabel={specialTheme ? selectedThemeLabel : ""}
                   isAnimated={isAnimatedCardType}
+                  motionName={motionDisplayName}
+                  copyQuantity={copyQuantity}
                   pricing={generationPricing}
                   creditBalance={creditBalance}
+                  phase="pre-generate"
                 />
 
                 {activePreviewCount > 0 ? (
@@ -1382,10 +1426,28 @@ export default function StudioPage() {
                             className="block w-full object-contain"
                           />
                         </div>
+                        <GenerationCostSummary
+                          playerName={playerDisplayName}
+                          teamName={teamName}
+                          position={position}
+                          jerseyNumber={jerseyNumber}
+                          gradYear={gradYear}
+                          tierLabel={selectedTierLabel}
+                          themeLabel={specialTheme ? selectedThemeLabel : ""}
+                          isAnimated={isAnimatedCardType}
+                          motionName={motionDisplayName}
+                          copyQuantity={copyQuantity}
+                          pricing={generationPricing}
+                          creditBalance={creditBalance}
+                          phase="confirm"
+                          showBalance
+                        />
                         <QuantitySelector
                           disabled={addCollectionLoading}
                           loading={addCollectionLoading}
-                          copyUnitPrice={additionalPreviewCost}
+                          copyPricingTiers={copyPricingTiers}
+                          value={copyQuantity}
+                          onChange={setCopyQuantity}
                           onConfirm={handleConfirmAddToCollection}
                         />
                         <button
@@ -1475,7 +1537,7 @@ export default function StudioPage() {
                     token={token || ""}
                     onRefreshDetail={refreshSavedCardDetail}
                     onCardsUpdated={fetchMyCards}
-                    copyUnitPrice={additionalPreviewCost}
+                    copyPricingTiers={copyPricingTiers}
                   />
                 ) : null}
                 {!isAnimatedCardType ? (

@@ -25,6 +25,10 @@ Backend on Render should also set:
   CARD_PRICE_LEGENDS=6.00
   ANIMATED_CARD_PRICE=10.00
     Animated card upgrade on first preview (Studio flow).
+  COPY_PRICE_TIER_1_4=0.50
+  COPY_PRICE_TIER_5_9=0.40
+  COPY_PRICE_TIER_10_PLUS=0.30
+    Bulk pricing for additional card copies (not preview regeneration).
 
 Backend on Render: card PNGs and uploads live under APP_DATA_DIR (e.g. /var/render/data
 with subdirs cards/ and uploads/). Without a persistent disk, redeploys clear files while

@@ -15,7 +15,7 @@ export default function PostGenerationPanel({
   token = "",
   onRefreshDetail,
   onCardsUpdated,
-  copyUnitPrice = 0,
+  copyPricingTiers,
 }) {
   const navigate = useNavigate();
   const [phase, setPhase] = useState("select");
@@ -129,7 +129,8 @@ export default function PostGenerationPanel({
             disabled={!detail.card_id}
             loading={qtyLoading}
             onConfirm={handleQuantityConfirm}
-            copyUnitPrice={copyUnitPrice}
+            copyPricingTiers={copyPricingTiers}
+            currentRun={Number(detail.print_run) || 1}
           />
         </>
       ) : null}

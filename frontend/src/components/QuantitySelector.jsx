@@ -1,5 +1,11 @@
 import React, { useState } from "react";
 import { formatMoney } from "../utils/marketplace";
+import {
+  bulkDiscountMessage,
+  copyChargeForQuantity,
+  formatCopyTierSummary,
+  normalizeCopyTiers,
+} from "../utils/copyPricing";
 
 const OPTIONS = [1, 2, 5, 10];
 
@@ -17,17 +23,31 @@ function priceHint(q) {
   return "Best value";
 }
 
-export default function QuantitySelector({ disabled, loading, onConfirm, copyUnitPrice = 0 }) {
-  const [selected, setSelected] = useState(1);
-  const unit = Number(copyUnitPrice) || 0;
-  const extraCopies = Math.max(0, selected - 1);
-  const extraCost = unit * extraCopies;
+export default function QuantitySelector({
+  disabled,
+  loading,
+  onConfirm,
+  copyPricingTiers,
+  value,
+  onChange,
+  currentRun = 1,
+}) {
+  const [internalSelected, setInternalSelected] = useState(1);
+  const selected = value !== undefined ? value : internalSelected;
+  const setSelected = onChange || setInternalSelected;
+  const tiers = normalizeCopyTiers(copyPricingTiers);
+  const { extra, unit, total } = copyChargeForQuantity(selected, currentRun, tiers);
+  const bulkMsg = bulkDiscountMessage(selected);
 
   return (
     <div className="mt-6 rounded-2xl border border-white/10 bg-[#111111]/90 p-4 sm:p-5">
       <h3 className="text-center text-base font-semibold text-white sm:text-left">How many copies do you want?</h3>
       <p className="mt-1 text-center text-sm text-slate-400 sm:text-left">
         Order multiple copies to trade with teammates and friends.
+      </p>
+
+      <p className="mt-4 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-center text-xs leading-relaxed text-slate-300 sm:text-left">
+        {formatCopyTierSummary(tiers)}
       </p>
 
       <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -64,16 +84,23 @@ export default function QuantitySelector({ disabled, loading, onConfirm, copyUni
 
       <p className="mt-5 text-center text-sm leading-relaxed text-slate-300 sm:text-left">{summaryLine(selected)}</p>
 
-      {unit > 0 ? (
-        <p className="mt-2 text-center text-sm text-slate-400 sm:text-left">
-          Each additional copy: <span className="font-medium text-white">{formatMoney(unit)}</span>
-          {extraCopies > 0 ? (
-            <span className="block pt-1 text-neonTeal">
-              {extraCopies} extra {extraCopies === 1 ? "copy" : "copies"}: {formatMoney(extraCost)}
-            </span>
-          ) : null}
-        </p>
+      {bulkMsg ? (
+        <p className="mt-3 text-center text-sm font-semibold text-neonTeal sm:text-left">{bulkMsg}</p>
       ) : null}
+
+      <div className="mt-3 rounded-lg border border-white/10 bg-cardBg/80 px-3 py-2.5 text-center text-sm sm:text-left">
+        {extra > 0 ? (
+          <>
+            <span className="text-slate-300">
+              {extra} {extra === 1 ? "copy" : "copies"} × {formatMoney(unit)} each ={" "}
+            </span>
+            <span className="font-semibold tabular-nums text-white">{formatMoney(total)}</span>
+            <p className="mt-1 text-xs text-slate-500">First card included from your preview — additional copies only.</p>
+          </>
+        ) : (
+          <span className="text-slate-400">No additional copy charge — first card included.</span>
+        )}
+      </div>
 
       <button
         type="button"

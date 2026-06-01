@@ -47,11 +47,66 @@ def _parse_price(raw: str | None, default: float) -> float:
 
 
 def tier_generation_price(tier: str | None) -> float:
-    """Per-preview / per-copy price for the given order tier."""
+    """Per-preview regeneration price for the given order tier (not additional copies)."""
     key = normalize_order_tier(tier)
     env_name = _TIER_ENV_KEYS[key]
     default = _TIER_DEFAULTS[key]
     return _parse_price(os.environ.get(env_name), default)
+
+
+def _copy_tier_defaults() -> list[dict]:
+    return [
+        {
+            "min_copies": 1,
+            "max_copies": 4,
+            "price_per_copy": _parse_price(os.environ.get("COPY_PRICE_TIER_1_4"), 0.50),
+        },
+        {
+            "min_copies": 5,
+            "max_copies": 9,
+            "price_per_copy": _parse_price(os.environ.get("COPY_PRICE_TIER_5_9"), 0.40),
+        },
+        {
+            "min_copies": 10,
+            "max_copies": None,
+            "price_per_copy": _parse_price(os.environ.get("COPY_PRICE_TIER_10_PLUS"), 0.30),
+        },
+    ]
+
+
+def copy_pricing_tiers() -> list[dict]:
+    """Bulk copy pricing tiers (additional copies only)."""
+    return _copy_tier_defaults()
+
+
+def copy_unit_price_for_quantity(quantity: int) -> float:
+    """Unit copy price based on target total quantity tier."""
+    q = max(1, int(quantity))
+    for tier in copy_pricing_tiers():
+        lo = int(tier["min_copies"])
+        hi = tier["max_copies"]
+        if q >= lo and (hi is None or q <= int(hi)):
+            return float(tier["price_per_copy"])
+    return 0.50
+
+
+def copy_charge_for_quantity(target_quantity: int, *, current_run: int = 1) -> dict:
+    """
+    Compute additional-copy charge when expanding print run to target_quantity.
+    First card in the run is included; only extra copies are billed.
+    """
+    target = max(1, int(target_quantity))
+    current = max(1, int(current_run))
+    extra = max(0, target - current)
+    unit = copy_unit_price_for_quantity(target)
+    total = round(extra * unit, 2)
+    return {
+        "target_quantity": target,
+        "current_run": current,
+        "extra_copies": extra,
+        "unit_price": unit,
+        "total": total,
+    }
 
 
 def animated_upgrade_price() -> float:
@@ -66,4 +121,5 @@ def generation_price_payload(tier: str | None) -> dict:
         "first_preview_price": 0.0,
         "additional_preview_price": tier_generation_price(key),
         "animated_upgrade_price": animated_upgrade_price(),
+        "copy_pricing_tiers": copy_pricing_tiers(),
     }

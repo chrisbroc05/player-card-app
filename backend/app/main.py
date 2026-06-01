@@ -46,7 +46,7 @@ from auth import (  # noqa: E402
 from credit_service import InsufficientCreditsError, TX_ANIMATION, TX_GENERATION, deduct_credits  # noqa: E402
 from card_pricing import (  # noqa: E402
     animated_upgrade_price,
-    order_tier_from_card_tier,
+    copy_charge_for_quantity,
     tier_generation_price,
 )
 from card_history import build_card_history  # noqa: E402
@@ -198,6 +198,64 @@ OrderStatus = Literal[
 ]
 
 
+def _card_composition_and_safe_zone_rules(*, variant: Literal["dual_edit", "single_edit", "text_generate"]) -> str:
+    """Shared framing, safe-zone, and legibility rules for all OpenAI card prompts."""
+    aspect = (
+        "Match the SECOND reference image (card template) aspect ratio, outer border, and layout grid "
+        "EXACTLY — the finished card must align 1:1 with that template so no cropping is needed. "
+        if variant == "dual_edit"
+        else "Compose as a perfect square 1:1 trading card that fills the frame proportionally with no "
+        "post-generation cropping required. "
+    )
+    return (
+        "COMPOSITION & SAFE ZONES (mandatory): "
+        "Render one complete, self-contained trading card — a single unified design fully visible "
+        "from edge to edge inside the image. The entire card border, frame, background, badges, and "
+        "decorative elements must appear in-frame; nothing clipped, truncated, or cut off by the image edge. "
+        "Nothing may bleed, extend, or fade outside the card boundary. "
+        f"{aspect}"
+        "Enforce an inner safe zone with at least 6% padding from every card edge. "
+        "ALL typography and badges — player name, jersey number, position, team name, grad year, tier labels, "
+        "and team logos — must sit entirely inside this safe zone with clear breathing room; "
+        "never touch the outer border, never half-rendered, never clipped. "
+        "Every text element and badge must sit on a high-contrast background panel "
+        "(solid bar, frosted plate, colored chip, or dark/light banner) so it stays legible on busy art. "
+        "Graphic team logos and icons are allowed but must also remain fully inside the safe zone. "
+    )
+
+
+def _player_framing_rules(*, variant: Literal["dual_edit", "single_edit", "text_generate"]) -> str:
+    """How the athlete should be placed within the card art area."""
+    identity = (
+        "Use the FIRST reference image for the subject's identity, preserving the same athletic action "
+        "and body pose (e.g. throwing stays throwing); redraw as stylized illustrated art. "
+        if variant == "dual_edit"
+        else (
+            "Use the input photo for identity and the same action/pose; redraw as stylized illustrated art. "
+            if variant == "single_edit"
+            else ""
+        )
+    )
+    return (
+        f"{identity}"
+        "PLAYER FRAMING: Center the athlete as the focal point in the card's main art window. "
+        "Head and upper body (shoulders and chest) must be clearly visible — never crop through the face, "
+        "forehead, chin, or shoulders. Leave visible space above the head within the safe zone. "
+        "The player portrait should feel well-framed and balanced, not zoomed-in so tight that limbs or "
+        "facial features are cut off. "
+    )
+
+
+def _tier_theme_balance_rules(tier_block: str, theme_line: str) -> str:
+    """Keep tier/theme visible in the style without overpowering the player."""
+    return (
+        f"{tier_block} "
+        f"{theme_line} "
+        "Tier rarity and theme must be prominent in borders, accents, color palette, and background atmosphere, "
+        "but must NOT overwhelm or obscure the player portrait — the athlete remains the hero of the card. "
+    )
+
+
 def _tier_animated_card_prompt(
     name: str,
     team: str,
@@ -218,46 +276,50 @@ def _tier_animated_card_prompt(
 
     tier_rules = {
         "base": (
-            "TIER: BASE — Common card. Clean, simple composition; minimal VFX; standard, even lighting; "
+            "TIER: ROOKIE / BASE — Common card. Clean, simple composition; minimal VFX; standard, even lighting; "
             "straightforward stadium or field background. Feels like a normal, common pull — restrained polish."
         ),
         "rare": (
-            "TIER: RARE — Clearly upgraded vs Base: stronger rim light and subtle glow; more kinetic background "
-            "(motion blur, light streaks, speed lines, energy); punchier contrast and richer color; busier and "
-            "more exciting, but still readable."
+            "TIER: ALL-STAR / RARE — Clearly upgraded vs Base: stronger rim light and subtle glow; more kinetic "
+            "background (motion blur, light streaks, speed lines, energy); punchier contrast and richer color; "
+            "busier and more exciting, but still readable with all elements inside safe zones."
         ),
         "legendary": (
-            "TIER: 1-of-1 LEGENDARY — Show-stopper: lavish gold/chrome/holographic and/or neon accents; particle "
-            "sparks, lens flare, energy bursts; cinematic or epic backdrop; maximal stylization; must feel "
-            "obviously rarer and more intense than RARE — premium grail energy."
+            "TIER: LEGENDS / 1-of-1 LEGENDARY — Show-stopper: lavish gold/chrome/holographic and/or neon accents; "
+            "particle sparks, lens flare, energy bursts; cinematic or epic backdrop; maximal stylization; "
+            "must feel obviously rarer and more intense than RARE — premium grail energy."
         ),
     }
 
     if variant == "dual_edit":
         layout = (
-            "Use the FIRST image for the subject's identity, keeping the **same athletic action and body pose** "
-            "as in that photo (e.g. throwing stays throwing, batting stays batting); redraw as a stylized fictional "
-            "athlete — do not invent a different sport action. "
-            "Use the SECOND image as the CARD TEMPLATE — follow its layout, borders, proportions, and framing. "
+            "Use the SECOND image strictly as the CARD TEMPLATE — replicate its layout, border shape, "
+            "proportions, typography zones, badge placement, and framing. "
+            "Place the illustrated player into the template's art window without breaking the template structure. "
         )
     elif variant == "single_edit":
         layout = (
-            "Use the INPUT image for identity, **keeping the same action and body pose as the photo**; "
-            "fully redraw the subject as a stylized fictional athlete — do not switch to a different sport action. "
-            "Design a bold trading-card frame, borders, and composition appropriate to the tier (no photo crop). "
+            "Design a bold trading-card frame, borders, and composition appropriate to the tier. "
+            "Include clear zones for player name, jersey number, position, team name, and grad year "
+            "within the safe zone — each on a high-contrast panel. "
         )
     else:
         layout = (
             "Illustrate a single square baseball trading card featuring one central cel-shaded fictional athlete "
-            f"character (team vibe: {team}). Invent a strong card frame and dynamic sports background for this tier. "
+            f"character (team vibe: {team}). Invent a strong card frame with designated typography zones "
+            "for name, jersey number, position, team, and grad year — all fully inside safe margins. "
         )
 
     modifier = theme_prompt_for_slug(special_theme)
     theme_line = (
-        f"THEME (color palette, background atmosphere, overall card aesthetic, border and frame style): {modifier} "
+        f"THEME (apply to color palette, background atmosphere, border/frame style, and accent effects): {modifier} "
         if modifier
         else ""
     )
+
+    composition = _card_composition_and_safe_zone_rules(variant=variant)
+    framing = _player_framing_rules(variant=variant)
+    tier_theme = _tier_theme_balance_rules(tier_rules[t], theme_line)
 
     if variant == "text_generate":
         pose_block = (
@@ -269,25 +331,27 @@ def _tier_animated_card_prompt(
             "image (do not default to batting or swinging unless the photo already shows that). "
         )
 
+    metadata_block = (
+        f"Incorporate these details into the card's typography zones (all fully visible, never clipped): "
+        f"{player_context_text} "
+        if player_context_text
+        else f"Player context: {name}, team {team}. "
+    )
+
     return (
         "OUTPUT MUST BE FULLY ILLUSTRATED, CARTOON / CEL-SHADED animated baseball trading card art — like modern "
         "sports VIDEO GAME character cards. NOT a photograph, NOT photorealistic, NOT a light photo edit. "
         "Do NOT preserve or copy exact pixels from the source photo; redraw everything as illustrated artwork. "
+        f"{composition}"
+        f"{framing}"
         f"{pose_block}"
         f"{layout}"
         "Clean outlines, bold lighting, vibrant saturated colors. "
-        "Dramatic sports background: stadium lights, motion, energy effects scaled to tier. "
-        f"{tier_rules[t]} "
-        f"{theme_line} "
-        f"Player context (mood only): {name}, team {team}. "
-        f"{player_context_text} "
-        "If numbers or labels appear in artwork, keep them abstract or unreadable. "
-        "Do NOT add any lower-third panel, text bar, label box, caption plate, or overlay box inside the artwork. "
-        "Keep the player's full body visible where possible, including legs/feet when in frame. "
-        "CRITICAL TEXT RULE: Do NOT render readable player names, team names, letters, words, or jersey text "
-        "on the card art itself; keep all naming text blank because it is added later in a clean overlay. "
-        "Graphic logos/icons without readable text are allowed. "
-        "Prioritize stylization and creativity over realism."
+        "Dramatic sports background: stadium lights, motion, energy effects scaled to tier — kept behind the player "
+        "and inside the card frame. "
+        f"{tier_theme}"
+        f"{metadata_block}"
+        "Prioritize correct full-card composition and legibility over excessive background detail near the edges."
     )
 
 
@@ -331,19 +395,19 @@ def _player_jersey_number(player_row: dict) -> str:
 
 
 def _player_prompt_context(player_row: dict) -> str:
-    """Structured player metadata to personalize generated cards."""
+    """Structured player metadata to personalize generated cards — rendered in safe-zone typography."""
     name = _player_display_name(player_row)
     team = _player_team_name(player_row)
     jersey_number = str(player_row.get("jersey_number") or "").strip() or "N/A"
     position = str(player_row.get("position") or "").strip() or "N/A"
     grad_year = str(player_row.get("grad_year") or "").strip() or "N/A"
     return (
-        "Player details to incorporate into the card design: "
-        f"- Name: {name} "
-        f"- Jersey Number: #{jersey_number} "
-        f"- Position: {position} "
-        f"- Team: {team} "
-        f"- Grad Year: {grad_year} "
+        "Render each value fully inside the card safe zone on a high-contrast panel — never clipped: "
+        f"Name: {name}; "
+        f"Jersey #: {jersey_number}; "
+        f"Position: {position}; "
+        f"Team: {team}; "
+        f"Grad Year: {grad_year}. "
     ).strip()
 
 
@@ -634,7 +698,7 @@ def _vision_caption_for_card(client: OpenAI, source_path: Path) -> str:
                             "In 2 short phrases, describe the person's appearance and what their body is doing "
                             "(pose / action — e.g. throwing, batting, running) plus hair, skin tone, expression, "
                             "and clothing colors, for an illustrator drawing a stylized fictional sports trading card. "
-                            "Do not use real names."
+                            "Note whether head and upper body are fully in frame. Do not use real names."
                         ),
                     },
                     {"type": "image_url", "image_url": {"url": data_url}},
@@ -1631,26 +1695,25 @@ def duplicate_cards(
             detail="Quantity must be one of: 1, 2, 5, 10.",
         )
     current_run = int(orm.print_run or 1)
-    extra_copies = max(0, body.quantity - current_run)
-    if extra_copies > 0:
-        order_tier = order_tier_from_card_tier(orm.tier)
-        unit_price = tier_generation_price(order_tier)
-        total_charge = unit_price * extra_copies
-        if total_charge > 0:
-            try:
-                deduct_credits(
-                    user_id=current_user.id,
-                    amount=total_charge,
-                    transaction_type=TX_GENERATION,
-                    reference_id=orm.card_id,
-                    note=f"Additional card copies ({extra_copies}x) - {order_tier} tier",
-                    db=db,
-                )
-            except InsufficientCreditsError as exc:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Insufficient credits. Please add credits to your account at /credits",
-                ) from exc
+    copy_charge = copy_charge_for_quantity(body.quantity, current_run=current_run)
+    if copy_charge["total"] > 0:
+        try:
+            deduct_credits(
+                user_id=current_user.id,
+                amount=copy_charge["total"],
+                transaction_type=TX_GENERATION,
+                reference_id=orm.card_id,
+                note=(
+                    f"Additional card copies ({copy_charge['extra_copies']}x "
+                    f"@ ${copy_charge['unit_price']:.2f})"
+                ),
+                db=db,
+            )
+        except InsufficientCreditsError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail="Insufficient credits. Please add credits to your account at /credits",
+            ) from exc
     try:
         new_rows = expand_print_run_for_owner_image(db, template=orm, target_quantity=body.quantity)
     except ValueError as exc:
