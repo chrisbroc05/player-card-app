@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import CardImage from "./CardImage";
+import AnimatedAiDisclaimer from "./AnimatedAiDisclaimer";
 import { formatMoney } from "../utils/marketplace";
 
 const CONFIRM_DELAY_MS = 1500;
@@ -16,6 +17,7 @@ export default function AnimateCardConfirmModal({
   motionName = "",
   cost = 10,
   creditBalance = 0,
+  showAiDisclaimer = false,
 }) {
   const [confirmEnabled, setConfirmEnabled] = useState(false);
 
@@ -97,6 +99,8 @@ export default function AnimateCardConfirmModal({
           This is a one-time upgrade. Once animated, this cannot be undone or refunded. Make sure you love your card
           before animating.
         </div>
+
+        {showAiDisclaimer ? <AnimatedAiDisclaimer className="mt-3 px-1" /> : null}
 
         <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap">
           <button

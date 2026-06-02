@@ -3,41 +3,46 @@
 from __future__ import annotations
 
 # Exact Runway prompts for selectable studio motions (do not paraphrase).
+_CAMERA_LOCK = (
+    "Static locked-off camera. No zoom, no push in, no pan, no camera movement. "
+    "Full card remains completely in frame for entire duration."
+)
+
 SELECTABLE_MOTION_PROMPTS: dict[str, str] = {
     "pitch_windup": (
         "Realistic sports photography motion. Baseball pitcher winds up from set position, "
         "drives off rubber with explosive leg drive, arm comes through in fluid overhand "
-        "delivery, full follow through. Cinematic slow motion. Photorealistic."
+        f"delivery, full follow through. Cinematic slow motion. {_CAMERA_LOCK} Photorealistic."
     ),
     "hit_homerun": (
         "Realistic sports photography motion. Baseball batter loads weight back, explodes "
         "through contact zone with full hip rotation, powerful follow through with bat finishing "
-        "high over shoulder. Slow motion broadcast style. Photorealistic."
+        f"high over shoulder. Slow motion broadcast style. {_CAMERA_LOCK} Photorealistic."
     ),
     "field_dive": (
         "Realistic sports photography motion. Baseball outfielder reads ball off bat, takes "
         "explosive first step, full extension dive to make catch, slides across grass. "
-        "Broadcast slow motion. Photorealistic."
+        f"Broadcast slow motion. {_CAMERA_LOCK} Photorealistic."
     ),
     "celebrate_homerun_trot": (
         "Realistic sports photography motion. Baseball player rounds bases in confident "
         "measured home run trot, slight smile, helmet tip as they approach home plate. "
-        "Smooth steady cam follow. Photorealistic."
+        f"Smooth steady cam follow. {_CAMERA_LOCK} Photorealistic."
     ),
     "celebrate_fist": (
         "Realistic sports photography motion. Baseball player pumps fist in celebration after "
         "big play, intense focused emotion, upper body motion only. Slow motion close up. "
-        "Photorealistic."
+        f"{_CAMERA_LOCK} Photorealistic."
     ),
     "catch_framing_throw": (
         "Realistic sports photography motion. Baseball catcher frames pitch in strike zone "
         "with soft hands, smoothly comes up out of crouch into strong pop throw to second base, "
-        "full arm extension. Broadcast angle slow motion. Photorealistic."
+        f"full arm extension. Broadcast angle slow motion. {_CAMERA_LOCK} Photorealistic."
     ),
     "celebrate_energy": (
         "Realistic sports photography motion. Baseball player throws both arms up in pure "
         "celebration after winning moment, jumps slightly, teammates react in background. "
-        "Broadcast slow motion. Photorealistic."
+        f"Broadcast slow motion. {_CAMERA_LOCK} Photorealistic."
     ),
 }
 

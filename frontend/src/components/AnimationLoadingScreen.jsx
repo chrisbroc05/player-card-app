@@ -121,19 +121,26 @@ export default function AnimationLoadingScreen({
 
   return (
     <div className="flex min-h-[70vh] flex-col items-center justify-center px-4 py-12">
-      <div className="animation-card-glow relative mb-10 h-40 w-28 rounded-xl border border-violet-400/40 bg-gradient-to-b from-violet-500/20 to-cardBg2 sm:h-48 sm:w-32" aria-hidden>
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-300/90">Step 2 of 2</p>
+
+      <div className="animation-card-glow relative mb-8 mt-4 h-40 w-28 rounded-xl border border-violet-400/40 bg-gradient-to-b from-violet-500/20 to-cardBg2 sm:h-48 sm:w-32" aria-hidden>
         <div className="animation-shimmer absolute inset-0 rounded-xl" />
       </div>
 
-      <p className="max-w-md text-center text-xl font-semibold text-white transition-opacity duration-500">
+      <h2 className="max-w-md text-center text-2xl font-semibold text-white">Animating your card...</h2>
+      <p className="mt-2 max-w-md text-center text-sm text-violet-200/90">
+        Our AI is bringing your card to life. This takes about 30–60 seconds.
+      </p>
+
+      <p className="mt-5 max-w-md text-center text-sm text-slate-400 transition-opacity duration-500">
         {STATUS_LINES[lineIdx]}
       </p>
-      <p className="mt-2 text-sm text-violet-200/90">{animationStatusUserLine(status)}</p>
+      <p className="mt-1 text-xs text-slate-500">{animationStatusUserLine(status)}</p>
 
-      <div className="mt-8 h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-white/10">
-        <div className="animation-progress-indeterminate h-full w-1/3 rounded-full bg-gradient-to-r from-neonTeal via-violet-400 to-neonBlue" />
+      <div className="mt-8 h-2 w-full max-w-sm overflow-hidden rounded-full border border-violet-400/25 bg-violet-950/50">
+        <div className="animation-progress-indeterminate h-full w-2/5 rounded-full bg-gradient-to-r from-violet-400 via-fuchsia-400 to-neonTeal shadow-[0_0_12px_rgba(167,139,250,0.45)]" />
       </div>
-      <p className="mt-3 text-xs text-slate-500">This usually takes 20 to 40 seconds</p>
+      <p className="mt-3 text-xs font-medium text-violet-200/80">Animation in progress — not card generation</p>
 
       <p
         className={`mt-10 max-w-sm text-center text-sm text-slate-400 transition-opacity duration-300 ${

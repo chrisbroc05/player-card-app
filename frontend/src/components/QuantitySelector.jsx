@@ -31,6 +31,10 @@ export default function QuantitySelector({
   value,
   onChange,
   currentRun = 1,
+  confirmLabel = "Add to Collection",
+  loadingLabel = "Creating your cards...",
+  heading = "How many copies do you want?",
+  subheading = "Order multiple copies to trade with teammates and friends.",
 }) {
   const [internalSelected, setInternalSelected] = useState(1);
   const selected = value !== undefined ? value : internalSelected;
@@ -111,10 +115,10 @@ export default function QuantitySelector({
         {loading ? (
           <span className="flex items-center gap-2">
             <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/30 border-t-black" />
-            Creating your cards...
+            {loadingLabel}
           </span>
         ) : (
-          "Add to Collection"
+          confirmLabel
         )}
       </button>
     </div>

@@ -17,6 +17,8 @@ import AnimationLoadingScreen from "../components/AnimationLoadingScreen";
 import AnimationFailedScreen from "../components/AnimationFailedScreen";
 import PendingCardResumePrompt from "../components/PendingCardResumePrompt";
 import AnimateCardConfirmModal from "../components/AnimateCardConfirmModal";
+import AnimatedFlowExplainer from "../components/AnimatedFlowExplainer";
+import AnimatedAiDisclaimer from "../components/AnimatedAiDisclaimer";
 import { motionLabel } from "../constants/animationMotions";
 import {
   getActionCategory,
@@ -227,7 +229,27 @@ function formatApiError(detail, fallback) {
   return fallback;
 }
 
-function PreviewGenerationLoading({ tierLabel, tierTheme }) {
+function PreviewGenerationLoading({ tierLabel, tierTheme, isAnimated = false }) {
+  if (isAnimated) {
+    return (
+      <div className="rounded-xl border border-neonTeal/30 bg-gradient-to-br from-neonTeal/10 via-cardBg2 to-cardBg px-4 py-6">
+        <div className="mb-3 flex items-center gap-2 text-sm font-medium text-neonTeal">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-neonTeal/20 text-xs font-bold text-neonTeal">
+            1
+          </span>
+          Step 1: Creating your card art...
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-white/10">
+          <div className="h-full w-1/3 animate-pulse rounded-full bg-gradient-to-r from-neonTeal via-neonBlue to-neonPurple" />
+        </div>
+        <p className="mt-3 text-sm text-slate-200/90">
+          Building your {tierLabel} card design — animation comes next!
+        </p>
+        <p className="mt-1 text-xs text-slate-400">This usually takes 30–60 seconds. Please keep this page open.</p>
+      </div>
+    );
+  }
+
   return (
     <div className={`rounded-xl border px-4 py-6 ${tierTheme.loading}`}>
       <div className="mb-3 flex items-center gap-2 text-sm text-violet-100">
@@ -302,6 +324,7 @@ export default function StudioPage() {
   const [pricingError, setPricingError] = useState("");
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
   const [showAnimateConfirm, setShowAnimateConfirm] = useState(false);
+  const [showAnimatedFlowExplainer, setShowAnimatedFlowExplainer] = useState(false);
   const [previewConfigureOpen, setPreviewConfigureOpen] = useState(false);
   const [addCollectionLoading, setAddCollectionLoading] = useState(false);
   const [copyQuantity, setCopyQuantity] = useState(1);
@@ -1538,6 +1561,7 @@ export default function StudioPage() {
                     />
                   </>
                 )}
+                <AnimatedAiDisclaimer className="mt-1" />
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -1667,7 +1691,11 @@ export default function StudioPage() {
                 ) : null}
 
                 {isGenerating ? (
-                  <PreviewGenerationLoading tierLabel={selectedTierLabel} tierTheme={tierTheme} />
+                  <PreviewGenerationLoading
+                    tierLabel={selectedTierLabel}
+                    tierTheme={tierTheme}
+                    isAnimated={isAnimatedCardType}
+                  />
                 ) : previewCards.length === 0 ? (
                   <button
                     type="button"
@@ -1681,10 +1709,24 @@ export default function StudioPage() {
                   </button>
                 ) : (
                   <>
+                    {isAnimatedCardType ? (
+                      <div className="rounded-xl border border-violet-400/35 bg-gradient-to-r from-violet-500/15 to-neonTeal/10 px-4 py-4 text-center">
+                        <p className="text-base font-semibold text-white sm:text-lg">
+                          Step 1 complete — your card is ready. Now let&apos;s animate it!
+                        </p>
+                        <p className="mt-2 text-sm text-slate-300">
+                          The animated version will be added to your collection. This static preview is just the base
+                          for your animation.
+                        </p>
+                      </div>
+                    ) : null}
+
                     {previewCards.length > 1 ? (
                       <div className="rounded-xl border border-white/10 bg-cardBg2 px-4 py-3 text-center">
                         <p className="text-base font-semibold text-white">
-                          Pick your favorite — only the card you choose will be added to your collection
+                          {isAnimatedCardType
+                            ? "Pick your favorite — we'll animate the one you choose"
+                            : "Pick your favorite — only the card you choose will be added to your collection"}
                         </p>
                       </div>
                     ) : null}
@@ -1721,7 +1763,7 @@ export default function StudioPage() {
                                   }}
                                   className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl bg-neonTeal px-4 py-2 text-sm font-semibold text-slate-950"
                                 >
-                                  Choose This Card
+                                  {isAnimatedCardType ? "Animate This Card →" : "Choose This Card"}
                                 </button>
                               ) : (
                                 <button
@@ -1732,7 +1774,7 @@ export default function StudioPage() {
                                   }}
                                   className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-neonTeal px-4 py-2.5 text-sm font-semibold text-slate-950"
                                 >
-                                  Add This Card to My Collection
+                                  {isAnimatedCardType ? "Animate This Card →" : "Add This Card to My Collection"}
                                 </button>
                               )}
                             </div>
@@ -1742,8 +1784,20 @@ export default function StudioPage() {
                     ) : null}
 
                     {previewConfigureOpen ? (
-                      <div className="rounded-2xl border border-neonTeal/30 bg-cardBg2 p-4 sm:p-6">
-                        <p className="text-center text-sm font-medium text-white">Confirm your card</p>
+                      <div className="rounded-2xl border border-violet-400/30 bg-cardBg2 p-4 sm:p-6">
+                        {isAnimatedCardType ? (
+                          <>
+                            <p className="text-center text-base font-semibold text-violet-100 sm:text-lg">
+                              Step 1 complete — your card is ready. Now let&apos;s animate it!
+                            </p>
+                            <p className="mt-2 text-center text-sm text-slate-400">
+                              The animated version will be added to your collection. This static preview is just the
+                              base for your animation.
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-center text-sm font-medium text-white">Confirm your card</p>
+                        )}
                         <div className="mx-auto mt-4 max-w-xs overflow-hidden rounded-xl border border-white/10">
                           <img
                             src={toApiUrl(selectedPreviewUrl || generatedCardUrl)}
@@ -1774,6 +1828,18 @@ export default function StudioPage() {
                           value={copyQuantity}
                           onChange={setCopyQuantity}
                           onConfirm={handleConfirmAddToCollection}
+                          confirmLabel={isAnimatedCardType ? "Animate This Card →" : "Add to Collection"}
+                          loadingLabel={isAnimatedCardType ? "Starting animation..." : "Creating your cards..."}
+                          heading={
+                            isAnimatedCardType
+                              ? "Want extra copies of your animated card?"
+                              : "How many copies do you want?"
+                          }
+                          subheading={
+                            isAnimatedCardType
+                              ? "Optional — order additional copies to trade. Your animated card is included."
+                              : "Order multiple copies to trade with teammates and friends."
+                          }
                         />
                         <button
                           type="button"
@@ -1942,9 +2008,9 @@ export default function StudioPage() {
       <AnimateCardConfirmModal
         open={showAnimateConfirm}
         onClose={() => setShowAnimateConfirm(false)}
-        onConfirm={async () => {
+        onConfirm={() => {
           setShowAnimateConfirm(false);
-          await handleGenerateFirstPreview();
+          setShowAnimatedFlowExplainer(true);
         }}
         busy={Boolean(orderActionKey)}
         previewImageUrl={imagePreviewUrl}
@@ -1952,6 +2018,16 @@ export default function StudioPage() {
         motionName={motionDisplayName}
         cost={animatedUpgradeCost}
         creditBalance={creditBalance}
+        showAiDisclaimer
+      />
+
+      <AnimatedFlowExplainer
+        open={showAnimatedFlowExplainer}
+        motionName={motionDisplayName}
+        onContinue={() => {
+          setShowAnimatedFlowExplainer(false);
+          handleGenerateFirstPreview();
+        }}
       />
 
       <AppFooter />
