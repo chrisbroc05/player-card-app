@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { API_BASE_URL } from "../config/api";
-import { ANIMATION_MOTION_CATEGORIES, groupMotionsByCategory } from "../constants/animationMotions";
+import { motionCategoryOrder, groupMotionsByCategory } from "../constants/animationMotions";
 
-export default function MotionSelectionGrid({ value, onChange, compact = false, error = "" }) {
+export default function MotionSelectionGrid({ value, onChange, compact = false, error = "", motionIds = null }) {
   const [motions, setMotions] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -25,7 +25,18 @@ export default function MotionSelectionGrid({ value, onChange, compact = false, 
     };
   }, []);
 
-  const groups = groupMotionsByCategory(motions);
+  const allowedIds = useMemo(() => {
+    if (!motionIds || !motionIds.length) return null;
+    return new Set(motionIds);
+  }, [motionIds]);
+
+  const filteredMotions = useMemo(() => {
+    if (!allowedIds) return motions;
+    return motions.filter((m) => allowedIds.has(m.id));
+  }, [motions, allowedIds]);
+
+  const groups = groupMotionsByCategory(filteredMotions);
+  const categories = motionCategoryOrder(filteredMotions);
 
   if (loading) {
     return <p className="text-sm text-slate-400">Loading motion options…</p>;
@@ -33,7 +44,7 @@ export default function MotionSelectionGrid({ value, onChange, compact = false, 
 
   return (
     <div className="space-y-5">
-      {ANIMATION_MOTION_CATEGORIES.map((cat) => {
+      {categories.map((cat) => {
         const items = groups[cat] || [];
         if (!items.length) return null;
         return (

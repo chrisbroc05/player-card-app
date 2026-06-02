@@ -66,6 +66,7 @@ def create_card_row(
     status: str = "active",
     preview_session_id: str | None = None,
     draft_metadata: str | None = None,
+    action_category: str | None = None,
     commit: bool = True,
 ) -> Card:
     creator = creator_user_id if creator_user_id is not None else owner_id
@@ -92,6 +93,7 @@ def create_card_row(
         status=(status or "active").strip() or "active",
         preview_session_id=preview_session_id,
         draft_metadata=draft_metadata,
+        action_category=action_category,
     )
     db.add(row)
     if commit:
@@ -154,6 +156,7 @@ def animation_fields_for_card(card: Card) -> dict:
         "animated_video_url": getattr(card, "animated_video_url", None) or None,
         "animation_status": getattr(card, "animation_status", None),
         "animation_motion": getattr(card, "animation_motion", None),
+        "action_category": getattr(card, "action_category", None) or None,
     }
 
 
@@ -244,6 +247,7 @@ def create_animated_upgrade_card(
     *,
     source: Card,
     motion_id: str,
+    action_category: str | None = None,
 ) -> Card:
     """
     Clone a static card into a new 1/1 animated edition; source row is unchanged.
@@ -277,6 +281,7 @@ def create_animated_upgrade_card(
     row.is_animated = True
     row.animation_status = "pending"
     row.animation_motion = motion_id
+    row.action_category = action_category
     row.animation_requested_at = utcnow()
     row.animation_completed_at = None
     row.animated_video_url = None

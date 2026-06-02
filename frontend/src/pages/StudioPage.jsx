@@ -11,11 +11,18 @@ import GenerationCostSummary from "../components/GenerationCostSummary";
 import ThemeLibraryPicker from "../components/ThemeLibraryPicker";
 import CardTypeStep from "../components/CardTypeStep";
 import QuantitySelector from "../components/QuantitySelector";
+import ActionCategoryStep from "../components/ActionCategoryStep";
 import MotionSelectionGrid from "../components/MotionSelectionGrid";
 import AnimationLoadingScreen from "../components/AnimationLoadingScreen";
 import AnimationFailedScreen from "../components/AnimationFailedScreen";
 import PendingCardResumePrompt from "../components/PendingCardResumePrompt";
+import AnimateCardConfirmModal from "../components/AnimateCardConfirmModal";
 import { motionLabel } from "../constants/animationMotions";
+import {
+  getActionCategory,
+  isSingleMotionCategory,
+  motionIdsForActionCategory,
+} from "../constants/actionCategories";
 import { API_BASE_URL, authHeaders, toApiUrl } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import { fetchGenerationPrice } from "../utils/cardPricing";
@@ -23,23 +30,49 @@ import { copyChargeForQuantity, normalizeCopyTiers } from "../utils/copyPricing"
 import { formatMoney } from "../utils/marketplace";
 
 const STEP_PHOTO = 1;
-const STEP_DETAILS = 2;
-const STEP_TIER = 3;
-const STEP_THEME = 4;
-const STEP_CARD_TYPE = 5;
-const STEP_MOTION = 6;
-const STEP_REVIEW = 7;
-const TOTAL_WIZARD_STEPS = 7;
+const STEP_CARD_TYPE = 2;
+const STEP_ACTION = 3;
+const STEP_MOTION = 4;
+const STEP_DETAILS = 5;
+const STEP_TIER = 6;
+const STEP_THEME = 7;
+const STEP_REVIEW = 8;
+const TOTAL_WIZARD_STEPS = 8;
 
 const WIZARD_STEP_LABELS = {
   [STEP_PHOTO]: "Upload Photo",
+  [STEP_CARD_TYPE]: "Choose Card Type",
+  [STEP_ACTION]: "Tag Your Action",
+  [STEP_MOTION]: "Choose Motion",
   [STEP_DETAILS]: "Player Details",
   [STEP_TIER]: "Choose Tier",
   [STEP_THEME]: "Choose Theme",
-  [STEP_CARD_TYPE]: "Choose Card Type",
-  [STEP_MOTION]: "Choose Motion",
   [STEP_REVIEW]: "Review & Generate",
 };
+
+function isAnimatedOnlyStep(step) {
+  return step === STEP_ACTION || step === STEP_MOTION;
+}
+
+function getNextWizardStep(step, isAnimated) {
+  if (step === STEP_PHOTO) return STEP_CARD_TYPE;
+  if (step === STEP_CARD_TYPE) return isAnimated ? STEP_ACTION : STEP_DETAILS;
+  if (step === STEP_ACTION) return STEP_MOTION;
+  if (step === STEP_MOTION) return STEP_DETAILS;
+  if (step === STEP_THEME) return STEP_REVIEW;
+  return Math.min(step + 1, STEP_REVIEW);
+}
+
+function getPrevWizardStep(step, isAnimated) {
+  if (step === STEP_REVIEW) return STEP_THEME;
+  if (step === STEP_THEME) return STEP_TIER;
+  if (step === STEP_TIER) return STEP_DETAILS;
+  if (step === STEP_DETAILS) return isAnimated ? STEP_MOTION : STEP_CARD_TYPE;
+  if (step === STEP_MOTION) return STEP_ACTION;
+  if (step === STEP_ACTION) return STEP_CARD_TYPE;
+  if (step === STEP_CARD_TYPE) return STEP_PHOTO;
+  return Math.max(step - 1, STEP_PHOTO);
+}
 
 const TIER_UI = {
   rookie: {
@@ -116,15 +149,6 @@ function validatePlayerDetails(firstName, lastName, displayName, teamName, posit
   return { valid: Object.keys(errors).length === 0, errors };
 }
 
-function getNextWizardStep(step, isAnimated) {
-  if (step === STEP_CARD_TYPE && !isAnimated) return STEP_REVIEW;
-  return Math.min(step + 1, STEP_REVIEW);
-}
-
-function getPrevWizardStep(step, isAnimated) {
-  if (step === STEP_REVIEW && !isAnimated) return STEP_CARD_TYPE;
-  return Math.max(step - 1, STEP_PHOTO);
-}
 
 function fieldErrorClass(hasError) {
   return hasError ? "border-rose-500/60 ring-1 ring-rose-500/30" : "border-white/15";
@@ -149,7 +173,7 @@ function WizardProgress({ currentStep, isAnimated, onGoToStep }) {
       <div className="mt-4 flex flex-wrap gap-2">
         {Array.from({ length: TOTAL_WIZARD_STEPS }, (_, i) => {
           const step = i + 1;
-          if (step === STEP_MOTION && !isAnimated) return null;
+          if (isAnimatedOnlyStep(step) && !isAnimated) return null;
           const done = step < currentStep;
           const active = step === currentStep;
           const canClick = done && typeof onGoToStep === "function";
@@ -262,6 +286,9 @@ export default function StudioPage() {
   const [savedCardDetail, setSavedCardDetail] = useState(null);
   const [cardType, setCardType] = useState("standard");
   const [selectedMotionId, setSelectedMotionId] = useState("");
+  const [actionCategory, setActionCategory] = useState("");
+  const [motionStepMode, setMotionStepMode] = useState("select");
+  const [actionStepError, setActionStepError] = useState("");
   const [motionStepError, setMotionStepError] = useState("");
   const [reviewSubPhase, setReviewSubPhase] = useState("setup");
   const [photoStepError, setPhotoStepError] = useState("");
@@ -274,6 +301,7 @@ export default function StudioPage() {
   const [generationPricing, setGenerationPricing] = useState(null);
   const [pricingError, setPricingError] = useState("");
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
+  const [showAnimateConfirm, setShowAnimateConfirm] = useState(false);
   const [previewConfigureOpen, setPreviewConfigureOpen] = useState(false);
   const [addCollectionLoading, setAddCollectionLoading] = useState(false);
   const [copyQuantity, setCopyQuantity] = useState(1);
@@ -379,14 +407,24 @@ export default function StudioPage() {
   const stepComplete = useMemo(
     () => ({
       [STEP_PHOTO]: Boolean(imageFile),
+      [STEP_CARD_TYPE]: Boolean(cardType),
+      [STEP_ACTION]: !isAnimatedCardType || Boolean(actionCategory),
+      [STEP_MOTION]: !isAnimatedCardType || Boolean(selectedMotionId),
       [STEP_DETAILS]: detailsValidation.valid,
       [STEP_TIER]: Boolean(orderTier),
       [STEP_THEME]: Boolean(specialTheme),
-      [STEP_CARD_TYPE]: Boolean(cardType),
-      [STEP_MOTION]: !isAnimatedCardType || Boolean(selectedMotionId),
       [STEP_REVIEW]: true,
     }),
-    [imageFile, detailsValidation.valid, orderTier, specialTheme, cardType, isAnimatedCardType, selectedMotionId]
+    [
+      imageFile,
+      cardType,
+      actionCategory,
+      selectedMotionId,
+      detailsValidation.valid,
+      orderTier,
+      specialTheme,
+      isAnimatedCardType,
+    ]
   );
 
   const canAdvanceFromStep = stepComplete[currentStep] ?? false;
@@ -405,6 +443,20 @@ export default function StudioPage() {
     setCurrentStep(step);
   }
 
+  function handleActionCategorySelect(categoryId) {
+    setActionCategory(categoryId);
+    setActionStepError("");
+    const motionIds = motionIdsForActionCategory(categoryId);
+    if (motionIds.length === 1) {
+      setSelectedMotionId(motionIds[0]);
+      setMotionStepMode("confirm");
+    } else {
+      setSelectedMotionId("");
+      setMotionStepMode("select");
+    }
+    setCurrentStep(STEP_MOTION);
+  }
+
   function tryAdvanceStep() {
     if (currentStep === STEP_PHOTO) {
       if (!imageFile) {
@@ -412,6 +464,28 @@ export default function StudioPage() {
         return;
       }
       setPhotoStepError("");
+      setCurrentStep(STEP_CARD_TYPE);
+      return;
+    }
+    if (currentStep === STEP_CARD_TYPE) {
+      setCurrentStep(getNextWizardStep(STEP_CARD_TYPE, isAnimatedCardType));
+      return;
+    }
+    if (currentStep === STEP_ACTION) {
+      if (!actionCategory) {
+        setActionStepError("Please select the action shown in your photo");
+        return;
+      }
+      setActionStepError("");
+      handleActionCategorySelect(actionCategory);
+      return;
+    }
+    if (currentStep === STEP_MOTION) {
+      if (!selectedMotionId) {
+        setMotionStepError("Please select a motion for your animated card");
+        return;
+      }
+      setMotionStepError("");
       setCurrentStep(STEP_DETAILS);
       return;
     }
@@ -437,19 +511,6 @@ export default function StudioPage() {
         return;
       }
       setThemeStepError("");
-      setCurrentStep(STEP_CARD_TYPE);
-      return;
-    }
-    if (currentStep === STEP_CARD_TYPE) {
-      setCurrentStep(getNextWizardStep(STEP_CARD_TYPE, isAnimatedCardType));
-      return;
-    }
-    if (currentStep === STEP_MOTION) {
-      if (!selectedMotionId) {
-        setMotionStepError("Please select a motion for your animated card");
-        return;
-      }
-      setMotionStepError("");
       setCurrentStep(STEP_REVIEW);
     }
   }
@@ -459,8 +520,8 @@ export default function StudioPage() {
   }
 
   useEffect(() => {
-    if (!isAnimatedCardType && currentStep === STEP_MOTION) {
-      setCurrentStep(STEP_REVIEW);
+    if (!isAnimatedCardType && isAnimatedOnlyStep(currentStep)) {
+      setCurrentStep(STEP_DETAILS);
     }
   }, [isAnimatedCardType, currentStep]);
 
@@ -621,6 +682,10 @@ export default function StudioPage() {
     setCardType(draft.card_type || "standard");
     setSpecialTheme(draft.special_theme || "");
     setSelectedMotionId(draft.selected_motion_id || "");
+    setActionCategory(draft.action_category || "");
+    if (draft.action_category && draft.selected_motion_id) {
+      setMotionStepMode(isSingleMotionCategory(draft.action_category) ? "confirm" : "select");
+    }
   }
 
   async function handleResumePending() {
@@ -860,6 +925,7 @@ export default function StudioPage() {
         card_type: cardType,
         special_theme: specialTheme || null,
         selected_motion_id: selectedMotionId || null,
+        action_category: actionCategory || null,
         add_ons: [],
       }),
     });
@@ -868,6 +934,14 @@ export default function StudioPage() {
     setCurrentOrderId(orderData.id);
     await fetchOrders();
     return orderData.id;
+  }
+
+  function requestGenerateFirstPreview() {
+    if (isAnimatedCardType) {
+      setShowAnimateConfirm(true);
+      return;
+    }
+    handleGenerateFirstPreview();
   }
 
   async function handleGenerateFirstPreview() {
@@ -977,7 +1051,7 @@ export default function StudioPage() {
     const res = await fetch(`${API_BASE_URL}/cards/${encodeURIComponent(cardId)}/animate`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders(token) },
-      body: JSON.stringify({ motion_id: selectedMotionId }),
+      body: JSON.stringify({ motion_id: selectedMotionId, action_category: actionCategory || null }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not start animation."));
@@ -1167,7 +1241,60 @@ export default function StudioPage() {
                     onClick={tryAdvanceStep}
                     className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
                   >
-                    Continue to Player Details
+                    Continue to Card Type
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {currentStep === STEP_CARD_TYPE ? (
+              <div className="grid gap-4">
+                <CardTypeStep
+                  value={cardType}
+                  onChange={(type) => {
+                    setCardType(type);
+                    if (type === "standard") {
+                      setSelectedMotionId("");
+                      setActionCategory("");
+                      setMotionStepMode("select");
+                    }
+                  }}
+                  animatedUpgradePrice={generationPricing?.animated_upgrade_price ?? 10}
+                />
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={goBackStep}
+                    className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!canAdvanceFromStep}
+                    onClick={tryAdvanceStep}
+                    className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
+                  >
+                    {isAnimatedCardType ? "Continue to Action Tagging" : "Continue to Player Details"}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {currentStep === STEP_ACTION && isAnimatedCardType ? (
+              <div className="grid gap-4">
+                <ActionCategoryStep
+                  value={actionCategory}
+                  onSelect={handleActionCategorySelect}
+                  error={actionStepError}
+                />
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={goBackStep}
+                    className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
+                  >
+                    Back
                   </button>
                 </div>
               </div>
@@ -1358,37 +1485,7 @@ export default function StudioPage() {
                     onClick={tryAdvanceStep}
                     className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
                   >
-                    Continue to Card Type
-                  </button>
-                </div>
-              </div>
-            ) : null}
-
-            {currentStep === STEP_CARD_TYPE ? (
-              <div className="grid gap-4">
-                <CardTypeStep
-                  value={cardType}
-                  onChange={(type) => {
-                    setCardType(type);
-                    if (type === "standard") setSelectedMotionId("");
-                  }}
-                  animatedUpgradePrice={generationPricing?.animated_upgrade_price ?? 10}
-                />
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={goBackStep}
-                    className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
-                  >
-                    Back
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!canAdvanceFromStep}
-                    onClick={tryAdvanceStep}
-                    className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
-                  >
-                    {isAnimatedCardType ? "Continue to Motion Selection" : "Continue to Review"}
+                    Continue to Review
                   </button>
                 </div>
               </div>
@@ -1396,20 +1493,51 @@ export default function StudioPage() {
 
             {currentStep === STEP_MOTION && isAnimatedCardType ? (
               <div className="grid gap-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-white">Choose Your Player&apos;s Motion</h3>
-                  <p className="mt-1 text-sm text-slate-400">
-                    Select how your player moves in the animation
-                  </p>
-                </div>
-                <MotionSelectionGrid
-                  value={selectedMotionId}
-                  onChange={(id) => {
-                    setSelectedMotionId(id);
-                    setMotionStepError("");
-                  }}
-                  error={motionStepError}
-                />
+                {motionStepMode === "confirm" ? (
+                  <>
+                    <div>
+                      <h3 className="text-lg font-semibold text-white">Your Animation</h3>
+                      <p className="mt-1 text-sm text-slate-400">
+                        Based on your {getActionCategory(actionCategory)?.label || "selected"} photo
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-violet-400/40 bg-violet-500/10 px-5 py-6 text-center">
+                      <p className="text-sm text-violet-200/90">Your animation:</p>
+                      <p className="mt-2 text-xl font-semibold text-white">
+                        {motionLabel(selectedMotionId)}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMotionStepMode("select");
+                          setSelectedMotionId("");
+                          setCurrentStep(STEP_ACTION);
+                        }}
+                        className="mt-4 text-sm text-violet-200 underline-offset-2 hover:text-violet-100 hover:underline"
+                      >
+                        Change
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <h3 className="text-lg font-semibold text-white">Choose Your Celebration</h3>
+                      <p className="mt-1 text-sm text-slate-400">
+                        Pick the motion that best matches your photo
+                      </p>
+                    </div>
+                    <MotionSelectionGrid
+                      value={selectedMotionId}
+                      onChange={(id) => {
+                        setSelectedMotionId(id);
+                        setMotionStepError("");
+                      }}
+                      error={motionStepError}
+                      motionIds={motionIdsForActionCategory(actionCategory)}
+                    />
+                  </>
+                )}
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -1424,7 +1552,7 @@ export default function StudioPage() {
                     onClick={tryAdvanceStep}
                     className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
                   >
-                    Continue to Review
+                    Continue to Player Details
                   </button>
                 </div>
               </div>
@@ -1492,13 +1620,8 @@ export default function StudioPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={handleGenerateFirstPreview}
-                    disabled={
-                      !canCreateOrder ||
-                      !generationPricing ||
-                      (isAnimatedCardType && !canAffordFirstGenerate) ||
-                      Boolean(orderActionKey)
-                    }
+                    onClick={requestGenerateFirstPreview}
+                    disabled={!canCreateOrder || !generationPricing || Boolean(orderActionKey)}
                     className="inline-flex min-h-[52px] flex-1 items-center justify-center rounded-xl bg-neonTeal px-6 py-3 text-base font-semibold text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400 sm:flex-none"
                   >
                     {orderActionKey === "generate-first"
@@ -1548,7 +1671,7 @@ export default function StudioPage() {
                 ) : previewCards.length === 0 ? (
                   <button
                     type="button"
-                    onClick={handleGenerateFirstPreview}
+                    onClick={requestGenerateFirstPreview}
                     disabled={Boolean(orderActionKey)}
                     className={`inline-flex min-h-[52px] w-full items-center justify-center rounded-xl px-6 py-3 text-base font-semibold text-white disabled:opacity-50 ${tierTheme.loading}`}
                   >
@@ -1815,6 +1938,21 @@ export default function StudioPage() {
           </div>
         </div>
       ) : null}
+
+      <AnimateCardConfirmModal
+        open={showAnimateConfirm}
+        onClose={() => setShowAnimateConfirm(false)}
+        onConfirm={async () => {
+          setShowAnimateConfirm(false);
+          await handleGenerateFirstPreview();
+        }}
+        busy={Boolean(orderActionKey)}
+        previewImageUrl={imagePreviewUrl}
+        previewAlt={playerDisplayName || "Your photo"}
+        motionName={motionDisplayName}
+        cost={animatedUpgradeCost}
+        creditBalance={creditBalance}
+      />
 
       <AppFooter />
     </div>

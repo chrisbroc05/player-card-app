@@ -14,7 +14,7 @@ from card_pricing import animated_upgrade_price, generation_price_payload, norma
 from auth import get_current_user
 from card_repo import create_animated_upgrade_card, get_card_by_card_id
 from credit_service import InsufficientCreditsError, deduct_credits
-from data.animation_motions import get_motion_by_id, list_motions_public
+from data.animation_motions import get_motion_by_id, is_motion_selectable, list_motions_public
 from database import get_db
 from email_service import _absolute_image_url
 from marketplace_repo import cancel_pending_marketplace_offers_for_card
@@ -70,6 +70,11 @@ def _validate_animate_request(card: Card, current_user: User, motion_id: str) ->
         raise HTTPException(status_code=400, detail="Animation is already in progress for this card")
     if get_motion_by_id(motion_id) is None:
         raise HTTPException(status_code=400, detail="Invalid motion_id")
+    if not is_motion_selectable(motion_id):
+        raise HTTPException(
+            status_code=400,
+            detail="This motion is no longer available for new cards. Please choose a different motion.",
+        )
     if (card.status or "active") not in ("active",):
         raise HTTPException(
             status_code=400,
@@ -85,6 +90,7 @@ class AnimateBody(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     motion_id: str = Field(..., min_length=1, max_length=64)
+    action_category: str | None = Field(default=None, max_length=32)
 
 
 @router.get("/animation-motions")
@@ -113,6 +119,14 @@ def animate_card(
     now = utcnow()
     card.animation_status = "pending"
     card.animation_motion = body.motion_id
+    if body.action_category:
+        card.action_category = body.action_category.strip()
+    else:
+        from data.animation_motions import action_category_for_motion
+
+        inferred = action_category_for_motion(body.motion_id)
+        if inferred:
+            card.action_category = inferred
     card.animation_requested_at = now
     card.animation_completed_at = None
     card.animated_video_url = None

@@ -99,6 +99,7 @@ class Card(Base):
     animated_video_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     animation_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
     animation_motion: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    action_category: Mapped[str | None] = mapped_column(String(32), nullable=True)
     animation_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     animation_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     preview_session_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)

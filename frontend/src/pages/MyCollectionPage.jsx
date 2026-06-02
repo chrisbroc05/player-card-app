@@ -455,6 +455,8 @@ export default function MyCollectionPage() {
         card={animateModalCard}
         open={Boolean(animateModalCard)}
         busy={Boolean(animateBusyId)}
+        creditBalance={Number(user?.credit_balance ?? 0)}
+        animationCost={10}
         onClose={() => setAnimateModalCard(null)}
         onConfirm={(motionId) => startAnimateUpgrade(animateModalCard, motionId)}
       />

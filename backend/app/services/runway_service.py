@@ -39,6 +39,14 @@ def _runway_headers() -> dict[str, str]:
     }
 
 
+# Runway Gen-4 image_to_video does not expose a negativePrompt field in the official API.
+# Anti-cartoon guidance is encoded in each motion-specific positive prompt instead.
+RUNWAY_MOTION_NEGATIVE_PROMPT = (
+    "cartoon, anime, illustrated, CGI, unrealistic, distorted faces, floating objects, "
+    "physics errors"
+)
+
+
 async def _start_image_to_video(client: httpx.AsyncClient, image_url: str, prompt: str) -> str:
     payload = {
         "model": RUNWAY_IMAGE_TO_VIDEO_MODEL,

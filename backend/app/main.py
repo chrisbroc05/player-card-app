@@ -513,6 +513,7 @@ def _draft_metadata_from_order(order: dict) -> str:
         "card_type": order.get("card_type") or "standard",
         "special_theme": order.get("special_theme"),
         "selected_motion_id": order.get("selected_motion_id") or "",
+        "action_category": order.get("action_category") or "",
     }
     return json.dumps(payload)
 
@@ -1218,6 +1219,7 @@ class CardVaultSummary(BaseModel):
     animated_video_url: str | None = Field(default=None)
     animation_status: str | None = Field(default=None)
     animation_motion: str | None = Field(default=None)
+    action_category: str | None = Field(default=None)
 
 
 class CardDuplicateBody(BaseModel):
@@ -1257,6 +1259,7 @@ class Card(BaseModel):
     animated_video_url: str | None = Field(default=None)
     animation_status: str | None = Field(default=None)
     animation_motion: str | None = Field(default=None)
+    action_category: str | None = Field(default=None)
 
 
 class CardShareMeta(BaseModel):
@@ -1311,6 +1314,7 @@ class OrderCreate(BaseModel):
     card_type: OrderCardType = Field(default="standard")
     special_theme: str | None = Field(default=None, max_length=120)
     selected_motion_id: str | None = Field(default=None, max_length=64)
+    action_category: str | None = Field(default=None, max_length=32)
     add_ons: list[str] = Field(default_factory=list)
     status: OrderStatus = "new_order"
 
@@ -1412,6 +1416,7 @@ class PendingCardDraft(BaseModel):
     card_type: OrderCardType = "standard"
     special_theme: str | None = None
     selected_motion_id: str = ""
+    action_category: str = ""
 
 
 class PendingCardSession(BaseModel):
@@ -1788,6 +1793,7 @@ def restore_pending_cards(
         preview_session_id=session["preview_session_id"],
         draft_metadata=json.dumps(draft),
         selected_motion_id=draft.get("selected_motion_id") or None,
+        action_category=draft.get("action_category") or None,
     )
     order_payload = order.model_dump()
     _orders.append(order_payload)
@@ -1974,6 +1980,7 @@ def create_order(
         card_type=body.card_type,
         special_theme=body.special_theme,
         selected_motion_id=body.selected_motion_id,
+        action_category=body.action_category,
         add_ons=body.add_ons,
         status=body.status,
         created_at=datetime.now(timezone.utc).isoformat(),

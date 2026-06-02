@@ -19,14 +19,13 @@ export const ANIMATION_MOTION_LABELS = {
   celebrate_run: "Running Full Speed",
 };
 
-/** Display order for motion picker group headers */
+/** Display order for motion picker group headers (selectable motions only). */
 export const ANIMATION_MOTION_CATEGORIES = [
   "Pitching",
   "Hitting",
   "Fielding",
   "Catching",
   "Celebration",
-  "Athletic",
 ];
 
 export function motionLabel(motionId) {
@@ -36,13 +35,17 @@ export function motionLabel(motionId) {
 
 export function groupMotionsByCategory(motions) {
   const groups = {};
-  for (const cat of ANIMATION_MOTION_CATEGORIES) {
-    groups[cat] = [];
-  }
   for (const m of motions || []) {
-    const cat = m.category || "Athletic";
+    const cat = m.category || "Celebration";
     if (!groups[cat]) groups[cat] = [];
     groups[cat].push(m);
   }
   return groups;
+}
+
+export function motionCategoryOrder(motions) {
+  const groups = groupMotionsByCategory(motions);
+  const ordered = ANIMATION_MOTION_CATEGORIES.filter((cat) => (groups[cat] || []).length > 0);
+  const extras = Object.keys(groups).filter((cat) => !ordered.includes(cat));
+  return [...ordered, ...extras];
 }

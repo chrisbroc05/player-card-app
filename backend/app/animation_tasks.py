@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from data.animation_motions import get_motion_by_id
+from data.animation_motions import get_motion_prompt
 from database import SessionLocal
 from email_service import (
     frontend_url,
@@ -27,9 +27,20 @@ async def process_animation(card_id: str, motion_id: str) -> None:
             logger.error("process_animation: card not found %s", card_id)
             return
 
-        motion = get_motion_by_id(motion_id)
-        if motion is None:
-            logger.error("process_animation: unknown motion_id %s for card %s", motion_id, card_id)
+        motion_key = (card.animation_motion or motion_id or "").strip()
+        if not motion_key:
+            logger.error("process_animation: no motion on card %s", card_id)
+            card.animation_status = "failed"
+            db.commit()
+            return
+
+        motion_prompt = get_motion_prompt(motion_key)
+        if motion_prompt is None:
+            logger.error(
+                "process_animation: no Runway prompt for motion_id %s on card %s",
+                motion_key,
+                card_id,
+            )
             card.animation_status = "failed"
             db.commit()
             return
@@ -37,7 +48,7 @@ async def process_animation(card_id: str, motion_id: str) -> None:
         card.animation_status = "processing"
         db.commit()
 
-        result = await generate_animation(card.image_url, motion["prompt"], card_id)
+        result = await generate_animation(card.image_url, motion_prompt, card_id)
 
         owner = db.query(User).filter(User.id == card.owner_id).first()
         player_name = card.player_name or "your card"

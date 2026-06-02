@@ -196,6 +196,15 @@ def run_schema_migrations_after_models(engine: Engine) -> None:
                 )
             else:
                 conn.execute(text("ALTER TABLE cards ADD COLUMN draft_metadata TEXT"))
+        if "action_category" not in cols:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN IF NOT EXISTS action_category VARCHAR(32)"
+                    )
+                )
+            else:
+                conn.execute(text("ALTER TABLE cards ADD COLUMN action_category VARCHAR(32)"))
 
         if "marketplace_offers" in insp.get_table_names():
             mcols = {c["name"] for c in insp.get_columns("marketplace_offers")}
