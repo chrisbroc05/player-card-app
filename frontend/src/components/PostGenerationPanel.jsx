@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toApiUrl, API_BASE_URL, authHeaders } from "../config/api";
-import { vaultTierBadge, formatEdition, rarityDisplay } from "../utils/tierStyles";
+import { vaultTierBadge, rarityDisplay } from "../utils/tierStyles";
 import CardImage from "./CardImage";
 import ShareCard from "./ShareCard";
 import QuantitySelector from "./QuantitySelector";
@@ -98,24 +98,20 @@ export default function PostGenerationPanel({
 
       <div className="mx-auto max-w-md">
         <div className={`overflow-hidden rounded-xl border-2 bg-black/20 transition duration-500 ${badge.glow}`}>
-          <CardImage card={detail} alt={detail.player_name || "Card"} forcePlay={isAnimatedCard(detail)} />
+          <CardImage
+            card={detail}
+            alt={detail.player_name || "Card"}
+            frameClassName="w-full"
+            variant="detail"
+            forcePlay={isAnimatedCard(detail)}
+          />
         </div>
       </div>
 
-      <div className="mx-auto mt-5 max-w-lg space-y-3 text-center">
-        <p className="text-xl font-semibold text-white">{detail.player_name}</p>
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${badge.pill}`}>{badge.label}</span>
-          <span className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs text-slate-300">
-            {rarityDisplay(detail.rarity)}
-          </span>
-        </div>
-        <p className="text-sm text-slate-400">
-          {formatEdition(detail.edition_number, detail.print_run)}
-          {detail.theme && detail.theme !== "none" ? (
-            <span className="block pt-1 text-xs text-slate-500">Theme: {detail.theme}</span>
-          ) : null}
-        </p>
+      <div className="mx-auto mt-5 max-w-lg text-center">
+        <span className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs text-slate-300">
+          {rarityDisplay(detail.rarity)}
+        </span>
       </div>
 
       {showQty && phase === "select" ? (

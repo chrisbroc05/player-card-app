@@ -14,6 +14,7 @@ import {
 import { isAnimatedCard, isAnimationInProgress } from "../utils/animationCard";
 import { useIsMobileViewport } from "../hooks/usePrefersReducedMotion";
 import AnimatedBadge from "./AnimatedBadge";
+import CardInfoBanner from "./CardInfoBanner";
 
 function resolveCardFields(card, props) {
   if (card && typeof card === "object") {
@@ -47,6 +48,10 @@ export default function CardImage({
   forcePlay = false,
   showAnimatedBadge = true,
   showInProgressOverlay = true,
+  /** When undefined, shows banner if `card` includes player_name */
+  showInfoBanner,
+  /** "default" | "compact" — compact for small thumbnails */
+  infoBannerVariant = "default",
   /** "grid" (default) | "detail" */
   variant = "grid",
 }) {
@@ -109,6 +114,14 @@ export default function CardImage({
         ? CARD_IMAGE_FRAME_ANIMATED
         : CARD_IMAGE_FRAME
       : "");
+
+  const shouldShowBanner =
+    showInfoBanner !== false &&
+    (showInfoBanner === true || (card && (card.player_name || card.playerName)));
+
+  const frameClass = shouldShowBanner
+    ? [resolvedFrame, resolvedFrame ? "rounded-b-none border-b-0" : ""].filter(Boolean).join(" ")
+    : resolvedFrame;
 
   let inner;
   if (!showStaticPoster && !hasVideo) {
@@ -197,10 +210,18 @@ export default function CardImage({
     </div>
   );
 
-  if (resolvedFrame) {
-    return <div className={resolvedFrame}>{media}</div>;
+  const imageBlock = frameClass ? <div className={frameClass}>{media}</div> : media;
+
+  if (shouldShowBanner) {
+    return (
+      <div className="flex w-full flex-col overflow-hidden rounded-[inherit]">
+        {imageBlock}
+        <CardInfoBanner card={card} variant={infoBannerVariant} />
+      </div>
+    );
   }
-  return media;
+
+  return imageBlock;
 }
 
 function PlaceholderInner({ alt, className, isDetail }) {

@@ -15,8 +15,9 @@ import CollectionToast from "../components/CollectionToast";
 import DeleteCardModal from "../components/DeleteCardModal";
 import { authFetch, formatApiError } from "../utils/authFetch";
 import { canAnimateCard, isAnimatedCard, isAnimationInProgress } from "../utils/animationCard";
-import { vaultTierBadge, rarityDisplay } from "../utils/tierStyles";
+import { vaultTierBadge } from "../utils/tierStyles";
 import { CARD_IMAGE_FRAME, CARD_IMAGE_FRAME_ANIMATED } from "../utils/cardImageStyles";
+import { scrollAfterPaint } from "../utils/smoothScroll";
 
 export default function MyCollectionPage() {
   const { token, user, initializing, refreshIncomingTradeCount, refreshNavBadges } = useAuth();
@@ -36,6 +37,7 @@ export default function MyCollectionPage() {
   const [deleteModalCard, setDeleteModalCard] = useState(null);
   const [deleteBusyId, setDeleteBusyId] = useState("");
   const [toast, setToast] = useState({ message: "", variant: "success" });
+  const animationFocusRef = useRef(null);
 
   const loadCards = useCallback(async () => {
     if (!token) return;
@@ -162,6 +164,18 @@ export default function MyCollectionPage() {
     }
     return undefined;
   }, [cards, bannerDismissed]);
+
+  useEffect(() => {
+    if (animationLoadingCardId) {
+      scrollAfterPaint(animationFocusRef.current);
+    }
+  }, [animationLoadingCardId]);
+
+  useEffect(() => {
+    if (animationUpgradeFailed) {
+      scrollAfterPaint(animationFocusRef.current);
+    }
+  }, [animationUpgradeFailed]);
 
   async function startAnimateUpgrade(card, motionId) {
     if (!token) return;
@@ -307,7 +321,10 @@ export default function MyCollectionPage() {
         ) : null}
 
         {animationUpgradeFailed ? (
-          <section className="animate-fadeUp rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6">
+          <section
+            ref={animationFocusRef}
+            className="scroll-focus-target animate-fadeUp rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6"
+          >
             <AnimationFailedScreen cardId={animationFailedCardId} />
             <div className="mt-2 text-center">
               <button
@@ -323,7 +340,10 @@ export default function MyCollectionPage() {
             </div>
           </section>
         ) : animationLoadingCardId ? (
-          <section className="animate-fadeUp rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6">
+          <section
+            ref={animationFocusRef}
+            className="scroll-focus-target animate-fadeUp rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6"
+          >
             <AnimationLoadingScreen
               cardId={animationLoadingCardId}
               token={token}
@@ -379,26 +399,11 @@ export default function MyCollectionPage() {
                     </div>
                   </div>
                   <div className="mt-3 space-y-2 px-1">
-                    <p className="truncate font-medium text-white">{card.player_name}</p>
-                    <div className="flex flex-wrap gap-2">
-                      <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${badge.pill}`}>
-                        {badge.label}
+                    {pending ? (
+                      <span className="inline-flex rounded-full border border-[#f59e0b]/50 bg-[#f59e0b]/15 px-2 py-0.5 text-[11px] font-semibold text-[#fbbf24]">
+                        Pending Trade
                       </span>
-                      <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[11px] text-slate-300">
-                        {rarityDisplay(card.rarity)}
-                      </span>
-                      {pending ? (
-                        <span className="rounded-full border border-[#f59e0b]/50 bg-[#f59e0b]/15 px-2 py-0.5 text-[11px] font-semibold text-[#fbbf24]">
-                          Pending Trade
-                        </span>
-                      ) : null}
-                    </div>
-                    <span
-                      className="inline-block rounded border border-[#2a2a2a] bg-[#1a1a1a] px-2 py-0.5 text-[11px] text-[#aaaaaa]"
-                      style={{ padding: "2px 8px", borderRadius: "4px" }}
-                    >
-                      #{card.edition_number} of {card.print_run}
-                    </span>
+                    ) : null}
                     <Link
                       to={`/card/${encodeURIComponent(card.shareable_slug)}`}
                       className="mt-2 inline-flex min-h-[40px] w-full items-center justify-center rounded-lg border border-white/20 bg-cardBg2 px-3 py-2 text-sm font-medium text-slate-100 transition hover:border-neonBlue/50 hover:text-white"

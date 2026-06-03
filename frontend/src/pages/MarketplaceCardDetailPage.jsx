@@ -12,7 +12,7 @@ import { motionLabel } from "../constants/animationMotions";
 import { isAnimatedCard } from "../utils/animationCard";
 import AnimatedBadge from "../components/AnimatedBadge";
 import CardHistoryTimeline from "../components/CardHistoryTimeline";
-import { vaultTierBadge, rarityDisplay, formatEditionShort } from "../utils/tierStyles";
+import { vaultTierBadge, rarityDisplay } from "../utils/tierStyles";
 import { CARD_IMAGE_FRAME_DETAIL } from "../utils/cardImageStyles";
 
 export default function MarketplaceCardDetailPage() {
@@ -180,16 +180,15 @@ export default function MarketplaceCardDetailPage() {
             <div className="space-y-4">
               <div>
               <p className="font-mono text-sm text-neonTeal/90">{listing.card_id}</p>
-              <h1 className="mt-1 text-2xl font-semibold text-white">{listing.player_name}</h1>
-              <p className="text-slate-400">{listing.team_name} · {listing.position}</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${badge?.pill || ""}`}>{badge?.label}</span>
-                <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[11px] text-slate-300">{rarityDisplay(listing.rarity)}</span>
+              {listing.animation_motion ? (
+                <p className="mt-2 text-sm text-slate-500">Motion: {motionLabel(listing.animation_motion)}</p>
+              ) : null}
+              <div className="mt-2 flex flex-wrap gap-2">
+                <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[11px] text-slate-300">
+                  {rarityDisplay(listing.rarity)}
+                </span>
                 {isAnimatedCard(listing) ? <AnimatedBadge /> : null}
               </div>
-              {listing.animation_motion ? (
-                <p className="text-sm text-slate-500">Motion: {motionLabel(listing.animation_motion)}</p>
-              ) : null}
               <p className="mt-3 text-3xl font-bold text-neonTeal">{formatMoney(listing.asking_price)}</p>
               {listing.days_remaining != null && listing.listing_expires_at ? (
                 <p className={`mt-1 text-sm ${listingExpiresSubtextClass(listing.days_remaining)}`}>
@@ -200,7 +199,6 @@ export default function MarketplaceCardDetailPage() {
               ) : null}
               <p className="text-sm text-slate-500">Listed by {listing.owner_display_name}</p>
               <p className="text-xs text-slate-600">{listedAgeLabel(listing.listed_at)}</p>
-              <p className="text-xs text-slate-500">{formatEditionShort(listing.edition_number, listing.print_run)}</p>
               {(listing.pending_offer_count || 0) > 0 ? (
                 <p className="mt-2 text-xs text-amber-200">{listing.pending_offer_count} pending offer(s)</p>
               ) : null}

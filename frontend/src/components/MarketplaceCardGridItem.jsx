@@ -33,6 +33,7 @@ export default function MarketplaceCardGridItem({ listing, variant = "list" }) {
             frameClassName={animated ? CARD_IMAGE_FRAME_THUMB_ANIMATED : CARD_IMAGE_FRAME_THUMB}
             playOnHover
             showAnimatedBadge={false}
+            infoBannerVariant="compact"
           />
           <div className="pointer-events-none absolute left-1 top-1 z-10 flex flex-col gap-1">
             {priority ? <PriorityBadge /> : null}
@@ -43,15 +44,7 @@ export default function MarketplaceCardGridItem({ listing, variant = "list" }) {
             </span>
           ) : null}
         </div>
-        <div className="mt-2 space-y-1 px-0.5">
-          <p className="truncate text-xs font-semibold text-white">{listing.player_name}</p>
-          <div className="flex flex-wrap items-center justify-between gap-1">
-            <span className={`rounded-full border px-1.5 py-0.5 text-[9px] font-semibold ${badge.pill}`}>
-              {badge.label}
-            </span>
-            <p className="text-xs font-bold text-neonTeal">{formatMoney(listing.asking_price)}</p>
-          </div>
-        </div>
+        <p className="mt-2 px-0.5 text-center text-xs font-bold text-neonTeal">{formatMoney(listing.asking_price)}</p>
       </Link>
     );
   }
@@ -81,13 +74,6 @@ export default function MarketplaceCardGridItem({ listing, variant = "list" }) {
         ) : null}
       </div>
       <div className="mt-3 flex flex-1 flex-col space-y-1.5 px-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${badge.pill}`}>
-            {badge.label}
-          </span>
-        </div>
-        <p className="truncate font-semibold text-white">{listing.player_name}</p>
-        <p className="truncate text-xs text-slate-400">{listing.team_name}</p>
         <p className="text-lg font-bold text-neonTeal">{formatMoney(listing.asking_price)}</p>
         {listing.days_remaining != null && listing.listing_expires_at ? (
           <p className={`text-[11px] ${listingExpiresSubtextClass(listing.days_remaining)}`}>

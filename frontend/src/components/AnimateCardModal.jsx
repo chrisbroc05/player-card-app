@@ -1,13 +1,16 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import CardImage from "./CardImage";
 import MotionSelectionGrid from "./MotionSelectionGrid";
 import AnimateCardConfirmModal from "./AnimateCardConfirmModal";
 import { motionLabel } from "../constants/animationMotions";
+import { useScrollModalIntoView } from "../hooks/useScrollIntoViewOnChange";
 
 export default function AnimateCardModal({ card, open, onClose, onConfirm, busy, creditBalance = 0, animationCost = 10 }) {
   const [motionId, setMotionId] = useState("");
   const [error, setError] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
+  const dialogRef = useRef(null);
+  useScrollModalIntoView(open && !showConfirm, dialogRef);
 
   useEffect(() => {
     if (!open) {
@@ -43,7 +46,8 @@ export default function AnimateCardModal({ card, open, onClose, onConfirm, busy,
     <>
       <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 sm:items-center sm:p-4">
         <div
-          className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/10 bg-cardBg p-4 shadow-2xl sm:p-6"
+          ref={dialogRef}
+          className="scroll-focus-target max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/10 bg-cardBg p-4 shadow-2xl sm:p-6"
           role="dialog"
           aria-labelledby="animate-modal-title"
         >
@@ -65,6 +69,7 @@ export default function AnimateCardModal({ card, open, onClose, onConfirm, busy,
               card={card}
               alt={card.player_name}
               frameClassName="aspect-[2/3] w-full overflow-hidden rounded-lg border border-white/10"
+              infoBannerVariant="compact"
             />
           </div>
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
@@ -17,6 +17,8 @@ import AnimationLoadingScreen from "../components/AnimationLoadingScreen";
 import AnimationFailedScreen from "../components/AnimationFailedScreen";
 import PendingCardResumePrompt from "../components/PendingCardResumePrompt";
 import AnimateCardConfirmModal from "../components/AnimateCardConfirmModal";
+import AnimatedCardChoiceModal from "../components/AnimatedCardChoiceModal";
+import PackOpeningLoader from "../components/PackOpeningLoader";
 import AnimatedFlowExplainer from "../components/AnimatedFlowExplainer";
 import AnimatedAiDisclaimer from "../components/AnimatedAiDisclaimer";
 import { motionLabel } from "../constants/animationMotions";
@@ -30,6 +32,7 @@ import { useAuth } from "../context/AuthContext";
 import { fetchGenerationPrice } from "../utils/cardPricing";
 import { copyChargeForQuantity, normalizeCopyTiers } from "../utils/copyPricing";
 import { formatMoney } from "../utils/marketplace";
+import { scrollAfterPaint } from "../utils/smoothScroll";
 
 const STEP_PHOTO = 1;
 const STEP_CARD_TYPE = 2;
@@ -229,42 +232,6 @@ function formatApiError(detail, fallback) {
   return fallback;
 }
 
-function PreviewGenerationLoading({ tierLabel, tierTheme, isAnimated = false }) {
-  if (isAnimated) {
-    return (
-      <div className="rounded-xl border border-neonTeal/30 bg-gradient-to-br from-neonTeal/10 via-cardBg2 to-cardBg px-4 py-6">
-        <div className="mb-3 flex items-center gap-2 text-sm font-medium text-neonTeal">
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-neonTeal/20 text-xs font-bold text-neonTeal">
-            1
-          </span>
-          Step 1: Creating your card art...
-        </div>
-        <div className="h-2 overflow-hidden rounded-full bg-white/10">
-          <div className="h-full w-1/3 animate-pulse rounded-full bg-gradient-to-r from-neonTeal via-neonBlue to-neonPurple" />
-        </div>
-        <p className="mt-3 text-sm text-slate-200/90">
-          Building your {tierLabel} card design — animation comes next!
-        </p>
-        <p className="mt-1 text-xs text-slate-400">This usually takes 30–60 seconds. Please keep this page open.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className={`rounded-xl border px-4 py-6 ${tierTheme.loading}`}>
-      <div className="mb-3 flex items-center gap-2 text-sm text-violet-100">
-        <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-violet-300" />
-        Minting your {tierLabel} preview...
-      </div>
-      <div className="h-2 overflow-hidden rounded-full bg-white/10">
-        <div className="h-full w-1/3 animate-pulse rounded-full bg-gradient-to-r from-neonBlue via-neonPurple to-neonTeal" />
-      </div>
-      <p className="mt-3 text-sm text-slate-200/90">Applying rarity framing, effects, and finish...</p>
-      <p className="mt-1 text-xs text-slate-400">This usually takes 30–60 seconds. Please keep this page open.</p>
-    </div>
-  );
-}
-
 export default function StudioPage() {
   const navigate = useNavigate();
   const { token, user, initializing, refreshUser } = useAuth();
@@ -324,14 +291,31 @@ export default function StudioPage() {
   const [pricingError, setPricingError] = useState("");
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
   const [showAnimateConfirm, setShowAnimateConfirm] = useState(false);
+  const [animateConfirmMode, setAnimateConfirmMode] = useState("pre-generate");
   const [showAnimatedFlowExplainer, setShowAnimatedFlowExplainer] = useState(false);
+  const [packOpeningActive, setPackOpeningActive] = useState(false);
   const [previewConfigureOpen, setPreviewConfigureOpen] = useState(false);
+  const [animatedChoiceModalOpen, setAnimatedChoiceModalOpen] = useState(false);
+  const [animatedSaveStaticFlow, setAnimatedSaveStaticFlow] = useState(false);
   const [addCollectionLoading, setAddCollectionLoading] = useState(false);
   const [copyQuantity, setCopyQuantity] = useState(1);
   const [pendingSession, setPendingSession] = useState(null);
   const [showPendingPrompt, setShowPendingPrompt] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [pendingActionLoading, setPendingActionLoading] = useState(false);
+
+  const wizardPanelRef = useRef(null);
+  const generationFocusRef = useRef(null);
+  const configureFocusRef = useRef(null);
+  const approveFocusRef = useRef(null);
+  const animationFocusRef = useRef(null);
+  const regenerateModalRef = useRef(null);
+  const prevStepRef = useRef(currentStep);
+  const prevGeneratingRef = useRef(false);
+  const prevReviewSubPhaseRef = useRef(reviewSubPhase);
+  const prevPreviewConfigureRef = useRef(false);
+  const prevAnimationLoadingRef = useRef(null);
+  const animatedChoiceShownForRef = useRef("");
 
   const selectedTierLabel = (TIER_UI[orderTier] || TIER_UI.all_star).label;
   const selectedTierRarityLabel = (TIER_UI[orderTier] || TIER_UI.all_star).sub;
@@ -555,6 +539,64 @@ export default function StudioPage() {
   }, [imagePreviewUrl]);
 
   useEffect(() => {
+    if (prevStepRef.current === currentStep) return;
+    prevStepRef.current = currentStep;
+    scrollAfterPaint(wizardPanelRef.current);
+  }, [currentStep]);
+
+  useEffect(() => {
+    if (prevReviewSubPhaseRef.current === reviewSubPhase) return;
+    prevReviewSubPhaseRef.current = reviewSubPhase;
+    if (reviewSubPhase === "generate") {
+      scrollAfterPaint(generationFocusRef.current);
+    }
+  }, [reviewSubPhase]);
+
+  useEffect(() => {
+    const wasGenerating = prevGeneratingRef.current;
+    prevGeneratingRef.current = isGenerating;
+    if (isGenerating || packOpeningActive) {
+      scrollAfterPaint(generationFocusRef.current);
+      return;
+    }
+    if (wasGenerating && previewCards.length > 0) {
+      scrollAfterPaint(generationFocusRef.current);
+    }
+  }, [isGenerating, packOpeningActive, previewCards.length]);
+
+  useEffect(() => {
+    if (previewConfigureOpen && !prevPreviewConfigureRef.current) {
+      scrollAfterPaint(configureFocusRef.current);
+    }
+    prevPreviewConfigureRef.current = previewConfigureOpen;
+  }, [previewConfigureOpen]);
+
+  useEffect(() => {
+    if (reviewSubPhase === "approve") {
+      scrollAfterPaint(approveFocusRef.current);
+    }
+  }, [reviewSubPhase, savedCardDetail?.card_id]);
+
+  useEffect(() => {
+    if (animationLoadingCardId && animationLoadingCardId !== prevAnimationLoadingRef.current) {
+      scrollAfterPaint(animationFocusRef.current);
+    }
+    prevAnimationLoadingRef.current = animationLoadingCardId;
+  }, [animationLoadingCardId]);
+
+  useEffect(() => {
+    if (animationFailed) {
+      scrollAfterPaint(animationFocusRef.current);
+    }
+  }, [animationFailed]);
+
+  useEffect(() => {
+    if (showRegenerateConfirm) {
+      scrollAfterPaint(regenerateModalRef.current, { block: "center" });
+    }
+  }, [showRegenerateConfirm]);
+
+  useEffect(() => {
     fetchThemes();
   }, [fetchThemes]);
 
@@ -673,6 +715,42 @@ export default function StudioPage() {
   }, [reviewSubPhase, previewCards.length]);
 
   useEffect(() => {
+    if (
+      !isAnimatedCardType ||
+      packOpeningActive ||
+      isGenerating ||
+      previewCards.length === 0 ||
+      reviewSubPhase !== "generate" ||
+      animationLoadingCardId ||
+      previewConfigureOpen ||
+      animatedSaveStaticFlow ||
+      previewCards.length > 1
+    ) {
+      return;
+    }
+
+    const key = previewCards.map((p) => p.image_url).join("|");
+    if (animatedChoiceShownForRef.current === key) return;
+
+    animatedChoiceShownForRef.current = key;
+    const url = previewCards[previewCards.length - 1]?.image_url;
+    if (url) {
+      setSelectedPreviewUrl(url);
+      setGeneratedCardUrl((prev) => prev || url);
+    }
+    setAnimatedChoiceModalOpen(true);
+  }, [
+    isAnimatedCardType,
+    packOpeningActive,
+    isGenerating,
+    previewCards,
+    reviewSubPhase,
+    animationLoadingCardId,
+    previewConfigureOpen,
+    animatedSaveStaticFlow,
+  ]);
+
+  useEffect(() => {
     const hasUnfinishedPreview =
       currentStep === STEP_REVIEW &&
       reviewSubPhase === "generate" &&
@@ -760,9 +838,16 @@ export default function StudioPage() {
       setCurrentStep(STEP_REVIEW);
       setReviewSubPhase("generate");
       setPreviewConfigureOpen(false);
+      setAnimatedSaveStaticFlow(false);
+      setAnimatedChoiceModalOpen(false);
+      animatedChoiceShownForRef.current = "";
       dismissPendingPrompt();
       setMessage("Welcome back — your preview is ready. No additional credits were charged.");
       await fetchOrders();
+      if ((pendingSession.draft?.card_type || "standard") === "animated" && previewUrl) {
+        animatedChoiceShownForRef.current = "";
+        setAnimatedChoiceModalOpen(true);
+      }
     } catch {
       await cleanupStalePending(sessionId);
     } finally {
@@ -900,10 +985,15 @@ export default function StudioPage() {
   }
 
   async function handleGenerateForOrder(orderId) {
+    setPackOpeningActive(true);
     setIsGenerating(true);
     setOrderActionKey(`generate-${orderId}`);
     setMessage("");
     setError("");
+    setPreviewConfigureOpen(false);
+    setAnimatedSaveStaticFlow(false);
+    setAnimatedChoiceModalOpen(false);
+    animatedChoiceShownForRef.current = "";
     try {
       const res = await fetch(`${API_BASE_URL}/orders/${orderId}/generate-card`, {
         method: "POST",
@@ -917,11 +1007,16 @@ export default function StudioPage() {
       setMessage(`Preview generated for order #${orderId}.`);
       await Promise.all([fetchMyCards(), fetchOrders(), refreshUser(token)]);
     } catch (err) {
+      setPackOpeningActive(false);
       setError(err.message || "Failed to generate order card.");
     } finally {
       setIsGenerating(false);
       setOrderActionKey("");
     }
+  }
+
+  function handlePackOpeningComplete() {
+    setPackOpeningActive(false);
   }
 
   async function ensureOrderForGeneration() {
@@ -961,10 +1056,66 @@ export default function StudioPage() {
 
   function requestGenerateFirstPreview() {
     if (isAnimatedCardType) {
+      setAnimateConfirmMode("pre-generate");
       setShowAnimateConfirm(true);
       return;
     }
     handleGenerateFirstPreview();
+  }
+
+  function handleAnimatedChoiceAnimate() {
+    setAnimatedChoiceModalOpen(false);
+    setAnimateConfirmMode("post-preview");
+    setShowAnimateConfirm(true);
+  }
+
+  function handleAnimatedChoiceSaveStatic() {
+    setAnimatedChoiceModalOpen(false);
+    setAnimatedSaveStaticFlow(true);
+    setPreviewConfigureOpen(true);
+    setCopyQuantity(1);
+  }
+
+  function handleCloseAnimateConfirm() {
+    setShowAnimateConfirm(false);
+    if (animateConfirmMode === "post-preview") {
+      setAnimatedChoiceModalOpen(true);
+    }
+  }
+
+  async function handleApproveAndAnimate() {
+    if (!currentOrderId) return setError("Create an order first.");
+    if (!selectedPreviewUrl && !generatedCardUrl) return setError("Select a preview first.");
+    if (!selectedMotionId) return setError("Select a motion before animating.");
+
+    setShowAnimateConfirm(false);
+    setAddCollectionLoading(true);
+    setOrderActionKey(`approve-animate-${currentOrderId}`);
+    setMessage("");
+    setError("");
+    try {
+      const res = await fetch(`${API_BASE_URL}/orders/${currentOrderId}/approve-preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders(token) },
+        body: JSON.stringify({ image_url: selectedPreviewUrl || generatedCardUrl || null }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(formatApiError(data?.detail, "Failed to start animation."));
+
+      const sel = previewCards.find((p) => p.image_url === (selectedPreviewUrl || generatedCardUrl));
+      const cardId = sel?.card_id;
+      if (!cardId) throw new Error("Could not find the selected preview card.");
+
+      await startCardAnimation(cardId);
+      await Promise.all([fetchOrders(), refreshUser(token)]);
+      setPendingSession(null);
+      setShowPendingPrompt(false);
+    } catch (err) {
+      setError(err.message || "Failed to start animation.");
+    } finally {
+      setAddCollectionLoading(false);
+      setOrderActionKey("");
+    }
   }
 
   async function handleGenerateFirstPreview() {
@@ -1045,13 +1196,9 @@ export default function StudioPage() {
       await Promise.all([fetchOrders(), fetchMyCards(), refreshUser(token)]);
       setPendingSession(null);
       setShowPendingPrompt(false);
-
-      if (isAnimatedCardType && selectedMotionId && cardId) {
-        await startCardAnimation(cardId);
-        return;
-      }
       setReviewSubPhase("approve");
       setPreviewConfigureOpen(false);
+      setAnimatedSaveStaticFlow(false);
     } catch (err) {
       setError(err.message || "Failed to add card to collection.");
     } finally {
@@ -1094,6 +1241,7 @@ export default function StudioPage() {
     setAnimationFailed(false);
     setReviewSubPhase("approve");
     setCurrentStep(STEP_REVIEW);
+    setMessage("Your animated card has been added to your collection.");
     await Promise.all([fetchMyCards(), fetchOrders(), refreshUser(token)]);
   }
 
@@ -1157,11 +1305,17 @@ export default function StudioPage() {
         )}
 
         {animationFailed ? (
-          <section className="animate-fadeUp rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6">
+          <section
+            ref={animationFocusRef}
+            className="scroll-focus-target animate-fadeUp rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6"
+          >
             <AnimationFailedScreen cardId={savedCardDetail?.card_id} />
           </section>
         ) : animationLoadingCardId ? (
-          <section className="animate-fadeUp rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6">
+          <section
+            ref={animationFocusRef}
+            className="scroll-focus-target animate-fadeUp rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6"
+          >
             <AnimationLoadingScreen
               cardId={animationLoadingCardId}
               token={token}
@@ -1173,7 +1327,10 @@ export default function StudioPage() {
             />
           </section>
         ) : (
-        <section className="animate-fadeUp rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6">
+        <section
+          ref={wizardPanelRef}
+          className="scroll-focus-target animate-fadeUp rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6"
+        >
             <WizardProgress
               currentStep={currentStep}
               isAnimated={isAnimatedCardType}
@@ -1659,7 +1816,19 @@ export default function StudioPage() {
             ) : null}
 
             {currentStep === STEP_REVIEW && reviewSubPhase === "generate" ? (
-              <div className="grid gap-6">
+              <div ref={generationFocusRef} className="scroll-focus-target grid gap-6">
+                {packOpeningActive ? (
+                  <PackOpeningLoader
+                    active={packOpeningActive}
+                    generationComplete={!isGenerating && Boolean(generatedCardUrl || selectedPreviewUrl)}
+                    cardImageUrl={generatedCardUrl || selectedPreviewUrl}
+                    tier={orderTier}
+                    themeLabel={specialTheme ? selectedThemeLabel : "Default (no theme)"}
+                    isAnimated={isAnimatedCardType}
+                    onComplete={handlePackOpeningComplete}
+                  />
+                ) : (
+                  <>
                 {!isGenerating ? (
                   <>
                     <GenerationCostSummary
@@ -1690,13 +1859,7 @@ export default function StudioPage() {
                   </>
                 ) : null}
 
-                {isGenerating ? (
-                  <PreviewGenerationLoading
-                    tierLabel={selectedTierLabel}
-                    tierTheme={tierTheme}
-                    isAnimated={isAnimatedCardType}
-                  />
-                ) : previewCards.length === 0 ? (
+                {previewCards.length === 0 ? (
                   <button
                     type="button"
                     onClick={requestGenerateFirstPreview}
@@ -1709,18 +1872,6 @@ export default function StudioPage() {
                   </button>
                 ) : (
                   <>
-                    {isAnimatedCardType ? (
-                      <div className="rounded-xl border border-violet-400/35 bg-gradient-to-r from-violet-500/15 to-neonTeal/10 px-4 py-4 text-center">
-                        <p className="text-base font-semibold text-white sm:text-lg">
-                          Step 1 complete — your card is ready. Now let&apos;s animate it!
-                        </p>
-                        <p className="mt-2 text-sm text-slate-300">
-                          The animated version will be added to your collection. This static preview is just the base
-                          for your animation.
-                        </p>
-                      </div>
-                    ) : null}
-
                     {previewCards.length > 1 ? (
                       <div className="rounded-xl border border-white/10 bg-cardBg2 px-4 py-3 text-center">
                         <p className="text-base font-semibold text-white">
@@ -1731,7 +1882,8 @@ export default function StudioPage() {
                       </div>
                     ) : null}
 
-                    {!previewConfigureOpen ? (
+                    {(!previewConfigureOpen || (isAnimatedCardType && !animatedSaveStaticFlow)) &&
+                    (!isAnimatedCardType || previewCards.length > 1 || !animatedChoiceModalOpen) ? (
                       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                         {previewCards.map((preview, idx) => (
                           <div
@@ -1754,7 +1906,20 @@ export default function StudioPage() {
                                 </span>{" "}
                                 Preview {idx + 1}
                               </p>
-                              {previewCards.length > 1 ? (
+                              {isAnimatedCardType ? (
+                                previewCards.length > 1 || !animatedChoiceModalOpen ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedPreviewUrl(preview.image_url);
+                                      setAnimatedChoiceModalOpen(true);
+                                    }}
+                                    className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl bg-neonTeal px-4 py-2 text-sm font-semibold text-slate-950"
+                                  >
+                                    Choose This Card
+                                  </button>
+                                ) : null
+                              ) : previewCards.length > 1 ? (
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -1763,7 +1928,7 @@ export default function StudioPage() {
                                   }}
                                   className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl bg-neonTeal px-4 py-2 text-sm font-semibold text-slate-950"
                                 >
-                                  {isAnimatedCardType ? "Animate This Card →" : "Choose This Card"}
+                                  Choose This Card
                                 </button>
                               ) : (
                                 <button
@@ -1774,7 +1939,7 @@ export default function StudioPage() {
                                   }}
                                   className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-neonTeal px-4 py-2.5 text-sm font-semibold text-slate-950"
                                 >
-                                  {isAnimatedCardType ? "Animate This Card →" : "Add This Card to My Collection"}
+                                  Add This Card to My Collection
                                 </button>
                               )}
                             </div>
@@ -1783,21 +1948,12 @@ export default function StudioPage() {
                       </div>
                     ) : null}
 
-                    {previewConfigureOpen ? (
-                      <div className="rounded-2xl border border-violet-400/30 bg-cardBg2 p-4 sm:p-6">
-                        {isAnimatedCardType ? (
-                          <>
-                            <p className="text-center text-base font-semibold text-violet-100 sm:text-lg">
-                              Step 1 complete — your card is ready. Now let&apos;s animate it!
-                            </p>
-                            <p className="mt-2 text-center text-sm text-slate-400">
-                              The animated version will be added to your collection. This static preview is just the
-                              base for your animation.
-                            </p>
-                          </>
-                        ) : (
-                          <p className="text-center text-sm font-medium text-white">Confirm your card</p>
-                        )}
+                    {previewConfigureOpen && (!isAnimatedCardType || animatedSaveStaticFlow) ? (
+                      <div
+                        ref={configureFocusRef}
+                        className="scroll-focus-target rounded-2xl border border-violet-400/30 bg-cardBg2 p-4 sm:p-6"
+                      >
+                        <p className="text-center text-sm font-medium text-white">Confirm your card</p>
                         <div className="mx-auto mt-4 max-w-xs overflow-hidden rounded-xl border border-white/10">
                           <img
                             src={toApiUrl(selectedPreviewUrl || generatedCardUrl)}
@@ -1813,7 +1969,7 @@ export default function StudioPage() {
                           gradYear={gradYear}
                           tierLabel={selectedTierLabel}
                           themeLabel={specialTheme ? selectedThemeLabel : ""}
-                          isAnimated={isAnimatedCardType}
+                          isAnimated={false}
                           motionName={motionDisplayName}
                           copyQuantity={copyQuantity}
                           pricing={generationPricing}
@@ -1828,30 +1984,28 @@ export default function StudioPage() {
                           value={copyQuantity}
                           onChange={setCopyQuantity}
                           onConfirm={handleConfirmAddToCollection}
-                          confirmLabel={isAnimatedCardType ? "Animate This Card →" : "Add to Collection"}
-                          loadingLabel={isAnimatedCardType ? "Starting animation..." : "Creating your cards..."}
-                          heading={
-                            isAnimatedCardType
-                              ? "Want extra copies of your animated card?"
-                              : "How many copies do you want?"
-                          }
-                          subheading={
-                            isAnimatedCardType
-                              ? "Optional — order additional copies to trade. Your animated card is included."
-                              : "Order multiple copies to trade with teammates and friends."
-                          }
+                          confirmLabel="Add to Collection"
+                          loadingLabel="Creating your cards..."
+                          heading="How many copies do you want?"
+                          subheading="Order multiple copies to trade with teammates and friends."
                         />
                         <button
                           type="button"
-                          onClick={() => setPreviewConfigureOpen(false)}
+                          onClick={() => {
+                            setPreviewConfigureOpen(false);
+                            setAnimatedSaveStaticFlow(false);
+                            if (isAnimatedCardType) {
+                              setAnimatedChoiceModalOpen(true);
+                            }
+                          }}
                           className="mt-3 w-full text-center text-sm text-slate-400 hover:text-slate-200"
                         >
-                          ← Back to previews
+                          ← Back
                         </button>
                       </div>
                     ) : null}
 
-                    {!previewConfigureOpen && previewCards.length === 1 ? (
+                    {!previewConfigureOpen && !animatedSaveStaticFlow && previewCards.length === 1 ? (
                       <div className="text-center">
                         <p className="text-sm text-slate-400">
                           Not happy with it? Generate another preview for {formatMoney(additionalPreviewCost)}
@@ -1875,7 +2029,7 @@ export default function StudioPage() {
                       </div>
                     ) : null}
 
-                    {!previewConfigureOpen && previewCards.length > 1 && !isPreviewLimitReached ? (
+                    {!previewConfigureOpen && !animatedSaveStaticFlow && previewCards.length > 1 && !isPreviewLimitReached ? (
                       <div className="text-center">
                         <button
                           type="button"
@@ -1914,11 +2068,13 @@ export default function StudioPage() {
                     ) : null}
                   </>
                 )}
+                  </>
+                )}
               </div>
             ) : null}
 
             {currentStep === STEP_REVIEW && reviewSubPhase === "approve" ? (
-              <div className="grid gap-6">
+              <div ref={approveFocusRef} className="scroll-focus-target grid gap-6">
                 {savedCardDetail ? (
                   <PostGenerationPanel
                     detail={savedCardDetail}
@@ -1970,13 +2126,20 @@ export default function StudioPage() {
           </section>
         )}
 
-        <FeaturedCard imageUrl={generatedCardFullUrl} tier={generatedTier} loading={isGenerating} />
+        <FeaturedCard
+          imageUrl={generatedCardFullUrl}
+          tier={generatedTier}
+          loading={isGenerating && !packOpeningActive}
+        />
         {user ? <CardGallery cards={cards} /> : null}
       </main>
 
       {showRegenerateConfirm ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-3 py-4 sm:px-4">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-cardBg p-5 shadow-2xl shadow-black/50 sm:p-6">
+          <div
+            ref={regenerateModalRef}
+            className="scroll-focus-target w-full max-w-md rounded-2xl border border-white/10 bg-cardBg p-5 shadow-2xl shadow-black/50 sm:p-6"
+          >
             <h3 className="text-lg font-semibold text-white">Generate another preview?</h3>
             <p className="mt-2 text-sm text-slate-300">
               Generate another preview for {formatMoney(additionalPreviewCost)}?
@@ -2005,20 +2168,39 @@ export default function StudioPage() {
         </div>
       ) : null}
 
+      <AnimatedCardChoiceModal
+        open={animatedChoiceModalOpen}
+        previewImageUrl={selectedPreviewUrl || generatedCardUrl}
+        previewAlt={playerDisplayName || "Your card"}
+        animationCost={animatedUpgradeCost}
+        onAnimate={handleAnimatedChoiceAnimate}
+        onSaveStatic={handleAnimatedChoiceSaveStatic}
+        busy={addCollectionLoading || Boolean(orderActionKey)}
+      />
+
       <AnimateCardConfirmModal
         open={showAnimateConfirm}
-        onClose={() => setShowAnimateConfirm(false)}
+        onClose={handleCloseAnimateConfirm}
         onConfirm={() => {
-          setShowAnimateConfirm(false);
-          setShowAnimatedFlowExplainer(true);
+          if (animateConfirmMode === "pre-generate") {
+            setShowAnimateConfirm(false);
+            setShowAnimatedFlowExplainer(true);
+          } else {
+            handleApproveAndAnimate();
+          }
         }}
-        busy={Boolean(orderActionKey)}
-        previewImageUrl={imagePreviewUrl}
+        busy={addCollectionLoading || Boolean(orderActionKey)}
+        previewImageUrl={
+          animateConfirmMode === "post-preview"
+            ? toApiUrl(selectedPreviewUrl || generatedCardUrl)
+            : imagePreviewUrl
+        }
         previewAlt={playerDisplayName || "Your photo"}
         motionName={motionDisplayName}
         cost={animatedUpgradeCost}
         creditBalance={creditBalance}
         showAiDisclaimer
+        confirmationOnly={animateConfirmMode === "post-preview"}
       />
 
       <AnimatedFlowExplainer

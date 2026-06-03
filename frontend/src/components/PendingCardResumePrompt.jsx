@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useRef } from "react";
 import { toApiUrl } from "../config/api";
+import { useScrollModalIntoView } from "../hooks/useScrollIntoViewOnChange";
 
 export default function PendingCardResumePrompt({
   session,
@@ -11,6 +12,9 @@ export default function PendingCardResumePrompt({
   onDiscardCancel,
   onDismiss,
 }) {
+  const dialogRef = useRef(null);
+  useScrollModalIntoView(Boolean(session), dialogRef);
+
   if (!session) return null;
 
   const latestPreview = session.previews?.[session.previews.length - 1];
@@ -23,7 +27,8 @@ export default function PendingCardResumePrompt({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
       <div
-        className="w-full max-w-lg overflow-hidden rounded-2xl border border-neonTeal/35 bg-cardBg shadow-[0_0_60px_rgba(45,212,191,0.15)]"
+        ref={dialogRef}
+        className="scroll-focus-target w-full max-w-lg overflow-hidden rounded-2xl border border-neonTeal/35 bg-cardBg shadow-[0_0_60px_rgba(45,212,191,0.15)]"
         role="dialog"
         aria-labelledby="pending-card-title"
         aria-modal="true"

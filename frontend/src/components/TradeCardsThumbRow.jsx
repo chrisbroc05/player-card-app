@@ -12,7 +12,13 @@ export default function TradeCardsThumbRow({ cards, className = "" }) {
           key={c.card_id}
           className="w-[72px] shrink-0 rounded-lg border border-white/10 bg-black/30 p-1"
         >
-          <CardImage card={c} alt={c.player_name} frameClassName={CARD_IMAGE_FRAME_THUMB} playOnHover />
+          <CardImage
+            card={c}
+            alt={c.player_name}
+            frameClassName={CARD_IMAGE_FRAME_THUMB}
+            playOnHover
+            infoBannerVariant="compact"
+          />
           <p className="mt-1 truncate text-[10px] font-medium text-white">{c.player_name}</p>
           <p className="truncate font-mono text-[9px] text-slate-500">{c.card_id}</p>
         </div>

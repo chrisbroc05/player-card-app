@@ -131,8 +131,8 @@ export default function TradeCardPicker({
                   alt={card.player_name}
                   frameClassName={CARD_IMAGE_FRAME_THUMB}
                   playOnHover={isAnimatedCard(card)}
+                  infoBannerVariant="compact"
                 />
-                <p className="mt-1 truncate text-[10px] font-medium text-white">{card.player_name}</p>
                 <p className="truncate font-mono text-[9px] text-slate-500">{card.card_id}</p>
                 {reason ? <p className="mt-0.5 text-[9px] text-slate-500">{reason}</p> : null}
               </button>

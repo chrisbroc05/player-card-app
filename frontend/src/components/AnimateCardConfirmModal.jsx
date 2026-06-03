@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import CardImage from "./CardImage";
 import AnimatedAiDisclaimer from "./AnimatedAiDisclaimer";
 import { formatMoney } from "../utils/marketplace";
+import { useScrollModalIntoView } from "../hooks/useScrollIntoViewOnChange";
 
 const CONFIRM_DELAY_MS = 1500;
 
@@ -18,8 +19,11 @@ export default function AnimateCardConfirmModal({
   cost = 10,
   creditBalance = 0,
   showAiDisclaimer = false,
+  confirmationOnly = false,
 }) {
   const [confirmEnabled, setConfirmEnabled] = useState(false);
+  const dialogRef = useRef(null);
+  useScrollModalIntoView(open, dialogRef);
 
   useEffect(() => {
     if (!open) {
@@ -35,14 +39,15 @@ export default function AnimateCardConfirmModal({
 
   const animationCost = Number(cost) || 10;
   const balance = Number(creditBalance) || 0;
-  const canAfford = balance >= animationCost;
-  const shortfall = Math.max(0, animationCost - balance);
+  const canAfford = confirmationOnly || balance >= animationCost;
+  const shortfall = confirmationOnly ? 0 : Math.max(0, animationCost - balance);
   const hasPreview = Boolean(card || previewImageUrl);
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-3 sm:items-center sm:p-4">
       <div
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/10 bg-cardBg p-4 shadow-2xl sm:p-6"
+        ref={dialogRef}
+        className="scroll-focus-target max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/10 bg-cardBg p-4 shadow-2xl sm:p-6"
         role="dialog"
         aria-labelledby="animate-confirm-title"
         aria-modal="true"
@@ -74,13 +79,22 @@ export default function AnimateCardConfirmModal({
         ) : null}
 
         <div className="mt-5 space-y-2 rounded-xl border border-white/10 bg-cardBg2 px-4 py-3 text-sm">
-          <p className="text-slate-200">
-            <span className="font-semibold text-white">{formatMoney(animationCost)}</span> will be deducted from your
-            credit balance
-          </p>
-          <p className="text-slate-400">
-            Your balance: <span className="font-semibold text-neonTeal">{formatMoney(balance)}</span>
-          </p>
+          {confirmationOnly ? (
+            <p className="text-slate-200">
+              Your <span className="font-semibold text-white">{formatMoney(animationCost)}</span> animated card fee was
+              applied when your preview was generated.
+            </p>
+          ) : (
+            <>
+              <p className="text-slate-200">
+                <span className="font-semibold text-white">{formatMoney(animationCost)}</span> will be deducted from
+                your credit balance
+              </p>
+              <p className="text-slate-400">
+                Your balance: <span className="font-semibold text-neonTeal">{formatMoney(balance)}</span>
+              </p>
+            </>
+          )}
         </div>
 
         {!canAfford ? (

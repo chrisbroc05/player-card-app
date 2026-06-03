@@ -8,7 +8,7 @@ import ShareCard from "../components/ShareCard";
 import SendCard from "../components/SendCard";
 import { useAuth } from "../context/AuthContext";
 import CardHistoryTimeline from "../components/CardHistoryTimeline";
-import { vaultTierBadge, formatEdition, rarityDisplay } from "../utils/tierStyles";
+import { vaultTierBadge, rarityDisplay } from "../utils/tierStyles";
 import { motionLabel } from "../constants/animationMotions";
 import { isAnimatedCard } from "../utils/animationCard";
 import AnimatedBadge from "../components/AnimatedBadge";
@@ -146,48 +146,22 @@ export default function CardDetailPage() {
             </div>
 
             <div className="mx-auto mt-10 max-w-xl space-y-6 text-center sm:text-left">
-              <div>
-                <h1 className="text-2xl font-bold text-white sm:text-3xl">{card.player_name}</h1>
-                <p className="mt-1 text-slate-400">{card.team_name}</p>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${badge?.pill ?? ""}`}>
-                  {badge?.label}
-                </span>
+              {card.animation_motion ? (
+                <p className="text-sm text-slate-400">
+                  Motion: <span className="text-violet-200">{motionLabel(card.animation_motion)}</span>
+                </p>
+              ) : null}
+              <div className="flex flex-wrap justify-center gap-2 sm:justify-start">
                 <span className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs text-slate-300">
                   {rarityDisplay(card.rarity)}
                 </span>
                 {isAnimatedCard(card) ? <AnimatedBadge /> : null}
               </div>
-              {card.animation_motion ? (
-                <p className="text-sm text-slate-500">Motion: {motionLabel(card.animation_motion)}</p>
-              ) : null}
 
               <dl className="grid gap-3 rounded-2xl border border-white/10 bg-cardBg p-4 text-sm sm:grid-cols-2">
-                <div>
-                  <dt className="text-slate-500">Position</dt>
-                  <dd className="font-medium text-white">{card.position || "—"}</dd>
-                </div>
-                <div>
-                  <dt className="text-slate-500">Jersey #</dt>
-                  <dd className="font-medium text-white">{card.jersey_number || "—"}</dd>
-                </div>
-                <div>
-                  <dt className="text-slate-500">Grad year</dt>
-                  <dd className="font-medium text-white">{card.grad_year}</dd>
-                </div>
-                <div>
-                  <dt className="text-slate-500">Theme</dt>
-                  <dd className="font-medium text-white capitalize">{card.theme || "—"}</dd>
-                </div>
                 <div className="sm:col-span-2">
                   <dt className="text-slate-500">Card ID</dt>
                   <dd className="font-mono text-xs text-neonTeal">{card.card_id}</dd>
-                </div>
-                <div className="sm:col-span-2">
-                  <dt className="text-slate-500">Edition</dt>
-                  <dd className="font-medium text-white">{formatEdition(card.edition_number, card.print_run)}</dd>
                 </div>
                 <div className="sm:col-span-2">
                   <dt className="text-slate-500">Created</dt>
