@@ -147,7 +147,8 @@ export default function CardImage({
 
   const showStaticPoster = Boolean(imgSrc && !imgFailed);
   const showVideoLayer = videoReady && shouldPlayVideo;
-  const showPosterUnderVideo = showStaticPoster && (showVideoLayer || (useOwnerVideoProxy && ownerVideoLoading));
+  // Show PNG whenever available; hide on detail only while video is actively playing
+  const showPosterImage = showStaticPoster && (!isDetail || !showVideoLayer);
 
   const protectedMediaClass = protectMedia ? "card-media-protected" : "";
   const imgClass = [CARD_IMAGE_MEDIA_CLASS, protectedMediaClass, className].filter(Boolean).join(" ");
@@ -214,7 +215,7 @@ export default function CardImage({
         </div>
       </ProtectedMediaShell>
     );
-  } else if (isDetail && showPosterUnderVideo) {
+  } else if (isDetail && showPosterImage) {
     inner = (
       <ProtectedMediaShell protectMedia={protectMedia}>
         <img
@@ -233,7 +234,7 @@ export default function CardImage({
   } else {
     inner = (
       <>
-        {showPosterUnderVideo ? (
+        {showPosterImage ? (
           <ProtectedMediaShell protectMedia={protectMedia}>
             <img
               src={imgSrc}
