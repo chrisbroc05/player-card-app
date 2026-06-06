@@ -1,6 +1,7 @@
 import base64
 import io
 import json
+import logging
 import os
 import sys
 import urllib.request
@@ -33,6 +34,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 # Load repo-root .env (e.g. OPENAI_API_KEY).
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 load_dotenv(_REPO_ROOT / ".env")
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # App
@@ -684,7 +687,19 @@ def _gpt_image_dual_edit_bytes(
     }
     if model in ("gpt-image-1", "gpt-image-1.5"):
         kwargs["input_fidelity"] = "high"
-    response = client.images.edit(**kwargs)
+    logger.info(
+        "OpenAI images.edit request model=%s tier=%s prompt_len=%s prompt=%s",
+        model,
+        tier,
+        len(prompt),
+        prompt,
+    )
+    try:
+        response = client.images.edit(**kwargs)
+    except Exception as exc:
+        logger.exception("OpenAI images.edit failed model=%s: %s", model, exc)
+        raise
+    logger.info("OpenAI images.edit succeeded model=%s", model)
     return _decode_first_image_bytes(response)
 
 
@@ -1042,9 +1057,9 @@ def _generate_card_openai(
     special_theme: str | None = None,
 ) -> dict:
     """
-    1) Prefer GPT Image edit with [player photo, card template] and tier-specific animated prompt.
+    1) Prefer GPT Image edit with [player photo, card template] and tier-specific prompt.
     2) Fallback: DALL·E 3 + vision caption, then DALL·E 2 edit (single image).
-    3) Pillow overlay for crisp name + team on the final image.
+    Player info is shown via the frontend CardInfoBanner — not baked into the image.
     """
     api_key = (os.environ.get("OPENAI_API_KEY") or "").strip()
     if not api_key:
@@ -1062,8 +1077,6 @@ def _generate_card_openai(
 
     name = _player_display_name(player_row)
     team = _player_team_name(player_row)
-    jersey_number = _player_jersey_number(player_row)
-    player_context_text = _player_prompt_context(player_row)
     client = OpenAI(api_key=api_key)
 
     generation = "gpt-image-template"
@@ -1082,21 +1095,26 @@ def _generate_card_openai(
                 tier=tier_norm,
                 special_theme=special_theme,
             )
+            logger.info("Card generation succeeded via gpt-image model=%s player_id=%s", model, player_id)
             break
-        except Exception:
+        except Exception as exc:
+            logger.warning("Card generation failed for model=%s player_id=%s: %s", model, player_id, exc)
             continue
 
     if out_bytes is None:
         generation = "dall-e-3"
         try:
             caption = _vision_caption_for_card(client, source_path)
-        except Exception:
+        except Exception as exc:
+            logger.warning("Vision caption failed player_id=%s: %s", player_id, exc)
             caption = "athletic portrait, confident sports pose"
         try:
             out_bytes = _dalle3_generate_card_bytes(
                 client, name, team, caption, tier_norm, special_theme
             )
-        except Exception:
+            logger.info("Card generation succeeded via dall-e-3 player_id=%s", player_id)
+        except Exception as exc:
+            logger.warning("DALL-E 3 generation failed player_id=%s: %s", player_id, exc)
             out_bytes = None
 
     if out_bytes is None:
@@ -1104,6 +1122,7 @@ def _generate_card_openai(
         out_bytes = _dalle2_edit_card_bytes(
             client, source_path, name, team, tier_norm, special_theme
         )
+        logger.info("Card generation succeeded via dall-e-2-edit player_id=%s", player_id)
 
     with Image.open(io.BytesIO(out_bytes)) as generated:
         final_rgb = generated.convert("RGB")
@@ -1112,7 +1131,7 @@ def _generate_card_openai(
     card_path = CARD_DIR / card_filename
     final_rgb.save(card_path, format="PNG")
 
-    return {
+    result = {
         "filename": card_filename,
         "path": str(card_path),
         "url": f"{CARD_MEDIA_URL_PREFIX}/{card_filename}",
@@ -1121,6 +1140,14 @@ def _generate_card_openai(
         "generation": generation,
         "special_theme": special_theme,
     }
+    logger.info(
+        "Card image saved player_id=%s generation=%s url=%s bytes=%s",
+        player_id,
+        generation,
+        result["url"],
+        len(out_bytes),
+    )
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -2074,7 +2101,12 @@ def generate_card_for_order(
         result = _generate_card_openai(
             player_row, order_id, source_path, tier=card_tier, special_theme=order.get("special_theme")
         )
-    except Exception:
+    except Exception as exc:
+        logger.exception(
+            "OpenAI card generation failed for order %s, using pillow fallback: %s",
+            order_id,
+            exc,
+        )
         result = _generate_card_pillow(
             player_row, order_id, source_path, tier=card_tier, special_theme=order.get("special_theme")
         )
