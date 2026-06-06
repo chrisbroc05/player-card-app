@@ -83,6 +83,7 @@ from marketplace_repo import float_from_decimal  # noqa: E402
 from parent_email_utils import normalize_optional_parent_email  # noqa: E402
 from schema_migrations import run_schema_migrations_after_models  # noqa: E402
 from trade_routes import router as trade_router  # noqa: E402
+from routers.activity import router as activity_router  # noqa: E402
 from routers.admin import router as admin_router  # noqa: E402
 from routers.auth import router as auth_user_router  # noqa: E402
 from routers.cards import router as cards_animation_router  # noqa: E402
@@ -161,6 +162,7 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(trade_router, prefix="/trades", tags=["trades"])
 app.include_router(admin_router, prefix="/admin", tags=["admin"])
 app.include_router(auth_user_router, prefix="/auth", tags=["auth"])
+app.include_router(activity_router, prefix="/activity", tags=["activity"])
 app.include_router(credits_router, prefix="/credits", tags=["credits"])
 app.include_router(connect_router, prefix="/connect", tags=["connect"])
 app.include_router(users_router, prefix="/users", tags=["users"])

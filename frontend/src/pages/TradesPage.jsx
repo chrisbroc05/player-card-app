@@ -6,6 +6,7 @@ import CardImage from "../components/CardImage";
 import { API_BASE_URL, authHeaders } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import { vaultTierBadge, formatEditionShort, rarityDisplay } from "../utils/tierStyles";
+import { ActivityHistorySection } from "../components/ActivityHistory";
 
 function relativeSentLabel(iso) {
   if (!iso) return "";
@@ -38,6 +39,30 @@ export default function TradesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionKey, setActionKey] = useState("");
+  const [activityItems, setActivityItems] = useState([]);
+  const [activityLoading, setActivityLoading] = useState(true);
+  const [activityError, setActivityError] = useState("");
+  const [activityFilter, setActivityFilter] = useState("all");
+
+  const loadActivity = useCallback(async () => {
+    if (!token) return;
+    setActivityLoading(true);
+    setActivityError("");
+    try {
+      const res = await fetch(`${API_BASE_URL}/activity/history?limit=50`, {
+        headers: { ...authHeaders(token) },
+        cache: "no-store",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data?.detail === "string" ? data.detail : "Could not load activity.");
+      setActivityItems(Array.isArray(data.items) ? data.items : []);
+    } catch (e) {
+      setActivityError(e.message || "Could not load activity.");
+      setActivityItems([]);
+    } finally {
+      setActivityLoading(false);
+    }
+  }, [token]);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -58,12 +83,25 @@ export default function TradesPage() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+    await loadActivity();
+  }, [token, loadActivity]);
 
   useEffect(() => {
     if (!token || initializing) return;
     load();
   }, [token, initializing, load]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.location.hash === "#activity-history") {
+      const el = document.getElementById("activity-history");
+      if (el) {
+        window.requestAnimationFrame(() => {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      }
+    }
+  }, [loading, activityLoading]);
 
   async function postTradeAction(tradeId, path) {
     if (!token) return;
@@ -250,6 +288,16 @@ export default function TradesPage() {
                 </ul>
               )}
             </section>
+
+            <div id="activity-history">
+              <ActivityHistorySection
+                items={activityItems}
+                loading={activityLoading}
+                error={activityError}
+                filter={activityFilter}
+                onFilterChange={setActivityFilter}
+              />
+            </div>
           </div>
         )}
 

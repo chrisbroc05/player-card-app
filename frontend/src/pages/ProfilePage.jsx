@@ -7,6 +7,7 @@ import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY, authHeaders } from "../config/api
 import { useAuth } from "../context/AuthContext";
 import { formatMoney } from "../utils/marketplace";
 import { CARD_IMAGE_FRAME_SM } from "../utils/cardImageStyles";
+import { RecentActivitySection } from "../components/ActivityHistory";
 
 function formatApiError(detail, fallback) {
   if (!detail) return fallback;
@@ -262,6 +263,8 @@ export default function ProfilePage() {
             ) : null}
           </div>
         </section>
+
+        {token ? <RecentActivitySection token={token} limit={5} /> : null}
 
         {!loading && showMarketplace ? (
           <section className="mt-8">
