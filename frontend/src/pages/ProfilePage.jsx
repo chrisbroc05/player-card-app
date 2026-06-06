@@ -7,7 +7,6 @@ import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY, authHeaders } from "../config/api
 import { useAuth } from "../context/AuthContext";
 import { formatMoney } from "../utils/marketplace";
 import { CARD_IMAGE_FRAME_SM } from "../utils/cardImageStyles";
-import { isAnimatedCard } from "../utils/animationCard";
 
 function formatApiError(detail, fallback) {
   if (!detail) return fallback;
@@ -91,7 +90,6 @@ export default function ProfilePage() {
   const { token, user, initializing } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [profile, setProfile] = useState(null);
-  const [animatedCardsOwned, setAnimatedCardsOwned] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [connectBanner, setConnectBanner] = useState("");
@@ -103,24 +101,14 @@ export default function ProfilePage() {
     try {
       const res = await fetch(`${API_BASE_URL}/auth/profile`, {
         headers: { ...authHeaders(token) },
+        cache: "no-store",
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not load profile."));
       setProfile(data);
-      const cardsRes = await fetch(`${API_BASE_URL}/cards/my-cards`, {
-        headers: { ...authHeaders(token) },
-      });
-      if (cardsRes.ok) {
-        const cards = await cardsRes.json().catch(() => []);
-        const list = Array.isArray(cards) ? cards : [];
-        setAnimatedCardsOwned(list.filter((c) => isAnimatedCard(c)).length);
-      } else {
-        setAnimatedCardsOwned(0);
-      }
     } catch (e) {
       setError(e.message || "Failed to load profile.");
       setProfile(null);
-      setAnimatedCardsOwned(0);
     } finally {
       setLoading(false);
     }
@@ -155,6 +143,7 @@ export default function ProfilePage() {
   const favClass = fav ? tierValueClass(fav) : "text-slate-500";
 
   const mp = profile?.marketplace_stats;
+  const animatedCardsOwned = profile?.animated_cards_owned ?? 0;
   const showMarketplace =
     mp &&
     (mp.total_spent > 0 ||
@@ -281,7 +270,7 @@ export default function ProfilePage() {
               <StatCard icon={iconDollar} label="Spent on Cards" value={formatMoney(mp.total_spent)} valueClass="text-neonTeal" />
               <StatCard icon={iconDollar} label="Earned from Sales" value={formatMoney(mp.total_earned)} valueClass="text-neonTeal" />
               <StatCard icon={iconCards} label="Cards Listed" value={mp.active_listings} />
-              <StatCard icon={iconSend} label="Offers Submitted" value={mp.total_offers_made} />
+              <StatCard icon={iconSend} label="Completed Purchases" value={mp.total_offers_made} />
             </div>
             {(mp.highest_purchase || mp.highest_sale) ? (
               <div className="mt-6 grid gap-4 sm:grid-cols-2">

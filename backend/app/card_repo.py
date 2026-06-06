@@ -18,6 +18,35 @@ _CARD_ID_PATTERN = re.compile(r"^FL-\d{4}-\d{6}$", re.IGNORECASE)
 PRINT_RUN_ALLOWED_QUANTITIES = frozenset({1, 2, 5, 10})
 PENDING_CARD_TTL_HOURS = 24
 
+# Same rows surfaced in My Collection and profile "Cards in Collection" KPI.
+COLLECTION_STATUSES = ("active", "pending_trade")
+
+# Studio previews and discarded variants never count toward creation KPIs.
+EXCLUDED_CREATOR_STATUSES = ("preview", "discarded")
+
+
+def owned_collection_filter(owner_id: int):
+    """Cards visible in the user's collection."""
+    from sqlalchemy import and_
+
+    return and_(
+        Card.owner_id == owner_id,
+        Card.status.in_(COLLECTION_STATUSES),
+    )
+
+
+def cards_created_by_user_filter(user_id: int):
+    """Cards this user originated; legacy rows without creator still count when owned."""
+    from sqlalchemy import and_, or_
+
+    return and_(
+        or_(
+            Card.creator_user_id == user_id,
+            and_(Card.creator_user_id.is_(None), Card.owner_id == user_id),
+        ),
+        Card.status.notin_(EXCLUDED_CREATOR_STATUSES),
+    )
+
 
 def _year_prefix() -> str:
     year = datetime.now(timezone.utc).year
@@ -169,10 +198,7 @@ def list_my_cards_dicts(db: Session, owner_id: int) -> list[dict]:
     """Cards in the user's collection — excludes studio previews and discarded variants."""
     rows = (
         db.query(Card)
-        .filter(
-            Card.owner_id == owner_id,
-            Card.status.in_(["active", "pending_trade"]),
-        )
+        .filter(owned_collection_filter(owner_id))
         .order_by(Card.created_at.desc())
         .all()
     )
