@@ -41,6 +41,7 @@ load_dotenv(_REPO_ROOT / ".env")
 from auth import (  # noqa: E402
     create_access_token,
     get_current_user,
+    get_optional_current_user,
     hash_password,
     verify_password,
 )
@@ -1799,7 +1800,11 @@ def get_card_share_meta(card_id: str, db: Session = Depends(get_db)):
 
 
 @app.get("/cards/{card_id}", response_model=Card)
-def get_card(card_id: str, db: Session = Depends(get_db)):
+def get_card(
+    card_id: str,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+):
     """Single card by collectible id (shareable slug accepted: fl-2026-000001)."""
     key = _canonical_card_id(card_id)
     if key is None:
@@ -1807,7 +1812,11 @@ def get_card(card_id: str, db: Session = Depends(get_db)):
     orm = get_card_by_card_id(db, key)
     if orm is None:
         raise HTTPException(status_code=404, detail="Card not found")
-    return Card.model_validate(card_to_dict(orm, db))
+    data = card_to_dict(orm, db)
+    is_owner = current_user is not None and orm.owner_id == current_user.id
+    if not is_owner:
+        data["animated_video_url"] = None
+    return Card.model_validate(data)
 
 
 @app.get("/cards/{card_id}/copies", response_model=list[CardVaultSummary])

@@ -1,14 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { toApiUrl } from "../config/api";
+import { API_BASE_URL, authHeaders, toApiUrl } from "../config/api";
 import {
   CARD_IMAGE_FRAME,
   CARD_IMAGE_FRAME_ANIMATED,
   CARD_IMAGE_MEDIA_CLASS,
   CARD_MEDIA_SLOT,
   CARD_MEDIA_SLOT_DETAIL,
-  CARD_VIDEO_DETAIL_CLASS,
+  CARD_VIDEO_CLASS,
   CARD_VIDEO_DETAIL_WRAPPER,
-  CARD_VIDEO_GRID_CLASS,
   CARD_VIDEO_WRAPPER_OVERLAY,
 } from "../utils/cardImageStyles";
 import { isAnimatedCard, isAnimationInProgress } from "../utils/animationCard";
@@ -33,6 +32,22 @@ function resolveCardFields(card, props) {
   };
 }
 
+function ProtectedMediaShell({ protectMedia, children }) {
+  if (!protectMedia) return children;
+
+  return (
+    <div className="card-media-protected-wrap relative h-full w-full min-h-0 min-w-0">
+      {children}
+      <div className="card-media-watermark" aria-hidden />
+      <div
+        className="card-media-protect-overlay"
+        aria-hidden
+        onContextMenu={(e) => e.preventDefault()}
+      />
+    </div>
+  );
+}
+
 /** Renders static or animated card media; single place for video/img logic app-wide */
 export default function CardImage({
   card,
@@ -48,20 +63,23 @@ export default function CardImage({
   forcePlay = false,
   showAnimatedBadge = true,
   showInProgressOverlay = true,
-  /** When undefined, shows banner if `card` includes player_name */
   showInfoBanner,
-  /** "default" | "compact" — compact for small thumbnails */
   infoBannerVariant = "default",
-  /** "grid" (default) | "detail" */
   variant = "grid",
+  protectMedia = false,
+  useOwnerVideoProxy = false,
+  token = "",
 }) {
   const [imgFailed, setImgFailed] = useState(false);
   const [videoFailed, setVideoFailed] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const [ownerVideoBlobUrl, setOwnerVideoBlobUrl] = useState(null);
+  const [ownerVideoLoading, setOwnerVideoLoading] = useState(false);
   const videoRef = useRef(null);
   const isMobile = useIsMobileViewport();
   const isDetail = variant === "detail";
   const isGridBrowse = variant === "grid" && playOnHover;
+  const cardIdForApi = card?.card_id || "";
 
   const fields = resolveCardFields(card, {
     imageUrl,
@@ -81,21 +99,64 @@ export default function CardImage({
     return `${base}${sep}cb=${encodeURIComponent(String(cacheBust))}`;
   }, [fields.imageUrl, cacheBust]);
 
-  const videoSrc = useMemo(() => toApiUrl(fields.animatedVideoUrl), [fields.animatedVideoUrl]);
+  const publicVideoSrc = useMemo(() => toApiUrl(fields.animatedVideoUrl), [fields.animatedVideoUrl]);
+
+  useEffect(() => {
+    if (!useOwnerVideoProxy || !token || !cardIdForApi || !fields.animatedVideoUrl) {
+      setOwnerVideoBlobUrl(null);
+      setOwnerVideoLoading(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    let objectUrl = null;
+    setOwnerVideoLoading(true);
+    setVideoFailed(false);
+
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/cards/${encodeURIComponent(cardIdForApi)}/video`, {
+          headers: { ...authHeaders(token) },
+        });
+        if (!res.ok) throw new Error("video fetch failed");
+        const blob = await res.blob();
+        objectUrl = URL.createObjectURL(blob);
+        if (!cancelled) setOwnerVideoBlobUrl(objectUrl);
+      } catch {
+        if (!cancelled) {
+          setOwnerVideoBlobUrl(null);
+          setVideoFailed(true);
+        }
+      } finally {
+        if (!cancelled) setOwnerVideoLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [useOwnerVideoProxy, token, cardIdForApi, fields.animatedVideoUrl]);
+
+  const videoSrc = useOwnerVideoProxy ? ownerVideoBlobUrl : publicVideoSrc;
+  const videoReady = hasVideo && (!useOwnerVideoProxy || Boolean(ownerVideoBlobUrl));
 
   const shouldPlayVideo =
-    hasVideo &&
+    videoReady &&
     (isGridBrowse ? hovered && !isMobile : forcePlay || (!playOnHover && !isGridBrowse));
 
   const showStaticPoster = Boolean(imgSrc && !imgFailed);
-  const showVideoLayer = hasVideo && shouldPlayVideo;
+  const showVideoLayer = videoReady && shouldPlayVideo;
+  const showPosterUnderVideo = showStaticPoster && (showVideoLayer || (useOwnerVideoProxy && ownerVideoLoading));
 
-  const imgClass = [CARD_IMAGE_MEDIA_CLASS, className].filter(Boolean).join(" ");
+  const protectedMediaClass = protectMedia ? "card-media-protected" : "";
+  const imgClass = [CARD_IMAGE_MEDIA_CLASS, protectedMediaClass, className].filter(Boolean).join(" ");
+  const videoClass = [CARD_VIDEO_CLASS, protectedMediaClass, className].filter(Boolean).join(" ");
 
   useEffect(() => {
     const el = videoRef.current;
-    if (!el || !hasVideo) return;
-    if (shouldPlayVideo) {
+    if (!el || !videoReady) return;
+    if (shouldPlayVideo && videoSrc) {
       el.play().catch(() => {});
     } else {
       el.pause();
@@ -105,7 +166,7 @@ export default function CardImage({
         /* ignore */
       }
     }
-  }, [shouldPlayVideo, hasVideo, videoSrc]);
+  }, [shouldPlayVideo, videoReady, videoSrc]);
 
   const resolvedFrame =
     frameClassName ||
@@ -123,65 +184,86 @@ export default function CardImage({
     ? [resolvedFrame, resolvedFrame ? "rounded-b-none border-b-0" : ""].filter(Boolean).join(" ")
     : resolvedFrame;
 
+  const mediaProtectionProps = protectMedia
+    ? {
+        draggable: false,
+        onContextMenu: (e) => e.preventDefault(),
+      }
+    : {};
+
   let inner;
   if (!showStaticPoster && !hasVideo) {
     inner = <PlaceholderInner alt={alt} className={className} isDetail={isDetail} />;
-  } else if (isDetail && showVideoLayer) {
+  } else if (isDetail && showVideoLayer && videoSrc) {
     inner = (
-      <div className={CARD_VIDEO_DETAIL_WRAPPER}>
-        <video
-          ref={videoRef}
-          src={videoSrc}
-          className={[CARD_VIDEO_DETAIL_CLASS, className].filter(Boolean).join(" ")}
-          autoPlay
-          loop
-          muted
-          playsInline
-          preload="metadata"
-          aria-label={alt || "Animated card"}
-          onError={() => setVideoFailed(true)}
+      <ProtectedMediaShell protectMedia={protectMedia}>
+        <div className={CARD_VIDEO_DETAIL_WRAPPER}>
+          <video
+            ref={videoRef}
+            src={videoSrc}
+            className={videoClass}
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="metadata"
+            aria-label={alt || "Animated card"}
+            onError={() => setVideoFailed(true)}
+            {...mediaProtectionProps}
+          />
+        </div>
+      </ProtectedMediaShell>
+    );
+  } else if (isDetail && showPosterUnderVideo) {
+    inner = (
+      <ProtectedMediaShell protectMedia={protectMedia}>
+        <img
+          src={imgSrc}
+          alt={alt || "Card"}
+          className={imgClass}
+          loading="lazy"
+          decoding="async"
+          onError={() => setImgFailed(true)}
+          {...mediaProtectionProps}
         />
-      </div>
+      </ProtectedMediaShell>
     );
   } else if (isDetail) {
-    inner = showStaticPoster ? (
-      <img
-        src={imgSrc}
-        alt={alt || "Card"}
-        className={imgClass}
-        loading="lazy"
-        decoding="async"
-        onError={() => setImgFailed(true)}
-      />
-    ) : null;
+    inner = null;
   } else {
     inner = (
       <>
-        {showStaticPoster ? (
-          <img
-            src={imgSrc}
-            alt={alt || "Card"}
-            className={`${imgClass} transition-opacity duration-200 ${
-              showVideoLayer ? "opacity-0" : "opacity-100"
-            }`}
-            loading="lazy"
-            decoding="async"
-            onError={() => setImgFailed(true)}
-          />
-        ) : null}
-        {hasVideo && showVideoLayer ? (
-          <div className={CARD_VIDEO_WRAPPER_OVERLAY} aria-hidden={false}>
-            <video
-              ref={videoRef}
-              src={videoSrc}
-              className={CARD_VIDEO_GRID_CLASS}
-              loop
-              muted
-              playsInline
-              preload="auto"
-              aria-label={alt || "Animated card"}
-              onError={() => setVideoFailed(true)}
+        {showPosterUnderVideo ? (
+          <ProtectedMediaShell protectMedia={protectMedia}>
+            <img
+              src={imgSrc}
+              alt={alt || "Card"}
+              className={`${imgClass} transition-opacity duration-200 ${
+                showVideoLayer ? "opacity-0" : "opacity-100"
+              }`}
+              loading="lazy"
+              decoding="async"
+              onError={() => setImgFailed(true)}
+              {...mediaProtectionProps}
             />
+          </ProtectedMediaShell>
+        ) : null}
+        {hasVideo && showVideoLayer && videoSrc ? (
+          <div className={CARD_VIDEO_WRAPPER_OVERLAY} aria-hidden={false}>
+            <ProtectedMediaShell protectMedia={protectMedia}>
+              <video
+                ref={videoRef}
+                src={videoSrc}
+                className={videoClass}
+                loop
+                muted
+                playsInline
+                preload="auto"
+                aria-label={alt || "Animated card"}
+                onError={() => setVideoFailed(true)}
+                {...mediaProtectionProps}
+              />
+            </ProtectedMediaShell>
           </div>
         ) : null}
       </>
@@ -214,7 +296,7 @@ export default function CardImage({
 
   if (shouldShowBanner) {
     return (
-      <div className="flex w-full flex-col overflow-hidden rounded-[inherit]">
+      <div className="flex w-full min-w-0 flex-col overflow-hidden rounded-[inherit]">
         {imageBlock}
         <CardInfoBanner card={card} variant={infoBannerVariant} />
       </div>

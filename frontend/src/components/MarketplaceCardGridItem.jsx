@@ -24,7 +24,7 @@ export default function MarketplaceCardGridItem({ listing, variant = "list" }) {
     return (
       <Link
         to={cardPath}
-        className={`group flex flex-col rounded-xl border border-white/10 bg-cardBg p-2 shadow-md transition duration-200 hover:border-white/20 hover:scale-[1.02] ${badge.glow}`}
+        className={`group flex flex-col rounded-xl border border-white/10 bg-cardBg p-2 shadow-md transition duration-200 hover:border-white/20 ${animated ? "" : "hover:scale-[1.02]"} ${badge.glow}`}
       >
         <div className="relative">
           <CardImage
@@ -52,7 +52,7 @@ export default function MarketplaceCardGridItem({ listing, variant = "list" }) {
   return (
     <Link
       to={cardPath}
-      className={`group flex flex-col rounded-2xl border border-white/10 bg-cardBg p-3 shadow-lg transition duration-300 hover:border-white/20 hover:scale-[1.02] ${badge.glow}`}
+      className={`group flex flex-col rounded-2xl border border-white/10 bg-cardBg p-3 shadow-lg transition duration-300 hover:border-white/20 ${animated ? "" : "hover:scale-[1.02]"} ${badge.glow}`}
     >
       <div className="relative">
         <CardImage

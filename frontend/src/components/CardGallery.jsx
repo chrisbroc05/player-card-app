@@ -23,10 +23,13 @@ export default function CardGallery({ cards }) {
           {cards.map((card) => {
             const badge = vaultTierBadge(card.tier);
             const key = card.card_id || card.id;
+            const animatedCard = isAnimatedCard(card);
             return (
               <article
                 key={key}
-                className="group rounded-xl border border-white/10 bg-cardBg2 p-3 transition duration-200 hover:scale-[1.02] hover:border-neonBlue/50 hover:shadow-glowBlue"
+                className={`group rounded-xl border border-white/10 bg-cardBg2 p-3 transition duration-200 hover:border-neonBlue/50 hover:shadow-glowBlue ${
+                  animatedCard ? "" : "hover:scale-[1.02]"
+                }`}
               >
                 <div className="relative">
                   <Link

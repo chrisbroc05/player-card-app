@@ -8,7 +8,6 @@ import { CardSharePopover } from "../components/ShareCard";
 import { useAuth } from "../context/AuthContext";
 import MarketplaceListingActions from "../components/MarketplaceListingActions";
 import AnimateCardModal from "../components/AnimateCardModal";
-import AnimationFailedScreen from "../components/AnimationFailedScreen";
 import AnimationLoadingScreen from "../components/AnimationLoadingScreen";
 import AnimationProgressBanner from "../components/AnimationProgressBanner";
 import CollectionToast from "../components/CollectionToast";
@@ -30,9 +29,8 @@ export default function MyCollectionPage() {
   const [animateModalCard, setAnimateModalCard] = useState(null);
   const [animateBusyId, setAnimateBusyId] = useState("");
   const [animationLoadingCardId, setAnimationLoadingCardId] = useState(null);
-  const [animationUpgradeFailed, setAnimationUpgradeFailed] = useState(false);
-  const [animationFailedCardId, setAnimationFailedCardId] = useState(null);
   const animationLoadingCardIdRef = useRef(null);
+  const lastAnimateMotionRef = useRef("");
   const [bannerDismissed, setBannerDismissed] = useState({});
   const [deleteModalCard, setDeleteModalCard] = useState(null);
   const [deleteBusyId, setDeleteBusyId] = useState("");
@@ -171,12 +169,6 @@ export default function MyCollectionPage() {
     }
   }, [animationLoadingCardId]);
 
-  useEffect(() => {
-    if (animationUpgradeFailed) {
-      scrollAfterPaint(animationFocusRef.current);
-    }
-  }, [animationUpgradeFailed]);
-
   async function startAnimateUpgrade(card, motionId) {
     if (!token) return;
     setAnimateBusyId(card.card_id);
@@ -193,8 +185,7 @@ export default function MyCollectionPage() {
       const newCardId = data?.card_id;
       if (!newCardId) throw new Error("Animation started but no card id was returned.");
       setAnimateModalCard(null);
-      setAnimationUpgradeFailed(false);
-      setAnimationFailedCardId(null);
+      lastAnimateMotionRef.current = motionId;
       animationLoadingCardIdRef.current = newCardId;
       setAnimationLoadingCardId(newCardId);
     } catch (e) {
@@ -208,17 +199,28 @@ export default function MyCollectionPage() {
     await loadCards();
     animationLoadingCardIdRef.current = null;
     setAnimationLoadingCardId(null);
-    setAnimationUpgradeFailed(false);
     showToast("Your animated card was added to your collection!");
   }, [loadCards]);
 
   const handleAnimationUpgradeFailed = useCallback(() => {
-    setAnimationFailedCardId(animationLoadingCardIdRef.current);
-    setAnimationUpgradeFailed(true);
-    animationLoadingCardIdRef.current = null;
-    setAnimationLoadingCardId(null);
     loadCards();
   }, [loadCards]);
+
+  const handleAnimationUpgradeRetry = useCallback(async () => {
+    const cardId = animationLoadingCardIdRef.current || animationLoadingCardId;
+    const motionId = lastAnimateMotionRef.current;
+    if (!token || !cardId || !motionId) {
+      throw new Error("Could not retry animation.");
+    }
+    const { res, unauthorized } = await authFetch(token, `/cards/${encodeURIComponent(cardId)}/animate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ motion_id: motionId }),
+    });
+    if (unauthorized) throw new Error("Session expired.");
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not restart animation."));
+  }, [animationLoadingCardId, token]);
 
   function renderAnimationBanner(card) {
     const st = (card.animation_status || "").toLowerCase();
@@ -320,26 +322,7 @@ export default function MyCollectionPage() {
           <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{error}</div>
         ) : null}
 
-        {animationUpgradeFailed ? (
-          <section
-            ref={animationFocusRef}
-            className="scroll-focus-target animate-fadeUp rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6"
-          >
-            <AnimationFailedScreen cardId={animationFailedCardId} />
-            <div className="mt-2 text-center">
-              <button
-                type="button"
-                onClick={() => {
-                  setAnimationUpgradeFailed(false);
-                  setAnimationFailedCardId(null);
-                }}
-                className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-white/20 px-5 text-sm font-medium text-slate-200 transition hover:border-white/30 hover:bg-white/5"
-              >
-                Back to collection
-              </button>
-            </div>
-          </section>
-        ) : animationLoadingCardId ? (
+        {animationLoadingCardId ? (
           <section
             ref={animationFocusRef}
             className="scroll-focus-target animate-fadeUp rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6"
@@ -347,8 +330,10 @@ export default function MyCollectionPage() {
             <AnimationLoadingScreen
               cardId={animationLoadingCardId}
               token={token}
-              onCompleted={handleAnimationUpgradeComplete}
+              onAddToCollection={handleAnimationUpgradeComplete}
               onFailed={handleAnimationUpgradeFailed}
+              onRetry={handleAnimationUpgradeRetry}
+              failureCreditMessage="Animation failed. Please contact support for assistance with your account."
             />
           </section>
         ) : initializing || loading ? (
@@ -372,11 +357,12 @@ export default function MyCollectionPage() {
               const badge = vaultTierBadge(card.tier);
               const pending = (card.status || "active") === "pending_trade";
               const showDelete = canDeleteCard(card);
+              const animatedCard = isAnimatedCard(card);
               return (
                 <article
                   key={card.card_id}
                   className={`group rounded-2xl border border-white/10 bg-cardBg p-3 shadow-lg transition duration-300 hover:border-white/20 ${badge.glow} ${
-                    pending ? "opacity-70" : "hover:scale-[1.02]"
+                    pending ? "opacity-70" : animatedCard ? "" : "hover:scale-[1.02]"
                   }`}
                 >
                   <div className="relative">

@@ -14,7 +14,6 @@ import QuantitySelector from "../components/QuantitySelector";
 import ActionCategoryStep from "../components/ActionCategoryStep";
 import MotionSelectionGrid from "../components/MotionSelectionGrid";
 import AnimationLoadingScreen from "../components/AnimationLoadingScreen";
-import AnimationFailedScreen from "../components/AnimationFailedScreen";
 import PendingCardResumePrompt from "../components/PendingCardResumePrompt";
 import AnimateCardConfirmModal from "../components/AnimateCardConfirmModal";
 import AnimatedCardChoiceModal from "../components/AnimatedCardChoiceModal";
@@ -1229,7 +1228,7 @@ export default function StudioPage() {
     setAnimationLoadingCardId(cardId);
   }
 
-  async function handleAnimationComplete() {
+  async function handleAnimationComplete(completedData) {
     if (animationLoadingCardId) {
       try {
         await fetchCardDetailById(animationLoadingCardId);
@@ -1243,7 +1242,18 @@ export default function StudioPage() {
     setCurrentStep(STEP_REVIEW);
     setMessage("Your animated card has been added to your collection.");
     await Promise.all([fetchMyCards(), fetchOrders(), refreshUser(token)]);
+    return completedData;
   }
+
+  const handleAnimationFailed = useCallback(() => {
+    setAnimationFailed(true);
+  }, []);
+
+  const handleAnimationRetry = useCallback(async () => {
+    if (!animationLoadingCardId) return;
+    setAnimationFailed(false);
+    await startCardAnimation(animationLoadingCardId);
+  }, [animationLoadingCardId, selectedMotionId, actionCategory, token]);
 
   function handlePhotoFileSelect(file) {
     if (!file || !file.type.startsWith("image/")) return;
@@ -1304,14 +1314,7 @@ export default function StudioPage() {
           </div>
         )}
 
-        {animationFailed ? (
-          <section
-            ref={animationFocusRef}
-            className="scroll-focus-target animate-fadeUp rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6"
-          >
-            <AnimationFailedScreen cardId={savedCardDetail?.card_id} />
-          </section>
-        ) : animationLoadingCardId ? (
+        {animationLoadingCardId ? (
           <section
             ref={animationFocusRef}
             className="scroll-focus-target animate-fadeUp rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6"
@@ -1319,11 +1322,10 @@ export default function StudioPage() {
             <AnimationLoadingScreen
               cardId={animationLoadingCardId}
               token={token}
-              onCompleted={handleAnimationComplete}
-              onFailed={() => {
-                setAnimationFailed(true);
-                setAnimationLoadingCardId(null);
-              }}
+              onAddToCollection={handleAnimationComplete}
+              onFailed={handleAnimationFailed}
+              onRetry={handleAnimationRetry}
+              failureCreditMessage="Animation failed. Please contact support. No additional credits were charged for this animation attempt."
             />
           </section>
         ) : (

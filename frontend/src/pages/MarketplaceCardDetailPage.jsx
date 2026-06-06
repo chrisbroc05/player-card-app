@@ -10,6 +10,7 @@ import { authFetch, formatApiError } from "../utils/authFetch";
 import { computeRoyaltyPreview, formatMoney, listedAgeLabel, listingExpiresSubtextClass } from "../utils/marketplace";
 import { motionLabel } from "../constants/animationMotions";
 import { isAnimatedCard } from "../utils/animationCard";
+import { isCardOwner } from "../utils/cardOwnership";
 import AnimatedBadge from "../components/AnimatedBadge";
 import CardHistoryTimeline from "../components/CardHistoryTimeline";
 import { vaultTierBadge, rarityDisplay } from "../utils/tierStyles";
@@ -79,7 +80,7 @@ export default function MarketplaceCardDetailPage() {
 
   const royaltyPreview = computeRoyaltyPreview(offerAmount);
   const badge = listing ? vaultTierBadge(listing.tier) : null;
-  const isOwner = user && listing && listing.owner_id === user.id;
+  const isOwner = isCardOwner(listing, user);
 
   async function handleSubmitOffer(e, forcedCashAmount = null) {
     e?.preventDefault?.();
@@ -174,7 +175,10 @@ export default function MarketplaceCardDetailPage() {
                 alt={listing.player_name}
                 frameClassName={CARD_IMAGE_FRAME_DETAIL}
                 variant="detail"
-                forcePlay={isAnimatedCard(listing)}
+                forcePlay={isOwner && isAnimatedCard(listing)}
+                protectMedia={!isOwner}
+                useOwnerVideoProxy={isOwner && isAnimatedCard(listing)}
+                token={token || ""}
               />
             </div>
             <div className="space-y-4">

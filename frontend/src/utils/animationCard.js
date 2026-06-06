@@ -18,8 +18,16 @@ export function canAnimateCard(card) {
   return st == null || st === "failed";
 }
 
+export function normalizeAnimationStatus(dataOrStatus) {
+  if (dataOrStatus == null) return "";
+  if (typeof dataOrStatus === "string") {
+    return dataOrStatus.trim().toLowerCase();
+  }
+  return String(dataOrStatus.status ?? dataOrStatus.animation_status ?? "").toLowerCase();
+}
+
 export function animationStatusUserLine(status) {
-  const st = (status || "").toLowerCase();
+  const st = normalizeAnimationStatus(status);
   if (st === "pending") return "Queued for generation";
   if (st === "processing") return "Runway AI is working its magic";
   if (st === "completed") return "Finishing up...";

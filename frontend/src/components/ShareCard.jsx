@@ -88,6 +88,7 @@ function ShareActionButtons({
   igHint,
   setIgHint,
   compact,
+  allowDownload = true,
 }) {
   const { socialSharingEnabled } = useFeatures();
   const cardUrl = resolved.card_url;
@@ -180,11 +181,13 @@ function ShareActionButtons({
             <span className="text-slate-100">Facebook</span>
           </a>
         ) : null}
-        <button type="button" className={btnBase} onClick={downloadImage} disabled={downloading || !imgPath}>
-          <Download className="h-5 w-5 text-teal-200/90" strokeWidth={2} />
-          <span>{downloading ? "Downloading..." : "Download"}</span>
-        </button>
-        {socialSharingEnabled && !compact ? (
+        {allowDownload ? (
+          <button type="button" className={btnBase} onClick={downloadImage} disabled={downloading || !imgPath}>
+            <Download className="h-5 w-5 text-teal-200/90" strokeWidth={2} />
+            <span>{downloading ? "Downloading..." : "Download"}</span>
+          </button>
+        ) : null}
+        {allowDownload && socialSharingEnabled && !compact ? (
           <div className="relative flex flex-col items-center">
             <button
               type="button"
@@ -211,7 +214,7 @@ function ShareActionButtons({
   );
 }
 
-export function CardSharePopover({ card }) {
+export function CardSharePopover({ card, isOwner = true }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
   const { resolved } = useShareMeta(card);
@@ -271,6 +274,7 @@ export function CardSharePopover({ card }) {
             igHint={igHint}
             setIgHint={setIgHint}
             compact
+            allowDownload={isOwner}
           />
         </div>
       ) : null}
@@ -279,7 +283,7 @@ export function CardSharePopover({ card }) {
   );
 }
 
-export default function ShareCard({ card, sectionTitle = "Share this card" }) {
+export default function ShareCard({ card, sectionTitle = "Share this card", isOwner = true }) {
   const { error, resolved } = useShareMeta(card);
   const [toast, setToast] = useState("");
   const [downloading, setDownloading] = useState(false);
@@ -309,6 +313,7 @@ export default function ShareCard({ card, sectionTitle = "Share this card" }) {
           igHint={igHint}
           setIgHint={setIgHint}
           compact={false}
+          allowDownload={isOwner}
         />
       </div>
       <ShareToast message={toast} />

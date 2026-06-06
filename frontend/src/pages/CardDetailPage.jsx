@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
-import { API_BASE_URL } from "../config/api";
+import { API_BASE_URL, authHeaders } from "../config/api";
 import CardImage from "../components/CardImage";
 import ShareCard from "../components/ShareCard";
 import SendCard from "../components/SendCard";
@@ -11,6 +11,7 @@ import CardHistoryTimeline from "../components/CardHistoryTimeline";
 import { vaultTierBadge, rarityDisplay } from "../utils/tierStyles";
 import { motionLabel } from "../constants/animationMotions";
 import { isAnimatedCard } from "../utils/animationCard";
+import { isCardOwner } from "../utils/cardOwnership";
 import AnimatedBadge from "../components/AnimatedBadge";
 import { CARD_IMAGE_FRAME_DETAIL } from "../utils/cardImageStyles";
 
@@ -37,7 +38,7 @@ function copyRowMatchesRoute(c, routeParam) {
 
 export default function CardDetailPage() {
   const { cardId } = useParams();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [card, setCard] = useState(null);
   const [copies, setCopies] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -46,7 +47,9 @@ export default function CardDetailPage() {
   const refetchCard = useCallback(async () => {
     if (!cardId) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/cards/${encodeURIComponent(cardId)}`);
+      const res = await fetch(`${API_BASE_URL}/cards/${encodeURIComponent(cardId)}`, {
+        headers: { ...authHeaders(token) },
+      });
       if (res.ok) setCard(await res.json());
       const res2 = await fetch(`${API_BASE_URL}/cards/${encodeURIComponent(cardId)}/copies`);
       if (res2.ok) {
@@ -56,7 +59,7 @@ export default function CardDetailPage() {
     } catch {
       /* ignore */
     }
-  }, [cardId]);
+  }, [cardId, token]);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,7 +68,9 @@ export default function CardDetailPage() {
       setLoading(true);
       setError("");
       try {
-        const res = await fetch(`${API_BASE_URL}/cards/${encodeURIComponent(cardId)}`);
+        const res = await fetch(`${API_BASE_URL}/cards/${encodeURIComponent(cardId)}`, {
+          headers: { ...authHeaders(token) },
+        });
         if (res.status === 404) {
           setError("Card not found.");
           setCard(null);
@@ -83,7 +88,7 @@ export default function CardDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [cardId]);
+  }, [cardId, token]);
 
   useEffect(() => {
     if (!cardId) return;
@@ -107,8 +112,7 @@ export default function CardDetailPage() {
   }, [cardId]);
 
   const badge = card ? vaultTierBadge(card.tier) : null;
-  const isOwner =
-    user && card && card.owner_id != null && Number(user.id) === Number(card.owner_id);
+  const isOwner = isCardOwner(card, user);
   const showSendTrade = isOwner && (card?.status || "active") === "active";
   const showPendingTradePanel = isOwner && card?.status === "pending_trade";
 
@@ -141,7 +145,10 @@ export default function CardDetailPage() {
                 cacheBust={card.created_at}
                 frameClassName={CARD_IMAGE_FRAME_DETAIL}
                 variant="detail"
-                forcePlay={isAnimatedCard(card)}
+                forcePlay={isOwner && isAnimatedCard(card)}
+                protectMedia={!isOwner}
+                useOwnerVideoProxy={isOwner && isAnimatedCard(card)}
+                token={token || ""}
               />
             </div>
 
@@ -199,7 +206,7 @@ export default function CardDetailPage() {
                 </div>
               ) : null}
 
-              <ShareCard card={card} sectionTitle="Share This Card" />
+              <ShareCard card={card} sectionTitle="Share This Card" isOwner={isOwner} />
 
               {showSendTrade ? <SendCard card={card} onSent={refetchCard} /> : null}
               {showPendingTradePanel ? <SendCard card={card} onCancelTrade={refetchCard} /> : null}

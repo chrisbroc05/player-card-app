@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import os
 import re
+from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
@@ -43,6 +45,22 @@ def _resolve_card(db: Session, card_id_raw: str) -> Card:
     return card
 
 
+def _animations_dir() -> Path:
+    base = (os.environ.get("APP_DATA_DIR") or "").strip() or "./data"
+    return Path(base).expanduser().resolve() / "animations"
+
+
+def _animation_video_path(card: Card) -> Path | None:
+    url = (card.animated_video_url or "").strip()
+    if not url:
+        return None
+    name = Path(url).name
+    if not name or not name.lower().endswith(".mp4"):
+        return None
+    path = _animations_dir() / name
+    return path if path.is_file() else None
+
+
 def _iso(dt) -> str | None:
     if dt is None:
         return None
@@ -50,13 +68,17 @@ def _iso(dt) -> str | None:
 
 
 def _animation_status_payload(card: Card) -> dict:
+    status = (card.animation_status or "pending").strip() or "pending"
+    video_url = (card.animated_video_url or "").strip() or None
     return {
         "card_id": card.card_id,
-        "animation_status": card.animation_status,
-        "animated_video_url": card.animated_video_url,
+        "status": status,
+        "animation_status": status,
+        "animated_video_url": video_url,
         "animation_motion": card.animation_motion,
         "animation_requested_at": _iso(card.animation_requested_at),
         "animation_completed_at": _iso(card.animation_completed_at),
+        "can_retry": status == "failed",
     }
 
 
@@ -185,6 +207,28 @@ def get_animation_status(
     if card.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="You do not own this card")
     return _animation_status_payload(card)
+
+
+@router.get("/{card_id}/video")
+def stream_card_video(
+    card_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Stream animated card video — owners only."""
+    card = _resolve_card(db, card_id)
+    if card.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not own this card")
+    if not card.is_animated:
+        raise HTTPException(status_code=404, detail="This card is not animated")
+    path = _animation_video_path(card)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Animation file not found")
+    return FileResponse(
+        path,
+        media_type="video/mp4",
+        filename=f"{card.card_id}.mp4",
+    )
 
 
 def _validate_delete_request(card: Card, current_user: User) -> None:
