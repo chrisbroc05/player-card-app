@@ -165,24 +165,17 @@ export default function PackOpeningLoader({
       ) : null}
 
       <div className="pack-opening-copy">
-        {phase !== "display" ? (
-          <>
-            <p className="pack-opening-headline">
-              Generating your card
-              <span className="pack-opening-ellipsis" aria-hidden>
-                <span>.</span>
-                <span>.</span>
-                <span>.</span>
-              </span>
-            </p>
-            <p className="pack-opening-subline">{statusMessage}</p>
-          </>
-        ) : (
-          <>
-            <p className="pack-opening-headline pack-opening-headline--success">Your card is ready!</p>
-            <p className="pack-opening-subline">Preparing your preview...</p>
-          </>
-        )}
+        <p className="pack-opening-headline">
+          Generating your card
+          <span className="pack-opening-ellipsis" aria-hidden>
+            <span>.</span>
+            <span>.</span>
+            <span>.</span>
+          </span>
+        </p>
+        <p className="pack-opening-subline">
+          {phase === "display" ? "Preparing your preview actions..." : statusMessage}
+        </p>
         <p className="pack-opening-hint">This usually takes 30–60 seconds. Please keep this page open.</p>
       </div>
     </div>

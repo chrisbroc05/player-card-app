@@ -55,6 +55,15 @@ const WIZARD_STEP_LABELS = {
   [STEP_REVIEW]: "Review & Generate",
 };
 
+const ANIMATED_FLOW_STAGE = {
+  IDLE: "idle",
+  GENERATING_STATIC: "generating_static",
+  CHOICE: "choice",
+  QUANTITY: "quantity",
+  STARTING_ANIMATION: "starting_animation",
+  ANIMATING: "animating",
+};
+
 function isAnimatedOnlyStep(step) {
   return step === STEP_ACTION || step === STEP_MOTION;
 }
@@ -291,12 +300,10 @@ export default function StudioPage() {
   const [pricingError, setPricingError] = useState("");
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
   const [showAnimateConfirm, setShowAnimateConfirm] = useState(false);
-  const [animateConfirmMode, setAnimateConfirmMode] = useState("pre-generate");
   const [showAnimatedFlowExplainer, setShowAnimatedFlowExplainer] = useState(false);
   const [packOpeningActive, setPackOpeningActive] = useState(false);
   const [previewConfigureOpen, setPreviewConfigureOpen] = useState(false);
-  const [animatedChoiceModalOpen, setAnimatedChoiceModalOpen] = useState(false);
-  const [showAnimatedQuantityModal, setShowAnimatedQuantityModal] = useState(false);
+  const [animatedFlowStage, setAnimatedFlowStage] = useState(ANIMATED_FLOW_STAGE.IDLE);
   const [animatedSaveStaticFlow, setAnimatedSaveStaticFlow] = useState(false);
   const [latestGeneratedPreview, setLatestGeneratedPreview] = useState(null);
   const [previewPollCardId, setPreviewPollCardId] = useState("");
@@ -319,6 +326,8 @@ export default function StudioPage() {
   const prevPreviewConfigureRef = useRef(false);
   const prevAnimationLoadingRef = useRef(null);
   const animatedChoiceShownForRef = useRef("");
+  const animatedFlowStageRef = useRef(ANIMATED_FLOW_STAGE.IDLE);
+  const previewPollGenerationRef = useRef(0);
 
   const selectedTierLabel = (TIER_UI[orderTier] || TIER_UI.all_star).label;
   const selectedTierRarityLabel = (TIER_UI[orderTier] || TIER_UI.all_star).sub;
@@ -399,6 +408,8 @@ export default function StudioPage() {
   const firstGenerateShortfall = Math.max(0, firstGenerateDue - creditBalance);
   const motionDisplayName = isAnimatedCardType && selectedMotionId ? motionLabel(selectedMotionId) : "";
   const inCreationFlow = currentStep >= STEP_PHOTO && currentStep <= STEP_REVIEW;
+  const animatedChoiceModalOpen = animatedFlowStage === ANIMATED_FLOW_STAGE.CHOICE;
+  const showAnimatedQuantityModal = animatedFlowStage === ANIMATED_FLOW_STAGE.QUANTITY;
 
   const detailsValidation = useMemo(
     () =>
@@ -588,6 +599,14 @@ export default function StudioPage() {
   }, [animationLoadingCardId]);
 
   useEffect(() => {
+    animatedFlowStageRef.current = animatedFlowStage;
+    console.log("[AnimatedFlow] stage changed:", animatedFlowStage);
+    if (animatedFlowStage === ANIMATED_FLOW_STAGE.ANIMATING) {
+      console.log("[AnimatedFlow] animation loading screen should now be visible");
+    }
+  }, [animatedFlowStage]);
+
+  useEffect(() => {
     if (animationFailed) {
       scrollAfterPaint(animationFocusRef.current);
     }
@@ -707,9 +726,8 @@ export default function StudioPage() {
   const tryOpenAnimatedChoiceModal = useCallback(() => {
     if (
       !isAnimatedCardType ||
+      animatedFlowStage !== ANIMATED_FLOW_STAGE.GENERATING_STATIC ||
       animatedSaveStaticFlow ||
-      animatedChoiceModalOpen ||
-      showAnimatedQuantityModal ||
       animationLoadingCardId ||
       previewConfigureOpen ||
       reviewSubPhase !== "generate"
@@ -726,14 +744,16 @@ export default function StudioPage() {
     if (animatedChoiceShownForRef.current === key) return;
 
     animatedChoiceShownForRef.current = key;
+    console.log("[AnimatedFlow] static generation complete, opening choice modal");
     setSelectedPreviewUrl(preview.image_url);
-    setGeneratedCardUrl((prev) => prev || preview.image_url);
-    setAnimatedChoiceModalOpen(true);
+    setGeneratedCardUrl(preview.image_url);
+    setPackOpeningActive(false);
+    setAnimatedFlowStage(ANIMATED_FLOW_STAGE.CHOICE);
+    console.log("[AnimatedFlow] choice modal state applied");
   }, [
     isAnimatedCardType,
+    animatedFlowStage,
     animatedSaveStaticFlow,
-    animatedChoiceModalOpen,
-    showAnimatedQuantityModal,
     animationLoadingCardId,
     previewConfigureOpen,
     reviewSubPhase,
@@ -749,12 +769,11 @@ export default function StudioPage() {
   }, [initializing, token, fetchPendingSession]);
 
   useEffect(() => {
-    if (!isAnimatedCardType || packOpeningActive || isGenerating) return;
+    if (!isAnimatedCardType) return;
     tryOpenAnimatedChoiceModal();
   }, [
     isAnimatedCardType,
-    packOpeningActive,
-    isGenerating,
+    animatedFlowStage,
     latestGeneratedPreview,
     previewCards,
     tryOpenAnimatedChoiceModal,
@@ -762,23 +781,40 @@ export default function StudioPage() {
 
   useEffect(() => {
     if (!previewPollCardId || !token || !isAnimatedCardType) return undefined;
+    if (animatedFlowStage !== ANIMATED_FLOW_STAGE.GENERATING_STATIC) return undefined;
     if (latestGeneratedPreview?.image_url) return undefined;
 
     let cancelled = false;
+    const generation = previewPollGenerationRef.current + 1;
+    previewPollGenerationRef.current = generation;
     const poll = async () => {
       try {
+        console.log(`[AnimatedFlow] polling static preview card_id=${previewPollCardId} generation=${generation}`);
         const res = await fetch(`${API_BASE_URL}/cards/${encodeURIComponent(previewPollCardId)}`, {
           headers: { ...authHeaders(token) },
         });
         if (!res.ok || cancelled) return;
         const card = await res.json().catch(() => null);
+        console.log("[AnimatedFlow] poll response received", {
+          cardId: previewPollCardId,
+          generation,
+          hasImage: Boolean(card?.image_url),
+          animationStatus: card?.animation_status || null,
+        });
         if (cancelled || !card?.image_url) return;
+        if (generation !== previewPollGenerationRef.current) return;
+        console.log("[AnimatedFlow] static card image ready, applying modal state");
         setLatestGeneratedPreview({
           card_id: card.card_id,
           image_url: card.image_url,
         });
         setSelectedPreviewUrl(card.image_url);
         setGeneratedCardUrl(card.image_url);
+        if (animatedFlowStageRef.current === ANIMATED_FLOW_STAGE.GENERATING_STATIC) {
+          setPackOpeningActive(false);
+          setAnimatedFlowStage(ANIMATED_FLOW_STAGE.CHOICE);
+          console.log("[AnimatedFlow] choice modal state update queued from poll completion");
+        }
       } catch {
         /* retry on next interval */
       }
@@ -790,7 +826,7 @@ export default function StudioPage() {
       cancelled = true;
       window.clearInterval(iv);
     };
-  }, [previewPollCardId, token, isAnimatedCardType, latestGeneratedPreview?.image_url]);
+  }, [previewPollCardId, token, isAnimatedCardType, latestGeneratedPreview?.image_url, animatedFlowStage]);
 
   useEffect(() => {
     if (reviewSubPhase === "generate" && previewCards.length > 0) {
@@ -887,14 +923,14 @@ export default function StudioPage() {
       setReviewSubPhase("generate");
       setPreviewConfigureOpen(false);
       setAnimatedSaveStaticFlow(false);
-      setAnimatedChoiceModalOpen(false);
+      setAnimatedFlowStage(ANIMATED_FLOW_STAGE.IDLE);
       animatedChoiceShownForRef.current = "";
       dismissPendingPrompt();
       setMessage("Welcome back — your preview is ready. No additional credits were charged.");
       await fetchOrders();
       if ((pendingSession.draft?.card_type || "standard") === "animated" && previewUrl) {
         animatedChoiceShownForRef.current = "";
-        setAnimatedChoiceModalOpen(true);
+        setAnimatedFlowStage(ANIMATED_FLOW_STAGE.CHOICE);
       }
     } catch {
       await cleanupStalePending(sessionId);
@@ -1033,6 +1069,11 @@ export default function StudioPage() {
   }
 
   async function handleGenerateForOrder(orderId) {
+    if (isAnimatedCardType) {
+      setAnimatedFlowStage(ANIMATED_FLOW_STAGE.GENERATING_STATIC);
+    } else {
+      setAnimatedFlowStage(ANIMATED_FLOW_STAGE.IDLE);
+    }
     setPackOpeningActive(true);
     setIsGenerating(true);
     setOrderActionKey(`generate-${orderId}`);
@@ -1040,7 +1081,6 @@ export default function StudioPage() {
     setError("");
     setPreviewConfigureOpen(false);
     setAnimatedSaveStaticFlow(false);
-    setAnimatedChoiceModalOpen(false);
     animatedChoiceShownForRef.current = "";
     setLatestGeneratedPreview(null);
     setPreviewPollCardId("");
@@ -1056,7 +1096,7 @@ export default function StudioPage() {
         image_url: data.image_url,
         tier: data.tier,
       };
-      setLatestGeneratedPreview(preview);
+      setLatestGeneratedPreview(preview.image_url ? preview : null);
       setPreviewPollCardId(data.card_id || "");
       setGeneratedCardUrl(data.image_url || "");
       setSelectedPreviewUrl(data.image_url || "");
@@ -1065,6 +1105,7 @@ export default function StudioPage() {
       await Promise.all([fetchMyCards(), fetchOrders(), refreshUser(token)]);
     } catch (err) {
       setPackOpeningActive(false);
+      setAnimatedFlowStage(ANIMATED_FLOW_STAGE.IDLE);
       setError(err.message || "Failed to generate order card.");
     } finally {
       setIsGenerating(false);
@@ -1074,6 +1115,9 @@ export default function StudioPage() {
 
   function handlePackOpeningComplete() {
     setPackOpeningActive(false);
+    if (!isAnimatedCardType) return;
+    if (animatedFlowStageRef.current !== ANIMATED_FLOW_STAGE.GENERATING_STATIC) return;
+    console.log("[AnimatedFlow] pack opening completed, checking for immediate choice modal");
     tryOpenAnimatedChoiceModal();
   }
 
@@ -1121,17 +1165,15 @@ export default function StudioPage() {
   }
 
   function handleAnimatedChoiceAnimate() {
-    setAnimatedChoiceModalOpen(false);
-    setShowAnimatedQuantityModal(true);
+    setAnimatedFlowStage(ANIMATED_FLOW_STAGE.QUANTITY);
   }
 
   function handleCloseAnimatedQuantity() {
-    setShowAnimatedQuantityModal(false);
-    setAnimatedChoiceModalOpen(true);
+    setAnimatedFlowStage(ANIMATED_FLOW_STAGE.CHOICE);
   }
 
   function handleAnimatedChoiceSaveStatic() {
-    setAnimatedChoiceModalOpen(false);
+    setAnimatedFlowStage(ANIMATED_FLOW_STAGE.IDLE);
     setAnimatedSaveStaticFlow(true);
     setPreviewConfigureOpen(true);
     setCopyQuantity(1);
@@ -1146,12 +1188,24 @@ export default function StudioPage() {
     if (!selectedPreviewUrl && !generatedCardUrl) return setError("Select a preview first.");
     if (!selectedMotionId) return setError("Select a motion before animating.");
 
-    setShowAnimatedQuantityModal(false);
+    setAnimatedFlowStage(ANIMATED_FLOW_STAGE.STARTING_ANIMATION);
+    console.log("[AnimatedFlow] quantity confirmed, closing modal");
     setAddCollectionLoading(true);
     setOrderActionKey(`approve-animate-${currentOrderId}`);
     setMessage("");
     setError("");
     try {
+      const sel =
+        previewCards.find((p) => p.image_url === (selectedPreviewUrl || generatedCardUrl)) ||
+        latestGeneratedPreview;
+      const cardId = sel?.card_id;
+      if (!cardId) throw new Error("Could not find the selected preview card.");
+
+      setAnimationFailed(false);
+      setAnimationLoadingCardId(cardId);
+      setAnimatedFlowStage(ANIMATED_FLOW_STAGE.ANIMATING);
+      console.log("[AnimatedFlow] loading screen state applied", { cardId });
+
       const res = await fetch(`${API_BASE_URL}/orders/${currentOrderId}/approve-preview`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders(token) },
@@ -1159,12 +1213,6 @@ export default function StudioPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(formatApiError(data?.detail, "Failed to start animation."));
-
-      const sel =
-        previewCards.find((p) => p.image_url === (selectedPreviewUrl || generatedCardUrl)) ||
-        latestGeneratedPreview;
-      const cardId = sel?.card_id;
-      if (!cardId) throw new Error("Could not find the selected preview card.");
 
       const animRes = await fetch(
         `${API_BASE_URL}/cards/${encodeURIComponent(cardId)}/start-studio-animation`,
@@ -1183,14 +1231,14 @@ export default function StudioPage() {
         throw new Error(formatApiError(animData?.detail, "Could not start animation."));
       }
 
-      setAnimationFailed(false);
-      setAnimationLoadingCardId(cardId);
       await Promise.all([fetchOrders(), refreshUser(token)]);
       setPendingSession(null);
       setShowPendingPrompt(false);
       setLatestGeneratedPreview(null);
       setPreviewPollCardId("");
     } catch (err) {
+      setAnimationLoadingCardId(null);
+      setAnimatedFlowStage(ANIMATED_FLOW_STAGE.CHOICE);
       setError(err.message || "Failed to start animation.");
     } finally {
       setAddCollectionLoading(false);
@@ -1314,6 +1362,7 @@ export default function StudioPage() {
       }
     }
     setAnimationLoadingCardId(null);
+    setAnimatedFlowStage(ANIMATED_FLOW_STAGE.IDLE);
     setAnimationFailed(false);
     setReviewSubPhase("approve");
     setCurrentStep(STEP_REVIEW);
@@ -1329,6 +1378,7 @@ export default function StudioPage() {
   const handleAnimationRetry = useCallback(async () => {
     if (!animationLoadingCardId) return;
     setAnimationFailed(false);
+    setAnimatedFlowStage(ANIMATED_FLOW_STAGE.ANIMATING);
     await startCardAnimation(animationLoadingCardId);
   }, [animationLoadingCardId, selectedMotionId, actionCategory, token]);
 
@@ -1904,7 +1954,8 @@ export default function StudioPage() {
                     isAnimated={isAnimatedCardType}
                     onComplete={handlePackOpeningComplete}
                   />
-                ) : (
+                ) : null}
+                {!packOpeningActive && (
                   <>
                 {!isGenerating ? (
                   <>
@@ -1987,7 +2038,7 @@ export default function StudioPage() {
                                     type="button"
                                     onClick={() => {
                                       setSelectedPreviewUrl(preview.image_url);
-                                      setAnimatedChoiceModalOpen(true);
+                                      setAnimatedFlowStage(ANIMATED_FLOW_STAGE.CHOICE);
                                     }}
                                     className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl bg-neonTeal px-4 py-2 text-sm font-semibold text-slate-950"
                                   >
@@ -2070,7 +2121,7 @@ export default function StudioPage() {
                             setPreviewConfigureOpen(false);
                             setAnimatedSaveStaticFlow(false);
                             if (isAnimatedCardType) {
-                              setAnimatedChoiceModalOpen(true);
+                              setAnimatedFlowStage(ANIMATED_FLOW_STAGE.CHOICE);
                             }
                           }}
                           className="mt-3 w-full text-center text-sm text-slate-400 hover:text-slate-200"
