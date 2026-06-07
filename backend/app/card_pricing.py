@@ -114,6 +114,43 @@ def animated_upgrade_price() -> float:
     return _parse_price(raw, 10.00)
 
 
+def animated_additional_copy_unit_price(total_quantity: int) -> float:
+    """Per-copy price for animated copies beyond the first (tier depends on total run)."""
+    q = max(1, int(total_quantity))
+    if q >= 5:
+        return _parse_price(os.environ.get("ANIMATED_COPY_PRICE_5_PLUS"), 1.50)
+    return _parse_price(os.environ.get("ANIMATED_COPY_PRICE_2_4"), 2.00)
+
+
+def animated_studio_total_price(quantity: int) -> dict:
+    """
+    Studio animated card pricing: $10 base includes first copy;
+    copies 2–4 at $2 each; 5+ total run uses $1.50 per additional copy.
+    """
+    q = max(1, min(10, int(quantity)))
+    base = animated_upgrade_price()
+    extra = max(0, q - 1)
+    if extra == 0:
+        return {
+            "quantity": q,
+            "base_price": base,
+            "extra_copies": 0,
+            "extra_unit_price": 0.0,
+            "extra_total": 0.0,
+            "total": round(base, 2),
+        }
+    unit = animated_additional_copy_unit_price(q)
+    extra_total = round(extra * unit, 2)
+    return {
+        "quantity": q,
+        "base_price": base,
+        "extra_copies": extra,
+        "extra_unit_price": unit,
+        "extra_total": extra_total,
+        "total": round(base + extra_total, 2),
+    }
+
+
 def generation_price_payload(tier: str | None) -> dict:
     key = normalize_order_tier(tier)
     return {
@@ -121,5 +158,9 @@ def generation_price_payload(tier: str | None) -> dict:
         "first_preview_price": 0.0,
         "additional_preview_price": tier_generation_price(key),
         "animated_upgrade_price": animated_upgrade_price(),
+        "animated_copy_pricing": {
+            "additional_2_to_4": animated_additional_copy_unit_price(4),
+            "additional_5_plus": animated_additional_copy_unit_price(5),
+        },
         "copy_pricing_tiers": copy_pricing_tiers(),
     }

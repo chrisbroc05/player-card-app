@@ -2056,19 +2056,7 @@ def generate_card_for_order(
     )
 
     try:
-        if preview_count == 0:
-            if card_type == "animated":
-                charge = animated_upgrade_price()
-                if charge > 0:
-                    deduct_credits(
-                        user_id=current_user.id,
-                        amount=charge,
-                        transaction_type=TX_ANIMATION,
-                        reference_id=str(order_id),
-                        note=f"Animated card upgrade - {player_label}",
-                        db=db,
-                    )
-        else:
+        if preview_count > 0:
             charge = tier_generation_price(order_tier)
             if charge > 0:
                 deduct_credits(

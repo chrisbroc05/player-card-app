@@ -1,13 +1,11 @@
 import React, { useRef } from "react";
 import { toApiUrl } from "../config/api";
-import { formatMoney } from "../utils/marketplace";
 import { useScrollModalIntoView } from "../hooks/useScrollIntoViewOnChange";
 
 export default function AnimatedCardChoiceModal({
   open,
   previewImageUrl,
   previewAlt = "Your card",
-  animationCost = 10,
   onAnimate,
   onSaveStatic,
   busy = false,
@@ -48,7 +46,7 @@ export default function AnimatedCardChoiceModal({
               onClick={onAnimate}
               className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-violet-500 px-4 text-sm font-semibold text-white transition hover:bg-violet-400 disabled:opacity-50"
             >
-              Animate This Card — {formatMoney(animationCost)}
+              Animate This Card
             </button>
             <button
               type="button"

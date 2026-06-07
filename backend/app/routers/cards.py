@@ -12,10 +12,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from animation_tasks import process_animation
-from card_pricing import animated_upgrade_price, generation_price_payload, normalize_order_tier
+from card_pricing import animated_studio_total_price, animated_upgrade_price, generation_price_payload, normalize_order_tier
 from auth import get_current_user
 from card_repo import create_animated_upgrade_card, get_card_by_card_id
-from credit_service import InsufficientCreditsError, deduct_credits
+from credit_service import InsufficientCreditsError, TX_ANIMATION, deduct_credits
 from data.animation_motions import get_motion_by_id, is_motion_selectable, list_motions_public
 from database import get_db
 from email_service import _absolute_image_url
@@ -115,6 +115,14 @@ class AnimateBody(BaseModel):
     action_category: str | None = Field(default=None, max_length=32)
 
 
+class StudioAnimateBody(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    motion_id: str = Field(..., min_length=1, max_length=64)
+    action_category: str | None = Field(default=None, max_length=32)
+    quantity: int = Field(default=1, ge=1, le=10)
+
+
 @router.get("/animation-motions")
 def list_animation_motions():
     """Public list of motion options (no internal prompts)."""
@@ -138,25 +146,89 @@ def animate_card(
     card = _resolve_card(db, card_id)
     _validate_animate_request(card, current_user, body.motion_id)
 
+    _apply_motion_to_card(card, body.motion_id, body.action_category)
+    db.commit()
+
+    background_tasks.add_task(process_animation, card.card_id, body.motion_id)
+    return {"success": True, "card_id": card.card_id, "status": "pending"}
+
+
+def _apply_motion_to_card(card: Card, motion_id: str, action_category: str | None) -> None:
     now = utcnow()
     card.animation_status = "pending"
-    card.animation_motion = body.motion_id
-    if body.action_category:
-        card.action_category = body.action_category.strip()
+    card.animation_motion = motion_id
+    if action_category:
+        card.action_category = action_category.strip()
     else:
         from data.animation_motions import action_category_for_motion
 
-        inferred = action_category_for_motion(body.motion_id)
+        inferred = action_category_for_motion(motion_id)
         if inferred:
             card.action_category = inferred
     card.animation_requested_at = now
     card.animation_completed_at = None
     card.animated_video_url = None
     card.is_animated = False
+
+
+@router.post("/{card_id}/start-studio-animation")
+def start_studio_animation(
+    card_id: str,
+    body: StudioAnimateBody,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Charge for animated studio upgrade (base + optional copies) and start animation job(s).
+    Called after the user confirms quantity on the static preview popup.
+    """
+    card = _resolve_card(db, card_id)
+    _validate_animate_request(card, current_user, body.motion_id)
+
+    pricing = animated_studio_total_price(body.quantity)
+    try:
+        deduct_credits(
+            user_id=current_user.id,
+            amount=pricing["total"],
+            transaction_type=TX_ANIMATION,
+            reference_id=card.card_id,
+            note=(
+                f"Animated card studio ×{pricing['quantity']} - {card.player_name} "
+                f"(${pricing['total']:.2f})"
+            ),
+            db=db,
+        )
+    except InsufficientCreditsError as e:
+        raise HTTPException(
+            status_code=400,
+            detail="Insufficient credits. Please add credits to your account at /credits",
+        ) from e
+
+    additional_ids: list[str] = []
+    for _ in range(max(0, body.quantity - 1)):
+        extra = create_animated_upgrade_card(
+            db,
+            source=card,
+            motion_id=body.motion_id,
+            action_category=body.action_category,
+        )
+        additional_ids.append(extra.card_id)
+        background_tasks.add_task(process_animation, extra.card_id, body.motion_id)
+
+    _apply_motion_to_card(card, body.motion_id, body.action_category)
     db.commit()
 
     background_tasks.add_task(process_animation, card.card_id, body.motion_id)
-    return {"success": True, "card_id": card.card_id, "status": "pending"}
+    return {
+        "success": True,
+        "card_id": card.card_id,
+        "additional_card_ids": additional_ids,
+        "quantity": pricing["quantity"],
+        "amount_charged": pricing["total"],
+        "pricing": pricing,
+        "status": "pending",
+    }
 
 
 @router.post("/{card_id}/animate-upgrade")

@@ -19,6 +19,7 @@ export default function AnimateCardConfirmModal({
   cost = 10,
   creditBalance = 0,
   showAiDisclaimer = false,
+  intentOnly = false,
   confirmationOnly = false,
 }) {
   const [confirmEnabled, setConfirmEnabled] = useState(false);
@@ -39,8 +40,8 @@ export default function AnimateCardConfirmModal({
 
   const animationCost = Number(cost) || 10;
   const balance = Number(creditBalance) || 0;
-  const canAfford = confirmationOnly || balance >= animationCost;
-  const shortfall = confirmationOnly ? 0 : Math.max(0, animationCost - balance);
+  const canAfford = intentOnly || confirmationOnly || balance >= animationCost;
+  const shortfall = intentOnly || confirmationOnly ? 0 : Math.max(0, animationCost - balance);
   const hasPreview = Boolean(card || previewImageUrl);
 
   return (
@@ -53,7 +54,7 @@ export default function AnimateCardConfirmModal({
         aria-modal="true"
       >
         <h3 id="animate-confirm-title" className="text-xl font-semibold text-white">
-          Ready to animate your card?
+          {intentOnly ? "Ready to create your animated card?" : "Ready to animate your card?"}
         </h3>
 
         {hasPreview ? (
@@ -79,10 +80,14 @@ export default function AnimateCardConfirmModal({
         ) : null}
 
         <div className="mt-5 space-y-2 rounded-xl border border-white/10 bg-cardBg2 px-4 py-3 text-sm">
-          {confirmationOnly ? (
+          {intentOnly ? (
             <p className="text-slate-200">
-              Your <span className="font-semibold text-white">{formatMoney(animationCost)}</span> animated card fee was
-              applied when your preview was generated.
+              We&apos;ll generate your static card preview first. The animated upgrade fee is only charged if you
+              choose to animate after seeing your card.
+            </p>
+          ) : confirmationOnly ? (
+            <p className="text-slate-200">
+              Confirm to proceed with your animated upgrade.
             </p>
           ) : (
             <>
@@ -132,7 +137,7 @@ export default function AnimateCardConfirmModal({
               onClick={onConfirm}
               className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-xl bg-violet-500 px-4 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {busy ? "Starting…" : "Animate My Card"}
+              {busy ? "Starting…" : intentOnly ? "Generate My Card Preview" : "Animate My Card"}
             </button>
           ) : null}
         </div>

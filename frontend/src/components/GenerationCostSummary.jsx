@@ -93,7 +93,7 @@ export default function GenerationCostSummary({
 
   let totalDue = 0;
   if (phase === "pre-generate") {
-    totalDue = isAnimated ? animated : 0;
+    totalDue = 0;
   } else {
     totalDue = extraCopyCost;
   }
@@ -115,7 +115,10 @@ export default function GenerationCostSummary({
             <>
               <TotalLine label="First preview" value="FREE" free />
               {isAnimated ? (
-                <TotalLine label="Animated upgrade" value={formatMoney(animated)} />
+                <TotalLine
+                  label="Animated upgrade"
+                  value={`${formatMoney(animated)} if you animate`}
+                />
               ) : (
                 <TotalLine label="Standard card" value="FREE" free />
               )}
@@ -141,7 +144,7 @@ export default function GenerationCostSummary({
                 <TotalLine label="Copy subtotal" value={formatMoney(0)} />
               )}
               {isAnimated ? (
-                <TotalLine label="Animated upgrade" value="Paid at preview" free />
+                <TotalLine label="Animated upgrade" value="Charged when you confirm animation" free />
               ) : null}
             </>
           )}

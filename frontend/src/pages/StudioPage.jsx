@@ -17,6 +17,7 @@ import AnimationLoadingScreen from "../components/AnimationLoadingScreen";
 import PendingCardResumePrompt from "../components/PendingCardResumePrompt";
 import AnimateCardConfirmModal from "../components/AnimateCardConfirmModal";
 import AnimatedCardChoiceModal from "../components/AnimatedCardChoiceModal";
+import AnimatedQuantityModal from "../components/AnimatedQuantityModal";
 import PackOpeningLoader from "../components/PackOpeningLoader";
 import AnimatedFlowExplainer from "../components/AnimatedFlowExplainer";
 import AnimatedAiDisclaimer from "../components/AnimatedAiDisclaimer";
@@ -295,7 +296,10 @@ export default function StudioPage() {
   const [packOpeningActive, setPackOpeningActive] = useState(false);
   const [previewConfigureOpen, setPreviewConfigureOpen] = useState(false);
   const [animatedChoiceModalOpen, setAnimatedChoiceModalOpen] = useState(false);
+  const [showAnimatedQuantityModal, setShowAnimatedQuantityModal] = useState(false);
   const [animatedSaveStaticFlow, setAnimatedSaveStaticFlow] = useState(false);
+  const [latestGeneratedPreview, setLatestGeneratedPreview] = useState(null);
+  const [previewPollCardId, setPreviewPollCardId] = useState("");
   const [addCollectionLoading, setAddCollectionLoading] = useState(false);
   const [copyQuantity, setCopyQuantity] = useState(1);
   const [pendingSession, setPendingSession] = useState(null);
@@ -388,8 +392,8 @@ export default function StudioPage() {
     () => normalizeCopyTiers(generationPricing?.copy_pricing_tiers),
     [generationPricing?.copy_pricing_tiers]
   );
-  const firstGenerateDue = isAnimatedCardType ? animatedUpgradeCost : 0;
-  const canAffordFirstGenerate = creditBalance >= firstGenerateDue;
+  const firstGenerateDue = 0;
+  const canAffordFirstGenerate = true;
   const canAffordRegenerate = creditBalance >= additionalPreviewCost;
   const regenerateShortfall = Math.max(0, additionalPreviewCost - creditBalance);
   const firstGenerateShortfall = Math.max(0, firstGenerateDue - creditBalance);
@@ -700,6 +704,43 @@ export default function StudioPage() {
     }
   }, [token]);
 
+  const tryOpenAnimatedChoiceModal = useCallback(() => {
+    if (
+      !isAnimatedCardType ||
+      animatedSaveStaticFlow ||
+      animatedChoiceModalOpen ||
+      showAnimatedQuantityModal ||
+      animationLoadingCardId ||
+      previewConfigureOpen ||
+      reviewSubPhase !== "generate"
+    ) {
+      return;
+    }
+
+    const preview =
+      latestGeneratedPreview ||
+      (previewCards.length ? previewCards[previewCards.length - 1] : null);
+    if (!preview?.image_url) return;
+
+    const key = String(preview.image_url);
+    if (animatedChoiceShownForRef.current === key) return;
+
+    animatedChoiceShownForRef.current = key;
+    setSelectedPreviewUrl(preview.image_url);
+    setGeneratedCardUrl((prev) => prev || preview.image_url);
+    setAnimatedChoiceModalOpen(true);
+  }, [
+    isAnimatedCardType,
+    animatedSaveStaticFlow,
+    animatedChoiceModalOpen,
+    showAnimatedQuantityModal,
+    animationLoadingCardId,
+    previewConfigureOpen,
+    reviewSubPhase,
+    latestGeneratedPreview,
+    previewCards,
+  ]);
+
   useEffect(() => {
     if (initializing || !token) return;
     fetchPendingSession().then((session) => {
@@ -708,46 +749,54 @@ export default function StudioPage() {
   }, [initializing, token, fetchPendingSession]);
 
   useEffect(() => {
-    if (reviewSubPhase === "generate" && previewCards.length > 0) {
-      setShowPendingPrompt(false);
-    }
-  }, [reviewSubPhase, previewCards.length]);
-
-  useEffect(() => {
-    if (
-      !isAnimatedCardType ||
-      packOpeningActive ||
-      isGenerating ||
-      previewCards.length === 0 ||
-      reviewSubPhase !== "generate" ||
-      animationLoadingCardId ||
-      previewConfigureOpen ||
-      animatedSaveStaticFlow ||
-      previewCards.length > 1
-    ) {
-      return;
-    }
-
-    const key = previewCards.map((p) => p.image_url).join("|");
-    if (animatedChoiceShownForRef.current === key) return;
-
-    animatedChoiceShownForRef.current = key;
-    const url = previewCards[previewCards.length - 1]?.image_url;
-    if (url) {
-      setSelectedPreviewUrl(url);
-      setGeneratedCardUrl((prev) => prev || url);
-    }
-    setAnimatedChoiceModalOpen(true);
+    if (!isAnimatedCardType || packOpeningActive || isGenerating) return;
+    tryOpenAnimatedChoiceModal();
   }, [
     isAnimatedCardType,
     packOpeningActive,
     isGenerating,
+    latestGeneratedPreview,
     previewCards,
-    reviewSubPhase,
-    animationLoadingCardId,
-    previewConfigureOpen,
-    animatedSaveStaticFlow,
+    tryOpenAnimatedChoiceModal,
   ]);
+
+  useEffect(() => {
+    if (!previewPollCardId || !token || !isAnimatedCardType) return undefined;
+    if (latestGeneratedPreview?.image_url) return undefined;
+
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/cards/${encodeURIComponent(previewPollCardId)}`, {
+          headers: { ...authHeaders(token) },
+        });
+        if (!res.ok || cancelled) return;
+        const card = await res.json().catch(() => null);
+        if (cancelled || !card?.image_url) return;
+        setLatestGeneratedPreview({
+          card_id: card.card_id,
+          image_url: card.image_url,
+        });
+        setSelectedPreviewUrl(card.image_url);
+        setGeneratedCardUrl(card.image_url);
+      } catch {
+        /* retry on next interval */
+      }
+    };
+
+    poll();
+    const iv = window.setInterval(poll, 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(iv);
+    };
+  }, [previewPollCardId, token, isAnimatedCardType, latestGeneratedPreview?.image_url]);
+
+  useEffect(() => {
+    if (reviewSubPhase === "generate" && previewCards.length > 0) {
+      setShowPendingPrompt(false);
+    }
+  }, [reviewSubPhase, previewCards.length]);
 
   useEffect(() => {
     const hasUnfinishedPreview =
@@ -993,6 +1042,8 @@ export default function StudioPage() {
     setAnimatedSaveStaticFlow(false);
     setAnimatedChoiceModalOpen(false);
     animatedChoiceShownForRef.current = "";
+    setLatestGeneratedPreview(null);
+    setPreviewPollCardId("");
     try {
       const res = await fetch(`${API_BASE_URL}/orders/${orderId}/generate-card`, {
         method: "POST",
@@ -1000,6 +1051,13 @@ export default function StudioPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(formatApiError(data?.detail, "Failed to generate order card."));
+      const preview = {
+        card_id: data.card_id,
+        image_url: data.image_url,
+        tier: data.tier,
+      };
+      setLatestGeneratedPreview(preview);
+      setPreviewPollCardId(data.card_id || "");
       setGeneratedCardUrl(data.image_url || "");
       setSelectedPreviewUrl(data.image_url || "");
       setGeneratedTier(data.tier || "base");
@@ -1016,6 +1074,7 @@ export default function StudioPage() {
 
   function handlePackOpeningComplete() {
     setPackOpeningActive(false);
+    tryOpenAnimatedChoiceModal();
   }
 
   async function ensureOrderForGeneration() {
@@ -1055,7 +1114,6 @@ export default function StudioPage() {
 
   function requestGenerateFirstPreview() {
     if (isAnimatedCardType) {
-      setAnimateConfirmMode("pre-generate");
       setShowAnimateConfirm(true);
       return;
     }
@@ -1064,8 +1122,12 @@ export default function StudioPage() {
 
   function handleAnimatedChoiceAnimate() {
     setAnimatedChoiceModalOpen(false);
-    setAnimateConfirmMode("post-preview");
-    setShowAnimateConfirm(true);
+    setShowAnimatedQuantityModal(true);
+  }
+
+  function handleCloseAnimatedQuantity() {
+    setShowAnimatedQuantityModal(false);
+    setAnimatedChoiceModalOpen(true);
   }
 
   function handleAnimatedChoiceSaveStatic() {
@@ -1077,17 +1139,14 @@ export default function StudioPage() {
 
   function handleCloseAnimateConfirm() {
     setShowAnimateConfirm(false);
-    if (animateConfirmMode === "post-preview") {
-      setAnimatedChoiceModalOpen(true);
-    }
   }
 
-  async function handleApproveAndAnimate() {
+  async function handleApproveAndAnimate(quantity = 1) {
     if (!currentOrderId) return setError("Create an order first.");
     if (!selectedPreviewUrl && !generatedCardUrl) return setError("Select a preview first.");
     if (!selectedMotionId) return setError("Select a motion before animating.");
 
-    setShowAnimateConfirm(false);
+    setShowAnimatedQuantityModal(false);
     setAddCollectionLoading(true);
     setOrderActionKey(`approve-animate-${currentOrderId}`);
     setMessage("");
@@ -1101,14 +1160,36 @@ export default function StudioPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(formatApiError(data?.detail, "Failed to start animation."));
 
-      const sel = previewCards.find((p) => p.image_url === (selectedPreviewUrl || generatedCardUrl));
+      const sel =
+        previewCards.find((p) => p.image_url === (selectedPreviewUrl || generatedCardUrl)) ||
+        latestGeneratedPreview;
       const cardId = sel?.card_id;
       if (!cardId) throw new Error("Could not find the selected preview card.");
 
-      await startCardAnimation(cardId);
+      const animRes = await fetch(
+        `${API_BASE_URL}/cards/${encodeURIComponent(cardId)}/start-studio-animation`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders(token) },
+          body: JSON.stringify({
+            motion_id: selectedMotionId,
+            action_category: actionCategory || null,
+            quantity,
+          }),
+        }
+      );
+      const animData = await animRes.json().catch(() => ({}));
+      if (!animRes.ok) {
+        throw new Error(formatApiError(animData?.detail, "Could not start animation."));
+      }
+
+      setAnimationFailed(false);
+      setAnimationLoadingCardId(cardId);
       await Promise.all([fetchOrders(), refreshUser(token)]);
       setPendingSession(null);
       setShowPendingPrompt(false);
+      setLatestGeneratedPreview(null);
+      setPreviewPollCardId("");
     } catch (err) {
       setError(err.message || "Failed to start animation.");
     } finally {
@@ -1118,10 +1199,6 @@ export default function StudioPage() {
   }
 
   async function handleGenerateFirstPreview() {
-    if (isAnimatedCardType && !canAffordFirstGenerate) {
-      setError(`You need ${formatMoney(firstGenerateDue)} in credits to generate this card.`);
-      return;
-    }
     setIsCreating(true);
     setOrderActionKey("generate-first");
     setMessage("");
@@ -1809,9 +1886,7 @@ export default function StudioPage() {
                   >
                     {orderActionKey === "generate-first"
                       ? "Generating..."
-                      : isAnimatedCardType
-                        ? `Generate My Card — ${formatMoney(firstGenerateDue)}`
-                        : "Generate My Card — Free Preview"}
+                      : "Generate My Card — Free Preview"}
                   </button>
                 </div>
               </div>
@@ -1868,9 +1943,7 @@ export default function StudioPage() {
                     disabled={Boolean(orderActionKey)}
                     className={`inline-flex min-h-[52px] w-full items-center justify-center rounded-xl px-6 py-3 text-base font-semibold text-white disabled:opacity-50 ${tierTheme.loading}`}
                   >
-                    {isAnimatedCardType
-                      ? `Generate My Card — ${formatMoney(firstGenerateDue)}`
-                      : "Generate My Card — Free Preview"}
+                    {"Generate My Card — Free Preview"}
                   </button>
                 ) : (
                   <>
@@ -2174,35 +2247,37 @@ export default function StudioPage() {
         open={animatedChoiceModalOpen}
         previewImageUrl={selectedPreviewUrl || generatedCardUrl}
         previewAlt={playerDisplayName || "Your card"}
-        animationCost={animatedUpgradeCost}
         onAnimate={handleAnimatedChoiceAnimate}
         onSaveStatic={handleAnimatedChoiceSaveStatic}
         busy={addCollectionLoading || Boolean(orderActionKey)}
+      />
+
+      <AnimatedQuantityModal
+        open={showAnimatedQuantityModal}
+        onClose={handleCloseAnimatedQuantity}
+        onConfirm={handleApproveAndAnimate}
+        busy={addCollectionLoading || Boolean(orderActionKey)}
+        generationPricing={generationPricing}
+        creditBalance={creditBalance}
+        previewImageUrl={toApiUrl(selectedPreviewUrl || generatedCardUrl)}
+        previewAlt={playerDisplayName || "Your card"}
       />
 
       <AnimateCardConfirmModal
         open={showAnimateConfirm}
         onClose={handleCloseAnimateConfirm}
         onConfirm={() => {
-          if (animateConfirmMode === "pre-generate") {
-            setShowAnimateConfirm(false);
-            setShowAnimatedFlowExplainer(true);
-          } else {
-            handleApproveAndAnimate();
-          }
+          setShowAnimateConfirm(false);
+          setShowAnimatedFlowExplainer(true);
         }}
         busy={addCollectionLoading || Boolean(orderActionKey)}
-        previewImageUrl={
-          animateConfirmMode === "post-preview"
-            ? toApiUrl(selectedPreviewUrl || generatedCardUrl)
-            : imagePreviewUrl
-        }
+        previewImageUrl={imagePreviewUrl}
         previewAlt={playerDisplayName || "Your photo"}
         motionName={motionDisplayName}
         cost={animatedUpgradeCost}
         creditBalance={creditBalance}
         showAiDisclaimer
-        confirmationOnly={animateConfirmMode === "post-preview"}
+        intentOnly
       />
 
       <AnimatedFlowExplainer
