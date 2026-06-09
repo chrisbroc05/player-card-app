@@ -8,6 +8,11 @@ export default function MarketplaceListingActions({
   busy,
   onList,
   onUnlist,
+  className = "",
+  showContainerDivider = true,
+  listButtonLabel = "List on Marketplace",
+  listedActionLabel,
+  listedTagLabel,
 }) {
   const [open, setOpen] = useState(false);
   const [price, setPrice] = useState("");
@@ -54,22 +59,26 @@ export default function MarketplaceListingActions({
   }
 
   return (
-    <div className="mt-2 space-y-2 border-t border-white/10 pt-2">
+    <div className={`${showContainerDivider ? "mt-2 space-y-2 border-t border-white/10 pt-2" : "space-y-2"} ${className}`}>
       {isListed ? (
         <>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex rounded-full border border-teal-500/40 bg-teal-500/10 px-2 py-0.5 text-[11px] font-semibold text-teal-200">
-              Listed on Free Agency Marketplace · {formatMoney(listingInfo.asking_price)}
-            </span>
-            {isPriorityListing(listingInfo) ? <PriorityBadge /> : null}
-          </div>
+          {listedTagLabel !== null ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex rounded-full border border-teal-500/40 bg-teal-500/10 px-2 py-0.5 text-[11px] font-semibold text-teal-200">
+                {listedTagLabel || `Listed on Free Agency Marketplace · ${formatMoney(listingInfo.asking_price)}`}
+              </span>
+              {isPriorityListing(listingInfo) ? <PriorityBadge /> : null}
+            </div>
+          ) : null}
           <button
             type="button"
             disabled={busy}
             onClick={handleUnlist}
             className="inline-flex min-h-[40px] w-full items-center justify-center rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-rose-400/40 hover:bg-rose-500/10 disabled:opacity-50"
           >
-            {busy ? "Updating…" : "Remove from Free Agency Marketplace"}
+            {busy
+              ? "Updating…"
+              : listedActionLabel || `Listed at ${formatMoney(listingInfo.asking_price)} — Unlist`}
           </button>
         </>
       ) : (
@@ -85,7 +94,7 @@ export default function MarketplaceListingActions({
               }}
               className="inline-flex min-h-[40px] w-full items-center justify-center rounded-lg border border-teal-500/35 bg-teal-500/10 px-3 py-2 text-sm font-medium text-teal-100 transition hover:border-teal-400/50 disabled:opacity-50"
             >
-              List on Free Agency Marketplace
+              {listButtonLabel}
             </button>
           ) : (
             <form onSubmit={handleList} className="space-y-2 rounded-lg border border-white/10 bg-cardBg2 p-3">

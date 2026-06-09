@@ -145,7 +145,7 @@ export function ActivityHistorySection({
           {emptyMessage}
         </p>
       ) : (
-        <ul className="space-y-3">
+        <ul className="overflow-hidden rounded-2xl border border-white/10 bg-cardBg divide-y divide-white/10">
           {filtered.map((item) => {
             const cp = counterpartyLine(item);
             const amt = amountDisplay(item);
@@ -154,42 +154,53 @@ export function ActivityHistorySection({
             return (
               <li
                 key={item.id}
-                className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-cardBg p-4 shadow-lg sm:flex-row sm:items-center"
+                className="px-4 py-4 sm:px-5 sm:py-5"
               >
-                <div className="mx-auto w-24 shrink-0 sm:mx-0">
-                  <CardImage
-                    card={item.card}
-                    alt={item.card?.player_name}
-                    frameClassName={CARD_IMAGE_FRAME_XS}
-                  />
-                </div>
-                <div className="min-w-0 flex-1 space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-base font-semibold text-white">{item.card?.player_name}</p>
-                    <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${badge.pill}`}>
-                      {badge.label}
-                    </span>
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${meta.badgeClass}`}
-                    >
-                      <span aria-hidden>{meta.emoji}</span>
-                      {meta.label}
-                    </span>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
+                  <div className="mx-auto w-24 shrink-0 flex-none sm:mx-0">
+                    <CardImage
+                      card={item.card}
+                      alt={item.card?.player_name}
+                      frameClassName={CARD_IMAGE_FRAME_XS}
+                    />
                   </div>
-                  <p className="font-mono text-xs text-slate-500">{item.card?.card_id}</p>
-                  {cp ? <p className="text-sm text-slate-300">{cp}</p> : null}
-                  <p className="text-xs text-slate-500">
-                    {formatActivityTimestamp(item.completed_at || item.created_at)}
-                    <span className="mx-2 text-white/20">·</span>
-                    {relativeTimeAgo(item.completed_at || item.created_at)}
-                  </p>
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-1 sm:min-w-[88px]">
-                  {amt ? (
-                    <span className={`text-lg font-semibold tabular-nums ${amt.className}`}>{amt.text}</span>
-                  ) : (
-                    <span className="text-xs text-slate-500">Free</span>
-                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <ActivityIcon item={item} />
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${meta.badgeClass}`}
+                      >
+                        <span aria-hidden>{meta.emoji}</span>
+                        {meta.label}
+                      </span>
+                    </div>
+
+                    <p className="mt-2 text-base font-semibold leading-snug text-white break-words">
+                      {item.card?.player_name || "Card"}
+                    </p>
+                    <div className="mt-2">
+                      <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${badge.pill}`}>
+                        {badge.label}
+                      </span>
+                    </div>
+
+                    <p className="mt-2 font-mono text-xs text-slate-500 break-all">{item.card?.card_id}</p>
+                    {cp ? <p className="mt-2 text-sm text-slate-300">{cp}</p> : null}
+                    <p className="mt-2 text-xs text-slate-500">
+                      {formatActivityTimestamp(item.completed_at || item.created_at)}
+                      <span className="mx-2 text-white/20">·</span>
+                      {relativeTimeAgo(item.completed_at || item.created_at)}
+                    </p>
+                  </div>
+
+                  <div className="flex shrink-0 flex-col items-start gap-1 border-t border-white/10 pt-3 sm:min-w-[110px] sm:items-end sm:border-t-0 sm:pt-0">
+                    <span className="text-[11px] uppercase tracking-wide text-slate-500">Amount</span>
+                    {amt ? (
+                      <span className={`text-lg font-semibold tabular-nums ${amt.className}`}>{amt.text}</span>
+                    ) : (
+                      <span className="text-xs text-slate-500">Free</span>
+                    )}
+                  </div>
                 </div>
               </li>
             );

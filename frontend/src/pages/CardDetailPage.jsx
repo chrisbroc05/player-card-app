@@ -6,6 +6,7 @@ import { API_BASE_URL, authHeaders } from "../config/api";
 import CardImage from "../components/CardImage";
 import ShareCard from "../components/ShareCard";
 import SendCard from "../components/SendCard";
+import MarketplaceListingActions from "../components/MarketplaceListingActions";
 import { useAuth } from "../context/AuthContext";
 import CardHistoryTimeline from "../components/CardHistoryTimeline";
 import { vaultTierBadge, rarityDisplay } from "../utils/tierStyles";
@@ -14,6 +15,7 @@ import { isAnimatedCard } from "../utils/animationCard";
 import { isCardOwner } from "../utils/cardOwnership";
 import AnimatedBadge from "../components/AnimatedBadge";
 import { CARD_IMAGE_FRAME_DETAIL } from "../utils/cardImageStyles";
+import { authFetch, formatApiError } from "../utils/authFetch";
 
 function formatCreatedAt(iso) {
   if (!iso) return "—";
@@ -38,9 +40,11 @@ function copyRowMatchesRoute(c, routeParam) {
 
 export default function CardDetailPage() {
   const { cardId } = useParams();
-  const { user, token } = useAuth();
+  const { user, token, refreshNavBadges } = useAuth();
   const [card, setCard] = useState(null);
   const [copies, setCopies] = useState([]);
+  const [listingInfo, setListingInfo] = useState(null);
+  const [marketplaceBusy, setMarketplaceBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -115,6 +119,86 @@ export default function CardDetailPage() {
   const isOwner = isCardOwner(card, user);
   const showSendTrade = isOwner && (card?.status || "active") === "active";
   const showPendingTradePanel = isOwner && card?.status === "pending_trade";
+
+  const loadListingStatus = useCallback(async () => {
+    if (!token || !card?.card_id || !isOwner) {
+      setListingInfo(null);
+      return;
+    }
+    try {
+      const { res, unauthorized } = await authFetch(token, "/marketplace/my-listings");
+      if (unauthorized || !res.ok) {
+        setListingInfo(null);
+        return;
+      }
+      const listings = await res.json().catch(() => []);
+      const row = Array.isArray(listings) ? listings.find((x) => x?.card_id === card.card_id) || null : null;
+      setListingInfo(row);
+    } catch {
+      setListingInfo(null);
+    }
+  }, [token, card?.card_id, isOwner]);
+
+  useEffect(() => {
+    loadListingStatus();
+  }, [loadListingStatus]);
+
+  async function listCardOnMarketplace(askingPrice, isPriority = false) {
+    if (!token || !card?.card_id) return;
+    setMarketplaceBusy(true);
+    setError("");
+    try {
+      const { res, unauthorized } = await authFetch(token, "/marketplace/list", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          card_id: card.card_id,
+          asking_price: askingPrice,
+          is_priority: Boolean(isPriority),
+        }),
+      });
+      if (unauthorized) throw new Error("Session expired.");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not list card."));
+      setListingInfo((prev) => ({
+        ...(prev || {}),
+        card_id: card.card_id,
+        asking_price: askingPrice,
+        is_priority: Boolean(isPriority),
+      }));
+      refreshNavBadges?.();
+      await Promise.all([refetchCard(), loadListingStatus()]);
+    } catch (e) {
+      setError(e.message || "Could not list card.");
+      throw e;
+    } finally {
+      setMarketplaceBusy(false);
+    }
+  }
+
+  async function unlistCardFromMarketplace() {
+    if (!token || !card?.card_id) return;
+    setMarketplaceBusy(true);
+    setError("");
+    try {
+      const { res, unauthorized } = await authFetch(token, "/marketplace/unlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ card_id: card.card_id }),
+      });
+      if (unauthorized) throw new Error("Session expired.");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not remove listing."));
+      setListingInfo(null);
+      refreshNavBadges?.();
+      await refetchCard();
+    } catch (e) {
+      setError(e.message || "Could not remove listing.");
+      throw e;
+    } finally {
+      setMarketplaceBusy(false);
+    }
+  }
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-appBg text-slate-100">
@@ -210,6 +294,26 @@ export default function CardDetailPage() {
 
               {showSendTrade ? <SendCard card={card} onSent={refetchCard} /> : null}
               {showPendingTradePanel ? <SendCard card={card} onCancelTrade={refetchCard} /> : null}
+              {isOwner && user ? (
+                <section className="rounded-2xl border border-white/10 bg-cardBg p-4 sm:p-5">
+                  <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">Marketplace</h2>
+                  <p className="mt-2 text-sm text-slate-300">
+                    List this card for sale or remove it from the marketplace.
+                  </p>
+                  <MarketplaceListingActions
+                    card={card}
+                    listingInfo={listingInfo}
+                    busy={marketplaceBusy}
+                    onList={listCardOnMarketplace}
+                    onUnlist={unlistCardFromMarketplace}
+                    showContainerDivider={false}
+                    className="mt-3"
+                    listButtonLabel="List on Marketplace"
+                    listedActionLabel={listingInfo ? `Listed at $${Number(listingInfo.asking_price || 0).toFixed(2)} — Unlist` : undefined}
+                    listedTagLabel={null}
+                  />
+                </section>
+              ) : null}
 
               <div className="flex justify-center sm:justify-start">
                 <Link
