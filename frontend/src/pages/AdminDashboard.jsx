@@ -796,7 +796,7 @@ export default function AdminDashboard() {
                       <p className="mt-1 text-cyan-100/80">
                         {fin.stripe_balance_ok
                           ? "Use this Stripe total alongside royalty metrics to spot retention discrepancies."
-                          : "Stripe balance unavailable (check STRIPE_SECRET_KEY on backend)."}
+                          : `Stripe balance unavailable${fin?.stripe_error ? `: ${fin.stripe_error}` : " (check STRIPE_SECRET_KEY on backend)."}`}
                       </p>
                     </div>
                   </div>

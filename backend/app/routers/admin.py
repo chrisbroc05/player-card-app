@@ -7,6 +7,7 @@ from __future__ import annotations
 import os
 import secrets
 import logging
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -244,17 +245,36 @@ def _platform_admin_user(db: Session) -> User:
             admin_email_raw,
             [(int(uid), email) for uid, email in near_matches],
         )
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "error": "Admin account not configured",
-                "detail": (
-                    "No user found matching ADMIN_EMAIL. "
-                    "Please verify the ADMIN_EMAIL environment variable matches "
-                    "the admin user's email in the database exactly."
-                ),
-            },
+        logger.warning("Auto-creating platform admin user for email: %s", admin_email_raw)
+        admin_user = User(
+            email=admin_email,
+            display_name="Platform Admin",
+            hashed_password=f"!platform-admin-autocreated-{uuid.uuid4().hex}",
+            parent_email=None,
         )
+        try:
+            db.add(admin_user)
+            db.commit()
+            db.refresh(admin_user)
+            logger.warning(
+                "Platform admin user auto-created: user_id=%s email=%s",
+                admin_user.id,
+                admin_user.email,
+            )
+        except Exception as exc:
+            db.rollback()
+            logger.error("Failed to auto-create platform admin user: %s", str(exc))
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "error": "Admin account not configured",
+                    "detail": (
+                        "No user found matching ADMIN_EMAIL. "
+                        "Please verify the ADMIN_EMAIL environment variable matches "
+                        "the admin user's email in the database exactly."
+                    ),
+                },
+            ) from exc
     return admin_user
 
 

@@ -156,7 +156,7 @@ def _startup_validate_admin_account() -> None:
         if admin_user is None:
             logger.warning(
                 "[startup] Admin account not found for ADMIN_EMAIL='%s'. "
-                "Set ADMIN_EMAIL to an existing user email.",
+                "The account will be auto-created on first royalty/admin earnings usage.",
                 admin_email_raw,
             )
         else:
