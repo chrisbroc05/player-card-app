@@ -47,9 +47,9 @@ export default function MarketplaceMyListingsPage() {
   const [declineNoticeOfferId, setDeclineNoticeOfferId] = useState(null);
   const [sellerBalance, setSellerBalance] = useState(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async ({ silent = false } = {}) => {
     if (!token) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError("");
     try {
       const [listRes, incRes] = await Promise.all([
@@ -71,15 +71,13 @@ export default function MarketplaceMyListingsPage() {
       if (balRes.res.ok) {
         const balData = await balRes.res.json().catch(() => ({}));
         setSellerBalance(Number(balData.credit_balance) || 0);
-      } else if (user) {
-        setSellerBalance(Number(user.credit_balance) || 0);
       }
     } catch (e) {
       setError(e.message || "Failed to load.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }, [token, user]);
+  }, [token]);
 
   useEffect(() => {
     if (!token || initializing) return;
@@ -101,7 +99,7 @@ export default function MarketplaceMyListingsPage() {
       }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(formatApiError(data?.detail, "Action failed."));
-      await load();
+      await load({ silent: true });
       refreshNavBadges?.();
       return true;
     } catch (e) {
@@ -147,7 +145,7 @@ export default function MarketplaceMyListingsPage() {
       setCounterFormOfferId(null);
       setCounterAmount("");
       setCounterTradeCardIds([]);
-      await load();
+      await load({ silent: true });
       refreshNavBadges?.();
     } catch (e) {
       setError(e.message || "Could not send counter.");
@@ -172,7 +170,7 @@ export default function MarketplaceMyListingsPage() {
       }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(formatApiError(data?.detail, "Relist failed."));
-      await load();
+      await load({ silent: true });
     } catch (e) {
       setError(e.message || "Relist failed.");
     } finally {

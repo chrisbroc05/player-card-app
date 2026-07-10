@@ -136,21 +136,21 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     if (initializing) return;
-    if (user && token) {
+    if (token) {
       refreshNavBadges(token);
     } else {
       setPendingIncomingTradesCount(0);
       setPendingIncomingMarketplaceCount(0);
     }
-  }, [user, token, initializing, refreshNavBadges]);
+  }, [token, initializing, refreshNavBadges]);
 
   useEffect(() => {
-    if (initializing || !user || !token) return undefined;
+    if (initializing || !token) return undefined;
     const id = window.setInterval(() => {
       refreshNavBadges(token);
     }, 60000);
     return () => window.clearInterval(id);
-  }, [user, token, initializing, refreshNavBadges]);
+  }, [token, initializing, refreshNavBadges]);
 
   const login = useCallback(
     async (email, password) => {
