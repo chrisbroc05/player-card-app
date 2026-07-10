@@ -25,6 +25,11 @@ def _configure_stripe() -> None:
     stripe.api_key = _stripe_secret_key()
 
 
+def configure_stripe_client() -> None:
+    """Public helper to configure the shared Stripe client with env key."""
+    _configure_stripe()
+
+
 def ensure_connect_account(db: Session, user: User) -> str:
     """Create or return existing Stripe Express Connect account id."""
     if user.stripe_account_id:

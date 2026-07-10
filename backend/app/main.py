@@ -26,6 +26,7 @@ from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from openai import OpenAI
 from PIL import Image, ImageDraw, ImageFont
@@ -71,7 +72,7 @@ from card_repo import (  # noqa: E402
     next_collectible_card_id,
     get_pending_session_by_id,
 )
-from database import engine, get_db  # noqa: E402
+from database import SessionLocal, engine, get_db  # noqa: E402
 from beta_config import get_beta_invite_code  # noqa: E402
 from models import Base, User  # noqa: E402
 from marketplace_jobs import run_marketplace_expiration_pass  # noqa: E402
@@ -143,6 +144,31 @@ os.makedirs(CARD_DIR, exist_ok=True)
 os.makedirs(ANIMATIONS_DIR, exist_ok=True)
 
 
+def _startup_validate_admin_account() -> None:
+    admin_email_raw = (os.environ.get("ADMIN_EMAIL") or "").strip()
+    admin_email = admin_email_raw.lower()
+    if not admin_email:
+        logger.warning("[startup] ADMIN_EMAIL is not configured; royalty admin checks are disabled.")
+        return
+    db = SessionLocal()
+    try:
+        admin_user = db.query(User).filter(func.lower(User.email) == admin_email).first()
+        if admin_user is None:
+            logger.warning(
+                "[startup] Admin account not found for ADMIN_EMAIL='%s'. "
+                "Set ADMIN_EMAIL to an existing user email.",
+                admin_email_raw,
+            )
+        else:
+            logger.info(
+                "[startup] Admin account verified for ADMIN_EMAIL='%s' -> user_id=%s",
+                admin_email_raw,
+                admin_user.id,
+            )
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -150,6 +176,7 @@ async def lifespan(_app: FastAPI):
     os.makedirs(ANIMATIONS_DIR, exist_ok=True)
     Base.metadata.create_all(bind=engine)
     run_schema_migrations_after_models(engine)
+    _startup_validate_admin_account()
     run_marketplace_expiration_pass()
     start_marketplace_scheduler()
     print(f"[startup] UPLOAD_DIR={UPLOAD_DIR} CARD_DIR={CARD_DIR} (writable={os.access(CARD_DIR, os.W_OK)})")

@@ -100,11 +100,29 @@ def _resolve_card(db: Session, card_id_raw: str) -> Card:
 
 
 def _platform_admin_user(db: Session) -> User:
-    admin_email = (os.environ.get("ADMIN_EMAIL") or "").strip().lower()
+    admin_email_raw = (os.environ.get("ADMIN_EMAIL") or "").strip()
+    admin_email = admin_email_raw.lower()
+    logger.info("Marketplace royalty lookup for ADMIN_EMAIL='%s'", admin_email_raw)
     if not admin_email:
         raise HTTPException(status_code=503, detail="ADMIN_EMAIL is not configured")
     admin_user = db.query(User).filter(func.lower(User.email) == admin_email).first()
+    logger.info(
+        "Marketplace royalty admin lookup result for '%s': %s",
+        admin_email_raw,
+        f"user_id={admin_user.id}, email={admin_user.email}" if admin_user else "none",
+    )
     if admin_user is None:
+        near_matches = (
+            db.query(User.id, User.email)
+            .filter(User.email.ilike(f"%{admin_email_raw}%"))
+            .limit(5)
+            .all()
+        )
+        logger.error(
+            "Admin account not found for email: %s. Near matches: %s",
+            admin_email_raw,
+            [(int(uid), email) for uid, email in near_matches],
+        )
         raise HTTPException(status_code=503, detail="Platform admin account not found")
     return admin_user
 

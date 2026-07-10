@@ -6,17 +6,19 @@ from __future__ import annotations
 
 import os
 import secrets
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import bcrypt
 import stripe
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from auth import ALGORITHM, SECRET_KEY
 from beta_config import beta_mode_active, get_beta_invite_code, set_beta_invite_code
@@ -24,10 +26,11 @@ from credit_service import InsufficientCreditsError, TX_WITHDRAWAL, deduct_credi
 from database import get_db
 from marketplace_repo import float_from_decimal, listing_active_filter
 from models import Card, CreditLedger, MarketplaceOffer, TradeOffer, User, utcnow
-from stripe_connect import create_onboarding_link
+from stripe_connect import configure_stripe_client, create_onboarding_link
 
 router = APIRouter()
 admin_security = HTTPBearer(auto_error=False)
+logger = logging.getLogger(__name__)
 
 # Hash ADMIN_PASSWORD once per process (same bcrypt stack as auth.py — avoids passlib/bcrypt4 edge cases).
 _admin_password_hash: bytes | None = None
@@ -149,29 +152,36 @@ def _compute_financial_summary(db: Session) -> dict[str, float | int]:
     stripe_balance_pending = 0.0
     stripe_balance_currency = "usd"
     stripe_balance_ok = False
-    stripe_key = (os.environ.get("STRIPE_SECRET_KEY") or "").strip()
-    if stripe_key:
-        try:
-            stripe.api_key = stripe_key
-            bal = stripe.Balance.retrieve()
-            avail = bal.get("available") or []
-            pend = bal.get("pending") or []
-            preferred_currency = "usd"
-            available_amount = 0
-            pending_amount = 0
-            for row in avail:
-                if (row.get("currency") or "").lower() == preferred_currency:
-                    available_amount += int(row.get("amount") or 0)
-            for row in pend:
-                if (row.get("currency") or "").lower() == preferred_currency:
-                    pending_amount += int(row.get("amount") or 0)
-            stripe_balance_available = round(available_amount / 100.0, 2)
-            stripe_balance_pending = round(pending_amount / 100.0, 2)
-            stripe_balance_total = round((available_amount + pending_amount) / 100.0, 2)
-            stripe_balance_currency = preferred_currency
-            stripe_balance_ok = True
-        except Exception:
-            stripe_balance_ok = False
+    stripe_error = ""
+    try:
+        configure_stripe_client()
+        bal = stripe.Balance.retrieve()
+        avail = bal.get("available") or []
+        pend = bal.get("pending") or []
+        preferred_currency = "usd"
+        available_amount = 0
+        pending_amount = 0
+        for row in avail:
+            if (row.get("currency") or "").lower() == preferred_currency:
+                available_amount += int(row.get("amount") or 0)
+        for row in pend:
+            if (row.get("currency") or "").lower() == preferred_currency:
+                pending_amount += int(row.get("amount") or 0)
+        stripe_balance_available = round(available_amount / 100.0, 2)
+        stripe_balance_pending = round(pending_amount / 100.0, 2)
+        stripe_balance_total = round((available_amount + pending_amount) / 100.0, 2)
+        stripe_balance_currency = preferred_currency
+        stripe_balance_ok = True
+        logger.info(
+            "Admin Stripe balance fetched: available=%.2f pending=%.2f total=%.2f",
+            stripe_balance_available,
+            stripe_balance_pending,
+            stripe_balance_total,
+        )
+    except Exception as exc:
+        stripe_balance_ok = False
+        stripe_error = str(exc)
+        logger.warning("Admin Stripe balance fetch failed: %s", stripe_error)
     return {
         "total_volume": total_volume,
         "total_royalties": total_royalties,
@@ -185,6 +195,7 @@ def _compute_financial_summary(db: Session) -> dict[str, float | int]:
         "stripe_balance_available": stripe_balance_available,
         "stripe_balance_pending": stripe_balance_pending,
         "stripe_balance_currency": stripe_balance_currency,
+        "stripe_error": stripe_error,
     }
 
 
@@ -200,12 +211,50 @@ def _map_tier_key(db_tier: str) -> str | None:
 
 
 def _platform_admin_user(db: Session) -> User:
-    admin_email = (os.environ.get("ADMIN_EMAIL") or "").strip().lower()
+    admin_email_raw = (os.environ.get("ADMIN_EMAIL") or "").strip()
+    admin_email = admin_email_raw.lower()
+    logger.info("Resolving platform admin user by ADMIN_EMAIL='%s'", admin_email_raw)
     if not admin_email:
-        raise HTTPException(status_code=503, detail="ADMIN_EMAIL is not configured")
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "Admin account not configured",
+                "detail": (
+                    "No user found matching ADMIN_EMAIL. "
+                    "Please verify the ADMIN_EMAIL environment variable matches "
+                    "the admin user's email in the database exactly."
+                ),
+            },
+        )
     admin_user = db.query(User).filter(func.lower(User.email) == admin_email).first()
+    logger.info(
+        "Platform admin lookup result for '%s': %s",
+        admin_email_raw,
+        f"user_id={admin_user.id}, email={admin_user.email}" if admin_user else "none",
+    )
     if admin_user is None:
-        raise HTTPException(status_code=404, detail="Platform admin account not found")
+        near_matches = (
+            db.query(User.id, User.email)
+            .filter(User.email.ilike(f"%{admin_email_raw}%"))
+            .limit(5)
+            .all()
+        )
+        logger.error(
+            "Admin account not found for email: %s. Near matches: %s",
+            admin_email_raw,
+            [(int(uid), email) for uid, email in near_matches],
+        )
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "Admin account not configured",
+                "detail": (
+                    "No user found matching ADMIN_EMAIL. "
+                    "Please verify the ADMIN_EMAIL environment variable matches "
+                    "the admin user's email in the database exactly."
+                ),
+            },
+        )
     return admin_user
 
 
@@ -577,27 +626,27 @@ def admin_financials_royalties(
         .scalar()
     )
 
-    Buyer = User
-    Seller = User
+    BuyerUser = aliased(User, name="buyer_user")
+    SellerUser = aliased(User, name="seller_user")
     rows_query = (
         db.query(
             MarketplaceOffer,
             Card.player_name,
             Card.tier,
-            Seller.display_name,
-            Buyer.display_name,
+            SellerUser.display_name,
+            BuyerUser.display_name,
         )
         .join(Card, MarketplaceOffer.card_id == Card.card_id)
-        .join(Seller, MarketplaceOffer.seller_id == Seller.id)
-        .join(Buyer, MarketplaceOffer.buyer_id == Buyer.id)
+        .join(SellerUser, MarketplaceOffer.seller_id == SellerUser.id)
+        .join(BuyerUser, MarketplaceOffer.buyer_id == BuyerUser.id)
         .filter(*base_filter)
     )
     if search_q:
         like_term = f"%{search_q}%"
         rows_query = rows_query.filter(
             func.lower(func.coalesce(Card.player_name, "")).like(like_term)
-            | func.lower(func.coalesce(Seller.display_name, "")).like(like_term)
-            | func.lower(func.coalesce(Buyer.display_name, "")).like(like_term)
+            | func.lower(func.coalesce(SellerUser.display_name, "")).like(like_term)
+            | func.lower(func.coalesce(BuyerUser.display_name, "")).like(like_term)
         )
 
     total_count = int(rows_query.count())
@@ -656,7 +705,12 @@ def admin_royalty_balance(
     db: Session = Depends(get_db),
     _admin: dict[str, Any] = Depends(require_admin),
 ):
-    admin_user = _platform_admin_user(db)
+    try:
+        admin_user = _platform_admin_user(db)
+    except HTTPException as exc:
+        if isinstance(exc.detail, dict) and exc.detail.get("error"):
+            return JSONResponse(status_code=503, content=exc.detail)
+        raise
     now = datetime.now(timezone.utc)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     total_royalties_earned = float_from_decimal(
@@ -687,11 +741,10 @@ def admin_royalty_balance(
     )
 
     pending_withdrawals = 0.0
-    stripe_key = (os.environ.get("STRIPE_SECRET_KEY") or "").strip()
     stripe_account_id = (admin_user.stripe_account_id or "").strip()
-    if stripe_key and stripe_account_id:
+    if stripe_account_id:
         try:
-            stripe.api_key = stripe_key
+            configure_stripe_client()
             payouts = stripe.Payout.list(limit=25, stripe_account=stripe_account_id)
             pending_cents = 0
             for payout in payouts.get("data", []):
@@ -699,8 +752,9 @@ def admin_royalty_balance(
                 if status_value in {"pending", "in_transit"}:
                     pending_cents += int(payout.get("amount") or 0)
             pending_withdrawals = round(pending_cents / 100.0, 2)
-        except Exception:
+        except Exception as exc:
             pending_withdrawals = 0.0
+            logger.warning("Admin pending withdrawals fetch failed: %s", str(exc))
 
     return {
         "admin_user_id": admin_user.id,
@@ -805,10 +859,10 @@ def admin_withdraw_royalties(
     if current_balance <= 0:
         raise HTTPException(status_code=400, detail="No withdrawable royalties available")
 
-    stripe_key = (os.environ.get("STRIPE_SECRET_KEY") or "").strip()
-    if not stripe_key:
-        raise HTTPException(status_code=503, detail="STRIPE_SECRET_KEY is not configured")
-    stripe.api_key = stripe_key
+    try:
+        configure_stripe_client()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     try:
         row = deduct_credits(
@@ -882,19 +936,19 @@ def admin_withdrawal_history(
     total_count = int(q.count())
     rows = q.offset(offset).limit(limit).all()
     pending_amount_counts: dict[int, int] = {}
-    stripe_key = (os.environ.get("STRIPE_SECRET_KEY") or "").strip()
     stripe_account_id = (admin_user.stripe_account_id or "").strip()
-    if stripe_key and stripe_account_id:
+    if stripe_account_id:
         try:
-            stripe.api_key = stripe_key
+            configure_stripe_client()
             payouts = stripe.Payout.list(limit=100, stripe_account=stripe_account_id)
             for payout in payouts.get("data", []):
                 status_value = (payout.get("status") or "").lower()
                 if status_value in {"pending", "in_transit"}:
                     cents = int(payout.get("amount") or 0)
                     pending_amount_counts[cents] = pending_amount_counts.get(cents, 0) + 1
-        except Exception:
+        except Exception as exc:
             pending_amount_counts = {}
+            logger.warning("Admin withdrawal history payout fetch failed: %s", str(exc))
 
     all_for_running_total = (
         db.query(CreditLedger.id, CreditLedger.amount)
@@ -980,13 +1034,21 @@ def admin_trades(
     db: Session = Depends(get_db),
     _admin: dict[str, Any] = Depends(require_admin),
 ):
-    Sender = User
-    Recipient = User
+    SenderUser = aliased(User, name="sender_user")
+    RecipientUser = aliased(User, name="recipient_user")
     rows = (
-        db.query(TradeOffer, Card.card_id, Card.player_name, Sender.display_name, Sender.email, Recipient.display_name, Recipient.email)
+        db.query(
+            TradeOffer,
+            Card.card_id,
+            Card.player_name,
+            SenderUser.display_name,
+            SenderUser.email,
+            RecipientUser.display_name,
+            RecipientUser.email,
+        )
         .join(Card, TradeOffer.card_id == Card.id)
-        .join(Sender, TradeOffer.sender_id == Sender.id)
-        .join(Recipient, TradeOffer.recipient_id == Recipient.id)
+        .join(SenderUser, TradeOffer.sender_id == SenderUser.id)
+        .join(RecipientUser, TradeOffer.recipient_id == RecipientUser.id)
         .order_by(TradeOffer.created_at.desc())
         .all()
     )
@@ -1015,20 +1077,20 @@ def admin_marketplace(
     db: Session = Depends(get_db),
     _admin: dict[str, Any] = Depends(require_admin),
 ):
-    Buyer = User
-    Seller = User
+    BuyerUser = aliased(User, name="buyer_user")
+    SellerUser = aliased(User, name="seller_user")
     rows = (
         db.query(
             MarketplaceOffer,
             Card.player_name,
-            Buyer.display_name,
-            Buyer.email,
-            Seller.display_name,
-            Seller.email,
+            BuyerUser.display_name,
+            BuyerUser.email,
+            SellerUser.display_name,
+            SellerUser.email,
         )
         .join(Card, MarketplaceOffer.card_id == Card.card_id)
-        .join(Buyer, MarketplaceOffer.buyer_id == Buyer.id)
-        .join(Seller, MarketplaceOffer.seller_id == Seller.id)
+        .join(BuyerUser, MarketplaceOffer.buyer_id == BuyerUser.id)
+        .join(SellerUser, MarketplaceOffer.seller_id == SellerUser.id)
         .order_by(MarketplaceOffer.created_at.desc())
         .all()
     )
