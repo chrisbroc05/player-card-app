@@ -31,6 +31,9 @@ export default function MarketplaceCardDetailPage() {
   const [offerError, setOfferError] = useState("");
   const [offerSuccess, setOfferSuccess] = useState("");
   const [buyerBalance, setBuyerBalance] = useState(null);
+  const [buyConfirmOpen, setBuyConfirmOpen] = useState(false);
+  const [buySuccessOpen, setBuySuccessOpen] = useState(false);
+  const [buyMessage, setBuyMessage] = useState("");
 
   const load = useCallback(async () => {
     if (!cardId) return;
@@ -82,13 +85,13 @@ export default function MarketplaceCardDetailPage() {
   const badge = listing ? vaultTierBadge(listing.tier) : null;
   const isOwner = isCardOwner(listing, user);
 
-  async function handleSubmitOffer(e, forcedCashAmount = null) {
+  async function handleSubmitOffer(e, forcedCashAmount = null, forcedMessage = null) {
     e?.preventDefault?.();
     setOfferError("");
     setOfferSuccess("");
     if (!user || !token) {
       navigate("/login", { state: { from: `/marketplace/${cardId}` } });
-      return;
+      return false;
     }
 
     const isTrade = offerMode === "card_trade";
@@ -97,7 +100,7 @@ export default function MarketplaceCardDetailPage() {
     if (isTrade) {
       if (tradeCardIds.length < 1) {
         setOfferError("Select at least one card to offer in trade");
-        return;
+        return false;
       }
       body = {
         card_id: listing.card_id,
@@ -109,17 +112,18 @@ export default function MarketplaceCardDetailPage() {
       const n = Number(forcedCashAmount ?? offerAmount);
       if (!Number.isFinite(n) || n < 0.01) {
         setOfferError("Offer amount must be at least $0.01");
-        return;
+        return false;
       }
       if (buyerBalance != null && n > buyerBalance) {
         setOfferError("Insufficient credits — Add credits to your account");
-        return;
+        return false;
       }
+      const messageText = String(forcedMessage ?? message ?? "");
       body = {
         card_id: listing.card_id,
         offer_type: "cash",
         offer_amount: n,
-        message: message.trim() || null,
+        message: messageText.trim() || null,
       };
     }
 
@@ -136,20 +140,44 @@ export default function MarketplaceCardDetailPage() {
       }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not submit offer."));
-      setOfferSuccess(
-        isTrade
-          ? "Trade offer submitted! The seller will be notified by email."
-          : "Offer submitted! The seller will be notified by email."
-      );
+      const wasInstantBuy = !isTrade && forcedCashAmount != null;
+      if (wasInstantBuy) {
+        setBuyerBalance((prev) => {
+          if (prev == null) return prev;
+          const next = Number(prev) - Number(forcedCashAmount || 0);
+          return Math.max(0, Math.round(next * 100) / 100);
+        });
+        setBuyConfirmOpen(false);
+        setBuySuccessOpen(true);
+      } else {
+        setOfferSuccess(
+          isTrade
+            ? "Trade offer submitted! The seller will be notified by email."
+            : "Offer submitted! The seller will be notified by email."
+        );
+      }
       setOfferAmount("");
       setTradeCardIds([]);
       setMessage("");
+      setBuyMessage("");
       refreshNavBadges?.();
-      await load();
+      if (!wasInstantBuy) {
+        await load();
+      }
+      return true;
     } catch (err) {
       setOfferError(err.message || "Offer failed.");
+      return false;
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleConfirmBuyAtAsking() {
+    if (!listing) return;
+    const ok = await handleSubmitOffer(null, Number(listing.asking_price), buyMessage);
+    if (!ok) {
+      setBuyConfirmOpen(true);
     }
   }
 
@@ -228,13 +256,42 @@ export default function MarketplaceCardDetailPage() {
                 submitting={submitting}
                 buyerBalance={buyerBalance}
                 onSubmit={handleSubmitOffer}
-                onBuyAtAsking={() => handleSubmitOffer(null, Number(listing.asking_price))}
+                onBuyAtAsking={() => {
+                  setOfferError("");
+                  setOfferSuccess("");
+                  setBuyConfirmOpen(true);
+                }}
                 onLogin={() => navigate("/login", { state: { from: `/marketplace/${cardId}` } })}
               />
             </div>
           </div>
         ) : null}
       </main>
+
+      <BuyAtAskingConfirmModal
+        open={buyConfirmOpen}
+        listing={listing}
+        buyerBalance={buyerBalance}
+        message={buyMessage}
+        setMessage={setBuyMessage}
+        submitting={submitting}
+        onCancel={() => setBuyConfirmOpen(false)}
+        onConfirm={handleConfirmBuyAtAsking}
+      />
+
+      <BuyAtAskingSuccessModal
+        open={buySuccessOpen}
+        listing={listing}
+        askingPrice={Number(listing?.asking_price || 0)}
+        onBackToMarketplace={() => {
+          setBuySuccessOpen(false);
+          navigate("/marketplace");
+        }}
+        onViewMyOffers={() => {
+          setBuySuccessOpen(false);
+          navigate("/marketplace/my-offers");
+        }}
+      />
       <AppFooter />
     </div>
   );
@@ -395,5 +452,168 @@ function OfferPanel({
       {offerError ? <p className="text-sm text-rose-300">{offerError}</p> : null}
       {offerSuccess ? <p className="text-sm text-emerald-300">{offerSuccess}</p> : null}
     </form>
+  );
+}
+
+function BuyAtAskingConfirmModal({
+  open,
+  listing,
+  buyerBalance,
+  message,
+  setMessage,
+  submitting,
+  onCancel,
+  onConfirm,
+}) {
+  if (!open || !listing) return null;
+
+  const askingPrice = Number(listing.asking_price || 0);
+  const balance = Number(buyerBalance ?? 0);
+  const hasBalance = buyerBalance != null;
+  const shortfall = Math.max(0, askingPrice - balance);
+  const insufficient = hasBalance && shortfall > 0;
+  const balanceAfter = hasBalance ? Math.max(0, balance - askingPrice) : null;
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-3 py-4 sm:px-4">
+      <div
+        className="w-full max-w-lg rounded-2xl border border-white/10 bg-cardBg p-5 shadow-2xl shadow-black/50 sm:p-6"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="buy-confirm-title"
+      >
+        <h3 id="buy-confirm-title" className="text-xl font-semibold text-white">
+          Confirm Purchase
+        </h3>
+        <p className="mt-2 text-sm text-slate-400">Review purchase details before completing payment.</p>
+
+        <div className="mt-4 flex items-start gap-3 rounded-xl border border-white/10 bg-cardBg2 p-3">
+          <div className="w-20 shrink-0 overflow-hidden rounded-lg border border-white/10">
+            <CardImage card={listing} alt={listing.player_name} frameClassName={CARD_IMAGE_FRAME_DETAIL} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-white">{listing.player_name || "Card"}</p>
+            <p className="mt-1 text-xs text-slate-400">Seller: {listing.owner_display_name || "Unknown Seller"}</p>
+            <p className="mt-2 text-sm text-slate-200">
+              You are buying this card for <span className="font-semibold text-neonTeal">{formatMoney(askingPrice)}</span>
+            </p>
+            <p className="mt-1 text-xs text-slate-400">
+              Your balance:{" "}
+              <span className="font-semibold text-white">
+                {hasBalance ? formatMoney(balance) : "—"}
+              </span>
+            </p>
+            <p className="mt-1 text-xs text-slate-400">
+              Balance after:{" "}
+              <span className="font-semibold text-white">
+                {balanceAfter != null ? formatMoney(balanceAfter) : "—"}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            Add a message to the seller (optional)
+          </label>
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            rows={3}
+            maxLength={2000}
+            placeholder="Great card! Looking forward to adding it to my collection."
+            className="mt-1 w-full rounded-lg border border-white/15 bg-cardBg2 px-3 py-2 text-sm text-slate-100"
+          />
+        </div>
+
+        {insufficient ? (
+          <div className="mt-4 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-3 text-sm text-amber-100">
+            <p>
+              You need <span className="font-semibold">{formatMoney(shortfall)}</span> more to complete this purchase.
+            </p>
+            <Link
+              to="/credits"
+              className="mt-3 inline-flex min-h-[42px] w-full items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950"
+            >
+              Add Credits
+            </Link>
+          </div>
+        ) : null}
+
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row">
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={onCancel}
+            className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg border border-white/20 px-4 text-sm text-slate-300 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          {!insufficient ? (
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={onConfirm}
+              className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+            >
+              {submitting ? "Purchasing…" : "Confirm Purchase"}
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BuyAtAskingSuccessModal({
+  open,
+  listing,
+  askingPrice,
+  onBackToMarketplace,
+  onViewMyOffers,
+}) {
+  if (!open || !listing) return null;
+
+  return (
+    <div className="fixed inset-0 z-[71] flex items-center justify-center bg-black/70 px-3 py-4 sm:px-4">
+      <div
+        className="w-full max-w-md rounded-2xl border border-emerald-500/30 bg-cardBg p-5 shadow-2xl shadow-black/50 sm:p-6"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="buy-success-title"
+      >
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-emerald-400/50 bg-emerald-500/15 text-2xl text-emerald-300">
+          ✓
+        </div>
+        <h3 id="buy-success-title" className="mt-3 text-center text-2xl font-semibold text-white">
+          Card Purchased!
+        </h3>
+
+        <div className="mx-auto mt-4 w-28 overflow-hidden rounded-lg border border-white/10">
+          <CardImage card={listing} alt={listing.player_name} frameClassName={CARD_IMAGE_FRAME_DETAIL} />
+        </div>
+        <p className="mt-3 text-center text-sm font-medium text-white">{listing.player_name || "Card"}</p>
+        <p className="mt-1 text-center text-sm text-slate-300">
+          {formatMoney(askingPrice)} credits have been deducted from your balance.
+        </p>
+
+        <div className="mt-5 space-y-2">
+          <button
+            type="button"
+            onClick={onBackToMarketplace}
+            className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg border border-white/20 bg-cardBg2 px-4 text-sm font-medium text-slate-100"
+          >
+            Back to Marketplace
+          </button>
+          <button
+            type="button"
+            onClick={onViewMyOffers}
+            className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950"
+          >
+            View My Offers
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

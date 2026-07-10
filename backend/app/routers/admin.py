@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import bcrypt
+import stripe
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
@@ -19,9 +20,11 @@ from sqlalchemy.orm import Session
 
 from auth import ALGORITHM, SECRET_KEY
 from beta_config import beta_mode_active, get_beta_invite_code, set_beta_invite_code
+from credit_service import InsufficientCreditsError, TX_WITHDRAWAL, deduct_credits
 from database import get_db
 from marketplace_repo import float_from_decimal, listing_active_filter
 from models import Card, CreditLedger, MarketplaceOffer, TradeOffer, User, utcnow
+from stripe_connect import create_onboarding_link
 
 router = APIRouter()
 admin_security = HTTPBearer(auto_error=False)
@@ -136,13 +139,52 @@ def _compute_financial_summary(db: Session) -> dict[str, float | int]:
         .filter(MarketplaceOffer.status == "accepted")
         .scalar()
     )
+    royalties_ledger_total = float_from_decimal(
+        db.query(func.coalesce(func.sum(CreditLedger.amount), 0))
+        .filter(CreditLedger.transaction_type == "royalty")
+        .scalar()
+    )
+    stripe_balance_total = 0.0
+    stripe_balance_available = 0.0
+    stripe_balance_pending = 0.0
+    stripe_balance_currency = "usd"
+    stripe_balance_ok = False
+    stripe_key = (os.environ.get("STRIPE_SECRET_KEY") or "").strip()
+    if stripe_key:
+        try:
+            stripe.api_key = stripe_key
+            bal = stripe.Balance.retrieve()
+            avail = bal.get("available") or []
+            pend = bal.get("pending") or []
+            preferred_currency = "usd"
+            available_amount = 0
+            pending_amount = 0
+            for row in avail:
+                if (row.get("currency") or "").lower() == preferred_currency:
+                    available_amount += int(row.get("amount") or 0)
+            for row in pend:
+                if (row.get("currency") or "").lower() == preferred_currency:
+                    pending_amount += int(row.get("amount") or 0)
+            stripe_balance_available = round(available_amount / 100.0, 2)
+            stripe_balance_pending = round(pending_amount / 100.0, 2)
+            stripe_balance_total = round((available_amount + pending_amount) / 100.0, 2)
+            stripe_balance_currency = preferred_currency
+            stripe_balance_ok = True
+        except Exception:
+            stripe_balance_ok = False
     return {
         "total_volume": total_volume,
         "total_royalties": total_royalties,
+        "royalties_ledger_total": royalties_ledger_total,
         "total_credits_in_circulation": total_credits_in_circulation,
         "total_withdrawals": total_withdrawals,
         "stripe_connected_sellers": stripe_connected_sellers,
         "average_sale_price": average_sale_price,
+        "stripe_balance_ok": stripe_balance_ok,
+        "stripe_balance_total": stripe_balance_total,
+        "stripe_balance_available": stripe_balance_available,
+        "stripe_balance_pending": stripe_balance_pending,
+        "stripe_balance_currency": stripe_balance_currency,
     }
 
 
@@ -154,6 +196,31 @@ def _map_tier_key(db_tier: str) -> str | None:
         return "all_star"
     if t == "legends":
         return "legends"
+    return None
+
+
+def _platform_admin_user(db: Session) -> User:
+    admin_email = (os.environ.get("ADMIN_EMAIL") or "").strip().lower()
+    if not admin_email:
+        raise HTTPException(status_code=503, detail="ADMIN_EMAIL is not configured")
+    admin_user = db.query(User).filter(func.lower(User.email) == admin_email).first()
+    if admin_user is None:
+        raise HTTPException(status_code=404, detail="Platform admin account not found")
+    return admin_user
+
+
+def _date_range_start(range_name: str) -> datetime | None:
+    now = datetime.now(timezone.utc)
+    key = (range_name or "all").strip().lower()
+    if key in {"all", "all_time"}:
+        return None
+    if key == "today":
+        return now.replace(hour=0, minute=0, second=0, microsecond=0)
+    if key in {"this_week", "week"}:
+        start = now - timedelta(days=now.weekday())
+        return start.replace(hour=0, minute=0, second=0, microsecond=0)
+    if key in {"this_month", "month"}:
+        return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     return None
 
 
@@ -486,30 +553,37 @@ def admin_financials_ledger(
 
 @router.get("/financials/royalties")
 def admin_financials_royalties(
-    limit: int = Query(default=25, ge=1, le=200),
+    limit: int = Query(default=25, ge=1, le=5000),
     offset: int = Query(default=0, ge=0),
+    date_range: str = Query(default="all"),
+    search: str | None = Query(default=None),
+    sort: str = Query(default="desc"),
     db: Session = Depends(get_db),
     _admin: dict[str, Any] = Depends(require_admin),
 ):
-    base_filter = (
+    start_dt = _date_range_start(date_range)
+    sort_desc = (sort or "desc").strip().lower() != "asc"
+    search_q = (search or "").strip().lower()
+
+    base_filter = [
         MarketplaceOffer.status == "accepted",
         MarketplaceOffer.royalty_amount > 0,
-    )
+    ]
+    if start_dt is not None:
+        base_filter.append(func.coalesce(MarketplaceOffer.updated_at, MarketplaceOffer.created_at) >= start_dt)
     total_royalties = float_from_decimal(
         db.query(func.coalesce(func.sum(MarketplaceOffer.royalty_amount), 0))
         .filter(*base_filter)
         .scalar()
     )
-    total_count = int(
-        db.query(func.count(MarketplaceOffer.id)).filter(*base_filter).scalar() or 0
-    )
 
     Buyer = User
     Seller = User
-    rows = (
+    rows_query = (
         db.query(
             MarketplaceOffer,
             Card.player_name,
+            Card.tier,
             Seller.display_name,
             Buyer.display_name,
         )
@@ -517,27 +591,351 @@ def admin_financials_royalties(
         .join(Seller, MarketplaceOffer.seller_id == Seller.id)
         .join(Buyer, MarketplaceOffer.buyer_id == Buyer.id)
         .filter(*base_filter)
-        .order_by(MarketplaceOffer.updated_at.desc(), MarketplaceOffer.id.desc())
+    )
+    if search_q:
+        like_term = f"%{search_q}%"
+        rows_query = rows_query.filter(
+            func.lower(func.coalesce(Card.player_name, "")).like(like_term)
+            | func.lower(func.coalesce(Seller.display_name, "")).like(like_term)
+            | func.lower(func.coalesce(Buyer.display_name, "")).like(like_term)
+        )
+
+    total_count = int(rows_query.count())
+    if sort_desc:
+        rows_query = rows_query.order_by(MarketplaceOffer.updated_at.desc(), MarketplaceOffer.id.desc())
+    else:
+        rows_query = rows_query.order_by(MarketplaceOffer.updated_at.asc(), MarketplaceOffer.id.asc())
+
+    rows = (
+        rows_query
         .offset(offset)
         .limit(limit)
         .all()
     )
+
+    all_rows_for_running_total = (
+        db.query(MarketplaceOffer.id, MarketplaceOffer.royalty_amount)
+        .filter(MarketplaceOffer.status == "accepted", MarketplaceOffer.royalty_amount > 0)
+        .order_by(MarketplaceOffer.updated_at.asc(), MarketplaceOffer.id.asc())
+        .all()
+    )
+    running_total_by_offer_id: dict[int, float] = {}
+    running = 0.0
+    for offer_id, royalty_amount in all_rows_for_running_total:
+        running += float_from_decimal(royalty_amount)
+        running_total_by_offer_id[int(offer_id)] = round(running, 2)
+
     entries = [
         {
             "offer_id": offer.id,
             "card_id": offer.card_id,
             "player_name": player_name or "",
+            "tier": tier or "",
             "seller_display_name": seller_dn or "—",
             "buyer_display_name": buyer_dn or "—",
             "sale_amount": float_from_decimal(offer.offer_amount),
             "royalty_amount": float_from_decimal(offer.royalty_amount),
             "date": _iso(offer.updated_at or offer.created_at),
+            "running_total": running_total_by_offer_id.get(int(offer.id), 0.0),
         }
-        for offer, player_name, seller_dn, buyer_dn in rows
+        for offer, player_name, tier, seller_dn, buyer_dn in rows
     ]
     return {
         "entries": entries,
         "total_royalties": total_royalties,
+        "total_count": total_count,
+        "date_range": date_range,
+        "search": search_q,
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+@router.get("/royalty-balance")
+def admin_royalty_balance(
+    db: Session = Depends(get_db),
+    _admin: dict[str, Any] = Depends(require_admin),
+):
+    admin_user = _platform_admin_user(db)
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    total_royalties_earned = float_from_decimal(
+        db.query(func.coalesce(func.sum(CreditLedger.amount), 0))
+        .filter(
+            CreditLedger.user_id == admin_user.id,
+            CreditLedger.transaction_type == "royalty",
+        )
+        .scalar()
+    )
+    this_month = float_from_decimal(
+        db.query(func.coalesce(func.sum(CreditLedger.amount), 0))
+        .filter(
+            CreditLedger.user_id == admin_user.id,
+            CreditLedger.transaction_type == "royalty",
+            CreditLedger.created_at >= month_start,
+        )
+        .scalar()
+    )
+    total_withdrawn = float_from_decimal(
+        db.query(func.coalesce(func.sum(func.abs(CreditLedger.amount)), 0))
+        .filter(
+            CreditLedger.user_id == admin_user.id,
+            CreditLedger.transaction_type == TX_WITHDRAWAL,
+            CreditLedger.amount < 0,
+        )
+        .scalar()
+    )
+
+    pending_withdrawals = 0.0
+    stripe_key = (os.environ.get("STRIPE_SECRET_KEY") or "").strip()
+    stripe_account_id = (admin_user.stripe_account_id or "").strip()
+    if stripe_key and stripe_account_id:
+        try:
+            stripe.api_key = stripe_key
+            payouts = stripe.Payout.list(limit=25, stripe_account=stripe_account_id)
+            pending_cents = 0
+            for payout in payouts.get("data", []):
+                status_value = (payout.get("status") or "").lower()
+                if status_value in {"pending", "in_transit"}:
+                    pending_cents += int(payout.get("amount") or 0)
+            pending_withdrawals = round(pending_cents / 100.0, 2)
+        except Exception:
+            pending_withdrawals = 0.0
+
+    return {
+        "admin_user_id": admin_user.id,
+        "admin_email": admin_user.email,
+        "total_royalties_earned": round(total_royalties_earned, 2),
+        "current_withdrawable_balance": float_from_decimal(admin_user.credit_balance),
+        "total_withdrawn": round(total_withdrawn, 2),
+        "pending_withdrawals": pending_withdrawals,
+        "this_month": round(this_month, 2),
+        "connect_ready": bool(admin_user.stripe_payouts_enabled and stripe_account_id),
+    }
+
+
+@router.post("/connect-onboarding-link")
+def admin_connect_onboarding_link(
+    db: Session = Depends(get_db),
+    _admin: dict[str, Any] = Depends(require_admin),
+):
+    admin_user = _platform_admin_user(db)
+    try:
+        url = create_onboarding_link(db, admin_user)
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create onboarding link: {str(e)}") from e
+    return {"url": url}
+
+
+@router.get("/earnings/monthly")
+def admin_earnings_monthly(
+    db: Session = Depends(get_db),
+    _admin: dict[str, Any] = Depends(require_admin),
+):
+    now = datetime.now(timezone.utc)
+    current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    month_starts: list[datetime] = []
+    year = current_month_start.year
+    month = current_month_start.month
+    for _ in range(12):
+        month_starts.append(datetime(year, month, 1, tzinfo=timezone.utc))
+        month -= 1
+        if month == 0:
+            month = 12
+            year -= 1
+    month_starts_desc = month_starts
+    oldest_start = month_starts_desc[-1]
+
+    rows = (
+        db.query(MarketplaceOffer.updated_at, MarketplaceOffer.created_at, MarketplaceOffer.royalty_amount)
+        .filter(
+            MarketplaceOffer.status == "accepted",
+            MarketplaceOffer.royalty_amount > 0,
+            func.coalesce(MarketplaceOffer.updated_at, MarketplaceOffer.created_at) >= oldest_start,
+        )
+        .all()
+    )
+
+    totals_by_month_key: dict[str, float] = {
+        f"{dt.year:04d}-{dt.month:02d}": 0.0 for dt in month_starts_desc
+    }
+    for updated_at, created_at, royalty_amount in rows:
+        eff = updated_at or created_at
+        if eff is None:
+            continue
+        if eff.tzinfo is None:
+            eff = eff.replace(tzinfo=timezone.utc)
+        key = f"{eff.year:04d}-{eff.month:02d}"
+        if key in totals_by_month_key:
+            totals_by_month_key[key] += float_from_decimal(royalty_amount)
+
+    points_desc = []
+    for dt in month_starts_desc:
+        key = f"{dt.year:04d}-{dt.month:02d}"
+        points_desc.append(
+            {
+                "month_key": key,
+                "label": dt.strftime("%b %Y"),
+                "total": round(totals_by_month_key[key], 2),
+            }
+        )
+    points = list(reversed(points_desc))
+    return {
+        "points": points,
+        "year_total": round(sum(item["total"] for item in points), 2),
+    }
+
+
+@router.post("/withdraw-royalties")
+def admin_withdraw_royalties(
+    db: Session = Depends(get_db),
+    _admin: dict[str, Any] = Depends(require_admin),
+):
+    admin_user = _platform_admin_user(db)
+    stripe_account_id = (admin_user.stripe_account_id or "").strip()
+    if not stripe_account_id or not admin_user.stripe_payouts_enabled:
+        raise HTTPException(
+            status_code=400,
+            detail="Admin Stripe Connect payout account is not fully set up",
+        )
+
+    current_balance = float_from_decimal(admin_user.credit_balance)
+    if current_balance <= 0:
+        raise HTTPException(status_code=400, detail="No withdrawable royalties available")
+
+    stripe_key = (os.environ.get("STRIPE_SECRET_KEY") or "").strip()
+    if not stripe_key:
+        raise HTTPException(status_code=503, detail="STRIPE_SECRET_KEY is not configured")
+    stripe.api_key = stripe_key
+
+    try:
+        row = deduct_credits(
+            admin_user.id,
+            admin_user.credit_balance,
+            TX_WITHDRAWAL,
+            note="Platform royalty withdrawal to Stripe",
+            db=db,
+            commit=False,
+        )
+    except InsufficientCreditsError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="No withdrawable royalties available") from None
+
+    withdrawal_amount = float_from_decimal(-row.amount)
+    amount_cents = int(round(withdrawal_amount * 100))
+    try:
+        transfer = stripe.Transfer.create(
+            amount=amount_cents,
+            currency="usd",
+            destination=stripe_account_id,
+            transfer_group=f"platform_royalty_withdrawal_{admin_user.id}",
+            description="Platform royalty withdrawal to Stripe Connect",
+            metadata={
+                "admin_user_id": str(admin_user.id),
+                "type": "platform_royalty_withdrawal",
+                "ledger_entry_id": str(row.id or ""),
+            },
+        )
+        payout = stripe.Payout.create(
+            amount=amount_cents,
+            currency="usd",
+            stripe_account=stripe_account_id,
+            metadata={
+                "admin_user_id": str(admin_user.id),
+                "source_transfer_id": str(transfer.get("id") or ""),
+                "type": "platform_royalty_withdrawal",
+            },
+        )
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Withdrawal failed: {str(e)}") from e
+
+    return {
+        "success": True,
+        "amount_withdrawn": withdrawal_amount,
+        "new_balance": float_from_decimal(row.balance_after),
+        "transfer_id": transfer.get("id"),
+        "payout_id": payout.get("id"),
+    }
+
+
+@router.get("/withdrawal-history")
+def admin_withdrawal_history(
+    limit: int = Query(default=50, ge=1, le=5000),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    _admin: dict[str, Any] = Depends(require_admin),
+):
+    admin_user = _platform_admin_user(db)
+    q = (
+        db.query(CreditLedger)
+        .filter(
+            CreditLedger.user_id == admin_user.id,
+            CreditLedger.transaction_type == TX_WITHDRAWAL,
+            CreditLedger.amount < 0,
+        )
+        .order_by(CreditLedger.created_at.desc(), CreditLedger.id.desc())
+    )
+    total_count = int(q.count())
+    rows = q.offset(offset).limit(limit).all()
+    pending_amount_counts: dict[int, int] = {}
+    stripe_key = (os.environ.get("STRIPE_SECRET_KEY") or "").strip()
+    stripe_account_id = (admin_user.stripe_account_id or "").strip()
+    if stripe_key and stripe_account_id:
+        try:
+            stripe.api_key = stripe_key
+            payouts = stripe.Payout.list(limit=100, stripe_account=stripe_account_id)
+            for payout in payouts.get("data", []):
+                status_value = (payout.get("status") or "").lower()
+                if status_value in {"pending", "in_transit"}:
+                    cents = int(payout.get("amount") or 0)
+                    pending_amount_counts[cents] = pending_amount_counts.get(cents, 0) + 1
+        except Exception:
+            pending_amount_counts = {}
+
+    all_for_running_total = (
+        db.query(CreditLedger.id, CreditLedger.amount)
+        .filter(
+            CreditLedger.user_id == admin_user.id,
+            CreditLedger.transaction_type == TX_WITHDRAWAL,
+            CreditLedger.amount < 0,
+        )
+        .order_by(CreditLedger.created_at.asc(), CreditLedger.id.asc())
+        .all()
+    )
+    running_total_withdrawn_by_id: dict[int, float] = {}
+    running_withdrawn = 0.0
+    for row_id, amount in all_for_running_total:
+        running_withdrawn += abs(float_from_decimal(amount))
+        running_total_withdrawn_by_id[int(row_id)] = round(running_withdrawn, 2)
+
+    entries = [
+        {
+            "id": row.id,
+            "amount": abs(float_from_decimal(row.amount)),
+            "amount_signed": float_from_decimal(row.amount),
+            "balance_after": float_from_decimal(row.balance_after),
+            "status": (
+                "pending"
+                if pending_amount_counts.get(int(round(abs(float_from_decimal(row.amount)) * 100)), 0) > 0
+                else "completed"
+            ),
+            "running_total_withdrawn": running_total_withdrawn_by_id.get(int(row.id), 0.0),
+            "reference_id": row.reference_id or "",
+            "note": row.note or "",
+            "created_at": _iso(row.created_at),
+        }
+        for row in rows
+    ]
+    for entry in entries:
+        if entry["status"] == "pending":
+            cents = int(round(entry["amount"] * 100))
+            pending_amount_counts[cents] = max(0, pending_amount_counts.get(cents, 0) - 1)
+    return {
+        "entries": entries,
         "total_count": total_count,
         "limit": limit,
         "offset": offset,

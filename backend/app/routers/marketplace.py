@@ -6,7 +6,7 @@ import logging
 import os
 import re
 from datetime import timedelta
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 import stripe
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
@@ -18,6 +18,7 @@ from auth import get_current_user
 from card_repo import get_card_by_card_id
 from credit_service import (
     InsufficientCreditsError,
+    TX_ROYALTY,
     add_credits,
     deduct_credits,
 )
@@ -71,6 +72,15 @@ logger = logging.getLogger(__name__)
 _CARD_ID_PATH_PATTERN = re.compile(r"^FL-(\d{4})-(\d{6})$", re.IGNORECASE)
 
 
+def _decimal_to_cents(amount: Decimal | float | int | None) -> int:
+    """Convert USD amount to integer cents with deterministic rounding."""
+    if amount is None:
+        return 0
+    dec = amount if isinstance(amount, Decimal) else Decimal(str(amount))
+    cents = (dec * Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    return int(cents)
+
+
 def _canonical_card_id(raw: str) -> str | None:
     s = (raw or "").strip()
     m = _CARD_ID_PATH_PATTERN.match(s)
@@ -87,6 +97,16 @@ def _resolve_card(db: Session, card_id_raw: str) -> Card:
     if card is None:
         raise HTTPException(status_code=404, detail="Card not found")
     return card
+
+
+def _platform_admin_user(db: Session) -> User:
+    admin_email = (os.environ.get("ADMIN_EMAIL") or "").strip().lower()
+    if not admin_email:
+        raise HTTPException(status_code=503, detail="ADMIN_EMAIL is not configured")
+    admin_user = db.query(User).filter(func.lower(User.email) == admin_email).first()
+    if admin_user is None:
+        raise HTTPException(status_code=503, detail="Platform admin account not found")
+    return admin_user
 
 
 def _tier_filter_values(tier: str) -> list[str] | None:
@@ -229,6 +249,20 @@ def _settle_cash_offer_credits(
         transaction_type="card_sale",
         reference_id=str(offer.id),
         note=f"Sold {card.player_name} ({card.card_id})",
+        db=db,
+    )
+
+    platform_admin = _platform_admin_user(db)
+    add_credits(
+        user_id=platform_admin.id,
+        amount=royalty_amount_f,
+        transaction_type=TX_ROYALTY,
+        reference_id=str(offer.id),
+        note=(
+            "2% royalty - "
+            f"{buyer.display_name} purchased {card.player_name} ({card.card_id}) "
+            f"from {seller.display_name} for ${offer_amount:.2f}"
+        ),
         db=db,
     )
 
@@ -557,15 +591,27 @@ def marketplace_accept_offer(
     ):
         try:
             stripe.api_key = (os.environ.get("STRIPE_SECRET_KEY") or "").strip()
+            gross_cents = _decimal_to_cents(offer.offer_amount)
+            royalty_cents = _decimal_to_cents(offer.royalty_amount)
+            net_transfer_cents = max(0, gross_cents - royalty_cents)
             stripe.Transfer.create(
-                amount=int(seller_receives_f * 100),
+                amount=net_transfer_cents,
                 currency="usd",
                 destination=current_user.stripe_account_id,
                 transfer_group=str(offer.id),
+                description=f"Marketplace sale payout for {card.card_id}",
+                metadata={
+                    "offer_id": str(offer.id),
+                    "card_id": card.card_id,
+                    "gross_cents": str(gross_cents),
+                    "royalty_cents": str(royalty_cents),
+                    "net_transfer_cents": str(net_transfer_cents),
+                },
             )
             payout_initiated = True
             print(
-                f"TRANSFER SUCCESS: ${seller_receives_f} to {current_user.stripe_account_id}",
+                f"TRANSFER SUCCESS: ${net_transfer_cents / 100:.2f} to {current_user.stripe_account_id} "
+                f"(gross=${gross_cents / 100:.2f}, royalty=${royalty_cents / 100:.2f})",
                 flush=True,
             )
         except Exception as e:
@@ -858,14 +904,29 @@ def marketplace_offer_counter_accept(
     ):
         try:
             stripe.api_key = (os.environ.get("STRIPE_SECRET_KEY") or "").strip()
+            gross_cents = _decimal_to_cents(offer.offer_amount)
+            royalty_cents = _decimal_to_cents(offer.royalty_amount)
+            net_transfer_cents = max(0, gross_cents - royalty_cents)
             stripe.Transfer.create(
-                amount=int(seller_receives_f * 100),
+                amount=net_transfer_cents,
                 currency="usd",
                 destination=seller.stripe_account_id,
                 transfer_group=str(offer.id),
+                description=f"Marketplace counter sale payout for {card.card_id}",
+                metadata={
+                    "offer_id": str(offer.id),
+                    "card_id": card.card_id,
+                    "gross_cents": str(gross_cents),
+                    "royalty_cents": str(royalty_cents),
+                    "net_transfer_cents": str(net_transfer_cents),
+                },
             )
             payout_initiated = True
-            print(f"TRANSFER SUCCESS: ${seller_receives_f} to {seller.stripe_account_id}", flush=True)
+            print(
+                f"TRANSFER SUCCESS: ${net_transfer_cents / 100:.2f} to {seller.stripe_account_id} "
+                f"(gross=${gross_cents / 100:.2f}, royalty=${royalty_cents / 100:.2f})",
+                flush=True,
+            )
         except Exception as e:
             print(f"TRANSFER ERROR: {str(e)}", flush=True)
 

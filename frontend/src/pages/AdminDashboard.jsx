@@ -1,4 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { useNavigate } from "react-router-dom";
 import AppFooter from "../components/AppFooter";
 import { ADMIN_TOKEN_STORAGE_KEY, API_BASE_URL, adminHeaders } from "../config/api";
@@ -11,10 +20,18 @@ const TABS = [
   { id: "cards", label: "Cards" },
   { id: "trades", label: "Trades" },
   { id: "marketplace", label: "Marketplace" },
+  { id: "earnings", label: "Earnings" },
   { id: "financials", label: "Financials" },
 ];
 
 const LEDGER_PAGE_SIZE = 25;
+const EARNINGS_PAGE_SIZE = 25;
+const EARNINGS_DATE_RANGE_OPTIONS = [
+  { value: "today", label: "Today" },
+  { value: "this_week", label: "This Week" },
+  { value: "this_month", label: "This Month" },
+  { value: "all", label: "All Time" },
+];
 
 const LEDGER_TYPE_OPTIONS = [
   { value: "all", label: "All types" },
@@ -71,6 +88,21 @@ function formatApiError(detail, fallback) {
   return fallback;
 }
 
+function formatDateTime(value) {
+  if (!value) return "—";
+  const dt = new Date(value);
+  if (Number.isNaN(dt.getTime())) return "—";
+  return dt.toLocaleString();
+}
+
+function tierBadgeClass(tier) {
+  const t = (tier || "").toLowerCase().replace("-", "_");
+  if (t === "rookie") return "border-emerald-500/40 bg-emerald-500/15 text-emerald-100";
+  if (t === "allstar" || t === "all_star") return "border-cyan-500/40 bg-cyan-500/15 text-cyan-100";
+  if (t === "legends") return "border-amber-500/40 bg-amber-500/15 text-amber-100";
+  return "border-white/20 bg-white/5 text-slate-200";
+}
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [tab, setTab] = useState("overview");
@@ -97,6 +129,22 @@ export default function AdminDashboard() {
   const [royaltiesTotal, setRoyaltiesTotal] = useState(0);
   const [royaltiesSum, setRoyaltiesSum] = useState(0);
   const [royaltiesOffset, setRoyaltiesOffset] = useState(0);
+  const [royaltyBalance, setRoyaltyBalance] = useState(null);
+  const [earningsEntries, setEarningsEntries] = useState([]);
+  const [earningsTotalCount, setEarningsTotalCount] = useState(0);
+  const [earningsFilteredTotal, setEarningsFilteredTotal] = useState(0);
+  const [earningsOffset, setEarningsOffset] = useState(0);
+  const [earningsDateRange, setEarningsDateRange] = useState("all");
+  const [earningsSearch, setEarningsSearch] = useState("");
+  const [earningsSort, setEarningsSort] = useState("desc");
+  const [withdrawalHistoryEntries, setWithdrawalHistoryEntries] = useState([]);
+  const [withdrawalHistoryTotal, setWithdrawalHistoryTotal] = useState(0);
+  const [monthlyEarningsPoints, setMonthlyEarningsPoints] = useState([]);
+  const [monthlyEarningsYearTotal, setMonthlyEarningsYearTotal] = useState(0);
+  const [withdrawConfirmOpen, setWithdrawConfirmOpen] = useState(false);
+  const [withdrawBusy, setWithdrawBusy] = useState(false);
+  const [connectBusy, setConnectBusy] = useState(false);
+  const [withdrawStatusMsg, setWithdrawStatusMsg] = useState("");
 
   const [loading, setLoading] = useState({
     overview: true,
@@ -106,6 +154,10 @@ export default function AdminDashboard() {
     marketplace: true,
     financialsLedger: false,
     financialsRoyalties: false,
+    earningsSummary: false,
+    earningsTable: false,
+    earningsWithdrawals: false,
+    earningsChart: false,
   });
   const [errors, setErrors] = useState({});
   const [userSort, setUserSort] = useState({ key: "display_name", dir: "asc" });
@@ -273,6 +325,89 @@ export default function AdminDashboard() {
     setLoading((s) => ({ ...s, financialsRoyalties: false }));
   }, [adminFetch, royaltiesOffset]);
 
+  const loadRoyaltyBalance = useCallback(async () => {
+    setLoading((s) => ({ ...s, earningsSummary: true }));
+    setErrors((e) => ({ ...e, earningsSummary: "" }));
+    const res = await adminFetch("/admin/royalty-balance");
+    if (!res) return;
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setErrors((e) => ({
+        ...e,
+        earningsSummary: formatApiError(data?.detail, "Failed to load royalty balance."),
+      }));
+      setLoading((s) => ({ ...s, earningsSummary: false }));
+      return;
+    }
+    setRoyaltyBalance(data || null);
+    setLoading((s) => ({ ...s, earningsSummary: false }));
+  }, [adminFetch]);
+
+  const loadEarningsEntries = useCallback(async () => {
+    setLoading((s) => ({ ...s, earningsTable: true }));
+    setErrors((e) => ({ ...e, earningsTable: "" }));
+    const params = new URLSearchParams({
+      limit: String(EARNINGS_PAGE_SIZE),
+      offset: String(earningsOffset),
+      date_range: earningsDateRange,
+      sort: earningsSort,
+    });
+    if (earningsSearch.trim()) params.set("search", earningsSearch.trim());
+    const res = await adminFetch(`/admin/financials/royalties?${params.toString()}`);
+    if (!res) return;
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setErrors((e) => ({
+        ...e,
+        earningsTable: formatApiError(data?.detail, "Failed to load earnings history."),
+      }));
+      setLoading((s) => ({ ...s, earningsTable: false }));
+      return;
+    }
+    setEarningsEntries(Array.isArray(data.entries) ? data.entries : []);
+    setEarningsTotalCount(Number(data.total_count) || 0);
+    setEarningsFilteredTotal(Number(data.total_royalties) || 0);
+    setLoading((s) => ({ ...s, earningsTable: false }));
+  }, [adminFetch, earningsDateRange, earningsOffset, earningsSearch, earningsSort]);
+
+  const loadWithdrawalHistory = useCallback(async () => {
+    setLoading((s) => ({ ...s, earningsWithdrawals: true }));
+    setErrors((e) => ({ ...e, earningsWithdrawals: "" }));
+    const res = await adminFetch("/admin/withdrawal-history?limit=5000&offset=0");
+    if (!res) return;
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setErrors((e) => ({
+        ...e,
+        earningsWithdrawals: formatApiError(data?.detail, "Failed to load withdrawal history."),
+      }));
+      setLoading((s) => ({ ...s, earningsWithdrawals: false }));
+      return;
+    }
+    setWithdrawalHistoryEntries(Array.isArray(data.entries) ? data.entries : []);
+    setWithdrawalHistoryTotal(Number(data.total_count) || 0);
+    setLoading((s) => ({ ...s, earningsWithdrawals: false }));
+  }, [adminFetch]);
+
+  const loadMonthlyEarnings = useCallback(async () => {
+    setLoading((s) => ({ ...s, earningsChart: true }));
+    setErrors((e) => ({ ...e, earningsChart: "" }));
+    const res = await adminFetch("/admin/earnings/monthly");
+    if (!res) return;
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setErrors((e) => ({
+        ...e,
+        earningsChart: formatApiError(data?.detail, "Failed to load monthly earnings chart."),
+      }));
+      setLoading((s) => ({ ...s, earningsChart: false }));
+      return;
+    }
+    setMonthlyEarningsPoints(Array.isArray(data.points) ? data.points : []);
+    setMonthlyEarningsYearTotal(Number(data.year_total) || 0);
+    setLoading((s) => ({ ...s, earningsChart: false }));
+  }, [adminFetch]);
+
   useEffect(() => {
     loadInvite();
     loadStats();
@@ -292,6 +427,18 @@ export default function AdminDashboard() {
     loadFinancialsRoyalties();
   }, [tab, loadFinancialsRoyalties]);
 
+  useEffect(() => {
+    if (tab !== "earnings") return;
+    loadRoyaltyBalance();
+    loadWithdrawalHistory();
+    loadMonthlyEarnings();
+  }, [tab, loadRoyaltyBalance, loadWithdrawalHistory, loadMonthlyEarnings]);
+
+  useEffect(() => {
+    if (tab !== "earnings") return;
+    loadEarningsEntries();
+  }, [tab, loadEarningsEntries]);
+
   async function handleInviteUpdate(e) {
     e.preventDefault();
     setInviteMsg("");
@@ -309,6 +456,93 @@ export default function AdminDashboard() {
     setInviteMsg("Invite code updated.");
     await loadInvite();
     setInviteDraft(data.new_code ?? inviteDraft);
+  }
+
+  async function handleExportEarningsCsv() {
+    const params = new URLSearchParams({
+      limit: "5000",
+      offset: "0",
+      date_range: earningsDateRange,
+      sort: earningsSort,
+    });
+    if (earningsSearch.trim()) params.set("search", earningsSearch.trim());
+    const res = await adminFetch(`/admin/financials/royalties?${params.toString()}`);
+    if (!res) return;
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setErrors((e) => ({
+        ...e,
+        earningsTable: formatApiError(data?.detail, "Failed to export earnings CSV."),
+      }));
+      return;
+    }
+    const rows = Array.isArray(data.entries) ? data.entries : [];
+    const header = [
+      "Date",
+      "Player Name",
+      "Card ID",
+      "Tier",
+      "Seller",
+      "Buyer",
+      "Sale Price",
+      "Royalty",
+      "Running Total",
+    ];
+    const csvRows = rows.map((row) => [
+      row.date || "",
+      row.player_name || "",
+      row.card_id || "",
+      row.tier || "",
+      row.seller_display_name || "",
+      row.buyer_display_name || "",
+      Number(row.sale_amount || 0).toFixed(2),
+      Number(row.royalty_amount || 0).toFixed(2),
+      Number(row.running_total || 0).toFixed(2),
+    ]);
+    const escapeCell = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+    const csv = [header, ...csvRows].map((line) => line.map(escapeCell).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `platform-earnings-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleWithdrawConfirm() {
+    setWithdrawBusy(true);
+    setWithdrawStatusMsg("");
+    const res = await adminFetch("/admin/withdraw-royalties", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const data = res ? await res.json().catch(() => ({})) : {};
+    setWithdrawBusy(false);
+    if (!res?.ok) {
+      setWithdrawStatusMsg(formatApiError(data?.detail, "Withdrawal failed."));
+      return;
+    }
+    const amount = Number(data?.amount_withdrawn || 0);
+    setWithdrawConfirmOpen(false);
+    setWithdrawStatusMsg(`Withdrawal initiated! ${formatMoney(amount)} is on its way to your bank.`);
+    await Promise.all([loadRoyaltyBalance(), loadWithdrawalHistory()]);
+  }
+
+  async function handleConnectBankAccount() {
+    setConnectBusy(true);
+    setWithdrawStatusMsg("");
+    const res = await adminFetch("/admin/connect-onboarding-link", { method: "POST" });
+    const data = res ? await res.json().catch(() => ({})) : {};
+    setConnectBusy(false);
+    if (!res?.ok) {
+      setWithdrawStatusMsg(formatApiError(data?.detail, "Failed to open Stripe onboarding."));
+      return;
+    }
+    if (data?.url) window.open(data.url, "_blank", "noopener,noreferrer");
   }
 
   function toggleUserSort(key) {
@@ -428,6 +662,8 @@ export default function AdminDashboard() {
   };
 
   const fin = stats?.financial_summary;
+  const canWithdraw = Number(royaltyBalance?.current_withdrawable_balance || 0) > 0;
+  const connectReady = Boolean(royaltyBalance?.connect_ready);
 
   const invitePanel = (
     <section className="mb-6 rounded-xl border border-amber-500/25 bg-amber-500/5 p-4 sm:p-5">
@@ -544,10 +780,24 @@ export default function AdminDashboard() {
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                       {kpi("Total Platform Volume", formatMoney(fin.total_volume))}
                       {kpi("Total Royalties Earned", formatMoney(fin.total_royalties))}
+                      {kpi("Royalty Ledger Total", formatMoney(fin.royalties_ledger_total || 0))}
                       {kpi("Total Credits in Circulation", formatMoney(fin.total_credits_in_circulation))}
                       {kpi("Total Withdrawals", formatMoney(fin.total_withdrawals))}
                       {kpi("Stripe Connected Sellers", fin.stripe_connected_sellers ?? 0)}
                       {kpi("Average Sale Price", formatMoney(fin.average_sale_price))}
+                    </div>
+                    <div className="mt-3 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-xs text-cyan-100">
+                      <p>
+                        Stripe balance ({String(fin.stripe_balance_currency || "usd").toUpperCase()}):{" "}
+                        <span className="font-semibold">{formatMoney(fin.stripe_balance_total || 0)}</span>{" "}
+                        (available {formatMoney(fin.stripe_balance_available || 0)} + pending{" "}
+                        {formatMoney(fin.stripe_balance_pending || 0)})
+                      </p>
+                      <p className="mt-1 text-cyan-100/80">
+                        {fin.stripe_balance_ok
+                          ? "Use this Stripe total alongside royalty metrics to spot retention discrepancies."
+                          : "Stripe balance unavailable (check STRIPE_SECRET_KEY on backend)."}
+                      </p>
                     </div>
                   </div>
                 ) : null}
@@ -1064,6 +1314,291 @@ export default function AdminDashboard() {
           </div>
         ) : null}
 
+        {tab === "earnings" ? (
+          <div className="space-y-8">
+            {errors.earningsSummary ? (
+              <p className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
+                {errors.earningsSummary}
+              </p>
+            ) : null}
+            {withdrawStatusMsg ? (
+              <p className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-100">
+                {withdrawStatusMsg}
+              </p>
+            ) : null}
+
+            <section>
+              <h2 className="mb-4 text-lg font-semibold text-white">Platform Earnings</h2>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+                  <p className="text-xs uppercase tracking-wide text-amber-100/90">Total Earned (All Time)</p>
+                  <p className="mt-1 text-2xl font-semibold text-white">
+                    {formatMoney(royaltyBalance?.total_royalties_earned || 0)}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+                  <p className="text-xs uppercase tracking-wide text-amber-100/90">Available to Withdraw</p>
+                  <p className="mt-1 text-2xl font-semibold text-white">
+                    {formatMoney(royaltyBalance?.current_withdrawable_balance || 0)}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+                  <p className="text-xs uppercase tracking-wide text-amber-100/90">Total Withdrawn (All Time)</p>
+                  <p className="mt-1 text-2xl font-semibold text-white">
+                    {formatMoney(royaltyBalance?.total_withdrawn || 0)}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+                  <p className="text-xs uppercase tracking-wide text-amber-100/90">This Month</p>
+                  <p className="mt-1 text-2xl font-semibold text-white">
+                    {formatMoney(royaltyBalance?.this_month || 0)}
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-xl border border-white/10 bg-cardBg p-4">
+              <h3 className="text-sm font-semibold text-white">Withdraw</h3>
+              {connectReady ? (
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    disabled={!canWithdraw || withdrawBusy}
+                    onClick={() => setWithdrawConfirmOpen(true)}
+                    className="min-h-[48px] rounded-lg bg-emerald-500 px-5 text-sm font-semibold text-slate-950 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Withdraw to Bank
+                  </button>
+                  <p className="text-sm text-slate-300">
+                    {canWithdraw
+                      ? `Withdraw ${formatMoney(royaltyBalance?.current_withdrawable_balance || 0)} to your bank account`
+                      : "No balance available to withdraw"}
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleConnectBankAccount}
+                    disabled={connectBusy}
+                    className="min-h-[48px] rounded-lg bg-amber-500 px-5 text-sm font-semibold text-slate-950 hover:bg-amber-400 disabled:opacity-50"
+                  >
+                    {connectBusy ? "Opening Stripe..." : "Connect Bank Account"}
+                  </button>
+                  <p className="text-sm text-slate-300">
+                    Connect Stripe Express for the admin account before withdrawing royalties.
+                  </p>
+                </div>
+              )}
+            </section>
+
+            <section className="rounded-xl border border-white/10 bg-cardBg p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold text-white">Earnings by Transaction</h3>
+                <button
+                  type="button"
+                  onClick={handleExportEarningsCsv}
+                  className="rounded-lg border border-white/20 px-3 py-2 text-xs font-medium text-slate-200 hover:border-white/40"
+                >
+                  Export CSV
+                </button>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <select
+                  value={earningsDateRange}
+                  onChange={(e) => {
+                    setEarningsDateRange(e.target.value);
+                    setEarningsOffset(0);
+                  }}
+                  className="min-h-[40px] rounded-lg border border-white/15 bg-cardBg2 px-3 text-sm"
+                >
+                  {EARNINGS_DATE_RANGE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={earningsSort}
+                  onChange={(e) => {
+                    setEarningsSort(e.target.value);
+                    setEarningsOffset(0);
+                  }}
+                  className="min-h-[40px] rounded-lg border border-white/15 bg-cardBg2 px-3 text-sm"
+                >
+                  <option value="desc">Newest first</option>
+                  <option value="asc">Oldest first</option>
+                </select>
+                <input
+                  value={earningsSearch}
+                  onChange={(e) => {
+                    setEarningsSearch(e.target.value);
+                    setEarningsOffset(0);
+                  }}
+                  placeholder="Search seller, buyer, card..."
+                  className="min-h-[40px] w-full min-w-[220px] flex-1 rounded-lg border border-white/15 bg-cardBg2 px-3 text-sm"
+                />
+              </div>
+              <p className="mt-3 text-sm text-slate-400">
+                {earningsTotalCount} rows · Filter total:{" "}
+                <span className="font-semibold text-emerald-300">{formatMoney(earningsFilteredTotal)}</span>
+              </p>
+              {errors.earningsTable ? (
+                <p className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
+                  {errors.earningsTable}
+                </p>
+              ) : null}
+              <div className="mt-3 overflow-x-auto rounded-xl border border-white/10">
+                <table className="w-full min-w-[1200px] text-left text-sm">
+                  <thead className="border-b border-white/10 bg-cardBg2 text-xs uppercase tracking-wide text-slate-500">
+                    <tr>
+                      {[
+                        "Date",
+                        "Card Sold",
+                        "Sold By",
+                        "Bought By",
+                        "Sale Price",
+                        "Our Cut",
+                        "Running Total",
+                      ].map((h) => (
+                        <th key={h} className="p-3 font-medium">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {earningsEntries.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="p-6 text-center text-slate-500">
+                          No earnings rows found for this filter.
+                        </td>
+                      </tr>
+                    ) : (
+                      earningsEntries.map((row, idx) => (
+                        <tr
+                          key={row.offer_id}
+                          className={`${idx % 2 ? "bg-white/[0.015]" : ""} border-b border-white/5`}
+                        >
+                          <td className="p-3 text-xs text-slate-400">{formatDateTime(row.date)}</td>
+                          <td className="p-3">
+                            <p className="text-slate-200">{row.player_name || "—"}</p>
+                            <p className="font-mono text-xs text-neonTeal/90">{row.card_id}</p>
+                            <span
+                              className={`mt-1 inline-block rounded-full border px-2 py-0.5 text-[11px] ${tierBadgeClass(row.tier)}`}
+                            >
+                              {row.tier || "—"}
+                            </span>
+                          </td>
+                          <td className="p-3 text-slate-300">{row.seller_display_name || "—"}</td>
+                          <td className="p-3 text-slate-300">{row.buyer_display_name || "—"}</td>
+                          <td className="p-3 tabular-nums text-slate-200">{formatMoney(row.sale_amount || 0)}</td>
+                          <td className="p-3 tabular-nums font-semibold text-emerald-300">
+                            {formatMoney(row.royalty_amount || 0)}
+                          </td>
+                          <td className="p-3 tabular-nums text-amber-200">{formatMoney(row.running_total || 0)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {paginationControls(
+                earningsOffset,
+                earningsTotalCount,
+                EARNINGS_PAGE_SIZE,
+                setEarningsOffset,
+                "earningsTable"
+              )}
+            </section>
+
+            <section className="rounded-xl border border-white/10 bg-cardBg p-4">
+              <h3 className="text-sm font-semibold text-white">Withdrawal History</h3>
+              <p className="mt-2 text-sm text-slate-400">
+                {withdrawalHistoryTotal} entries
+              </p>
+              {errors.earningsWithdrawals ? (
+                <p className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
+                  {errors.earningsWithdrawals}
+                </p>
+              ) : null}
+              <div className="mt-3 overflow-x-auto rounded-xl border border-white/10">
+                <table className="w-full min-w-[820px] text-left text-sm">
+                  <thead className="border-b border-white/10 bg-cardBg2 text-xs uppercase tracking-wide text-slate-500">
+                    <tr>
+                      {["Date", "Amount", "Status", "Running Total Withdrawn"].map((h) => (
+                        <th key={h} className="p-3 font-medium">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {withdrawalHistoryEntries.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="p-6 text-center text-slate-500">
+                          No withdrawals yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      withdrawalHistoryEntries.slice(0, 100).map((row) => (
+                        <tr key={row.id} className="border-b border-white/5">
+                          <td className="p-3 text-xs text-slate-400">{formatDateTime(row.created_at)}</td>
+                          <td className="p-3 tabular-nums text-slate-100">{formatMoney(row.amount || 0)}</td>
+                          <td className="p-3">
+                            <span
+                              className={`rounded-full border px-2 py-0.5 text-[11px] ${
+                                row.status === "pending"
+                                  ? "border-amber-500/40 bg-amber-500/15 text-amber-200"
+                                  : "border-emerald-500/40 bg-emerald-500/15 text-emerald-200"
+                              }`}
+                            >
+                              {row.status || "completed"}
+                            </span>
+                          </td>
+                          <td className="p-3 tabular-nums text-slate-300">
+                            {formatMoney(row.running_total_withdrawn || 0)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section className="rounded-xl border border-white/10 bg-cardBg p-4">
+              <h3 className="text-sm font-semibold text-white">Monthly Earnings (Last 12 Months)</h3>
+              <p className="mt-1 text-sm text-slate-400">
+                Year total: <span className="font-semibold text-emerald-300">{formatMoney(monthlyEarningsYearTotal)}</span>
+              </p>
+              {errors.earningsChart ? (
+                <p className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
+                  {errors.earningsChart}
+                </p>
+              ) : null}
+              <div className="mt-3 h-72 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={monthlyEarningsPoints}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.2)" />
+                    <XAxis dataKey="label" stroke="#94a3b8" tick={{ fontSize: 11 }} />
+                    <YAxis
+                      stroke="#94a3b8"
+                      tick={{ fontSize: 11 }}
+                      tickFormatter={(v) => `$${Number(v || 0).toFixed(0)}`}
+                    />
+                    <Tooltip
+                      formatter={(value) => [formatMoney(Number(value || 0)), "Earnings"]}
+                      labelStyle={{ color: "#0f172a" }}
+                    />
+                    <Bar dataKey="total" fill="#34d399" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </section>
+          </div>
+        ) : null}
+
         {tab === "financials" ? (
           <div className="space-y-10">
             <section>
@@ -1155,6 +1690,20 @@ export default function AdminDashboard() {
               <p className="mt-3 text-2xl font-bold tabular-nums text-neonTeal">
                 Total Royalties Earned: {formatMoney(royaltiesSum)}
               </p>
+              {fin ? (
+                <div className="mt-3 rounded-lg border border-white/10 bg-cardBg2 px-3 py-3 text-xs text-slate-300">
+                  <p>
+                    Royalties (accepted offers): <span className="font-semibold text-white">{formatMoney(fin.total_royalties || 0)}</span>
+                  </p>
+                  <p className="mt-1">
+                    Royalties (credit ledger): <span className="font-semibold text-white">{formatMoney(fin.royalties_ledger_total || 0)}</span>
+                  </p>
+                  <p className="mt-1">
+                    Platform Stripe balance: <span className="font-semibold text-white">{formatMoney(fin.stripe_balance_total || 0)}</span>
+                    {` `}({String(fin.stripe_balance_currency || "usd").toUpperCase()})
+                  </p>
+                </div>
+              ) : null}
               {errors.financialsRoyalties ? (
                 <p className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
                   {errors.financialsRoyalties}
@@ -1207,6 +1756,39 @@ export default function AdminDashboard() {
                 "financialsRoyalties"
               )}
             </section>
+          </div>
+        ) : null}
+
+        {withdrawConfirmOpen ? (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4">
+            <div className="w-full max-w-md rounded-xl border border-white/15 bg-cardBg p-5">
+              <h3 className="text-lg font-semibold text-white">Confirm Withdrawal</h3>
+              <p className="mt-2 text-sm text-slate-300">
+                You are about to withdraw{" "}
+                <span className="font-semibold text-emerald-300">
+                  {formatMoney(royaltyBalance?.current_withdrawable_balance || 0)}
+                </span>{" "}
+                to your connected bank account.
+              </p>
+              <p className="mt-1 text-xs text-slate-400">Funds typically arrive in 2-3 business days.</p>
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setWithdrawConfirmOpen(false)}
+                  className="rounded-lg border border-white/15 px-4 py-2 text-sm text-slate-200 hover:border-white/35"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleWithdrawConfirm}
+                  disabled={withdrawBusy}
+                  className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-50"
+                >
+                  {withdrawBusy ? "Processing..." : "Confirm Withdrawal"}
+                </button>
+              </div>
+            </div>
           </div>
         ) : null}
       </main>
