@@ -33,6 +33,60 @@ router = APIRouter()
 admin_security = HTTPBearer(auto_error=False)
 logger = logging.getLogger(__name__)
 
+MIN_ROYALTY_WITHDRAWAL_DOLLARS = 1.0
+
+
+def _stripe_dashboard_base() -> str:
+    key = (os.environ.get("STRIPE_SECRET_KEY") or "").strip()
+    if key.startswith("sk_test"):
+        return "https://dashboard.stripe.com/test"
+    return "https://dashboard.stripe.com"
+
+
+def _stripe_payout_dashboard_url(payout_id: str) -> str:
+    pid = (payout_id or "").strip()
+    if not pid:
+        return ""
+    return f"{_stripe_dashboard_base()}/payouts/{pid}"
+
+
+def _normalize_payout_status(stripe_status: str | None) -> str:
+    value = (stripe_status or "").strip().lower()
+    if value == "paid":
+        return "paid"
+    if value in {"pending", "in_transit"}:
+        return "pending"
+    if value in {"failed", "canceled", "cancelled"}:
+        return "failed"
+    return value or "pending"
+
+
+def _fetch_platform_payout(payout_id: str) -> dict[str, Any] | None:
+    pid = (payout_id or "").strip()
+    if not pid:
+        return None
+    try:
+        configure_stripe_client()
+        return stripe.Payout.retrieve(pid)
+    except Exception as exc:
+        logger.warning("Failed to retrieve Stripe payout %s: %s", pid, str(exc))
+        return None
+
+
+def _platform_pending_withdrawal_total() -> float:
+    try:
+        configure_stripe_client()
+        payouts = stripe.Payout.list(limit=25)
+        pending_cents = 0
+        for payout in payouts.get("data", []):
+            status_value = (payout.get("status") or "").lower()
+            if status_value in {"pending", "in_transit"}:
+                pending_cents += int(payout.get("amount") or 0)
+        return round(pending_cents / 100.0, 2)
+    except Exception as exc:
+        logger.warning("Admin pending withdrawals fetch failed: %s", str(exc))
+        return 0.0
+
 # Hash ADMIN_PASSWORD once per process (same bcrypt stack as auth.py — avoids passlib/bcrypt4 edge cases).
 _admin_password_hash: bytes | None = None
 
@@ -760,31 +814,19 @@ def admin_royalty_balance(
         .scalar()
     )
 
-    pending_withdrawals = 0.0
-    stripe_account_id = (admin_user.stripe_account_id or "").strip()
-    if stripe_account_id:
-        try:
-            configure_stripe_client()
-            payouts = stripe.Payout.list(limit=25, stripe_account=stripe_account_id)
-            pending_cents = 0
-            for payout in payouts.get("data", []):
-                status_value = (payout.get("status") or "").lower()
-                if status_value in {"pending", "in_transit"}:
-                    pending_cents += int(payout.get("amount") or 0)
-            pending_withdrawals = round(pending_cents / 100.0, 2)
-        except Exception as exc:
-            pending_withdrawals = 0.0
-            logger.warning("Admin pending withdrawals fetch failed: %s", str(exc))
+    pending_withdrawals = _platform_pending_withdrawal_total()
+    withdrawable_balance = float_from_decimal(admin_user.credit_balance)
 
     return {
         "admin_user_id": admin_user.id,
         "admin_email": admin_user.email,
         "total_royalties_earned": round(total_royalties_earned, 2),
-        "current_withdrawable_balance": float_from_decimal(admin_user.credit_balance),
+        "current_withdrawable_balance": withdrawable_balance,
         "total_withdrawn": round(total_withdrawn, 2),
         "pending_withdrawals": pending_withdrawals,
         "this_month": round(this_month, 2),
-        "connect_ready": bool(admin_user.stripe_payouts_enabled and stripe_account_id),
+        "minimum_withdrawal_dollars": MIN_ROYALTY_WITHDRAWAL_DOLLARS,
+        "can_withdraw": withdrawable_balance >= MIN_ROYALTY_WITHDRAWAL_DOLLARS,
     }
 
 
@@ -868,71 +910,88 @@ def admin_withdraw_royalties(
     _admin: dict[str, Any] = Depends(require_admin),
 ):
     admin_user = _platform_admin_user(db)
-    stripe_account_id = (admin_user.stripe_account_id or "").strip()
-    if not stripe_account_id or not admin_user.stripe_payouts_enabled:
-        raise HTTPException(
-            status_code=400,
-            detail="Admin Stripe Connect payout account is not fully set up",
-        )
+    admin_email = (os.environ.get("ADMIN_EMAIL") or admin_user.email or "").strip()
 
     current_balance = float_from_decimal(admin_user.credit_balance)
     if current_balance <= 0:
         raise HTTPException(status_code=400, detail="No withdrawable royalties available")
+    if current_balance < MIN_ROYALTY_WITHDRAWAL_DOLLARS:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Minimum withdrawal is $1.00. Your current balance is ${current_balance:.2f}. "
+                "Keep selling cards and come back when you have more to withdraw!"
+            ),
+        )
 
     try:
         configure_stripe_client()
     except Exception as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    withdrawal_amount = current_balance
+    amount_cents = int(round(withdrawal_amount * 100))
+    now = datetime.now(timezone.utc)
+    date_str = now.strftime("%Y-%m-%d")
+    amount_label = f"{withdrawal_amount:.2f}"
+
+    try:
+        payout = stripe.Payout.create(
+            amount=amount_cents,
+            currency="usd",
+            description=(
+                f"Future Legends platform royalty withdrawal — {date_str} — ${amount_label}"
+            ),
+            metadata={
+                "withdrawal_date": now.isoformat(),
+                "royalty_credits_withdrawn": str(amount_cents),
+                "admin_email": admin_email,
+            },
+        )
+    except stripe.error.StripeError as exc:
+        logger.exception("Admin royalty Stripe payout failed")
+        detail = getattr(exc, "user_message", None) or str(exc)
+        raise HTTPException(status_code=500, detail=f"Withdrawal failed: {detail}") from exc
+    except Exception as exc:
+        logger.exception("Admin royalty Stripe payout failed")
+        raise HTTPException(status_code=500, detail=f"Withdrawal failed: {str(exc)}") from exc
+
+    payout_id = str(payout.get("id") or "")
+    payout_status = _normalize_payout_status(payout.get("status"))
+
     try:
         row = deduct_credits(
             admin_user.id,
             admin_user.credit_balance,
             TX_WITHDRAWAL,
-            note="Platform royalty withdrawal to Stripe",
+            reference_id=payout_id,
+            note=f"Royalty withdrawal to bank — Stripe payout ID: {payout_id}",
             db=db,
             commit=False,
         )
+        db.commit()
     except InsufficientCreditsError:
         db.rollback()
+        logger.error(
+            "Stripe payout %s succeeded but admin credit deduction failed due to insufficient balance",
+            payout_id,
+        )
         raise HTTPException(status_code=400, detail="No withdrawable royalties available") from None
-
-    withdrawal_amount = float_from_decimal(-row.amount)
-    amount_cents = int(round(withdrawal_amount * 100))
-    try:
-        transfer = stripe.Transfer.create(
-            amount=amount_cents,
-            currency="usd",
-            destination=stripe_account_id,
-            transfer_group=f"platform_royalty_withdrawal_{admin_user.id}",
-            description="Platform royalty withdrawal to Stripe Connect",
-            metadata={
-                "admin_user_id": str(admin_user.id),
-                "type": "platform_royalty_withdrawal",
-                "ledger_entry_id": str(row.id or ""),
-            },
-        )
-        payout = stripe.Payout.create(
-            amount=amount_cents,
-            currency="usd",
-            stripe_account=stripe_account_id,
-            metadata={
-                "admin_user_id": str(admin_user.id),
-                "source_transfer_id": str(transfer.get("id") or ""),
-                "type": "platform_royalty_withdrawal",
-            },
-        )
-        db.commit()
-    except Exception as e:
+    except Exception as exc:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Withdrawal failed: {str(e)}") from e
+        logger.exception("Ledger update failed after Stripe payout %s", payout_id)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Withdrawal payout created but ledger update failed: {str(exc)}",
+        ) from exc
 
     return {
         "success": True,
         "amount_withdrawn": withdrawal_amount,
         "new_balance": float_from_decimal(row.balance_after),
-        "transfer_id": transfer.get("id"),
-        "payout_id": payout.get("id"),
+        "payout_id": payout_id,
+        "payout_status": payout_status,
+        "stripe_payout_url": _stripe_payout_dashboard_url(payout_id),
     }
 
 
@@ -955,20 +1014,6 @@ def admin_withdrawal_history(
     )
     total_count = int(q.count())
     rows = q.offset(offset).limit(limit).all()
-    pending_amount_counts: dict[int, int] = {}
-    stripe_account_id = (admin_user.stripe_account_id or "").strip()
-    if stripe_account_id:
-        try:
-            configure_stripe_client()
-            payouts = stripe.Payout.list(limit=100, stripe_account=stripe_account_id)
-            for payout in payouts.get("data", []):
-                status_value = (payout.get("status") or "").lower()
-                if status_value in {"pending", "in_transit"}:
-                    cents = int(payout.get("amount") or 0)
-                    pending_amount_counts[cents] = pending_amount_counts.get(cents, 0) + 1
-        except Exception as exc:
-            pending_amount_counts = {}
-            logger.warning("Admin withdrawal history payout fetch failed: %s", str(exc))
 
     all_for_running_total = (
         db.query(CreditLedger.id, CreditLedger.amount)
@@ -986,28 +1031,26 @@ def admin_withdrawal_history(
         running_withdrawn += abs(float_from_decimal(amount))
         running_total_withdrawn_by_id[int(row_id)] = round(running_withdrawn, 2)
 
-    entries = [
-        {
-            "id": row.id,
-            "amount": abs(float_from_decimal(row.amount)),
-            "amount_signed": float_from_decimal(row.amount),
-            "balance_after": float_from_decimal(row.balance_after),
-            "status": (
-                "pending"
-                if pending_amount_counts.get(int(round(abs(float_from_decimal(row.amount)) * 100)), 0) > 0
-                else "completed"
-            ),
-            "running_total_withdrawn": running_total_withdrawn_by_id.get(int(row.id), 0.0),
-            "reference_id": row.reference_id or "",
-            "note": row.note or "",
-            "created_at": _iso(row.created_at),
-        }
-        for row in rows
-    ]
-    for entry in entries:
-        if entry["status"] == "pending":
-            cents = int(round(entry["amount"] * 100))
-            pending_amount_counts[cents] = max(0, pending_amount_counts.get(cents, 0) - 1)
+    entries = []
+    for row in rows:
+        payout_id = (row.reference_id or "").strip()
+        payout = _fetch_platform_payout(payout_id) if payout_id else None
+        stripe_status = _normalize_payout_status(payout.get("status") if payout else None)
+        entries.append(
+            {
+                "id": row.id,
+                "amount": abs(float_from_decimal(row.amount)),
+                "amount_signed": float_from_decimal(row.amount),
+                "balance_after": float_from_decimal(row.balance_after),
+                "status": stripe_status,
+                "running_total_withdrawn": running_total_withdrawn_by_id.get(int(row.id), 0.0),
+                "reference_id": payout_id,
+                "payout_id": payout_id,
+                "stripe_payout_url": _stripe_payout_dashboard_url(payout_id),
+                "note": row.note or "",
+                "created_at": _iso(row.created_at),
+            }
+        )
     return {
         "entries": entries,
         "total_count": total_count,

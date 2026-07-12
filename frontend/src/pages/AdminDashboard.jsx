@@ -26,6 +26,7 @@ const TABS = [
 
 const LEDGER_PAGE_SIZE = 25;
 const EARNINGS_PAGE_SIZE = 25;
+const MIN_ROYALTY_WITHDRAWAL_DOLLARS = 1;
 const EARNINGS_DATE_RANGE_OPTIONS = [
   { value: "today", label: "Today" },
   { value: "this_week", label: "This Week" },
@@ -143,8 +144,9 @@ export default function AdminDashboard() {
   const [monthlyEarningsYearTotal, setMonthlyEarningsYearTotal] = useState(0);
   const [withdrawConfirmOpen, setWithdrawConfirmOpen] = useState(false);
   const [withdrawBusy, setWithdrawBusy] = useState(false);
-  const [connectBusy, setConnectBusy] = useState(false);
   const [withdrawStatusMsg, setWithdrawStatusMsg] = useState("");
+  const [withdrawSuccessOpen, setWithdrawSuccessOpen] = useState(false);
+  const [withdrawSuccessData, setWithdrawSuccessData] = useState(null);
 
   const [loading, setLoading] = useState({
     overview: true,
@@ -528,21 +530,37 @@ export default function AdminDashboard() {
     }
     const amount = Number(data?.amount_withdrawn || 0);
     setWithdrawConfirmOpen(false);
-    setWithdrawStatusMsg(`Withdrawal initiated! ${formatMoney(amount)} is on its way to your bank.`);
+    setWithdrawStatusMsg("");
+    setWithdrawSuccessData({
+      amount,
+      payoutId: data?.payout_id || "",
+      stripePayoutUrl: data?.stripe_payout_url || "",
+      payoutStatus: data?.payout_status || "pending",
+      newBalance: Number(data?.new_balance || 0),
+    });
+    setWithdrawSuccessOpen(true);
+    setRoyaltyBalance((prev) =>
+      prev
+        ? {
+            ...prev,
+            current_withdrawable_balance: Number(data?.new_balance || 0),
+            total_withdrawn: Number(prev.total_withdrawn || 0) + amount,
+            can_withdraw: false,
+          }
+        : prev
+    );
     await Promise.all([loadRoyaltyBalance(), loadWithdrawalHistory()]);
   }
 
-  async function handleConnectBankAccount() {
-    setConnectBusy(true);
-    setWithdrawStatusMsg("");
-    const res = await adminFetch("/admin/connect-onboarding-link", { method: "POST" });
-    const data = res ? await res.json().catch(() => ({})) : {};
-    setConnectBusy(false);
-    if (!res?.ok) {
-      setWithdrawStatusMsg(formatApiError(data?.detail, "Failed to open Stripe onboarding."));
-      return;
+  function payoutStatusClass(status) {
+    const value = (status || "").toLowerCase();
+    if (value === "paid") {
+      return "border-emerald-500/40 bg-emerald-500/15 text-emerald-200";
     }
-    if (data?.url) window.open(data.url, "_blank", "noopener,noreferrer");
+    if (value === "failed") {
+      return "border-rose-500/40 bg-rose-500/15 text-rose-200";
+    }
+    return "border-amber-500/40 bg-amber-500/15 text-amber-200";
   }
 
   function toggleUserSort(key) {
@@ -662,8 +680,15 @@ export default function AdminDashboard() {
   };
 
   const fin = stats?.financial_summary;
-  const canWithdraw = Number(royaltyBalance?.current_withdrawable_balance || 0) > 0;
-  const connectReady = Boolean(royaltyBalance?.connect_ready);
+  const withdrawableBalance = Number(royaltyBalance?.current_withdrawable_balance || 0);
+  const canWithdraw =
+    royaltyBalance?.can_withdraw === true ||
+    withdrawableBalance >= MIN_ROYALTY_WITHDRAWAL_DOLLARS;
+  const belowMinimumWithdrawal =
+    withdrawableBalance > 0 && withdrawableBalance < MIN_ROYALTY_WITHDRAWAL_DOLLARS;
+  const minimumWithdrawalMessage = `Minimum withdrawal is $1.00. Your current balance is ${formatMoney(
+    withdrawableBalance
+  )}. Keep selling cards and come back when you have more to withdraw!`;
 
   const invitePanel = (
     <section className="mb-6 rounded-xl border border-amber-500/25 bg-amber-500/5 p-4 sm:p-5">
@@ -1322,7 +1347,7 @@ export default function AdminDashboard() {
               </p>
             ) : null}
             {withdrawStatusMsg ? (
-              <p className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-100">
+              <p className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
                 {withdrawStatusMsg}
               </p>
             ) : null}
@@ -1359,37 +1384,29 @@ export default function AdminDashboard() {
 
             <section className="rounded-xl border border-white/10 bg-cardBg p-4">
               <h3 className="text-sm font-semibold text-white">Withdraw</h3>
-              {connectReady ? (
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    disabled={!canWithdraw || withdrawBusy}
-                    onClick={() => setWithdrawConfirmOpen(true)}
-                    className="min-h-[48px] rounded-lg bg-emerald-500 px-5 text-sm font-semibold text-slate-950 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Withdraw to Bank
-                  </button>
-                  <p className="text-sm text-slate-300">
-                    {canWithdraw
-                      ? `Withdraw ${formatMoney(royaltyBalance?.current_withdrawable_balance || 0)} to your bank account`
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  disabled={!canWithdraw || withdrawBusy}
+                  onClick={() => setWithdrawConfirmOpen(true)}
+                  className="min-h-[48px] rounded-lg bg-emerald-500 px-5 text-sm font-semibold text-slate-950 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {canWithdraw
+                    ? `Withdraw ${formatMoney(withdrawableBalance)} to Bank`
+                    : "Withdraw to Bank"}
+                </button>
+                <p className="text-sm text-slate-300">
+                  {canWithdraw
+                    ? `Withdraw ${formatMoney(withdrawableBalance)} to your connected bank account`
+                    : belowMinimumWithdrawal
+                      ? minimumWithdrawalMessage
                       : "No balance available to withdraw"}
-                  </p>
-                </div>
-              ) : (
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handleConnectBankAccount}
-                    disabled={connectBusy}
-                    className="min-h-[48px] rounded-lg bg-amber-500 px-5 text-sm font-semibold text-slate-950 hover:bg-amber-400 disabled:opacity-50"
-                  >
-                    {connectBusy ? "Opening Stripe..." : "Connect Bank Account"}
-                  </button>
-                  <p className="text-sm text-slate-300">
-                    Connect Stripe Express for the admin account before withdrawing royalties.
-                  </p>
-                </div>
-              )}
+                </p>
+              </div>
+              <p className="mt-3 text-xs text-slate-500">
+                Payouts are sent from your platform Stripe balance to the bank account configured in
+                Stripe Settings → Bank accounts and scheduling.
+              </p>
             </section>
 
             <section className="rounded-xl border border-white/10 bg-cardBg p-4">
@@ -1523,10 +1540,16 @@ export default function AdminDashboard() {
                 </p>
               ) : null}
               <div className="mt-3 overflow-x-auto rounded-xl border border-white/10">
-                <table className="w-full min-w-[820px] text-left text-sm">
+                <table className="w-full min-w-[980px] text-left text-sm">
                   <thead className="border-b border-white/10 bg-cardBg2 text-xs uppercase tracking-wide text-slate-500">
                     <tr>
-                      {["Date", "Amount", "Status", "Running Total Withdrawn"].map((h) => (
+                      {[
+                        "Date",
+                        "Amount",
+                        "Stripe Payout ID",
+                        "Status",
+                        "Running Total Withdrawn",
+                      ].map((h) => (
                         <th key={h} className="p-3 font-medium">
                           {h}
                         </th>
@@ -1536,7 +1559,7 @@ export default function AdminDashboard() {
                   <tbody>
                     {withdrawalHistoryEntries.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="p-6 text-center text-slate-500">
+                        <td colSpan={5} className="p-6 text-center text-slate-500">
                           No withdrawals yet.
                         </td>
                       </tr>
@@ -1546,14 +1569,33 @@ export default function AdminDashboard() {
                           <td className="p-3 text-xs text-slate-400">{formatDateTime(row.created_at)}</td>
                           <td className="p-3 tabular-nums text-slate-100">{formatMoney(row.amount || 0)}</td>
                           <td className="p-3">
+                            {row.payout_id || row.reference_id ? (
+                              <div className="space-y-1">
+                                <p className="font-mono text-xs text-slate-300">
+                                  {row.payout_id || row.reference_id}
+                                </p>
+                                {row.stripe_payout_url ? (
+                                  <a
+                                    href={row.stripe_payout_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs font-medium text-neonTeal hover:underline"
+                                  >
+                                    View in Stripe →
+                                  </a>
+                                ) : null}
+                              </div>
+                            ) : (
+                              <span className="text-slate-500">—</span>
+                            )}
+                          </td>
+                          <td className="p-3">
                             <span
-                              className={`rounded-full border px-2 py-0.5 text-[11px] ${
-                                row.status === "pending"
-                                  ? "border-amber-500/40 bg-amber-500/15 text-amber-200"
-                                  : "border-emerald-500/40 bg-emerald-500/15 text-emerald-200"
-                              }`}
+                              className={`rounded-full border px-2 py-0.5 text-[11px] capitalize ${payoutStatusClass(
+                                row.status
+                              )}`}
                             >
-                              {row.status || "completed"}
+                              {row.status || "pending"}
                             </span>
                           </td>
                           <td className="p-3 tabular-nums text-slate-300">
@@ -1762,15 +1804,19 @@ export default function AdminDashboard() {
         {withdrawConfirmOpen ? (
           <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4">
             <div className="w-full max-w-md rounded-xl border border-white/15 bg-cardBg p-5">
-              <h3 className="text-lg font-semibold text-white">Confirm Withdrawal</h3>
+              <h3 className="text-lg font-semibold text-white">Withdraw to Bank</h3>
               <p className="mt-2 text-sm text-slate-300">
                 You are about to withdraw{" "}
-                <span className="font-semibold text-emerald-300">
-                  {formatMoney(royaltyBalance?.current_withdrawable_balance || 0)}
-                </span>{" "}
+                <span className="font-semibold text-emerald-300">{formatMoney(withdrawableBalance)}</span>{" "}
                 to your connected bank account.
               </p>
-              <p className="mt-1 text-xs text-slate-400">Funds typically arrive in 2-3 business days.</p>
+              <p className="mt-2 text-sm text-slate-400">
+                This will appear in Stripe as a payout and arrive in your bank account within 2
+                business days.
+              </p>
+              <p className="mt-2 text-xs text-slate-500">
+                Stripe payout ID will be saved for your records.
+              </p>
               <div className="mt-4 flex justify-end gap-2">
                 <button
                   type="button"
@@ -1786,6 +1832,44 @@ export default function AdminDashboard() {
                   className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-50"
                 >
                   {withdrawBusy ? "Processing..." : "Confirm Withdrawal"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {withdrawSuccessOpen && withdrawSuccessData ? (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4">
+            <div className="w-full max-w-md rounded-xl border border-emerald-500/30 bg-cardBg p-5">
+              <h3 className="text-lg font-semibold text-white">
+                Withdrawal of {formatMoney(withdrawSuccessData.amount)} initiated!
+              </h3>
+              <p className="mt-2 text-sm text-slate-300">
+                Stripe Payout ID:{" "}
+                <span className="font-mono text-emerald-300">{withdrawSuccessData.payoutId || "—"}</span>
+                {" — "}use this to track in your Stripe dashboard under Payouts.
+              </p>
+              {withdrawSuccessData.stripePayoutUrl ? (
+                <a
+                  href={withdrawSuccessData.stripePayoutUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-block text-sm font-medium text-neonTeal hover:underline"
+                >
+                  View in Stripe →
+                </a>
+              ) : null}
+              <p className="mt-3 text-sm text-slate-400">Funds arrive in approximately 2 business days.</p>
+              <p className="mt-2 text-sm text-slate-300">
+                Available balance is now {formatMoney(withdrawSuccessData.newBalance)}.
+              </p>
+              <div className="mt-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setWithdrawSuccessOpen(false)}
+                  className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-emerald-400"
+                >
+                  Done
                 </button>
               </div>
             </div>
