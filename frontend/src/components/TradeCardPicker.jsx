@@ -1,8 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { API_BASE_URL } from "../config/api";
 import CardImage from "./CardImage";
 import { CARD_IMAGE_FRAME_THUMB } from "../utils/cardImageStyles";
 import { isAnimatedCard } from "../utils/animationCard";
+
+const CARDS_PER_PAGE = 6;
 
 function isTradeSelectable(card, excludeIds) {
   const id = (card?.card_id || "").toUpperCase();
@@ -23,6 +25,34 @@ function ineligibleReason(card, excludeIds) {
   return null;
 }
 
+function PagerArrowButton({ direction, disabled, onClick, label }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      aria-label={label}
+      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-cardBg text-slate-300 transition hover:border-teal-500/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+    >
+      <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        {direction === "up" ? (
+          <path
+            fillRule="evenodd"
+            d="M10 3a.75.75 0 01.53.22l4.5 4.5a.75.75 0 11-1.06 1.06L10 5.31 6.03 9.28a.75.75 0 11-1.06-1.06l4.5-4.5A.75.75 0 0110 3z"
+            clipRule="evenodd"
+          />
+        ) : (
+          <path
+            fillRule="evenodd"
+            d="M10 17a.75.75 0 01-.53-.22l-4.5-4.5a.75.75 0 111.06-1.06L10 14.69l3.97-3.97a.75.75 0 111.06 1.06l-4.5 4.5A.75.75 0 0110 17z"
+            clipRule="evenodd"
+          />
+        )}
+      </svg>
+    </button>
+  );
+}
+
 /**
  * Multi-select card picker from the user's collection for marketplace card trades.
  */
@@ -36,8 +66,7 @@ export default function TradeCardPicker({
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const scrollerRef = useRef(null);
-  const [showScrollHint, setShowScrollHint] = useState(false);
+  const [pageIndex, setPageIndex] = useState(0);
 
   const excludeSet = useMemo(() => {
     const s = new Set();
@@ -78,32 +107,30 @@ export default function TradeCardPicker({
     loadCards();
   }, [loadCards]);
 
+  const needsPagination = cards.length >= 7;
+  const totalPages = needsPagination ? Math.ceil(cards.length / CARDS_PER_PAGE) : 1;
+
+  useEffect(() => {
+    if (pageIndex > totalPages - 1) {
+      setPageIndex(Math.max(0, totalPages - 1));
+    }
+  }, [pageIndex, totalPages]);
+
+  const visibleCards = useMemo(() => {
+    if (!needsPagination) return cards;
+    const start = pageIndex * CARDS_PER_PAGE;
+    return cards.slice(start, start + CARDS_PER_PAGE);
+  }, [cards, needsPagination, pageIndex]);
+
+  const rangeStart = needsPagination ? pageIndex * CARDS_PER_PAGE + 1 : 1;
+  const rangeEnd = needsPagination
+    ? Math.min((pageIndex + 1) * CARDS_PER_PAGE, cards.length)
+    : cards.length;
+
   const selectedCards = useMemo(
     () => cards.filter((c) => selectedSet.has((c.card_id || "").toUpperCase())),
     [cards, selectedSet]
   );
-
-  useEffect(() => {
-    const el = scrollerRef.current;
-    if (!el) {
-      setShowScrollHint(false);
-      return;
-    }
-
-    const updateHint = () => {
-      const overflow = el.scrollHeight - el.clientHeight > 2;
-      const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 4;
-      setShowScrollHint(overflow && !nearBottom);
-    };
-
-    updateHint();
-    el.addEventListener("scroll", updateHint, { passive: true });
-    window.addEventListener("resize", updateHint);
-    return () => {
-      el.removeEventListener("scroll", updateHint);
-      window.removeEventListener("resize", updateHint);
-    };
-  }, [cards.length, selectedIds]);
 
   function toggleCard(card) {
     const key = (card.card_id || "").toUpperCase();
@@ -130,12 +157,26 @@ export default function TradeCardPicker({
       ) : cards.length === 0 ? (
         <p className="text-sm text-slate-500">No cards in your collection.</p>
       ) : (
-        <div className="relative rounded-lg border border-white/10 bg-cardBg2/40 p-2">
-          <div
-            ref={scrollerRef}
-            className="grid max-h-[300px] grid-cols-3 gap-2 overflow-y-auto pr-1 touch-pan-y overscroll-contain sm:max-h-[460px] sm:grid-cols-4 [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.65)_rgba(15,23,42,0.25)]"
-          >
-            {cards.map((card) => {
+        <div className="rounded-lg border border-white/10 bg-cardBg2/40 p-2">
+          {needsPagination ? (
+            <div className="mb-2 flex justify-center">
+              <PagerArrowButton
+                direction="up"
+                label="Show previous cards"
+                disabled={pageIndex <= 0}
+                onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}
+              />
+            </div>
+          ) : null}
+
+          {needsPagination ? (
+            <p className="mb-2 text-center text-xs text-slate-400">
+              Showing cards {rangeStart}-{rangeEnd} of {cards.length}
+            </p>
+          ) : null}
+
+          <div className="grid grid-cols-3 gap-2">
+            {visibleCards.map((card) => {
               const selectable = isTradeSelectable(card, excludeSet);
               const selected = selectedSet.has((card.card_id || "").toUpperCase());
               const reason = ineligibleReason(card, excludeSet);
@@ -167,9 +208,15 @@ export default function TradeCardPicker({
               );
             })}
           </div>
-          {showScrollHint ? (
-            <div className="pointer-events-none absolute inset-x-2 bottom-2 rounded-md bg-gradient-to-t from-cardBg2 via-cardBg2/80 to-transparent pt-8 pb-1 text-center text-[10px] font-medium uppercase tracking-[0.08em] text-slate-400">
-              Scroll for more cards
+
+          {needsPagination ? (
+            <div className="mt-2 flex justify-center">
+              <PagerArrowButton
+                direction="down"
+                label="Show next cards"
+                disabled={pageIndex >= totalPages - 1}
+                onClick={() => setPageIndex((prev) => Math.min(totalPages - 1, prev + 1))}
+              />
             </div>
           ) : null}
         </div>

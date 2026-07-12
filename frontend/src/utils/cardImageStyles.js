@@ -42,6 +42,14 @@ export const CARD_VIDEO_DETAIL_CLASS = CARD_VIDEO_CLASS;
 export const CARD_IMAGE_FRAME_DETAIL =
   "relative mx-auto flex aspect-[2/3] w-full min-h-0 max-w-sm flex-col overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-slate-800/80 via-black/50 to-slate-900/90 p-2 sm:max-w-md sm:p-3";
 
+/** Marketplace modals — minimum 200px wide card preview */
+export const CARD_IMAGE_FRAME_MODAL =
+  "relative flex aspect-[2/3] w-full min-w-[200px] max-w-[240px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-slate-800/80 via-black/50 to-slate-900/90 p-2 sm:p-3";
+
+/** My Listings row — minimum 120px wide alongside listing details */
+export const CARD_IMAGE_FRAME_LISTING_ROW =
+  "relative flex aspect-[2/3] w-full min-w-[120px] flex-col overflow-hidden rounded-xl border border-white/10 bg-gradient-to-b from-slate-800/90 via-black/60 to-slate-900/95 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]";
+
 export const CARD_IMAGE_MEDIA_DETAIL = CARD_IMAGE_MEDIA_CLASS;
 
 export const CARD_IMAGE_FRAME_SM =

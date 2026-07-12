@@ -1,10 +1,11 @@
 import React from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { formatMoney } from "../utils/marketplace";
 
 export default function AppHeader() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, logout, initializing, pendingIncomingTradesCount, pendingIncomingMarketplaceCount } =
     useAuth();
   const onStudio = location.pathname === "/";
@@ -14,6 +15,11 @@ export default function AppHeader() {
   const onTrades = location.pathname.startsWith("/trades");
   const onProfile = location.pathname.startsWith("/profile");
   const onCredits = location.pathname.startsWith("/credits");
+
+  function handleLogout() {
+    logout();
+    navigate("/login", { replace: true });
+  }
 
   return (
     <header className="border-b border-white/10 bg-cardBg/50 backdrop-blur">
@@ -109,7 +115,7 @@ export default function AppHeader() {
               </Link>
               <button
                 type="button"
-                onClick={() => logout()}
+                onClick={handleLogout}
                 className="rounded-lg border border-white/15 px-3 py-2 text-xs font-medium text-slate-300 transition hover:border-white/30 hover:text-white sm:text-sm"
               >
                 Logout

@@ -13,6 +13,7 @@ import MarketplacePage from "./pages/MarketplacePage";
 import MarketplaceCardDetailPage from "./pages/MarketplaceCardDetailPage";
 import MarketplaceMyListingsPage from "./pages/MarketplaceMyListingsPage";
 import MarketplaceMyOffersPage from "./pages/MarketplaceMyOffersPage";
+import MarketplaceOfferDetailPage from "./pages/MarketplaceOfferDetailPage";
 import CreditsPage from "./pages/CreditsPage";
 
 export default function App() {
@@ -34,6 +35,7 @@ export default function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/my-collection" element={<MyCollectionPage />} />
       <Route path="/marketplace/my-listings" element={<MarketplaceMyListingsPage />} />
+      <Route path="/marketplace/my-offers/:offerId" element={<MarketplaceOfferDetailPage />} />
       <Route path="/marketplace/my-offers" element={<MarketplaceMyOffersPage />} />
       <Route path="/marketplace/:cardId" element={<MarketplaceCardDetailPage />} />
       <Route path="/marketplace" element={<MarketplacePage />} />

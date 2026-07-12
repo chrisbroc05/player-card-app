@@ -255,12 +255,19 @@ export default function MarketplaceMyOffersPage() {
                   ) : null}
 
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                    <Link to={"/marketplace/" + encodeURIComponent(offer.card_id)} className="block w-full max-w-[100px] shrink-0">
+                    <Link
+                      to={`/marketplace/my-offers/${offer.offer_id}`}
+                      className="block w-full max-w-[120px] shrink-0 self-center sm:self-start"
+                    >
                       <CardImage card={offer} alt={offer.player_name} frameClassName={CARD_IMAGE_FRAME_XS} />
                     </Link>
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-white">{offer.player_name}</p>
-                      <p className="font-mono text-xs text-slate-500">{offer.card_id}</p>
+                      <Link
+                        to={`/marketplace/my-offers/${offer.offer_id}`}
+                        className="block transition hover:opacity-90"
+                      >
+                        <p className="text-base font-medium text-white break-words">{offer.player_name}</p>
+                        <p className="font-mono text-[13px] text-slate-500 break-all">{offer.card_id}</p>
                       {isTrade ? (
                         <>
                           <p className="mt-1 text-sm font-semibold text-amber-200">Card Trade Offer</p>
@@ -269,10 +276,12 @@ export default function MarketplaceMyOffersPage() {
                       ) : (
                         <>
                           <p className="mt-1 text-lg font-semibold text-neonTeal">{formatMoney(offer.offer_amount)}</p>
-                          <p className="text-xs text-slate-500">
-                            Asking {formatMoney(offer.asking_price)}
-                            {compare ? " · " + compare : ""}
-                          </p>
+                          {offer.asking_price != null && offer.asking_price > 0 ? (
+                            <p className="text-[13px] text-slate-500">
+                              Asking {formatMoney(offer.asking_price)}
+                              {compare ? ` · ${compare}` : ""}
+                            </p>
+                          ) : null}
                         </>
                       )}
                       <span
@@ -287,7 +296,8 @@ export default function MarketplaceMyOffersPage() {
                           {offerExpiresLabel(offer.days_remaining)}
                         </p>
                       ) : null}
-                      {note ? <p className="mt-1 text-xs text-slate-500">{note}</p> : null}
+                      {note ? <p className="mt-1 text-[13px] text-slate-500">{note}</p> : null}
+                      </Link>
                     </div>
                     {pending && !counterPending ? (
                       <button

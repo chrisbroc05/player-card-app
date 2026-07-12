@@ -18,6 +18,7 @@ export default function MarketplaceListingActions({
   const [price, setPrice] = useState("");
   const [priorityBoost, setPriorityBoost] = useState(false);
   const [localError, setLocalError] = useState("");
+  const [listSuccessOpen, setListSuccessOpen] = useState(false);
 
   const priceNum = Number(price);
   const totalWithBoost = useMemo(() => {
@@ -44,6 +45,7 @@ export default function MarketplaceListingActions({
       setOpen(false);
       setPrice("");
       setPriorityBoost(false);
+      setListSuccessOpen(true);
     } catch (err) {
       setLocalError(err.message || "Could not list card.");
     }
@@ -141,6 +143,39 @@ export default function MarketplaceListingActions({
         </>
       )}
       {localError ? <p className="text-xs text-rose-300">{localError}</p> : null}
+      <ListedSuccessModal open={listSuccessOpen} onClose={() => setListSuccessOpen(false)} />
+    </div>
+  );
+}
+
+function ListedSuccessModal({ open, onClose }) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-3 py-4 sm:px-4">
+      <div
+        className="w-full max-w-sm rounded-2xl border border-emerald-500/30 bg-cardBg p-5 shadow-2xl shadow-black/50 sm:p-6"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="listed-success-title"
+      >
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-emerald-400/50 bg-emerald-500/15 text-2xl text-emerald-300">
+          ✓
+        </div>
+        <h3 id="listed-success-title" className="mt-3 text-center text-xl font-semibold text-white">
+          Card Listed!
+        </h3>
+        <p className="mt-2 text-center text-sm text-slate-300">
+          Your card is now live on the marketplace.
+        </p>
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-5 inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 transition hover:opacity-90"
+        >
+          OK
+        </button>
+      </div>
     </div>
   );
 }

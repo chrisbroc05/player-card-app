@@ -16,6 +16,13 @@ import {
   offerExpiresLineClass,
 } from "../utils/marketplace";
 import { vaultTierBadge } from "../utils/tierStyles";
+import { CARD_IMAGE_FRAME_LISTING_ROW } from "../utils/cardImageStyles";
+import {
+  MARKETPLACE_MODAL_OVERLAY_CLASS,
+  MarketplaceModalCardDetails,
+  MarketplaceModalCardSection,
+  marketplaceModalPanelClass,
+} from "../components/MarketplaceModalLayout";
 
 function formatListingExpiresDate(iso) {
   if (!iso) return "";
@@ -290,53 +297,66 @@ export default function MarketplaceMyListingsPage() {
               return (
                 <article
                   key={listing.card_id}
-                  className={`rounded-2xl border border-white/10 bg-cardBg p-4 ${badge.glow}`}
+                  className={`rounded-2xl border border-white/10 bg-cardBg p-5 sm:p-6 ${badge.glow}`}
                 >
-                  <div className="flex flex-col gap-4 sm:flex-row">
+                  <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-6">
                     {cardOffers.length > 0 ? (
                       <button
                         type="button"
                         onClick={() => setReviewCardId(listing.card_id)}
-                        className="block w-full max-w-[140px] shrink-0 overflow-hidden rounded-xl border border-white/10 transition hover:border-neonTeal/60"
+                        className="block w-[120px] min-w-[120px] shrink-0 self-center overflow-hidden rounded-xl border border-white/10 transition hover:border-neonTeal/60 sm:w-[140px] sm:self-start"
                       >
                         <CardImage
                           card={listing}
                           alt={listing.player_name}
-                          frameClassName="flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/30"
+                          frameClassName={CARD_IMAGE_FRAME_LISTING_ROW}
                           playOnHover
                         />
                       </button>
                     ) : (
                       <Link
                         to={`/marketplace/${encodeURIComponent(listing.card_id)}`}
-                        className="block w-full max-w-[140px] shrink-0 overflow-hidden rounded-xl border border-white/10"
+                        className="block w-[120px] min-w-[120px] shrink-0 self-center overflow-hidden rounded-xl border border-white/10 sm:w-[140px] sm:self-start"
                       >
                         <CardImage
                           card={listing}
                           alt={listing.player_name}
-                          frameClassName="flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/30"
+                          frameClassName={CARD_IMAGE_FRAME_LISTING_ROW}
                           playOnHover
                         />
                       </Link>
                     )}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1 space-y-3">
+                      <div className="space-y-2">
+                        <h2 className="text-base font-semibold leading-snug text-white break-words">
+                          {listing.player_name}
+                        </h2>
+                        {listing.team_name ? (
+                          <p className="text-[13px] leading-relaxed text-slate-400 break-words">
+                            {listing.team_name}
+                          </p>
+                        ) : null}
                         <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h2 className="text-lg font-semibold text-white">{listing.player_name}</h2>
-                            {(listing.pending_offer_count || 0) > 0 ? (
-                              <span className="inline-flex rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-200">
-                                {listing.pending_offer_count} Offer{listing.pending_offer_count === 1 ? "" : "s"}
-                              </span>
-                            ) : null}
-                          </div>
-                          <p className="text-sm text-slate-400">{listing.team_name}</p>
-                          <p className="mt-1 font-mono text-xs text-neonTeal/80">{listing.card_id}</p>
+                          <span
+                            className={`inline-flex rounded-full border px-2.5 py-0.5 text-[13px] font-medium ${badge.pill}`}
+                          >
+                            {badge.label}
+                          </span>
                         </div>
-                        <p className="text-xl font-bold text-neonTeal">{formatMoney(listing.asking_price)}</p>
+                        {(listing.pending_offer_count || 0) > 0 ? (
+                          <div>
+                            <span className="inline-flex rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-0.5 text-[13px] font-semibold text-amber-200">
+                              {listing.pending_offer_count} Offer{listing.pending_offer_count === 1 ? "" : "s"}
+                            </span>
+                          </div>
+                        ) : null}
+                        <p className="font-mono text-[13px] leading-relaxed text-neonTeal/80 break-all">
+                          {listing.card_id}
+                        </p>
                       </div>
+                      <p className="text-xl font-bold text-neonTeal">{formatMoney(listing.asking_price)}</p>
                       {listing.listing_expires_at ? (
-                        <p className={`mt-2 text-xs ${listingExpiresSubtextClass(dr)}`}>
+                        <p className={`text-[13px] ${listingExpiresSubtextClass(dr)}`}>
                           {listingExpiresLabel(dr)}
                           {formatListingExpiresDate(listing.listing_expires_at)
                             ? ` · ${formatListingExpiresDate(listing.listing_expires_at)}`
@@ -743,26 +763,28 @@ function AcceptOfferSuccessModal({ open, payload, onGoProfile, onBackListings })
   if (!open || !payload) return null;
   const { listing, isTrade, net, newBalance } = payload;
   return (
-    <div className="fixed inset-0 z-[74] flex items-center justify-center bg-black/70 px-3 py-4 sm:px-4">
-      <div className="w-full max-w-md rounded-2xl border border-emerald-500/30 bg-cardBg p-5 shadow-2xl sm:p-6">
+    <div className={`${MARKETPLACE_MODAL_OVERLAY_CLASS} z-[74]`}>
+      <div className={marketplaceModalPanelClass("border-emerald-500/30")}>
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-emerald-400/50 bg-emerald-500/15 text-2xl text-emerald-300">
           ✓
         </div>
-        <h3 className="mt-3 text-center text-2xl font-semibold text-white">Offer Accepted!</h3>
-        <p className="mt-2 text-center text-sm text-slate-300">
+        <h3 className="mt-4 text-center text-2xl font-semibold text-white">Offer Accepted!</h3>
+        <p className="mt-2 text-center text-[13px] text-slate-300 sm:text-left">
           {isTrade ? "Card added to your collection" : `You received ${formatMoney(net)}`}
         </p>
         {newBalance != null ? (
-          <p className="mt-1 text-center text-sm text-neonTeal">Current credit balance: {formatMoney(newBalance)}</p>
+          <p className="mt-1 text-center text-[13px] text-neonTeal sm:text-left">
+            Current credit balance: {formatMoney(newBalance)}
+          </p>
         ) : null}
-        <div className="mx-auto mt-4 w-24 overflow-hidden rounded-lg border border-white/10">
-          <CardImage
-            card={listing}
-            alt={listing?.player_name}
-            frameClassName="flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/30"
-          />
+
+        <div className="mt-6 rounded-xl border border-white/10 bg-cardBg2 p-4">
+          <MarketplaceModalCardSection card={listing} centered>
+            <MarketplaceModalCardDetails listing={listing} />
+          </MarketplaceModalCardSection>
         </div>
-        <div className="mt-5 space-y-2">
+
+        <div className="mt-6 space-y-2">
           <button
             type="button"
             onClick={onGoProfile}

@@ -50,6 +50,7 @@ from marketplace_repo import (
     listing_dict,
     log_priority_listing_pending_charge,
     partition_and_sort_marketplace_rows,
+    buyer_offer_row_dict,
 )
 from marketplace_trade_repo import (
     OFFER_TYPE_CARD_TRADE,
@@ -176,7 +177,19 @@ def _offer_extra_fields(offer: MarketplaceOffer) -> dict:
         "counter_amount": ca,
         "counter_at": offer.counter_at.isoformat() if offer.counter_at else None,
         "counter_status": offer.counter_status,
+        "offer_type": (offer.offer_type or OFFER_TYPE_CASH).strip().lower(),
     }
+
+
+def _serialize_buyer_offer(db: Session, offer: MarketplaceOffer, card: Card, seller: User) -> dict:
+    row = buyer_offer_row_dict(
+        offer,
+        card,
+        seller_display_name=seller.display_name,
+    )
+    row.update(_offer_extra_fields(offer))
+    row.update(offer_trade_fields(db, offer))
+    return row
 
 
 def _block_if_counter_awaiting_buyer(offer: MarketplaceOffer) -> None:
@@ -1076,31 +1089,36 @@ def marketplace_my_offers(
     current_user: User = Depends(get_current_user),
 ):
     rows = (
-        db.query(MarketplaceOffer, Card)
+        db.query(MarketplaceOffer, Card, User)
         .join(Card, MarketplaceOffer.card_id == Card.card_id)
+        .join(User, MarketplaceOffer.seller_id == User.id)
         .filter(MarketplaceOffer.buyer_id == current_user.id)
         .order_by(MarketplaceOffer.created_at.desc())
         .all()
     )
-    out = []
-    for offer, card in rows:
-        owner_dn = _owner_display(db, card)
-        row = {
-            "offer_id": offer.id,
-            "card_id": card.card_id,
-            "player_name": card.player_name,
-            "image_url": card.image_url,
-            "offer_amount": float_from_decimal(offer.offer_amount),
-            "asking_price": float_from_decimal(card.asking_price),
-            "status": offer.status,
-            "message": offer.message or "",
-            "created_at": offer.created_at.isoformat() if offer.created_at else "",
-            "owner_display_name": owner_dn,
-        }
-        row.update(_offer_extra_fields(offer))
-        row.update(offer_trade_fields(db, offer))
-        out.append(row)
-    return out
+    return [_serialize_buyer_offer(db, offer, card, seller) for offer, card, seller in rows]
+
+
+@router.get("/offer/{offer_id}")
+def marketplace_get_buyer_offer(
+    offer_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    row = (
+        db.query(MarketplaceOffer, Card, User)
+        .join(Card, MarketplaceOffer.card_id == Card.card_id)
+        .join(User, MarketplaceOffer.seller_id == User.id)
+        .filter(
+            MarketplaceOffer.id == offer_id,
+            MarketplaceOffer.buyer_id == current_user.id,
+        )
+        .first()
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Offer not found")
+    offer, card, seller = row
+    return _serialize_buyer_offer(db, offer, card, seller)
 
 
 @router.get("/incoming-offers")

@@ -237,6 +237,41 @@ def listing_dict(card: Card, owner_display_name: str, *, pending_offer_count: in
     return row
 
 
+def buyer_offer_row_dict(
+    offer: MarketplaceOffer,
+    card: Card,
+    *,
+    seller_display_name: str,
+) -> dict:
+    """Serialize a buyer's offer with embedded card details (listing status not required)."""
+    asking = float_from_decimal(card.asking_price) if card.asking_price is not None else None
+    row = {
+        "offer_id": offer.id,
+        "card_id": card.card_id,
+        "player_name": card.player_name,
+        "team_name": card.team_name,
+        "position": card.position or "",
+        "jersey_number": card.jersey_number or "",
+        "grad_year": _grad_year_int(card),
+        "tier": card.tier,
+        "theme": card.theme or "none",
+        "rarity": card.rarity,
+        "edition_number": card.edition_number,
+        "print_run": card.print_run,
+        "image_url": card.image_url,
+        "offer_amount": float_from_decimal(offer.offer_amount),
+        "asking_price": asking,
+        "status": offer.status,
+        "message": offer.message or "",
+        "created_at": _iso(offer.created_at),
+        "updated_at": _iso(offer.updated_at),
+        "seller_display_name": seller_display_name,
+        "owner_display_name": seller_display_name,
+    }
+    row.update(animation_fields_for_card(card))
+    return row
+
+
 def get_listed_card_or_none(db: Session, card_id: str) -> Card | None:
     now = utcnow()
     return (

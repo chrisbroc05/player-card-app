@@ -15,6 +15,12 @@ import AnimatedBadge from "../components/AnimatedBadge";
 import CardHistoryTimeline from "../components/CardHistoryTimeline";
 import { vaultTierBadge, rarityDisplay } from "../utils/tierStyles";
 import { CARD_IMAGE_FRAME_DETAIL } from "../utils/cardImageStyles";
+import {
+  MARKETPLACE_MODAL_OVERLAY_CLASS,
+  MarketplaceModalCardDetails,
+  MarketplaceModalCardSection,
+  marketplaceModalPanelClass,
+} from "../components/MarketplaceModalLayout";
 
 export default function MarketplaceCardDetailPage() {
   const { cardId } = useParams();
@@ -475,9 +481,9 @@ function BuyAtAskingConfirmModal({
   const balanceAfter = hasBalance ? Math.max(0, balance - askingPrice) : null;
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-3 py-4 sm:px-4">
+    <div className={`${MARKETPLACE_MODAL_OVERLAY_CLASS} z-[70]`}>
       <div
-        className="w-full max-w-lg rounded-2xl border border-white/10 bg-cardBg p-5 shadow-2xl shadow-black/50 sm:p-6"
+        className={marketplaceModalPanelClass()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="buy-confirm-title"
@@ -485,31 +491,40 @@ function BuyAtAskingConfirmModal({
         <h3 id="buy-confirm-title" className="text-xl font-semibold text-white">
           Confirm Purchase
         </h3>
-        <p className="mt-2 text-sm text-slate-400">Review purchase details before completing payment.</p>
+        <p className="mt-2 text-[13px] text-slate-400">Review purchase details before completing payment.</p>
 
-        <div className="mt-4 flex items-start gap-3 rounded-xl border border-white/10 bg-cardBg2 p-3">
-          <div className="w-20 shrink-0 overflow-hidden rounded-lg border border-white/10">
-            <CardImage card={listing} alt={listing.player_name} frameClassName={CARD_IMAGE_FRAME_DETAIL} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-white">{listing.player_name || "Card"}</p>
-            <p className="mt-1 text-xs text-slate-400">Seller: {listing.owner_display_name || "Unknown Seller"}</p>
-            <p className="mt-2 text-sm text-slate-200">
-              You are buying this card for <span className="font-semibold text-neonTeal">{formatMoney(askingPrice)}</span>
-            </p>
-            <p className="mt-1 text-xs text-slate-400">
-              Your balance:{" "}
-              <span className="font-semibold text-white">
-                {hasBalance ? formatMoney(balance) : "—"}
-              </span>
-            </p>
-            <p className="mt-1 text-xs text-slate-400">
-              Balance after:{" "}
-              <span className="font-semibold text-white">
-                {balanceAfter != null ? formatMoney(balanceAfter) : "—"}
-              </span>
-            </p>
-          </div>
+        <div className="mt-6 rounded-xl border border-white/10 bg-cardBg2 p-4">
+          <MarketplaceModalCardSection card={listing}>
+            <MarketplaceModalCardDetails
+              listing={listing}
+              extra={
+                <>
+                  <p className="text-[13px] text-slate-400">
+                    Seller:{" "}
+                    <span className="font-medium text-white break-words">
+                      {listing.owner_display_name || "Unknown Seller"}
+                    </span>
+                  </p>
+                  <p className="text-[13px] leading-relaxed text-slate-200">
+                    You are buying this card for{" "}
+                    <span className="font-semibold text-neonTeal">{formatMoney(askingPrice)}</span>
+                  </p>
+                  <p className="text-[13px] text-slate-400">
+                    Your balance:{" "}
+                    <span className="font-semibold text-white">
+                      {hasBalance ? formatMoney(balance) : "—"}
+                    </span>
+                  </p>
+                  <p className="text-[13px] text-slate-400">
+                    Balance after:{" "}
+                    <span className="font-semibold text-white">
+                      {balanceAfter != null ? formatMoney(balanceAfter) : "—"}
+                    </span>
+                  </p>
+                </>
+              }
+            />
+          </MarketplaceModalCardSection>
         </div>
 
         <div className="mt-4">
@@ -575,9 +590,9 @@ function BuyAtAskingSuccessModal({
   if (!open || !listing) return null;
 
   return (
-    <div className="fixed inset-0 z-[71] flex items-center justify-center bg-black/70 px-3 py-4 sm:px-4">
+    <div className={`${MARKETPLACE_MODAL_OVERLAY_CLASS} z-[71]`}>
       <div
-        className="w-full max-w-md rounded-2xl border border-emerald-500/30 bg-cardBg p-5 shadow-2xl shadow-black/50 sm:p-6"
+        className={marketplaceModalPanelClass("border-emerald-500/30")}
         role="dialog"
         aria-modal="true"
         aria-labelledby="buy-success-title"
@@ -585,19 +600,24 @@ function BuyAtAskingSuccessModal({
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-emerald-400/50 bg-emerald-500/15 text-2xl text-emerald-300">
           ✓
         </div>
-        <h3 id="buy-success-title" className="mt-3 text-center text-2xl font-semibold text-white">
+        <h3 id="buy-success-title" className="mt-4 text-center text-2xl font-semibold text-white">
           Card Purchased!
         </h3>
 
-        <div className="mx-auto mt-4 w-28 overflow-hidden rounded-lg border border-white/10">
-          <CardImage card={listing} alt={listing.player_name} frameClassName={CARD_IMAGE_FRAME_DETAIL} />
+        <div className="mt-6 rounded-xl border border-white/10 bg-cardBg2 p-4">
+          <MarketplaceModalCardSection card={listing} centered>
+            <MarketplaceModalCardDetails
+              listing={listing}
+              extra={
+                <p className="text-[13px] leading-relaxed text-slate-300">
+                  {formatMoney(askingPrice)} credits have been deducted from your balance.
+                </p>
+              }
+            />
+          </MarketplaceModalCardSection>
         </div>
-        <p className="mt-3 text-center text-sm font-medium text-white">{listing.player_name || "Card"}</p>
-        <p className="mt-1 text-center text-sm text-slate-300">
-          {formatMoney(askingPrice)} credits have been deducted from your balance.
-        </p>
 
-        <div className="mt-5 space-y-2">
+        <div className="mt-6 space-y-2">
           <button
             type="button"
             onClick={onBackToMarketplace}

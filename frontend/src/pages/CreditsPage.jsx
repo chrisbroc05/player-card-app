@@ -97,6 +97,15 @@ export default function CreditsPage() {
     return null;
   }, [selectedAmount, customAmount]);
 
+  const loadCreditsButtonLabel = useMemo(() => {
+    if (checkoutBusy) return "Redirecting to Stripe…";
+    if (resolvedAmount == null || resolvedAmount < 5) return "Load Credits";
+    const amountLabel = Number.isInteger(resolvedAmount)
+      ? `$${resolvedAmount}`
+      : formatMoney(resolvedAmount);
+    return `Load ${amountLabel} Credits`;
+  }, [checkoutBusy, resolvedAmount]);
+
   const loadLedger = useCallback(async () => {
     if (!token) return;
     setLedgerLoading(true);
@@ -375,7 +384,7 @@ export default function CreditsPage() {
             onClick={() => startCheckout(null)}
             className="mt-5 min-h-[48px] w-full rounded-xl bg-neonTeal font-semibold text-slate-950 disabled:opacity-50"
           >
-            {checkoutBusy ? "Redirecting to Stripe…" : "Load Credits"}
+            {checkoutBusy ? "Redirecting to Stripe…" : loadCreditsButtonLabel}
           </button>
         </section>
 
