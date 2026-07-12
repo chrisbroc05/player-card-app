@@ -144,6 +144,7 @@ export default function AdminDashboard() {
   const [monthlyEarningsYearTotal, setMonthlyEarningsYearTotal] = useState(0);
   const [withdrawConfirmOpen, setWithdrawConfirmOpen] = useState(false);
   const [withdrawBusy, setWithdrawBusy] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState("");
   const [withdrawStatusMsg, setWithdrawStatusMsg] = useState("");
   const [withdrawSuccessOpen, setWithdrawSuccessOpen] = useState(false);
   const [withdrawSuccessData, setWithdrawSuccessData] = useState(null);
@@ -681,14 +682,55 @@ export default function AdminDashboard() {
 
   const fin = stats?.financial_summary;
   const withdrawableBalance = Number(royaltyBalance?.current_withdrawable_balance || 0);
-  const canWithdraw =
-    royaltyBalance?.can_withdraw === true ||
-    withdrawableBalance >= MIN_ROYALTY_WITHDRAWAL_DOLLARS;
   const belowMinimumWithdrawal =
     withdrawableBalance > 0 && withdrawableBalance < MIN_ROYALTY_WITHDRAWAL_DOLLARS;
   const minimumWithdrawalMessage = `Minimum withdrawal is $1.00. Your current balance is ${formatMoney(
     withdrawableBalance
   )}. Keep selling cards and come back when you have more to withdraw!`;
+
+  const parsedWithdrawAmount = useMemo(() => {
+    const raw = withdrawAmount.trim();
+    if (!raw) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+  }, [withdrawAmount]);
+
+  const withdrawButtonLabel = useMemo(() => {
+    if (withdrawBusy) return "Processing...";
+    const amount = parsedWithdrawAmount;
+    if (amount == null || amount <= 0) return "Withdraw to Bank";
+    if (amount > withdrawableBalance) return "Insufficient Balance";
+    if (amount < MIN_ROYALTY_WITHDRAWAL_DOLLARS) return "Minimum withdrawal is $1.00";
+    return `Withdraw ${formatMoney(amount)} to Bank`;
+  }, [withdrawBusy, parsedWithdrawAmount, withdrawableBalance]);
+
+  const withdrawButtonEnabled = useMemo(() => {
+    if (withdrawBusy || withdrawableBalance <= 0) return false;
+    const amount = parsedWithdrawAmount;
+    if (amount == null || amount <= 0) return false;
+    if (amount > withdrawableBalance) return false;
+    if (amount < MIN_ROYALTY_WITHDRAWAL_DOLLARS) return false;
+    return true;
+  }, [withdrawBusy, parsedWithdrawAmount, withdrawableBalance]);
+
+  const confirmWithdrawAmount =
+    parsedWithdrawAmount != null && parsedWithdrawAmount > 0
+      ? parsedWithdrawAmount
+      : withdrawableBalance;
+
+  const confirmWithdrawLabel = useMemo(() => {
+    if (withdrawBusy) return "Processing...";
+    if (confirmWithdrawAmount > 0) {
+      return `Confirm Withdrawal of ${formatMoney(confirmWithdrawAmount)}`;
+    }
+    return "Confirm Withdrawal";
+  }, [withdrawBusy, confirmWithdrawAmount]);
+
+  useEffect(() => {
+    if (royaltyBalance?.current_withdrawable_balance == null) return;
+    const balance = Number(royaltyBalance.current_withdrawable_balance) || 0;
+    setWithdrawAmount(balance > 0 ? balance.toFixed(2) : "");
+  }, [royaltyBalance?.current_withdrawable_balance]);
 
   const invitePanel = (
     <section className="mb-6 rounded-xl border border-amber-500/25 bg-amber-500/5 p-4 sm:p-5">
@@ -1384,23 +1426,56 @@ export default function AdminDashboard() {
 
             <section className="rounded-xl border border-white/10 bg-cardBg p-4">
               <h3 className="text-sm font-semibold text-white">Withdraw</h3>
-              <div className="mt-3 flex flex-wrap items-center gap-3">
+              <p className="mt-1 text-sm text-slate-400">
+                Available to withdraw:{" "}
+                <span className="font-semibold text-emerald-300">{formatMoney(withdrawableBalance)}</span>
+              </p>
+              <div className="mt-4">
+                <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Withdrawal amount
+                </label>
+                <div className="relative mt-1 max-w-xs">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                    $
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    max={withdrawableBalance > 0 ? withdrawableBalance : undefined}
+                    step="0.01"
+                    disabled={withdrawBusy || withdrawableBalance <= 0}
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="min-h-[44px] w-full rounded-lg border border-white/15 bg-cardBg2 py-2 pl-7 pr-3 text-slate-100"
+                  />
+                </div>
+                <p className="mt-1 text-xs text-slate-500">Minimum $1.00</p>
+              </div>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
-                  disabled={!canWithdraw || withdrawBusy}
+                  disabled={!withdrawButtonEnabled}
                   onClick={() => setWithdrawConfirmOpen(true)}
                   className="min-h-[48px] rounded-lg bg-emerald-500 px-5 text-sm font-semibold text-slate-950 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {canWithdraw
-                    ? `Withdraw ${formatMoney(withdrawableBalance)} to Bank`
-                    : "Withdraw to Bank"}
+                  {withdrawButtonLabel}
                 </button>
                 <p className="text-sm text-slate-300">
-                  {canWithdraw
-                    ? `Withdraw ${formatMoney(withdrawableBalance)} to your connected bank account`
+                  {withdrawButtonEnabled
+                    ? `Withdraw ${formatMoney(parsedWithdrawAmount)} to your connected bank account`
                     : belowMinimumWithdrawal
                       ? minimumWithdrawalMessage
-                      : "No balance available to withdraw"}
+                      : withdrawableBalance <= 0
+                        ? "No balance available to withdraw"
+                        : parsedWithdrawAmount != null &&
+                            parsedWithdrawAmount > withdrawableBalance
+                          ? "Amount exceeds your available balance."
+                          : parsedWithdrawAmount != null &&
+                              parsedWithdrawAmount > 0 &&
+                              parsedWithdrawAmount < MIN_ROYALTY_WITHDRAWAL_DOLLARS
+                            ? "Minimum withdrawal is $1.00."
+                            : "Enter a withdrawal amount to continue."}
                 </p>
               </div>
               <p className="mt-3 text-xs text-slate-500">
@@ -1807,7 +1882,9 @@ export default function AdminDashboard() {
               <h3 className="text-lg font-semibold text-white">Withdraw to Bank</h3>
               <p className="mt-2 text-sm text-slate-300">
                 You are about to withdraw{" "}
-                <span className="font-semibold text-emerald-300">{formatMoney(withdrawableBalance)}</span>{" "}
+                <span className="font-semibold text-emerald-300">
+                  {formatMoney(confirmWithdrawAmount)}
+                </span>{" "}
                 to your connected bank account.
               </p>
               <p className="mt-2 text-sm text-slate-400">
@@ -1828,10 +1905,10 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={handleWithdrawConfirm}
-                  disabled={withdrawBusy}
+                  disabled={withdrawBusy || !withdrawButtonEnabled}
                   className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-50"
                 >
-                  {withdrawBusy ? "Processing..." : "Confirm Withdrawal"}
+                  {confirmWithdrawLabel}
                 </button>
               </div>
             </div>
