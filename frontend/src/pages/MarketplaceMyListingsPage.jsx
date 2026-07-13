@@ -34,6 +34,11 @@ function formatListingExpiresDate(iso) {
   }
 }
 
+const LISTING_CARD_THUMB_CLASS =
+  "block mx-auto w-full max-w-[200px] min-w-[130px] shrink-0 overflow-hidden rounded-xl border border-white/10 sm:mx-0 sm:w-[180px] sm:max-w-none sm:min-w-[180px] md:w-[200px] md:min-w-[200px]";
+
+const LISTING_CARD_THUMB_INTERACTIVE_CLASS = `${LISTING_CARD_THUMB_CLASS} transition hover:border-neonTeal/60`;
+
 export default function MarketplaceMyListingsPage() {
   const navigate = useNavigate();
   const { token, user, initializing, refreshNavBadges } = useAuth();
@@ -261,7 +266,7 @@ export default function MarketplaceMyListingsPage() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-appBg text-slate-100">
       <AppHeader />
-      <main className="mx-auto w-full max-w-4xl px-3 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto w-full max-w-6xl px-3 py-8 sm:px-6 lg:px-8">
         <div className="mb-6">
           <h1 className="text-2xl font-semibold text-white sm:text-3xl">My Listings</h1>
           <p className="mt-2 text-sm text-slate-400">Cards listed on Free Agency Marketplace and incoming offers.</p>
@@ -297,14 +302,14 @@ export default function MarketplaceMyListingsPage() {
               return (
                 <article
                   key={listing.card_id}
-                  className={`rounded-2xl border border-white/10 bg-cardBg p-5 sm:p-6 ${badge.glow}`}
+                  className={`w-full rounded-2xl border border-white/10 bg-cardBg p-5 sm:p-6 ${badge.glow}`}
                 >
-                  <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-6">
+                  <div className="flex w-full flex-col items-stretch gap-5 sm:flex-row sm:items-start sm:gap-8">
                     {cardOffers.length > 0 ? (
                       <button
                         type="button"
                         onClick={() => setReviewCardId(listing.card_id)}
-                        className="block w-[120px] min-w-[120px] shrink-0 self-center overflow-hidden rounded-xl border border-white/10 transition hover:border-neonTeal/60 sm:w-[140px] sm:self-start"
+                        className={LISTING_CARD_THUMB_INTERACTIVE_CLASS}
                       >
                         <CardImage
                           card={listing}
@@ -316,7 +321,7 @@ export default function MarketplaceMyListingsPage() {
                     ) : (
                       <Link
                         to={`/marketplace/${encodeURIComponent(listing.card_id)}`}
-                        className="block w-[120px] min-w-[120px] shrink-0 self-center overflow-hidden rounded-xl border border-white/10 sm:w-[140px] sm:self-start"
+                        className={LISTING_CARD_THUMB_CLASS}
                       >
                         <CardImage
                           card={listing}
@@ -326,13 +331,13 @@ export default function MarketplaceMyListingsPage() {
                         />
                       </Link>
                     )}
-                    <div className="min-w-0 flex-1 space-y-3">
+                    <div className="w-full min-w-0 flex-1 space-y-3 sm:min-w-[16rem]">
                       <div className="space-y-2">
-                        <h2 className="text-base font-semibold leading-snug text-white break-words">
+                        <h2 className="text-base font-semibold leading-snug text-white break-words whitespace-normal [overflow-wrap:anywhere]">
                           {listing.player_name}
                         </h2>
                         {listing.team_name ? (
-                          <p className="text-[13px] leading-relaxed text-slate-400 break-words">
+                          <p className="text-[13px] leading-relaxed text-slate-400 break-words whitespace-normal [overflow-wrap:anywhere]">
                             {listing.team_name}
                           </p>
                         ) : null}
@@ -377,7 +382,7 @@ export default function MarketplaceMyListingsPage() {
                         </div>
                       ) : null}
                       {(listing.pending_offer_count || 0) > 0 ? (
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <button
                             type="button"
                             onClick={() => setReviewCardId(listing.card_id)}
@@ -385,12 +390,12 @@ export default function MarketplaceMyListingsPage() {
                           >
                             Review Incoming Offers
                           </button>
-                          <p className="text-xs text-amber-100/90">
+                          <p className="min-w-0 text-xs text-amber-100/90 break-words">
                             Sorted by highest cash offer first
                           </p>
                         </div>
                       ) : (
-                        <p className="mt-2 text-sm text-slate-500">No pending offers yet</p>
+                        <p className="text-sm text-slate-500">No pending offers yet</p>
                       )}
                     </div>
                   </div>

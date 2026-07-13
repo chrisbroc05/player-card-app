@@ -1317,9 +1317,9 @@ class OrderCreate(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
-    # Customer fields
-    customer_name: str = Field(..., min_length=1, max_length=200)
-    customer_email: str = Field(..., min_length=3, max_length=320)
+    # Customer fields (optional — derived from authenticated user when omitted)
+    customer_name: str | None = Field(default=None, max_length=200)
+    customer_email: str | None = Field(default=None, max_length=320)
 
     # Player fields
     player_first_name: str = Field(..., min_length=1, max_length=100)
@@ -1989,15 +1989,15 @@ def list_cards_for_player(
 @app.post("/orders", response_model=Order, status_code=201)
 def create_order(
     body: OrderCreate,
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Create a new in-memory order."""
     global _next_order_id
 
     order = Order(
         id=_next_order_id,
-        customer_name=body.customer_name,
-        customer_email=body.customer_email,
+        customer_name=(body.customer_name or "").strip() or current_user.display_name,
+        customer_email=(body.customer_email or "").strip() or current_user.email,
         player_first_name=body.player_first_name,
         player_last_name=body.player_last_name,
         player_display_name=body.player_display_name,

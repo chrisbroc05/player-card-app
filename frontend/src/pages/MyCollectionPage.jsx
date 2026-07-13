@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import { API_BASE_URL, authHeaders } from "../config/api";
 import CardImage from "../components/CardImage";
 import { CardSharePopover } from "../components/ShareCard";
 import { useAuth } from "../context/AuthContext";
-import MarketplaceListingActions from "../components/MarketplaceListingActions";
+import MarketplaceListingActions, { ListedSuccessModal } from "../components/MarketplaceListingActions";
 import AnimateCardModal from "../components/AnimateCardModal";
 import AnimationLoadingScreen from "../components/AnimationLoadingScreen";
 import AnimationProgressBanner from "../components/AnimationProgressBanner";
@@ -20,6 +20,7 @@ import { scrollAfterPaint } from "../utils/smoothScroll";
 
 export default function MyCollectionPage() {
   const { token, user, initializing, refreshIncomingTradeCount, refreshNavBadges } = useAuth();
+  const navigate = useNavigate();
   const [cards, setCards] = useState([]);
   const [listingByCardId, setListingByCardId] = useState({});
   const [loading, setLoading] = useState(true);
@@ -35,6 +36,7 @@ export default function MyCollectionPage() {
   const [deleteModalCard, setDeleteModalCard] = useState(null);
   const [deleteBusyId, setDeleteBusyId] = useState("");
   const [toast, setToast] = useState({ message: "", variant: "success" });
+  const [listSuccessOpen, setListSuccessOpen] = useState(false);
   const animationFocusRef = useRef(null);
 
   const loadCards = useCallback(async () => {
@@ -422,6 +424,7 @@ export default function MyCollectionPage() {
                       busy={marketplaceBusyId === card.card_id}
                       onList={(price, isPriority) => listCardOnMarketplace(card.card_id, price, isPriority)}
                       onUnlist={() => unlistCardFromMarketplace(card.card_id)}
+                      onListSuccess={() => setListSuccessOpen(true)}
                     />
                     {showDelete ? (
                       <button
@@ -458,6 +461,16 @@ export default function MyCollectionPage() {
         busy={Boolean(deleteBusyId)}
         onClose={() => setDeleteModalCard(null)}
         onConfirm={confirmDeleteCard}
+      />
+
+      <ListedSuccessModal
+        open={listSuccessOpen}
+        variant="my-collection"
+        onClose={() => setListSuccessOpen(false)}
+        onViewMarketplace={() => {
+          setListSuccessOpen(false);
+          navigate("/marketplace");
+        }}
       />
 
       <CollectionToast message={toast.message} variant={toast.variant} />

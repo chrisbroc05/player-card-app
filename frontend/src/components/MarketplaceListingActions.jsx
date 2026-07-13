@@ -8,6 +8,7 @@ export default function MarketplaceListingActions({
   busy,
   onList,
   onUnlist,
+  onListSuccess,
   className = "",
   showContainerDivider = true,
   listButtonLabel = "List on Marketplace",
@@ -45,7 +46,11 @@ export default function MarketplaceListingActions({
       setOpen(false);
       setPrice("");
       setPriorityBoost(false);
-      setListSuccessOpen(true);
+      if (onListSuccess) {
+        onListSuccess();
+      } else {
+        setListSuccessOpen(true);
+      }
     } catch (err) {
       setLocalError(err.message || "Could not list card.");
     }
@@ -143,16 +148,18 @@ export default function MarketplaceListingActions({
         </>
       )}
       {localError ? <p className="text-xs text-rose-300">{localError}</p> : null}
-      <ListedSuccessModal open={listSuccessOpen} onClose={() => setListSuccessOpen(false)} />
+      {!onListSuccess ? (
+        <ListedSuccessModal open={listSuccessOpen} onClose={() => setListSuccessOpen(false)} />
+      ) : null}
     </div>
   );
 }
 
-function ListedSuccessModal({ open, onClose }) {
+export function ListedSuccessModal({ open, onClose, variant = "default", onViewMarketplace }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-3 py-4 sm:px-4">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 px-3 py-4 sm:px-4">
       <div
         className="w-full max-w-sm rounded-2xl border border-emerald-500/30 bg-cardBg p-5 shadow-2xl shadow-black/50 sm:p-6"
         role="dialog"
@@ -168,13 +175,32 @@ function ListedSuccessModal({ open, onClose }) {
         <p className="mt-2 text-center text-sm text-slate-300">
           Your card is now live on the marketplace.
         </p>
-        <button
-          type="button"
-          onClick={onClose}
-          className="mt-5 inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 transition hover:opacity-90"
-        >
-          OK
-        </button>
+        {variant === "my-collection" ? (
+          <div className="mt-5 space-y-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg border border-white/20 bg-white/5 px-4 text-sm font-semibold text-slate-100 transition hover:border-white/30 hover:bg-white/10"
+            >
+              Go to My Collection
+            </button>
+            <button
+              type="button"
+              onClick={onViewMarketplace}
+              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 transition hover:opacity-90"
+            >
+              View on Marketplace
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={onClose}
+            className="mt-5 inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 transition hover:opacity-90"
+          >
+            OK
+          </button>
+        )}
       </div>
     </div>
   );

@@ -267,8 +267,6 @@ export default function StudioPage() {
   const [cards, setCards] = useState([]);
   const [orders, setOrders] = useState([]);
 
-  const [orderCustomerName, setOrderCustomerName] = useState("Test User");
-  const [orderCustomerEmail, setOrderCustomerEmail] = useState("test@email.com");
   const [orderTier, setOrderTier] = useState("");
   const [specialTheme, setSpecialTheme] = useState("");
 
@@ -453,8 +451,6 @@ export default function StudioPage() {
   const canCreateOrder = Boolean(
     currentStep === STEP_REVIEW &&
       reviewSubPhase === "setup" &&
-      orderCustomerName.trim() &&
-      orderCustomerEmail.trim() &&
       !isCreating &&
       !isGenerating
   );
@@ -861,8 +857,6 @@ export default function StudioPage() {
     setPosition(draft.player_position || "");
     setGradYear(String(draft.player_grad_year || ""));
     setTeamName(draft.player_team_name || "");
-    setOrderCustomerName(draft.customer_name || orderCustomerName);
-    setOrderCustomerEmail(draft.customer_email || orderCustomerEmail);
     setOrderTier(draft.tier || "");
     setCardType(draft.card_type || "standard");
     setSpecialTheme(draft.special_theme || "");
@@ -1131,8 +1125,6 @@ export default function StudioPage() {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders(token) },
       body: JSON.stringify({
-        customer_name: orderCustomerName.trim(),
-        customer_email: orderCustomerEmail.trim(),
         player_first_name: playerData.first_name,
         player_last_name: playerData.last_name,
         player_display_name: playerData.display_name ?? null,
@@ -1879,47 +1871,21 @@ export default function StudioPage() {
                     <p className="mt-2 text-sm text-rose-300">{pricingError}</p>
                   ) : null}
                 </div>
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <div className="rounded-xl border border-white/10 bg-cardBg2 p-3 sm:p-4">
-                    <p className="text-sm font-medium text-white">Delivery Contact</p>
-                    <p className="mt-1 text-xs text-slate-400">
-                      These details are attached to the order for fulfillment and delivery.
-                    </p>
-                    <label className="mt-3 block text-xs font-medium uppercase tracking-wide text-slate-300">
-                      Customer Name
-                    </label>
-                    <input
-                      value={orderCustomerName}
-                      onChange={(e) => setOrderCustomerName(e.target.value)}
-                      placeholder="Enter customer name"
-                      className="mt-1 min-h-[44px] w-full rounded-xl border border-white/15 bg-cardBg px-3 py-2.5"
-                    />
-                    <label className="mt-3 block text-xs font-medium uppercase tracking-wide text-slate-300">
-                      Customer Email
-                    </label>
-                    <input
-                      value={orderCustomerEmail}
-                      onChange={(e) => setOrderCustomerEmail(e.target.value)}
-                      placeholder="Enter customer email"
-                      className="mt-1 min-h-[44px] w-full rounded-xl border border-white/15 bg-cardBg px-3 py-2.5"
-                    />
-                  </div>
-                  <GenerationCostSummary
-                    playerName={playerDisplayName}
-                    teamName={teamName}
-                    position={position}
-                    jerseyNumber={jerseyNumber}
-                    gradYear={gradYear}
-                    tierLabel={selectedTierLabel}
-                    themeLabel={specialTheme ? selectedThemeLabel : ""}
-                    isAnimated={isAnimatedCardType}
-                    motionName={motionDisplayName}
-                    copyQuantity={copyQuantity}
-                    pricing={generationPricing}
-                    creditBalance={creditBalance}
-                    phase="pre-generate"
-                  />
-                </div>
+                <GenerationCostSummary
+                  playerName={playerDisplayName}
+                  teamName={teamName}
+                  position={position}
+                  jerseyNumber={jerseyNumber}
+                  gradYear={gradYear}
+                  tierLabel={selectedTierLabel}
+                  themeLabel={specialTheme ? selectedThemeLabel : ""}
+                  isAnimated={isAnimatedCardType}
+                  motionName={motionDisplayName}
+                  copyQuantity={copyQuantity}
+                  pricing={generationPricing}
+                  creditBalance={creditBalance}
+                  phase="pre-generate"
+                />
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"

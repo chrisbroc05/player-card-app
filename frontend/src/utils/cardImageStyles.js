@@ -46,9 +46,9 @@ export const CARD_IMAGE_FRAME_DETAIL =
 export const CARD_IMAGE_FRAME_MODAL =
   "relative flex aspect-[2/3] w-full min-w-[200px] max-w-[240px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-slate-800/80 via-black/50 to-slate-900/90 p-2 sm:p-3";
 
-/** My Listings row — minimum 120px wide alongside listing details */
+/** My Listings row — minimum 130px wide alongside listing details */
 export const CARD_IMAGE_FRAME_LISTING_ROW =
-  "relative flex aspect-[2/3] w-full min-w-[120px] flex-col overflow-hidden rounded-xl border border-white/10 bg-gradient-to-b from-slate-800/90 via-black/60 to-slate-900/95 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]";
+  "relative flex aspect-[2/3] w-full min-w-[130px] flex-col overflow-hidden rounded-xl border border-white/10 bg-gradient-to-b from-slate-800/90 via-black/60 to-slate-900/95 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]";
 
 export const CARD_IMAGE_MEDIA_DETAIL = CARD_IMAGE_MEDIA_CLASS;
 
