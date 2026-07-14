@@ -17,7 +17,6 @@ import MotionSelectionGrid from "../components/MotionSelectionGrid";
 import AnimationLoadingScreen from "../components/AnimationLoadingScreen";
 import PendingCardResumePrompt from "../components/PendingCardResumePrompt";
 import AnimateCardConfirmModal from "../components/AnimateCardConfirmModal";
-import CollectionCongratsModal from "../components/CollectionCongratsModal";
 import AnimatedCardChoiceModal from "../components/AnimatedCardChoiceModal";
 import AnimatedQuantityModal from "../components/AnimatedQuantityModal";
 import PackOpeningLoader from "../components/PackOpeningLoader";
@@ -31,16 +30,11 @@ import {
 } from "../constants/actionCategories";
 import { API_BASE_URL, authHeaders, toApiUrl } from "../config/api";
 import { useAuth } from "../context/AuthContext";
+import { useNewCardCelebration } from "../context/NewCardCelebrationContext";
 import { fetchGenerationPrice } from "../utils/cardPricing";
 import { copyChargeForQuantity, normalizeCopyTiers } from "../utils/copyPricing";
 import { formatMoney } from "../utils/marketplace";
 import { scrollAfterPaint } from "../utils/smoothScroll";
-import { canAnimateCard } from "../utils/animationCard";
-import {
-  hasAnimatedUpgradeForCard,
-  markCollectionCongratsShown,
-  wasCollectionCongratsShown,
-} from "../utils/collectionCongrats";
 
 const STEP_PHOTO = 1;
 const STEP_CARD_TYPE = 2;
@@ -252,6 +246,7 @@ function formatApiError(detail, fallback) {
 export default function StudioPage() {
   const navigate = useNavigate();
   const { token, user, initializing, refreshUser } = useAuth();
+  const { showCelebration } = useNewCardCelebration();
   const [currentStep, setCurrentStep] = useState(1);
   const [dragActive, setDragActive] = useState(false);
 
@@ -314,11 +309,6 @@ export default function StudioPage() {
   const [latestGeneratedPreview, setLatestGeneratedPreview] = useState(null);
   const [previewPollCardId, setPreviewPollCardId] = useState("");
   const [addCollectionLoading, setAddCollectionLoading] = useState(false);
-  const [collectionCongratsCard, setCollectionCongratsCard] = useState(null);
-  const [collectionCongratsShowUpsell, setCollectionCongratsShowUpsell] = useState(true);
-  const [postCollectionAnimateConfirmOpen, setPostCollectionAnimateConfirmOpen] = useState(false);
-  const [pendingAnimateCard, setPendingAnimateCard] = useState(null);
-  const [postCollectionMotionId, setPostCollectionMotionId] = useState("");
   const [copyQuantity, setCopyQuantity] = useState(1);
   const [pendingSession, setPendingSession] = useState(null);
   const [showPendingPrompt, setShowPendingPrompt] = useState(false);
@@ -1376,7 +1366,6 @@ export default function StudioPage() {
       }
 
       setMessage(`Order #${currentOrderId} completed and added to your collection.`);
-      const freshCards = await fetchMyCards();
       await Promise.all([fetchOrders(), refreshUser(token)]);
       setPendingSession(null);
       setShowPendingPrompt(false);
@@ -1384,16 +1373,11 @@ export default function StudioPage() {
       setPreviewConfigureOpen(false);
       setAnimatedSaveStaticFlow(false);
 
-      if (
-        cardId &&
-        addedCardDetail &&
-        !isAnimatedCardType &&
-        !wasCollectionCongratsShown(cardId)
-      ) {
-        const showUpsell =
-          canAnimateCard(addedCardDetail) && !hasAnimatedUpgradeForCard(freshCards, cardId);
-        setCollectionCongratsShowUpsell(showUpsell);
-        setCollectionCongratsCard(addedCardDetail);
+      if (cardId && addedCardDetail) {
+        await showCelebration({
+          card: addedCardDetail,
+          source: "created",
+        });
       }
     } catch (err) {
       setError(err.message || "Failed to add card to collection.");
@@ -1401,72 +1385,6 @@ export default function StudioPage() {
       setAddCollectionLoading(false);
       setOrderActionKey("");
     }
-  }
-
-  async function handlePostCollectionAnimateConfirm() {
-    if (!pendingAnimateCard?.card_id || !postCollectionMotionId) return;
-    setPostCollectionAnimateConfirmOpen(false);
-    setAddCollectionLoading(true);
-    setOrderActionKey(`post-animate-${pendingAnimateCard.card_id}`);
-    setMessage("");
-    setError("");
-    try {
-      const res = await fetch(
-        `${API_BASE_URL}/cards/${encodeURIComponent(pendingAnimateCard.card_id)}/animate-upgrade`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeaders(token) },
-          body: JSON.stringify({ motion_id: postCollectionMotionId }),
-        }
-      );
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not start animation."));
-      const newCardId = data?.card_id;
-      if (!newCardId) throw new Error("Animation started but no card id was returned.");
-      setAnimationFailed(false);
-      setAnimationLoadingCardId(newCardId);
-      setPendingAnimateCard(null);
-      setPostCollectionMotionId("");
-      await Promise.all([fetchMyCards(), refreshUser(token)]);
-    } catch (err) {
-      setError(err.message || "Could not start animation.");
-      setPostCollectionAnimateConfirmOpen(true);
-    } finally {
-      setAddCollectionLoading(false);
-      setOrderActionKey("");
-    }
-  }
-
-  function handleCollectionCongratsAnimate(motionId) {
-    if (!collectionCongratsCard) return;
-    setPendingAnimateCard(collectionCongratsCard);
-    setPostCollectionMotionId(motionId);
-    markCollectionCongratsShown(collectionCongratsCard.card_id);
-    setCollectionCongratsCard(null);
-    setPostCollectionAnimateConfirmOpen(true);
-  }
-
-  function handleCollectionCongratsMaybeLater() {
-    if (collectionCongratsCard?.card_id) {
-      markCollectionCongratsShown(collectionCongratsCard.card_id);
-    }
-    setCollectionCongratsCard(null);
-    navigate("/my-collection");
-  }
-
-  function handleCollectionCongratsGoToCollection() {
-    if (collectionCongratsCard?.card_id) {
-      markCollectionCongratsShown(collectionCongratsCard.card_id);
-    }
-    setCollectionCongratsCard(null);
-    navigate("/my-collection");
-  }
-
-  function handleCollectionCongratsCreditsClick() {
-    if (collectionCongratsCard?.card_id) {
-      markCollectionCongratsShown(collectionCongratsCard.card_id);
-    }
-    setCollectionCongratsCard(null);
   }
 
   async function fetchCardDetailById(cardId) {
@@ -2463,38 +2381,6 @@ export default function StudioPage() {
           setShowAnimatedFlowExplainer(false);
           handleGenerateFirstPreview();
         }}
-      />
-
-      <CollectionCongratsModal
-        open={Boolean(collectionCongratsCard)}
-        card={collectionCongratsCard}
-        showUpsell={collectionCongratsShowUpsell}
-        animationCost={animatedUpgradeCost}
-        creditBalance={creditBalance}
-        initialMotionId={selectedMotionId}
-        motionCategoryLabel={getActionCategory(actionCategory)?.label || ""}
-        motionIdsFilter={actionCategory ? motionIdsForActionCategory(actionCategory) : null}
-        onAnimate={handleCollectionCongratsAnimate}
-        onMaybeLater={handleCollectionCongratsMaybeLater}
-        onGoToCollection={handleCollectionCongratsGoToCollection}
-        onCreditsClick={handleCollectionCongratsCreditsClick}
-      />
-
-      <AnimateCardConfirmModal
-        open={postCollectionAnimateConfirmOpen}
-        onClose={() => {
-          setPostCollectionAnimateConfirmOpen(false);
-          setPendingAnimateCard(null);
-          setPostCollectionMotionId("");
-        }}
-        onConfirm={handlePostCollectionAnimateConfirm}
-        busy={addCollectionLoading || Boolean(orderActionKey)}
-        card={pendingAnimateCard}
-        previewAlt={pendingAnimateCard?.player_name || "Your card"}
-        motionName={postCollectionMotionId ? motionLabel(postCollectionMotionId) : ""}
-        cost={animatedUpgradeCost}
-        creditBalance={creditBalance}
-        confirmationOnly
       />
 
       <AppFooter />

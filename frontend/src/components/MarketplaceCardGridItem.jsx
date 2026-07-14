@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import CardImage from "./CardImage";
 import AnimatedBadge from "./AnimatedBadge";
 import PriorityBadge, { isPriorityListing } from "./PriorityBadge";
+import UserOfferBadge from "./UserOfferBadge";
 import { vaultTierBadge } from "../utils/tierStyles";
 import { formatMoney, listingExpiresLabel, listingExpiresSubtextClass } from "../utils/marketplace";
 import {
@@ -14,7 +15,7 @@ import {
 import { isAnimatedCard } from "../utils/animationCard";
 
 /** @param {"list" | "compact"} [variant] — list = current marketplace cards; compact = thumbnail grid */
-export default function MarketplaceCardGridItem({ listing, variant = "list" }) {
+export default function MarketplaceCardGridItem({ listing, variant = "list", currentUserId = null }) {
   const badge = vaultTierBadge(listing.tier);
   const cardPath = `/marketplace/${encodeURIComponent(listing.card_id)}`;
   const animated = isAnimatedCard(listing);
@@ -35,7 +36,8 @@ export default function MarketplaceCardGridItem({ listing, variant = "list" }) {
             showAnimatedBadge={false}
             infoBannerVariant="compact"
           />
-          <div className="pointer-events-none absolute left-1 top-1 z-10 flex flex-col gap-1">
+          <div className="pointer-events-none absolute left-1 top-1 z-10 flex max-w-[calc(100%-0.5rem)] flex-col items-start gap-1">
+            <UserOfferBadge listing={listing} currentUserId={currentUserId} />
             {priority ? <PriorityBadge /> : null}
           </div>
           {animated ? (
@@ -62,11 +64,10 @@ export default function MarketplaceCardGridItem({ listing, variant = "list" }) {
           playOnHover
           showAnimatedBadge={false}
         />
-        {priority ? (
-          <span className="pointer-events-none absolute left-2 top-2 z-10">
-            <PriorityBadge />
-          </span>
-        ) : null}
+        <div className="pointer-events-none absolute left-2 top-2 z-10 flex max-w-[calc(100%-1rem)] flex-col items-start gap-1">
+          <UserOfferBadge listing={listing} currentUserId={currentUserId} />
+          {priority ? <PriorityBadge /> : null}
+        </div>
         {animated ? (
           <span className="pointer-events-none absolute right-2 top-2 z-10">
             <AnimatedBadge />

@@ -9,6 +9,8 @@ import MarketplaceViewToggle, {
   writeMarketplaceViewPreference,
 } from "../components/MarketplaceViewToggle";
 import { API_BASE_URL } from "../config/api";
+import { useAuth } from "../context/AuthContext";
+import { authFetch } from "../utils/authFetch";
 import { normalizeTierKey, sortMarketplaceBrowseRows } from "../utils/marketplace";
 
 const TIER_OPTIONS = [
@@ -37,6 +39,7 @@ function useDebouncedValue(value, delayMs) {
 }
 
 export default function MarketplacePage() {
+  const { user, token } = useAuth();
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -57,7 +60,17 @@ export default function MarketplacePage() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`${API_BASE_URL}/marketplace/listings`);
+      const path = "/marketplace/listings";
+      const { res, unauthorized } = token
+        ? await authFetch(token, path)
+        : { res: await fetch(`${API_BASE_URL}${path}`), unauthorized: false };
+      if (unauthorized) {
+        const fallback = await fetch(`${API_BASE_URL}${path}`);
+        if (!fallback.ok) throw new Error("Could not load listings.");
+        const data = await fallback.json();
+        setListings(Array.isArray(data) ? data : []);
+        return;
+      }
       if (!res.ok) throw new Error("Could not load listings.");
       const data = await res.json();
       setListings(Array.isArray(data) ? data : []);
@@ -66,7 +79,7 @@ export default function MarketplacePage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     load();
@@ -114,6 +127,7 @@ export default function MarketplacePage() {
       setSort={setSort}
       viewMode={viewMode}
       onViewModeChange={onViewModeChange}
+      currentUserId={user?.id ?? null}
     />
   );
 }
@@ -133,6 +147,7 @@ function MarketplaceBrowseLayout({
   setSort,
   viewMode,
   onViewModeChange,
+  currentUserId,
 }) {
   const isListView = viewMode === "list";
   const listingGridClass = isListView
@@ -224,6 +239,7 @@ function MarketplaceBrowseLayout({
                 key={listing.card_id}
                 listing={listing}
                 variant={isListView ? "list" : "compact"}
+                currentUserId={currentUserId}
               />
             ))}
           </div>

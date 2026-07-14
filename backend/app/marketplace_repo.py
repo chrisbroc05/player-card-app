@@ -43,6 +43,50 @@ def count_pending_offers_for_card(db: Session, card_id: str) -> int:
     )
 
 
+_PREVIOUS_OFFER_STATUSES = frozenset({"accepted", "declined", "expired"})
+
+
+def viewer_offer_flags_by_card(
+    db: Session,
+    *,
+    buyer_id: int,
+    card_ids: list[str],
+) -> dict[str, dict[str, bool | float | None]]:
+    """Per-card offer history for the browsing buyer (batch query)."""
+    if not card_ids:
+        return {}
+
+    offers = (
+        db.query(MarketplaceOffer)
+        .filter(
+            MarketplaceOffer.buyer_id == buyer_id,
+            MarketplaceOffer.card_id.in_(card_ids),
+        )
+        .order_by(MarketplaceOffer.created_at.desc())
+        .all()
+    )
+
+    grouped: dict[str, list[MarketplaceOffer]] = {}
+    for offer in offers:
+        grouped.setdefault(offer.card_id, []).append(offer)
+
+    out: dict[str, dict[str, bool | float | None]] = {}
+    for card_id in card_ids:
+        rows = grouped.get(card_id, [])
+        pending = next((row for row in rows if row.status == "pending"), None)
+        previous = next((row for row in rows if row.status in _PREVIOUS_OFFER_STATUSES), None)
+        pending_offer = pending is not None
+        previous_offer = previous is not None
+        amount_source = pending or previous
+        offer_amount = float_from_decimal(amount_source.offer_amount) if amount_source else None
+        out[card_id] = {
+            "pending_offer": pending_offer,
+            "previous_offer": previous_offer,
+            "offer_amount": offer_amount,
+        }
+    return out
+
+
 def cancel_pending_marketplace_offers_for_card(
     db: Session,
     card_id: str,

@@ -9,6 +9,7 @@ import TradeCardsThumbRow from "../components/TradeCardsThumbRow";
 import { useAuth } from "../context/AuthContext";
 import { authFetch, formatApiError } from "../utils/authFetch";
 import {
+  counterOfferButtonLabel,
   formatMoney,
   listingExpiresLabel,
   listingExpiresSubtextClass,
@@ -618,7 +619,9 @@ function OfferReviewModal({
                           onClick={() => onSendCounter(offer)}
                           className="min-h-[40px] rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
                         >
-                          {counterBusyId === offer.offer_id ? "Sending…" : "Send Counter"}
+                          {counterBusyId === offer.offer_id
+                            ? "Sending…"
+                            : counterOfferButtonLabel(counterAmount)}
                         </button>
                         <button
                           type="button"

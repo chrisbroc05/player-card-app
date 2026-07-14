@@ -37,6 +37,27 @@ function ActivityIcon({ item }) {
   );
 }
 
+function ActivityAmount({ amount, variant = "compact" }) {
+  if (!amount) return null;
+  const primaryClass =
+    variant === "full" ? "text-lg font-semibold tabular-nums" : "text-xs font-semibold tabular-nums";
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className={`${primaryClass} ${amount.className}`}>{amount.text}</span>
+      {amount.subtext ? (
+        <span
+          className={
+            amount.subtextClassName ||
+            "max-w-[220px] text-[11px] leading-tight text-slate-500 sm:max-w-none sm:text-right"
+          }
+        >
+          {amount.subtext}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 export function ActivityHistoryCompactList({ items, loading }) {
   if (loading) {
     return (
@@ -70,7 +91,7 @@ export function ActivityHistoryCompactList({ items, loading }) {
               <p className="mt-0.5 truncate text-xs text-slate-500">{item.card?.card_id}</p>
               {cp ? <p className="mt-1 text-sm text-slate-400">{cp}</p> : null}
               <div className="mt-1 flex flex-wrap items-center gap-3 text-xs">
-                {amt ? <span className={`font-semibold tabular-nums ${amt.className}`}>{amt.text}</span> : null}
+                <ActivityAmount amount={amt} />
                 <span className="text-slate-500">{relativeTimeAgo(item.completed_at || item.created_at)}</span>
               </div>
             </div>
@@ -193,10 +214,10 @@ export function ActivityHistorySection({
                     </p>
                   </div>
 
-                  <div className="flex shrink-0 flex-col items-start gap-1 border-t border-white/10 pt-3 sm:min-w-[110px] sm:items-end sm:border-t-0 sm:pt-0">
+                  <div className="flex shrink-0 flex-col items-start gap-0.5 border-t border-white/10 pt-3 sm:min-w-[150px] sm:items-end sm:border-t-0 sm:pt-0">
                     <span className="text-[11px] uppercase tracking-wide text-slate-500">Amount</span>
                     {amt ? (
-                      <span className={`text-lg font-semibold tabular-nums ${amt.className}`}>{amt.text}</span>
+                      <ActivityAmount amount={amt} variant="full" />
                     ) : (
                       <span className="text-xs text-slate-500">Free</span>
                     )}

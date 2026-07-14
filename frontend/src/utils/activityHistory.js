@@ -109,13 +109,29 @@ export function counterpartyLine(item) {
   return name;
 }
 
+export function marketplaceSoldAmountDisplay(item) {
+  const gross = Number(item?.amount);
+  if (!Number.isFinite(gross)) return null;
+  const royaltyRaw = Number(item?.royalty_amount);
+  const fee = Number.isFinite(royaltyRaw)
+    ? Math.max(0, Math.round(royaltyRaw * 100) / 100)
+    : Math.max(0, Math.round(gross * 0.02 * 100) / 100);
+  const net = Math.max(0, Math.round((gross - fee) * 100) / 100);
+  return {
+    text: `+${formatMoney(net)} received`,
+    className: "text-emerald-300",
+    subtext: `Sale price ${formatMoney(gross)} — 2% platform fee (${formatMoney(fee)})`,
+    subtextClassName: "text-[11px] leading-tight text-slate-500",
+  };
+}
+
 export function amountDisplay(item) {
+  if (item?.activity_type === "marketplace_sold") {
+    return marketplaceSoldAmountDisplay(item);
+  }
   if (item?.amount == null || Number.isNaN(Number(item.amount))) return null;
   const n = Number(item.amount);
   const formatted = formatMoney(Math.abs(n));
-  if (item.activity_type === "marketplace_sold") {
-    return { text: `+${formatted}`, className: "text-emerald-300" };
-  }
   if (item.activity_type === "marketplace_bought") {
     return { text: `-${formatted}`, className: "text-rose-300" };
   }

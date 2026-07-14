@@ -67,9 +67,10 @@ def _build_item(
     card: Card,
     counterparty: dict | None,
     amount: float | None,
+    royalty_amount: float | None = None,
 ) -> dict:
     when = completed_at or created_at
-    return {
+    row = {
         "id": item_id,
         "activity_type": activity_type,
         "created_at": _iso(created_at or when),
@@ -80,6 +81,9 @@ def _build_item(
         "status": "completed",
         "_sort_ts": _completed_ts(when),
     }
+    if royalty_amount is not None:
+        row["royalty_amount"] = royalty_amount
+    return row
 
 
 def gather_user_activity_items(db: Session, user_id: int) -> list[dict]:
@@ -172,6 +176,9 @@ def gather_user_activity_items(db: Session, user_id: int) -> list[dict]:
                 )
             )
         if offer.seller_id == user_id:
+            royalty_amount = None
+            if is_cash and amount is not None:
+                royalty_amount = float_from_decimal(offer.royalty_amount)
             items.append(
                 _build_item(
                     item_id=f"marketplace_sold-{offer.id}",
@@ -184,6 +191,7 @@ def gather_user_activity_items(db: Session, user_id: int) -> list[dict]:
                         offer.buyer_id,
                     ),
                     amount=amount,
+                    royalty_amount=royalty_amount,
                 )
             )
 

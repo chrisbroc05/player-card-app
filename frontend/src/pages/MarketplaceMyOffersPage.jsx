@@ -6,6 +6,7 @@ import MarketplaceSubNav from "../components/MarketplaceSubNav";
 import CardImage from "../components/CardImage";
 import TradeCardsThumbRow from "../components/TradeCardsThumbRow";
 import { useAuth } from "../context/AuthContext";
+import { useNewCardCelebration } from "../context/NewCardCelebrationContext";
 import { authFetch, formatApiError } from "../utils/authFetch";
 import {
   formatMoney,
@@ -63,6 +64,7 @@ function footerNote(offer) {
 
 export default function MarketplaceMyOffersPage() {
   const { token, user, initializing, refreshNavBadges } = useAuth();
+  const { showCelebration } = useNewCardCelebration();
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -96,6 +98,31 @@ export default function MarketplaceMyOffersPage() {
     load();
   }, [token, initializing, load]);
 
+  useEffect(() => {
+    if (loading || !offers.length) return;
+    let cancelled = false;
+    (async () => {
+      for (const offer of offers) {
+        if (cancelled) return;
+        if ((offer.status || "").toLowerCase() !== "accepted") continue;
+        const updatedAt = offer.updated_at || offer.created_at;
+        const updatedMs = updatedAt ? new Date(updatedAt).getTime() : NaN;
+        if (!Number.isFinite(updatedMs) || Date.now() - updatedMs > 30 * 60 * 1000) continue;
+        const isTrade = (offer.offer_type || "cash") === "card_trade";
+        const shown = await showCelebration({
+          card: offer,
+          source: isTrade ? "traded" : "purchased",
+          counterparty: offer.seller_display_name,
+          amount: isTrade ? null : Number(offer.counter_amount || offer.offer_amount || 0),
+        });
+        if (shown) break;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, offers, showCelebration]);
+
   const filteredOffers = useMemo(() => {
     if (statusFilter === "all") return offers;
     return offers.filter((o) => (o.status || "").toLowerCase() === statusFilter);
@@ -125,6 +152,7 @@ export default function MarketplaceMyOffersPage() {
 
   async function counterDecision(offerId, suffix) {
     if (!token) return;
+    const offer = offers.find((row) => row.offer_id === offerId);
     setActionKey(`${suffix === "accept" ? "cacc" : "cdec"}-${offerId}`);
     setError("");
     try {
@@ -137,6 +165,15 @@ export default function MarketplaceMyOffersPage() {
       }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(formatApiError(data?.detail, "Action failed."));
+      if (suffix === "accept" && offer) {
+        const isTrade = (offer.offer_type || "cash") === "card_trade";
+        await showCelebration({
+          card: offer,
+          source: isTrade ? "traded" : "purchased",
+          counterparty: offer.seller_display_name,
+          amount: isTrade ? null : Number(offer.counter_amount || offer.offer_amount || 0),
+        });
+      }
       await load();
       refreshNavBadges?.();
     } catch (e) {

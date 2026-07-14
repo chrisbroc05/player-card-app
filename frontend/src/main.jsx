@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { FeatureProvider } from "./context/FeatureContext";
+import { NewCardCelebrationProvider } from "./context/NewCardCelebrationContext";
 import App from "./App";
 import "./index.css";
 
@@ -11,7 +12,9 @@ createRoot(document.getElementById("root")).render(
     <BrowserRouter>
       <FeatureProvider>
         <AuthProvider>
-          <App />
+          <NewCardCelebrationProvider>
+            <App />
+          </NewCardCelebrationProvider>
         </AuthProvider>
       </FeatureProvider>
     </BrowserRouter>

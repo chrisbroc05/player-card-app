@@ -5,6 +5,7 @@ import AppFooter from "../components/AppFooter";
 import CardImage from "../components/CardImage";
 import { API_BASE_URL, authHeaders } from "../config/api";
 import { useAuth } from "../context/AuthContext";
+import { useNewCardCelebration } from "../context/NewCardCelebrationContext";
 import { vaultTierBadge, formatEditionShort, rarityDisplay } from "../utils/tierStyles";
 import { ActivityHistorySection } from "../components/ActivityHistory";
 
@@ -34,6 +35,7 @@ function tierImageGlow(tier) {
 
 export default function TradesPage() {
   const { token, user, initializing, refreshIncomingTradeCount } = useAuth();
+  const { showCelebration } = useNewCardCelebration();
   const [incoming, setIncoming] = useState([]);
   const [outgoing, setOutgoing] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -105,6 +107,7 @@ export default function TradesPage() {
 
   async function postTradeAction(tradeId, path) {
     if (!token) return;
+    const incomingOffer = incoming.find((row) => row.id === tradeId);
     const key = `${path}-${tradeId}`;
     setActionKey(key);
     setError("");
@@ -115,6 +118,13 @@ export default function TradesPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof data?.detail === "string" ? data.detail : "Request failed.");
+      if (path === "accept" && incomingOffer) {
+        await showCelebration({
+          card: data?.card_id ? data : incomingOffer.card,
+          source: "traded",
+          counterparty: incomingOffer.sender?.display_name,
+        });
+      }
       await load();
       refreshIncomingTradeCount?.();
     } catch (e) {

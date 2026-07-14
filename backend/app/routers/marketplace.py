@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import asc, desc, func, or_
 from sqlalchemy.orm import Session
 
-from auth import get_current_user
+from auth import get_current_user, get_optional_current_user
 from card_repo import get_card_by_card_id
 from credit_service import (
     InsufficientCreditsError,
@@ -51,6 +51,7 @@ from marketplace_repo import (
     log_priority_listing_pending_charge,
     partition_and_sort_marketplace_rows,
     buyer_offer_row_dict,
+    viewer_offer_flags_by_card,
 )
 from marketplace_trade_repo import (
     OFFER_TYPE_CARD_TRADE,
@@ -400,6 +401,7 @@ def marketplace_unlist(
 @router.get("/listings")
 def marketplace_listings(
     db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
     tier: str | None = Query(default=None),
     team_name: str | None = Query(default=None),
     player_name: str | None = Query(default=None),
@@ -437,7 +439,30 @@ def marketplace_listings(
         sort_order=sort_order or "desc",
         now=now,
     )
-    return [listing_dict(card, od or "—") for card, od in ordered]
+
+    viewer_flags: dict[str, dict[str, bool | float | None]] = {}
+    if current_user is not None:
+        card_ids = [card.card_id for card, _ in ordered if card.owner_id != current_user.id]
+        viewer_flags = viewer_offer_flags_by_card(db, buyer_id=current_user.id, card_ids=card_ids)
+
+    out = []
+    for card, od in ordered:
+        extra: dict = {}
+        if current_user is None:
+            extra["pending_offer"] = None
+            extra["previous_offer"] = None
+            extra["offer_amount"] = None
+        elif card.owner_id == current_user.id:
+            extra["pending_offer"] = False
+            extra["previous_offer"] = False
+            extra["offer_amount"] = None
+        else:
+            flags = viewer_flags.get(card.card_id, {})
+            extra["pending_offer"] = bool(flags.get("pending_offer"))
+            extra["previous_offer"] = bool(flags.get("previous_offer"))
+            extra["offer_amount"] = flags.get("offer_amount")
+        out.append({**listing_dict(card, od or "—"), **extra})
+    return out
 
 
 @router.get("/listings/{card_id}")

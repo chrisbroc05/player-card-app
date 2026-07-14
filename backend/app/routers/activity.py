@@ -41,6 +41,7 @@ class ActivityItemOut(BaseModel):
     card: ActivityCardOut
     counterparty: ActivityCounterpartyOut | None = None
     amount: float | None = None
+    royalty_amount: float | None = None
     status: str = "completed"
 
 

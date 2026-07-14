@@ -130,3 +130,28 @@ export function compareOfferToAsking(offerAmount, askingPrice) {
   if (o < a) return "below asking";
   return "at asking";
 }
+
+export function parseOfferAmount(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.round(n * 100) / 100;
+}
+
+/** Cash offer submit button label from amount input */
+export function cashOfferButtonLabel(amount, askingPrice) {
+  const n = parseOfferAmount(amount);
+  if (n == null) return "Submit Offer";
+  const formatted = formatMoney(n);
+  const asking = Number(askingPrice);
+  if (Number.isFinite(asking) && Math.abs(n - asking) < 0.005) {
+    return `Buy at ${formatted}`;
+  }
+  return `Offer ${formatted}`;
+}
+
+/** Seller counter-offer button label */
+export function counterOfferButtonLabel(amount) {
+  const n = parseOfferAmount(amount);
+  if (n == null) return "Send Counter";
+  return `Counter ${formatMoney(n)}`;
+}
