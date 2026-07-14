@@ -353,6 +353,7 @@ export default function StudioPage() {
   const tierTheme = TIER_UI[orderTier] || TIER_UI.all_star;
   const imagePreviewUrl = useMemo(() => (imageFile ? URL.createObjectURL(imageFile) : ""), [imageFile]);
   const generatedCardFullUrl = useMemo(() => toApiUrl(generatedCardUrl), [generatedCardUrl]);
+  const playerDisplayName = playerNameFromForm(firstName, lastName, displayName);
 
   function previewToDisplayCard(preview) {
     return {
@@ -455,7 +456,6 @@ export default function StudioPage() {
   }, []);
 
   const isAnimatedCardType = cardType === "animated";
-  const playerDisplayName = playerNameFromForm(firstName, lastName, displayName);
   const creditBalance = Number(user?.credit_balance ?? 0);
   const animatedUpgradeCost = Number(generationPricing?.animated_upgrade_price ?? 10);
   const additionalPreviewCost = Number(generationPricing?.additional_preview_price ?? 0);
