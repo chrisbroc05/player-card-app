@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import { toApiUrl } from "../config/api";
+import CardImage from "./CardImage";
 import { useScrollModalIntoView } from "../hooks/useScrollIntoViewOnChange";
 
 export default function PendingCardResumePrompt({
@@ -43,11 +43,23 @@ export default function PendingCardResumePrompt({
 
         <div className="space-y-4 px-5 py-5">
           {latestPreview?.image_url ? (
-            <div className="mx-auto max-w-[180px] overflow-hidden rounded-xl border border-white/15 bg-black/30">
-              <img
-                src={toApiUrl(latestPreview.image_url)}
+            <div className="mx-auto max-w-[200px]">
+              <CardImage
+                card={{
+                  image_url: latestPreview.image_url,
+                  player_name: playerName,
+                  team_name: session.draft?.player_team_name,
+                  position: session.draft?.player_position,
+                  jersey_number: session.draft?.player_jersey_number,
+                  grad_year: session.draft?.player_grad_year,
+                  tier: session.draft?.tier || latestPreview.tier || "rookie",
+                  theme: session.draft?.special_theme,
+                  card_id: latestPreview.card_id,
+                  edition_number: latestPreview.edition_number,
+                  print_run: latestPreview.print_run,
+                }}
                 alt={`Preview for ${playerName}`}
-                className="block aspect-[2/3] w-full object-contain"
+                showInfoBanner
               />
             </div>
           ) : null}

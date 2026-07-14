@@ -175,7 +175,7 @@ export default function TradesPage() {
                             card={c}
                             alt={c.player_name}
                             cacheBust={c.created_at}
-                            frameClassName="flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/30"
+                            frameClassName="w-full"
                           />
                         </div>
                         <div className="min-w-0 flex-1 space-y-2">
@@ -248,7 +248,7 @@ export default function TradesPage() {
                             card={c}
                             alt={c.player_name}
                             cacheBust={c.created_at}
-                            frameClassName="flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/30"
+                            frameClassName="w-full"
                           />
                         </div>
                         <div className="min-w-0 flex-1 space-y-2">

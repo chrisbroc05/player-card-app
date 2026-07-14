@@ -13,7 +13,7 @@ export default function MarketplaceGridSkeleton({ count = 6, viewMode = "grid" }
           key={i}
           className={`animate-pulse rounded-xl border border-white/10 bg-cardBg ${isList ? "rounded-2xl p-3" : "p-2"}`}
         >
-          <div className="aspect-[2/3] rounded-lg bg-white/5" />
+          <div className="aspect-[5/7] rounded-lg bg-white/5" />
           <div className={`space-y-2 ${isList ? "mt-3 px-1" : "mt-2"}`}>
             <div className={`rounded bg-white/10 ${isList ? "h-4 w-3/4" : "h-3 w-full"}`} />
             {!isList ? <div className="h-3 w-2/3 rounded bg-white/10" /> : null}

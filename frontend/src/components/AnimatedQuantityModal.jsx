@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import CardImage from "./CardImage";
 import { formatMoney } from "../utils/marketplace";
 import {
   animatedStudioBreakdown,
@@ -19,6 +20,7 @@ export default function AnimatedQuantityModal({
   creditBalance = 0,
   previewImageUrl = "",
   previewAlt = "Your card",
+  previewCard = null,
 }) {
   const [selected, setSelected] = useState(1);
   const dialogRef = React.useRef(null);
@@ -53,12 +55,19 @@ export default function AnimatedQuantityModal({
         </div>
 
         <div className="px-5 py-5">
-          {previewImageUrl ? (
-            <div className="mx-auto mb-5 max-w-[120px] overflow-hidden rounded-lg border border-white/15">
-              <img
-                src={previewImageUrl}
+          {previewImageUrl || previewCard ? (
+            <div className="mx-auto mb-5 max-w-[160px]">
+              <CardImage
+                card={
+                  previewCard || {
+                    image_url: previewImageUrl,
+                    player_name: previewAlt,
+                    tier: "rookie",
+                  }
+                }
                 alt={previewAlt}
-                className="block aspect-[2/3] w-full object-contain bg-black/30"
+                showInfoBanner
+                infoBannerVariant="compact"
               />
             </div>
           ) : null}

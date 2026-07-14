@@ -58,18 +58,18 @@ export default function AnimateCardConfirmModal({
         </h3>
 
         {hasPreview ? (
-          <div className="mx-auto mt-5 max-w-[160px]">
-            {card ? (
-              <CardImage
-                card={card}
-                alt={previewAlt}
-                frameClassName="aspect-[2/3] w-full overflow-hidden rounded-lg border border-white/10"
-              />
-            ) : (
-              <div className="aspect-[2/3] w-full overflow-hidden rounded-lg border border-white/10">
-                <img src={previewImageUrl} alt={previewAlt} className="h-full w-full object-cover" />
-              </div>
-            )}
+          <div className="mx-auto mt-5 max-w-[220px]">
+            <CardImage
+              card={
+                card ||
+                (previewImageUrl
+                  ? { image_url: previewImageUrl, player_name: previewAlt || "Card preview", tier: "rookie" }
+                  : null)
+              }
+              alt={previewAlt}
+              frameClassName="w-full"
+              showInfoBanner
+            />
           </div>
         ) : null}
 

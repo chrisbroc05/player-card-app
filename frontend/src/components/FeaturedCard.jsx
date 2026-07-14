@@ -1,35 +1,23 @@
 import React from "react";
+import CardImage from "./CardImage";
+import { CARD_IMAGE_FRAME_DETAIL } from "../utils/cardImageStyles";
 
-function tierBadge(tier) {
-  const normalized = (tier || "base").toLowerCase();
-  if (normalized === "legendary") {
-    return {
-      label: "1-OF-1",
-      className: "bg-amber-300/20 text-amber-200 border-amber-300/40",
-    };
-  }
-  if (normalized === "rare") {
-    return {
-      label: "RARE",
-      className: "bg-cyan-300/20 text-cyan-200 border-cyan-300/40",
-    };
-  }
-  return {
-    label: "BASE",
-    className: "bg-slate-300/20 text-slate-200 border-slate-300/40",
-  };
-}
-
-export default function FeaturedCard({ imageUrl, tier, loading }) {
-  const badge = tierBadge(tier);
+export default function FeaturedCard({ card, imageUrl, tier, loading }) {
+  const displayCard =
+    card ||
+    (imageUrl
+      ? {
+          image_url: imageUrl,
+          tier: tier || "rookie",
+          player_name: "Your Card",
+        }
+      : null);
 
   return (
     <section className="rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-4">
         <h2 className="text-base font-semibold text-white sm:text-lg">Latest Generated Card</h2>
-        <span className={`rounded-full border px-3 py-1 text-xs font-semibold tracking-wide ${badge.className}`}>
-          {badge.label}
-        </span>
+        <p className="mt-1 text-xs text-slate-400">Consistent card template with UI banner and tier styling.</p>
       </div>
 
       {loading ? (
@@ -37,12 +25,14 @@ export default function FeaturedCard({ imageUrl, tier, loading }) {
           <div className="h-7 w-7 animate-spin rounded-full border-2 border-white/20 border-t-neonBlue" />
           <p className="mt-3 text-sm text-slate-300">Generating your card...</p>
         </div>
-      ) : imageUrl ? (
-        <div className="animate-fadeUp">
-          <img
-            src={imageUrl}
-            alt="Generated baseball card"
-            className="mx-auto block h-auto w-full max-w-2xl rounded-xl border border-white/15 object-contain shadow-2xl shadow-black/50"
+      ) : displayCard ? (
+        <div className="animate-fadeUp mx-auto max-w-md">
+          <CardImage
+            card={displayCard}
+            alt={displayCard.player_name || "Generated card"}
+            frameClassName={CARD_IMAGE_FRAME_DETAIL}
+            variant="detail"
+            showInfoBanner
           />
         </div>
       ) : (

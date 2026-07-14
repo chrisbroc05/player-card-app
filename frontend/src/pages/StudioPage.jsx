@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import FeaturedCard from "../components/FeaturedCard";
+import CardImage from "../components/CardImage";
 import CardGallery from "../components/CardGallery";
 import PostGenerationPanel from "../components/PostGenerationPanel";
 import StudioAuthGate from "../components/StudioAuthGate";
@@ -16,6 +17,7 @@ import MotionSelectionGrid from "../components/MotionSelectionGrid";
 import AnimationLoadingScreen from "../components/AnimationLoadingScreen";
 import PendingCardResumePrompt from "../components/PendingCardResumePrompt";
 import AnimateCardConfirmModal from "../components/AnimateCardConfirmModal";
+import CollectionCongratsModal from "../components/CollectionCongratsModal";
 import AnimatedCardChoiceModal from "../components/AnimatedCardChoiceModal";
 import AnimatedQuantityModal from "../components/AnimatedQuantityModal";
 import PackOpeningLoader from "../components/PackOpeningLoader";
@@ -33,6 +35,12 @@ import { fetchGenerationPrice } from "../utils/cardPricing";
 import { copyChargeForQuantity, normalizeCopyTiers } from "../utils/copyPricing";
 import { formatMoney } from "../utils/marketplace";
 import { scrollAfterPaint } from "../utils/smoothScroll";
+import { canAnimateCard } from "../utils/animationCard";
+import {
+  hasAnimatedUpgradeForCard,
+  markCollectionCongratsShown,
+  wasCollectionCongratsShown,
+} from "../utils/collectionCongrats";
 
 const STEP_PHOTO = 1;
 const STEP_CARD_TYPE = 2;
@@ -306,6 +314,11 @@ export default function StudioPage() {
   const [latestGeneratedPreview, setLatestGeneratedPreview] = useState(null);
   const [previewPollCardId, setPreviewPollCardId] = useState("");
   const [addCollectionLoading, setAddCollectionLoading] = useState(false);
+  const [collectionCongratsCard, setCollectionCongratsCard] = useState(null);
+  const [collectionCongratsShowUpsell, setCollectionCongratsShowUpsell] = useState(true);
+  const [postCollectionAnimateConfirmOpen, setPostCollectionAnimateConfirmOpen] = useState(false);
+  const [pendingAnimateCard, setPendingAnimateCard] = useState(null);
+  const [postCollectionMotionId, setPostCollectionMotionId] = useState("");
   const [copyQuantity, setCopyQuantity] = useState(1);
   const [pendingSession, setPendingSession] = useState(null);
   const [showPendingPrompt, setShowPendingPrompt] = useState(false);
@@ -341,11 +354,62 @@ export default function StudioPage() {
   const imagePreviewUrl = useMemo(() => (imageFile ? URL.createObjectURL(imageFile) : ""), [imageFile]);
   const generatedCardFullUrl = useMemo(() => toApiUrl(generatedCardUrl), [generatedCardUrl]);
 
+  function previewToDisplayCard(preview) {
+    return {
+      card_id: preview.card_id,
+      player_name: preview.player_name || playerDisplayName,
+      team_name: preview.team_name || teamName,
+      position,
+      jersey_number: jerseyNumber,
+      grad_year: gradYear,
+      tier: preview.tier || orderTier || "rookie",
+      theme: specialTheme,
+      image_url: preview.image_url,
+      edition_number: preview.edition_number || 1,
+      print_run: preview.print_run || 1,
+    };
+  }
+
   const activeOrder = useMemo(
     () => orders.find((order) => order.id === currentOrderId) || null,
     [orders, currentOrderId]
   );
   const previewCards = activeOrder?.generated_cards || [];
+
+  const featuredDisplayCard = useMemo(() => {
+    if (savedCardDetail) return savedCardDetail;
+    const sel =
+      previewCards.find((p) => p.image_url === (selectedPreviewUrl || generatedCardUrl)) ||
+      previewCards[previewCards.length - 1];
+    if (!sel && !generatedCardUrl) return null;
+    return {
+      card_id: sel?.card_id,
+      player_name: sel?.player_name || playerDisplayName,
+      team_name: sel?.team_name || teamName,
+      position,
+      jersey_number: jerseyNumber,
+      grad_year: gradYear,
+      tier: sel?.tier || orderTier || generatedTier || "rookie",
+      theme: specialTheme,
+      image_url: sel?.image_url || generatedCardUrl,
+      edition_number: sel?.edition_number || 1,
+      print_run: sel?.print_run || 1,
+    };
+  }, [
+    savedCardDetail,
+    previewCards,
+    selectedPreviewUrl,
+    generatedCardUrl,
+    playerDisplayName,
+    teamName,
+    position,
+    jerseyNumber,
+    gradYear,
+    orderTier,
+    generatedTier,
+    specialTheme,
+  ]);
+
   const activePreviewCount = Number(activeOrder?.preview_count ?? 0);
   const activePreviewLimit = Number(activeOrder?.preview_limit ?? 3);
   const remainingPreviews = Math.max(0, activePreviewLimit - activePreviewCount);
@@ -1006,7 +1070,9 @@ export default function StudioPage() {
     });
     if (!res.ok) throw new Error("Failed to load your cards.");
     const data = await res.json();
-    setCards(Array.isArray(data) ? data : []);
+    const list = Array.isArray(data) ? data : [];
+    setCards(list);
+    return list;
   }
 
   async function fetchOrders() {
@@ -1293,7 +1359,8 @@ export default function StudioPage() {
 
       const sel = previewCards.find((p) => p.image_url === (selectedPreviewUrl || generatedCardUrl));
       const cardId = sel?.card_id;
-      if (cardId) await fetchCardDetailById(cardId);
+      let addedCardDetail = null;
+      if (cardId) addedCardDetail = await fetchCardDetailById(cardId);
 
       if (quantity > 1 && cardId) {
         const dupRes = await fetch(`${API_BASE_URL}/cards/${encodeURIComponent(cardId)}/duplicate`, {
@@ -1309,18 +1376,97 @@ export default function StudioPage() {
       }
 
       setMessage(`Order #${currentOrderId} completed and added to your collection.`);
-      await Promise.all([fetchOrders(), fetchMyCards(), refreshUser(token)]);
+      const freshCards = await fetchMyCards();
+      await Promise.all([fetchOrders(), refreshUser(token)]);
       setPendingSession(null);
       setShowPendingPrompt(false);
       setReviewSubPhase("approve");
       setPreviewConfigureOpen(false);
       setAnimatedSaveStaticFlow(false);
+
+      if (
+        cardId &&
+        addedCardDetail &&
+        !isAnimatedCardType &&
+        !wasCollectionCongratsShown(cardId)
+      ) {
+        const showUpsell =
+          canAnimateCard(addedCardDetail) && !hasAnimatedUpgradeForCard(freshCards, cardId);
+        setCollectionCongratsShowUpsell(showUpsell);
+        setCollectionCongratsCard(addedCardDetail);
+      }
     } catch (err) {
       setError(err.message || "Failed to add card to collection.");
     } finally {
       setAddCollectionLoading(false);
       setOrderActionKey("");
     }
+  }
+
+  async function handlePostCollectionAnimateConfirm() {
+    if (!pendingAnimateCard?.card_id || !postCollectionMotionId) return;
+    setPostCollectionAnimateConfirmOpen(false);
+    setAddCollectionLoading(true);
+    setOrderActionKey(`post-animate-${pendingAnimateCard.card_id}`);
+    setMessage("");
+    setError("");
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/cards/${encodeURIComponent(pendingAnimateCard.card_id)}/animate-upgrade`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders(token) },
+          body: JSON.stringify({ motion_id: postCollectionMotionId }),
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not start animation."));
+      const newCardId = data?.card_id;
+      if (!newCardId) throw new Error("Animation started but no card id was returned.");
+      setAnimationFailed(false);
+      setAnimationLoadingCardId(newCardId);
+      setPendingAnimateCard(null);
+      setPostCollectionMotionId("");
+      await Promise.all([fetchMyCards(), refreshUser(token)]);
+    } catch (err) {
+      setError(err.message || "Could not start animation.");
+      setPostCollectionAnimateConfirmOpen(true);
+    } finally {
+      setAddCollectionLoading(false);
+      setOrderActionKey("");
+    }
+  }
+
+  function handleCollectionCongratsAnimate(motionId) {
+    if (!collectionCongratsCard) return;
+    setPendingAnimateCard(collectionCongratsCard);
+    setPostCollectionMotionId(motionId);
+    markCollectionCongratsShown(collectionCongratsCard.card_id);
+    setCollectionCongratsCard(null);
+    setPostCollectionAnimateConfirmOpen(true);
+  }
+
+  function handleCollectionCongratsMaybeLater() {
+    if (collectionCongratsCard?.card_id) {
+      markCollectionCongratsShown(collectionCongratsCard.card_id);
+    }
+    setCollectionCongratsCard(null);
+    navigate("/my-collection");
+  }
+
+  function handleCollectionCongratsGoToCollection() {
+    if (collectionCongratsCard?.card_id) {
+      markCollectionCongratsShown(collectionCongratsCard.card_id);
+    }
+    setCollectionCongratsCard(null);
+    navigate("/my-collection");
+  }
+
+  function handleCollectionCongratsCreditsClick() {
+    if (collectionCongratsCard?.card_id) {
+      markCollectionCongratsShown(collectionCongratsCard.card_id);
+    }
+    setCollectionCongratsCard(null);
   }
 
   async function fetchCardDetailById(cardId) {
@@ -1915,6 +2061,7 @@ export default function StudioPage() {
                     active={packOpeningActive}
                     generationComplete={!isGenerating && Boolean(generatedCardUrl || selectedPreviewUrl)}
                     cardImageUrl={generatedCardUrl || selectedPreviewUrl}
+                    card={featuredDisplayCard}
                     tier={orderTier}
                     themeLabel={specialTheme ? selectedThemeLabel : "Default (no theme)"}
                     isAnimated={isAnimatedCardType}
@@ -1986,10 +2133,10 @@ export default function StudioPage() {
                                 : tierTheme.card
                             }`}
                           >
-                            <img
-                              src={toApiUrl(preview.image_url)}
+                            <CardImage
+                              card={previewToDisplayCard(preview)}
                               alt={`Preview ${idx + 1}`}
-                              className="block aspect-[2/3] h-auto w-full object-contain bg-black/20"
+                              showInfoBanner
                             />
                             <div className="space-y-2 bg-cardBg2 p-3">
                               <p className="text-xs text-slate-400">
@@ -2046,11 +2193,22 @@ export default function StudioPage() {
                         className="scroll-focus-target rounded-2xl border border-violet-400/30 bg-cardBg2 p-4 sm:p-6"
                       >
                         <p className="text-center text-sm font-medium text-white">Confirm your card</p>
-                        <div className="mx-auto mt-4 max-w-xs overflow-hidden rounded-xl border border-white/10">
-                          <img
-                            src={toApiUrl(selectedPreviewUrl || generatedCardUrl)}
+                        <div className="mx-auto mt-4 max-w-xs">
+                          <CardImage
+                            card={
+                              featuredDisplayCard || {
+                                image_url: selectedPreviewUrl || generatedCardUrl,
+                                player_name: playerDisplayName,
+                                team_name: teamName,
+                                position,
+                                jersey_number: jerseyNumber,
+                                grad_year: gradYear,
+                                tier: orderTier || "rookie",
+                                theme: specialTheme,
+                              }
+                            }
                             alt="Selected preview"
-                            className="block w-full object-contain"
+                            showInfoBanner
                           />
                         </div>
                         <GenerationCostSummary
@@ -2219,8 +2377,7 @@ export default function StudioPage() {
         )}
 
         <FeaturedCard
-          imageUrl={generatedCardFullUrl}
-          tier={generatedTier}
+          card={featuredDisplayCard}
           loading={isGenerating && !packOpeningActive}
         />
         {user ? <CardGallery cards={cards} /> : null}
@@ -2263,6 +2420,7 @@ export default function StudioPage() {
       <AnimatedCardChoiceModal
         open={animatedChoiceModalOpen}
         previewImageUrl={selectedPreviewUrl || generatedCardUrl}
+        previewCard={featuredDisplayCard}
         previewAlt={playerDisplayName || "Your card"}
         onAnimate={handleAnimatedChoiceAnimate}
         onSaveStatic={handleAnimatedChoiceSaveStatic}
@@ -2277,6 +2435,7 @@ export default function StudioPage() {
         generationPricing={generationPricing}
         creditBalance={creditBalance}
         previewImageUrl={toApiUrl(selectedPreviewUrl || generatedCardUrl)}
+        previewCard={featuredDisplayCard}
         previewAlt={playerDisplayName || "Your card"}
       />
 
@@ -2304,6 +2463,38 @@ export default function StudioPage() {
           setShowAnimatedFlowExplainer(false);
           handleGenerateFirstPreview();
         }}
+      />
+
+      <CollectionCongratsModal
+        open={Boolean(collectionCongratsCard)}
+        card={collectionCongratsCard}
+        showUpsell={collectionCongratsShowUpsell}
+        animationCost={animatedUpgradeCost}
+        creditBalance={creditBalance}
+        initialMotionId={selectedMotionId}
+        motionCategoryLabel={getActionCategory(actionCategory)?.label || ""}
+        motionIdsFilter={actionCategory ? motionIdsForActionCategory(actionCategory) : null}
+        onAnimate={handleCollectionCongratsAnimate}
+        onMaybeLater={handleCollectionCongratsMaybeLater}
+        onGoToCollection={handleCollectionCongratsGoToCollection}
+        onCreditsClick={handleCollectionCongratsCreditsClick}
+      />
+
+      <AnimateCardConfirmModal
+        open={postCollectionAnimateConfirmOpen}
+        onClose={() => {
+          setPostCollectionAnimateConfirmOpen(false);
+          setPendingAnimateCard(null);
+          setPostCollectionMotionId("");
+        }}
+        onConfirm={handlePostCollectionAnimateConfirm}
+        busy={addCollectionLoading || Boolean(orderActionKey)}
+        card={pendingAnimateCard}
+        previewAlt={pendingAnimateCard?.player_name || "Your card"}
+        motionName={postCollectionMotionId ? motionLabel(postCollectionMotionId) : ""}
+        cost={animatedUpgradeCost}
+        creditBalance={creditBalance}
+        confirmationOnly
       />
 
       <AppFooter />

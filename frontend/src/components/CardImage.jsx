@@ -1,19 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { API_BASE_URL, authHeaders, toApiUrl } from "../config/api";
 import {
-  CARD_IMAGE_FRAME,
-  CARD_IMAGE_FRAME_ANIMATED,
   CARD_IMAGE_MEDIA_CLASS,
-  CARD_MEDIA_SLOT,
-  CARD_MEDIA_SLOT_DETAIL,
   CARD_VIDEO_CLASS,
   CARD_VIDEO_DETAIL_WRAPPER,
   CARD_VIDEO_WRAPPER_OVERLAY,
 } from "../utils/cardImageStyles";
+import { cardDisplaySizeFromFrame } from "../utils/cardTemplate";
 import { isAnimatedCard, isAnimationInProgress } from "../utils/animationCard";
 import { useIsMobileViewport } from "../hooks/usePrefersReducedMotion";
-import AnimatedBadge from "./AnimatedBadge";
-import CardInfoBanner from "./CardInfoBanner";
+import CardDisplay from "./CardDisplay";
 
 function resolveCardFields(card, props) {
   if (card && typeof card === "object") {
@@ -48,7 +44,13 @@ function ProtectedMediaShell({ protectMedia, children }) {
   );
 }
 
-/** Renders static or animated card media; single place for video/img logic app-wide */
+function buildSyntheticCard(card, imageUrl) {
+  if (card && typeof card === "object") return card;
+  if (!imageUrl) return null;
+  return { image_url: imageUrl, player_name: "Player" };
+}
+
+/** Renders card media inside the fixed CardDisplay template app-wide */
 export default function CardImage({
   card,
   imageUrl,
@@ -74,7 +76,6 @@ export default function CardImage({
   const [videoFailed, setVideoFailed] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [ownerVideoBlobUrl, setOwnerVideoBlobUrl] = useState(null);
-  const [ownerVideoLoading, setOwnerVideoLoading] = useState(false);
   const videoRef = useRef(null);
   const isMobile = useIsMobileViewport();
   const isDetail = variant === "detail";
@@ -88,6 +89,7 @@ export default function CardImage({
     animationStatus,
   });
 
+  const displayCard = buildSyntheticCard(card, fields.imageUrl);
   const hasVideo =
     isAnimatedCard(fields) && fields.animatedVideoUrl && !videoFailed && !isAnimationInProgress(fields);
   const inProgress = showInProgressOverlay && isAnimationInProgress(fields);
@@ -104,14 +106,11 @@ export default function CardImage({
   useEffect(() => {
     if (!useOwnerVideoProxy || !token || !cardIdForApi || !fields.animatedVideoUrl) {
       setOwnerVideoBlobUrl(null);
-      setOwnerVideoLoading(false);
       return undefined;
     }
 
     let cancelled = false;
     let objectUrl = null;
-    setOwnerVideoLoading(true);
-    setVideoFailed(false);
 
     (async () => {
       try {
@@ -127,8 +126,6 @@ export default function CardImage({
           setOwnerVideoBlobUrl(null);
           setVideoFailed(true);
         }
-      } finally {
-        if (!cancelled) setOwnerVideoLoading(false);
       }
     })();
 
@@ -147,7 +144,6 @@ export default function CardImage({
 
   const showStaticPoster = Boolean(imgSrc && !imgFailed);
   const showVideoLayer = videoReady && shouldPlayVideo;
-  // Show PNG whenever available; hide on detail only while video is actively playing
   const showPosterImage = showStaticPoster && (!isDetail || !showVideoLayer);
 
   const protectedMediaClass = protectMedia ? "card-media-protected" : "";
@@ -169,22 +165,6 @@ export default function CardImage({
     }
   }, [shouldPlayVideo, videoReady, videoSrc]);
 
-  const resolvedFrame =
-    frameClassName ||
-    (variant === "grid"
-      ? hasVideo
-        ? CARD_IMAGE_FRAME_ANIMATED
-        : CARD_IMAGE_FRAME
-      : "");
-
-  const shouldShowBanner =
-    showInfoBanner !== false &&
-    (showInfoBanner === true || (card && (card.player_name || card.playerName)));
-
-  const frameClass = shouldShowBanner
-    ? [resolvedFrame, resolvedFrame ? "rounded-b-none border-b-0" : ""].filter(Boolean).join(" ")
-    : resolvedFrame;
-
   const mediaProtectionProps = protectMedia
     ? {
         draggable: false,
@@ -192,11 +172,23 @@ export default function CardImage({
       }
     : {};
 
-  let inner;
+  const displaySize =
+    infoBannerVariant === "compact"
+      ? "compact"
+      : variant === "detail"
+        ? "detail"
+        : cardDisplaySizeFromFrame(frameClassName);
+
+  const useTemplate =
+    showInfoBanner !== false &&
+    displayCard &&
+    (showInfoBanner === true || displayCard.player_name || displayCard.playerName);
+
+  let mediaInner;
   if (!showStaticPoster && !hasVideo) {
-    inner = <PlaceholderInner alt={alt} className={className} isDetail={isDetail} />;
+    mediaInner = <PlaceholderInner alt={alt} />;
   } else if (isDetail && showVideoLayer && videoSrc) {
-    inner = (
+    mediaInner = (
       <ProtectedMediaShell protectMedia={protectMedia}>
         <div className={CARD_VIDEO_DETAIL_WRAPPER}>
           <video
@@ -216,7 +208,7 @@ export default function CardImage({
       </ProtectedMediaShell>
     );
   } else if (isDetail && showPosterImage) {
-    inner = (
+    mediaInner = (
       <ProtectedMediaShell protectMedia={protectMedia}>
         <img
           src={imgSrc}
@@ -229,10 +221,8 @@ export default function CardImage({
         />
       </ProtectedMediaShell>
     );
-  } else if (isDetail) {
-    inner = null;
   } else {
-    inner = (
+    mediaInner = (
       <>
         {showPosterImage ? (
           <ProtectedMediaShell protectMedia={protectMedia}>
@@ -271,20 +261,35 @@ export default function CardImage({
     );
   }
 
-  const media = (
+  const mediaSlot = (
     <div
-      className={isDetail ? CARD_MEDIA_SLOT_DETAIL : CARD_MEDIA_SLOT}
+      className="relative h-full w-full"
       onMouseEnter={isGridBrowse && !isMobile ? () => setHovered(true) : undefined}
       onMouseLeave={isGridBrowse && !isMobile ? () => setHovered(false) : undefined}
     >
-      {inner}
-      {showAnimatedBadge && hasVideo ? (
-        <span className="absolute right-2 top-2 z-10">
-          <AnimatedBadge />
-        </span>
-      ) : null}
+      {mediaInner}
+    </div>
+  );
+
+  if (useTemplate) {
+    return (
+      <CardDisplay
+        card={displayCard}
+        size={displaySize}
+        className={frameClassName}
+        showAnimatedBadge={showAnimatedBadge && hasVideo}
+        inProgressOverlay={inProgress}
+      >
+        {mediaSlot}
+      </CardDisplay>
+    );
+  }
+
+  return (
+    <div className={`relative h-full w-full overflow-hidden ${frameClassName}`}>
+      {mediaSlot}
       {inProgress ? (
-        <div className="absolute inset-0 z-20 flex items-center justify-center overflow-hidden rounded-[inherit] bg-black/55 backdrop-blur-[2px]">
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/55 backdrop-blur-[2px]">
           <span className="animate-pulse rounded-lg border border-violet-400/40 bg-violet-500/20 px-3 py-2 text-xs font-semibold text-violet-100">
             Animation in progress...
           </span>
@@ -292,27 +297,12 @@ export default function CardImage({
       ) : null}
     </div>
   );
-
-  const imageBlock = frameClass ? <div className={frameClass}>{media}</div> : media;
-
-  if (shouldShowBanner) {
-    return (
-      <div className="flex w-full min-w-0 flex-col overflow-hidden rounded-[inherit]">
-        {imageBlock}
-        <CardInfoBanner card={card} variant={infoBannerVariant} />
-      </div>
-    );
-  }
-
-  return imageBlock;
 }
 
-function PlaceholderInner({ alt, className, isDetail }) {
+function PlaceholderInner({ alt }) {
   return (
     <div
-      className={`flex flex-col items-center justify-center gap-2 bg-slate-900/90 p-4 text-center text-slate-400 ${
-        isDetail ? "min-h-[200px] w-full" : "min-h-[120px]"
-      } ${className}`}
+      className="flex h-full min-h-[80px] w-full flex-col items-center justify-center gap-2 bg-slate-900/90 p-4 text-center text-slate-400"
       role="img"
       aria-label={alt || "Card preview unavailable"}
     >

@@ -68,8 +68,9 @@ export default function AnimateCardModal({ card, open, onClose, onConfirm, busy,
             <CardImage
               card={card}
               alt={card.player_name}
-              frameClassName="aspect-[2/3] w-full overflow-hidden rounded-lg border border-white/10"
+              frameClassName="w-full"
               infoBannerVariant="compact"
+              showInfoBanner
             />
           </div>
 

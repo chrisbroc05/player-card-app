@@ -1,11 +1,12 @@
 import React, { useRef } from "react";
-import { toApiUrl } from "../config/api";
+import CardImage from "./CardImage";
 import { useScrollModalIntoView } from "../hooks/useScrollIntoViewOnChange";
 
 export default function AnimatedCardChoiceModal({
   open,
   previewImageUrl,
   previewAlt = "Your card",
+  previewCard = null,
   onAnimate,
   onSaveStatic,
   busy = false,
@@ -31,11 +32,17 @@ export default function AnimatedCardChoiceModal({
         </div>
 
         <div className="px-5 py-5">
-          <div className="mx-auto max-w-[200px] overflow-hidden rounded-xl border border-white/15 shadow-lg shadow-black/40">
-            <img
-              src={toApiUrl(previewImageUrl)}
+          <div className="mx-auto max-w-[220px]">
+            <CardImage
+              card={
+                previewCard || {
+                  image_url: previewImageUrl,
+                  player_name: previewAlt,
+                  tier: "rookie",
+                }
+              }
               alt={previewAlt}
-              className="block aspect-[2/3] w-full object-contain bg-black/30"
+              showInfoBanner
             />
           </div>
 

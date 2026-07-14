@@ -1,66 +1,44 @@
-/** Shared card image frames — 2:3 aspect, contain fit, full card visible */
+/** Shared card image frames — 2.5:3.5 (5:7) aspect; UI banner is always separate */
 
-/** Grid / collection / marketplace browse tiles */
-export const CARD_IMAGE_FRAME =
-  "relative flex aspect-[2/3] w-full min-h-0 flex-col overflow-hidden rounded-xl border border-white/10 bg-gradient-to-b from-slate-800/90 via-black/60 to-slate-900/95 p-1.5 sm:p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]";
+export const CARD_ASPECT = "aspect-[5/7]";
 
-export const CARD_IMAGE_FRAME_ANIMATED =
-  `${CARD_IMAGE_FRAME} ring-1 ring-violet-400/35 shadow-[0_0_28px_rgba(139,92,246,0.18)]`;
+/** @deprecated Layout is owned by CardDisplay — kept for size hints passed to CardImage */
+export const CARD_IMAGE_FRAME = `relative w-full min-h-0 ${CARD_ASPECT}`;
 
-/** Inner slot — clips media to card bounds; inherits frame radius */
-export const CARD_MEDIA_SLOT =
-  "relative min-h-0 w-full flex-1 overflow-hidden rounded-[inherit]";
+export const CARD_IMAGE_FRAME_ANIMATED = `${CARD_IMAGE_FRAME} ring-1 ring-violet-400/35`;
 
-/** Detail page slot — fixed aspect frame, clip media to bounds */
-export const CARD_MEDIA_SLOT_DETAIL =
-  "relative h-full min-h-0 w-full flex-1 overflow-hidden rounded-[inherit]";
+export const CARD_MEDIA_SLOT = "relative h-full w-full min-h-0 overflow-hidden";
 
-/** Parent wrapper for every animated <video> — overflow hidden, no hover scale */
+export const CARD_MEDIA_SLOT_DETAIL = CARD_MEDIA_SLOT;
+
 export const CARD_VIDEO_CONTAINER = "card-animated-video-container";
 
-/** Grid overlay: video on hover, contained within frame */
-export const CARD_VIDEO_WRAPPER_OVERLAY =
-  `absolute inset-0 z-[1] ${CARD_VIDEO_CONTAINER}`;
+export const CARD_VIDEO_WRAPPER_OVERLAY = `absolute inset-0 z-[1] ${CARD_VIDEO_CONTAINER}`;
 
-/** Detail page video wrapper */
 export const CARD_VIDEO_DETAIL_WRAPPER = `relative h-full w-full min-h-0 min-w-0 ${CARD_VIDEO_CONTAINER}`;
 
-/** Static PNG in grid/thumbnail */
+/** Player portrait — cover fill inside top 70% art window */
 export const CARD_IMAGE_MEDIA_CLASS =
-  "block h-full w-full max-h-full max-w-full object-contain object-center rounded-[inherit] drop-shadow-[0_6px_20px_rgba(0,0,0,0.55)]";
+  "block h-full w-full object-cover object-center";
 
-/** All animated card videos — single class, contain fit only */
 export const CARD_VIDEO_CLASS = "card-animated-video";
 
-/** @deprecated use CARD_VIDEO_CLASS */
 export const CARD_VIDEO_GRID_CLASS = CARD_VIDEO_CLASS;
 
-/** @deprecated use CARD_VIDEO_CLASS */
 export const CARD_VIDEO_DETAIL_CLASS = CARD_VIDEO_CLASS;
 
-/** Detail page frame — fixed 2:3 aspect, size does not change when video plays */
-export const CARD_IMAGE_FRAME_DETAIL =
-  "relative mx-auto flex aspect-[2/3] w-full min-h-0 max-w-sm flex-col overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-slate-800/80 via-black/50 to-slate-900/90 p-2 sm:max-w-md sm:p-3";
+export const CARD_IMAGE_FRAME_DETAIL = `relative mx-auto w-full min-h-0 max-w-sm ${CARD_ASPECT} sm:max-w-md`;
 
-/** Marketplace modals — minimum 200px wide card preview */
-export const CARD_IMAGE_FRAME_MODAL =
-  "relative flex aspect-[2/3] w-full min-w-[200px] max-w-[240px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-slate-800/80 via-black/50 to-slate-900/90 p-2 sm:p-3";
+export const CARD_IMAGE_FRAME_MODAL = `relative w-full min-w-[200px] max-w-[240px] ${CARD_ASPECT}`;
 
-/** My Listings row — minimum 130px wide alongside listing details */
-export const CARD_IMAGE_FRAME_LISTING_ROW =
-  "relative flex aspect-[2/3] w-full min-w-[130px] flex-col overflow-hidden rounded-xl border border-white/10 bg-gradient-to-b from-slate-800/90 via-black/60 to-slate-900/95 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]";
+export const CARD_IMAGE_FRAME_LISTING_ROW = `relative w-full min-w-[130px] ${CARD_ASPECT}`;
 
 export const CARD_IMAGE_MEDIA_DETAIL = CARD_IMAGE_MEDIA_CLASS;
 
-export const CARD_IMAGE_FRAME_SM =
-  "relative flex aspect-[2/3] w-full min-h-0 max-w-[140px] flex-col overflow-hidden rounded-xl border border-white/10 bg-gradient-to-b from-slate-800/90 to-black/70 p-1.5";
+export const CARD_IMAGE_FRAME_SM = `relative w-full min-h-0 max-w-[140px] ${CARD_ASPECT}`;
 
-export const CARD_IMAGE_FRAME_XS =
-  "relative flex aspect-[2/3] w-full min-h-0 max-w-[100px] flex-col overflow-hidden rounded-lg border border-white/10 bg-gradient-to-b from-slate-800/90 to-black/70 p-1";
+export const CARD_IMAGE_FRAME_XS = `relative w-full min-h-0 max-w-[100px] ${CARD_ASPECT}`;
 
-/** Marketplace thumbnail grid — compact 2:3 tile */
-export const CARD_IMAGE_FRAME_THUMB =
-  "relative flex aspect-[2/3] w-full min-h-0 flex-col overflow-hidden rounded-lg border border-white/10 bg-gradient-to-b from-slate-800/90 via-black/60 to-slate-900/95 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]";
+export const CARD_IMAGE_FRAME_THUMB = `relative w-full min-h-0 ${CARD_ASPECT}`;
 
-export const CARD_IMAGE_FRAME_THUMB_ANIMATED =
-  `${CARD_IMAGE_FRAME_THUMB} ring-1 ring-violet-400/30 shadow-[0_0_16px_rgba(139,92,246,0.14)]`;
+export const CARD_IMAGE_FRAME_THUMB_ANIMATED = `${CARD_IMAGE_FRAME_THUMB} ring-1 ring-violet-400/30`;

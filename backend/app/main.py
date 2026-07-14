@@ -236,84 +236,55 @@ OrderStatus = Literal[
 
 
 _STYLE_ANCHOR = (
-    "Professional sports trading card art in the style of Topps Project 70 and "
-    "Panini Prizm. Ultra-sharp photorealistic player rendering. Studio-quality "
-    "lighting with dramatic shadows. Rich saturated colors. Premium card stock feel. "
-    "Cinematic depth of field with player in sharp focus against stylized background. "
+    "Ultra-sharp photorealistic youth baseball sports photography. "
+    "Studio-quality lighting with dramatic shadows. Rich saturated colors. "
     "The player should look like a real athlete photographed professionally, "
     "not illustrated or cartoon. Consistent proportions, no distortion."
 )
 
-_TIER_STYLE_RULES: dict[str, str] = {
-    "base": (
-        "ROOKIE TIER STYLE: Clean fresh design. Bright energetic colors. Subtle holographic shimmer on edges. "
-        "Green and silver accent tones."
-    ),
-    "rare": (
-        "ALL-STAR TIER STYLE: Bold dynamic design. Deep blue and silver tones. Refractor-style light rays "
-        "emanating from player. Premium foil texture on borders."
-    ),
-    "legendary": (
-        "LEGENDS TIER STYLE: Iconic premium design. Rich gold and black tones. Dramatic spotlight lighting "
-        "on player. Gold prismatic border effect. Feels like a hall of fame moment."
-    ),
+_TIER_PORTRAIT_STYLE: dict[str, str] = {
+    "base": "bright natural lighting, fresh energetic feel",
+    "rare": "dramatic stadium lighting, dynamic pose",
+    "legendary": "cinematic hero lighting, iconic moment feel",
 }
 
 
-def _card_composition_rules(*, variant: Literal["dual_edit", "single_edit", "text_generate"]) -> str:
-    """Shared framing and full-card visibility rules — no baked-in typography."""
-    aspect = (
-        "Match the SECOND reference image (card template) aspect ratio, outer border, and layout grid "
-        "EXACTLY — the finished card must align 1:1 with that template so no cropping is needed. "
-        if variant == "dual_edit"
-        else "Compose as a perfect square 1:1 trading card that fills the frame proportionally with no "
-        "post-generation cropping required. "
-    )
-    return (
-        "COMPOSITION (mandatory): "
-        "Render one complete, self-contained premium sports trading card — a single unified design fully "
-        "visible from edge to edge inside the image. The entire card border, frame, background, and "
-        "decorative elements must appear in-frame; nothing clipped, truncated, or cut off by the image edge. "
-        "Nothing may bleed, extend, or fade outside the card boundary. "
-        f"{aspect}"
-        "Do NOT render any readable text, numbers, letters, names, team labels, jersey numbers, graduation years, "
-        "position labels, or statistics inside the image. No typography zones, no nameplates, no stat overlays. "
-        "The player portrait and visual style are the only focal content. "
-    )
+def _tier_player_portrait_prompt(
+    tier: str,
+    *,
+    variant: Literal["single_edit", "text_generate"] = "single_edit",
+    special_theme: str | None = None,
+    caption: str | None = None,
+) -> str:
+    """
+    Portrait-only prompt — UI renders card frame, banner, and tier styling.
+    AI generates only the player image for the top art window.
+    """
+    t = tier.lower()
+    if t not in ("base", "rare", "legendary"):
+        t = "base"
 
+    tier_style = _TIER_PORTRAIT_STYLE[t]
+    modifier = theme_prompt_for_slug(special_theme)
+    theme_aesthetic = f"{modifier} " if modifier else ""
 
-def _player_framing_rules(*, variant: Literal["dual_edit", "single_edit", "text_generate"]) -> str:
-    """How the athlete should be placed within the card art area."""
     identity = (
-        "Use the FIRST reference image for the subject's identity, preserving the same athletic action "
-        "and body pose (e.g. throwing stays throwing); render as ultra-sharp photorealistic trading card art. "
-        if variant == "dual_edit"
-        else (
-            "Use the input photo for identity and the same action/pose; render as ultra-sharp photorealistic "
-            "trading card art. "
-            if variant == "single_edit"
-            else ""
-        )
+        "Preserve the subject's identity, likeness, skin tone, and athletic pose from the reference photo. "
+        "Match the same action shown in the photo (do not invent a different pose). "
+        if variant == "single_edit"
+        else ""
     )
+    caption_line = f" Subject details: {caption}. " if caption and variant == "text_generate" else ""
+
     return (
+        f"{_STYLE_ANCHOR} "
         f"{identity}"
-        "PLAYER FRAMING: Center the athlete as the clear focal point in the card's main art window. "
-        "Head and upper body (shoulders and chest) must be fully visible — never crop through the face, "
-        "forehead, chin, or shoulders. Leave comfortable space above the head. "
-        "The player should feel well-framed and balanced, not zoomed-in so tight that limbs or "
-        "facial features are cut off. "
-    )
-
-
-def _tier_theme_balance_rules(tier_style_block: str, theme_line: str) -> str:
-    """Layer theme on top of tier style without replacing it."""
-    return (
-        f"{tier_style_block} "
-        f"{theme_line} "
-        "Apply theme-specific color palette, background atmosphere, and accent effects on top of the tier style — "
-        "theme enhances but does not replace the tier look. "
-        "Tier and theme must be visible in borders, accents, and background atmosphere, "
-        "but must NOT overwhelm or obscure the player portrait — the athlete remains the hero of the card. "
+        f"{caption_line}"
+        "Professional youth baseball player portrait, centered, head and upper body fully visible, "
+        "stadium or sports background, dramatic sports photography lighting, "
+        f"{tier_style}, {theme_aesthetic}"
+        "photorealistic, no text, no overlays, no borders, no card frame, no typography, no nameplates. "
+        "Clean portrait suitable for placement inside a trading card template."
     )
 
 
@@ -322,70 +293,13 @@ def _tier_animated_card_prompt(
     team: str,
     tier: str,
     *,
-    variant: Literal["dual_edit", "single_edit", "text_generate"] = "dual_edit",
+    variant: Literal["dual_edit", "single_edit", "text_generate"] = "single_edit",
     special_theme: str | None = None,
 ) -> str:
-    """
-    Shared premium trading-card prompt: photorealistic Topps/Prizm-style athlete art.
-    Tier block: Base (Rookie) vs Rare (All-Star) vs Legendary (Legends).
-    variant: dual_edit = player + template images; single_edit = DALL·E 2 one image; text_generate = no image inputs.
-    """
-    t = tier.lower()
-    if t not in ("base", "rare", "legendary"):
-        t = "base"
-
-    tier_style = _TIER_STYLE_RULES[t]
-
-    if variant == "dual_edit":
-        layout = (
-            "Use the SECOND image strictly as the CARD TEMPLATE — replicate its layout, border shape, "
-            "proportions, and framing. Place the photorealistic player rendering into the template's art window "
-            "without breaking the template structure. Leave any template text areas blank — no readable text in the output. "
-        )
-    elif variant == "single_edit":
-        layout = (
-            "Design a bold premium trading-card frame, borders, and composition appropriate to the tier. "
-            "The frame is decorative only — no text, numbers, or labels in the artwork. "
-        )
-    else:
-        layout = (
-            "Compose a single square baseball trading card featuring one central photorealistic athlete "
-            f"(team color vibe: {team}). Invent a strong premium card frame with clean decorative borders — "
-            "no text or stat overlays. "
-        )
-
-    modifier = theme_prompt_for_slug(special_theme)
-    theme_line = (
-        f"THEME (layer on top of tier style — color palette, background atmosphere, border/frame accents): {modifier} "
-        if modifier
-        else ""
-    )
-
-    composition = _card_composition_rules(variant=variant)
-    framing = _player_framing_rules(variant=variant)
-    tier_theme = _tier_theme_balance_rules(tier_style, theme_line)
-
-    if variant == "text_generate":
-        pose_block = (
-            "Believable athletic baseball pose and energy appropriate to this tier and the written subject brief. "
-            "Photorealistic proportions, no distortion. "
-        )
-    else:
-        pose_block = (
-            "Match the **same pose and action** as the reference image "
-            "(do not default to batting or swinging unless the photo already shows that). "
-            "Photorealistic proportions, no distortion. "
-        )
-
-    return (
-        f"{_STYLE_ANCHOR} "
-        f"{composition}"
-        f"{framing}"
-        f"{pose_block}"
-        f"{layout}"
-        f"{tier_theme}"
-        "Prioritize a clean, full, unclipped player portrait and correct full-card composition over busy edge detail."
-    )
+    """Backward-compatible alias — portrait-only generation (layout is frontend UI)."""
+    _ = (name, team)
+    mapped = "text_generate" if variant == "text_generate" else "single_edit"
+    return _tier_player_portrait_prompt(tier, variant=mapped, special_theme=special_theme)
 
 
 def _resolve_player_and_source_path(player_id: int) -> tuple[dict, Path]:
@@ -684,6 +598,41 @@ def _decode_first_image_bytes(response) -> bytes:
     raise RuntimeError("OpenAI returned no image data")
 
 
+def _gpt_image_portrait_edit_bytes(
+    client: OpenAI,
+    player_path: Path,
+    *,
+    model: str,
+    tier: str,
+    special_theme: str | None,
+) -> bytes:
+    """Portrait-only edit from the uploaded player photo — no card template."""
+    player_f = _bytesio_image_file_for_edit(player_path, "player")
+    prompt = _tier_player_portrait_prompt(tier, variant="single_edit", special_theme=special_theme)
+    kwargs: dict = {
+        "model": model,
+        "image": [player_f],
+        "prompt": prompt,
+        "size": "1024x1024",
+        "n": 1,
+    }
+    if model in ("gpt-image-1", "gpt-image-1.5"):
+        kwargs["input_fidelity"] = "high"
+    logger.info(
+        "OpenAI images.edit (portrait) model=%s tier=%s prompt_len=%s",
+        model,
+        tier,
+        len(prompt),
+    )
+    try:
+        response = client.images.edit(**kwargs)
+    except Exception as exc:
+        logger.exception("OpenAI images.edit failed model=%s: %s", model, exc)
+        raise
+    logger.info("OpenAI images.edit succeeded model=%s", model)
+    return _decode_first_image_bytes(response)
+
+
 def _gpt_image_dual_edit_bytes(
     client: OpenAI,
     player_path: Path,
@@ -695,41 +644,15 @@ def _gpt_image_dual_edit_bytes(
     tier: str,
     special_theme: str | None,
 ) -> bytes:
-    """
-    Pass two images to images.edit: (1) player likeness, (2) card template.
-    Order matches the prompt (first / second image).
-    """
-    player_f = _bytesio_image_file_for_edit(player_path, "player")
-    template_f = _bytesio_image_file_for_edit(template_path, "template")
-    prompt = _tier_animated_card_prompt(
-        name,
-        team,
-        tier,
+    """Legacy name — portrait-only edit (template ignored; layout is frontend UI)."""
+    _ = (template_path, name, team)
+    return _gpt_image_portrait_edit_bytes(
+        client,
+        player_path,
+        model=model,
+        tier=tier,
         special_theme=special_theme,
     )
-    kwargs: dict = {
-        "model": model,
-        "image": [player_f, template_f],
-        "prompt": prompt,
-        "size": "1024x1024",
-        "n": 1,
-    }
-    if model in ("gpt-image-1", "gpt-image-1.5"):
-        kwargs["input_fidelity"] = "high"
-    logger.info(
-        "OpenAI images.edit request model=%s tier=%s prompt_len=%s prompt=%s",
-        model,
-        tier,
-        len(prompt),
-        prompt,
-    )
-    try:
-        response = client.images.edit(**kwargs)
-    except Exception as exc:
-        logger.exception("OpenAI images.edit failed model=%s: %s", model, exc)
-        raise
-    logger.info("OpenAI images.edit succeeded model=%s", model)
-    return _decode_first_image_bytes(response)
 
 
 def _jpeg_data_url_for_vision(source_path: Path, max_side: int = 1024) -> str:
@@ -781,15 +704,11 @@ def _dalle3_generate_card_bytes(
     """
     Full photorealistic trading card via DALL·E 3 text generation (fallback when template edit fails).
     """
-    prompt = (
-        _tier_animated_card_prompt(
-            name,
-            team,
-            tier,
-            variant="text_generate",
-            special_theme=special_theme,
-        )
-        + f" Subject reference from uploaded photo: {caption}."
+    prompt = _tier_player_portrait_prompt(
+        tier,
+        variant="text_generate",
+        special_theme=special_theme,
+        caption=caption,
     )
     resp = client.images.generate(
         model="dall-e-3",
@@ -812,9 +731,7 @@ def _dalle2_edit_card_bytes(
     """
     Fallback: DALL·E 2 image *edit* — often keeps most of the original photo pixels; use only if DALL·E 3 fails.
     """
-    prompt = _tier_animated_card_prompt(
-        name,
-        team,
+    prompt = _tier_player_portrait_prompt(
         tier,
         variant="single_edit",
         special_theme=special_theme,
@@ -1086,19 +1003,13 @@ def _generate_card_openai(
     special_theme: str | None = None,
 ) -> dict:
     """
-    1) Prefer GPT Image edit with [player photo, card template] and tier-specific prompt.
+    1) Prefer GPT Image edit on the player photo only (portrait — UI renders card chrome).
     2) Fallback: DALL·E 3 + vision caption, then DALL·E 2 edit (single image).
-    Player info is shown via the frontend CardInfoBanner — not baked into the image.
+    Player info is shown via the frontend CardDisplay banner — not baked into the image.
     """
     api_key = (os.environ.get("OPENAI_API_KEY") or "").strip()
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY is not set")
-
-    if not CARD_TEMPLATE_PATH.is_file():
-        raise HTTPException(
-            status_code=503,
-            detail=f"Card template not found. Add an image at: {CARD_TEMPLATE_PATH}",
-        )
 
     tier_norm = tier.lower()
     if tier_norm not in ("base", "rare", "legendary"):
@@ -1108,18 +1019,14 @@ def _generate_card_openai(
     team = _player_team_name(player_row)
     client = OpenAI(api_key=api_key)
 
-    generation = "gpt-image-template"
+    generation = "gpt-image-portrait"
     out_bytes: bytes | None = None
 
-    # Prefer template-guided generation to keep consistent card framing/style.
     for model in ("gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"):
         try:
-            out_bytes = _gpt_image_dual_edit_bytes(
+            out_bytes = _gpt_image_portrait_edit_bytes(
                 client,
                 source_path,
-                CARD_TEMPLATE_PATH,
-                name,
-                team,
                 model=model,
                 tier=tier_norm,
                 special_theme=special_theme,
@@ -1129,6 +1036,26 @@ def _generate_card_openai(
         except Exception as exc:
             logger.warning("Card generation failed for model=%s player_id=%s: %s", model, player_id, exc)
             continue
+
+    if out_bytes is None and CARD_TEMPLATE_PATH.is_file():
+        for model in ("gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"):
+            try:
+                out_bytes = _gpt_image_dual_edit_bytes(
+                    client,
+                    source_path,
+                    CARD_TEMPLATE_PATH,
+                    name,
+                    team,
+                    model=model,
+                    tier=tier_norm,
+                    special_theme=special_theme,
+                )
+                generation = "gpt-image-template"
+                logger.info("Card generation succeeded via legacy path model=%s player_id=%s", model, player_id)
+                break
+            except Exception as exc:
+                logger.warning("Legacy generation failed model=%s player_id=%s: %s", model, player_id, exc)
+                continue
 
     if out_bytes is None:
         generation = "dall-e-3"

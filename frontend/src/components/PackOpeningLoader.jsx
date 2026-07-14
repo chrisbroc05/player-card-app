@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { toApiUrl } from "../config/api";
+import CardImage from "./CardImage";
 
 const MIN_BUILD_MS = 8000;
 const ENTER_MS = 2000;
@@ -47,6 +47,7 @@ export default function PackOpeningLoader({
   active,
   generationComplete,
   cardImageUrl,
+  card = null,
   tier = "rookie",
   themeLabel = "",
   isAnimated = false,
@@ -118,7 +119,16 @@ export default function PackOpeningLoader({
 
   if (!active || phase === "done") return null;
 
-  const imgSrc = cardImageUrl ? toApiUrl(cardImageUrl) : "";
+  const revealCard = useMemo(() => {
+    if (card) return card;
+    if (!cardImageUrl) return null;
+    return {
+      image_url: cardImageUrl,
+      tier: tierKey,
+      player_name: "Your Card",
+    };
+  }, [card, cardImageUrl, tierKey]);
+
   const showPack = phase === "enter" || phase === "anticipation";
   const showReveal = phase === "reveal" || phase === "display";
   const statusMessage = phase === "enter" ? "Your pack is arriving..." : messages[messageIdx];
@@ -156,9 +166,9 @@ export default function PackOpeningLoader({
               <span key={i} className="pack-opening-spark" style={{ "--i": i }} />
             ))}
           </div>
-          {imgSrc ? (
+          {revealCard ? (
             <div className={`pack-opening-card-wrap ${phase === "display" ? "pack-opening-card-wrap--landed" : ""}`}>
-              <img src={imgSrc} alt="Your generated card" className="pack-opening-card" />
+              <CardImage card={revealCard} alt="Your generated card" showInfoBanner />
             </div>
           ) : null}
         </>
