@@ -94,6 +94,56 @@ export function loadVideoMetadata(source) {
   });
 }
 
+export function captureVideoFrameAsFile(objectUrl, timeSeconds = 0, fileName = "highlight-frame.jpg") {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    video.preload = "auto";
+    video.playsInline = true;
+    video.muted = true;
+    video.src = objectUrl;
+
+    const cleanup = () => {
+      video.removeAttribute("src");
+      video.load();
+    };
+
+    video.onloadeddata = () => {
+      const seekTo = Math.max(0, Math.min(timeSeconds, Number.isFinite(video.duration) ? video.duration : timeSeconds));
+      video.currentTime = seekTo;
+    };
+
+    video.onseeked = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth || 1280;
+        canvas.height = video.videoHeight || 720;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(
+          (blob) => {
+            cleanup();
+            if (!blob) {
+              reject(new Error("Could not capture a frame from your video."));
+              return;
+            }
+            resolve(new File([blob], fileName, { type: "image/jpeg" }));
+          },
+          "image/jpeg",
+          0.92
+        );
+      } catch (err) {
+        cleanup();
+        reject(err);
+      }
+    };
+
+    video.onerror = () => {
+      cleanup();
+      reject(new Error("Could not read video for player photo."));
+    };
+  });
+}
+
 export async function cameraAvailable() {
   if (!navigator.mediaDevices?.getUserMedia) return false;
   if (!window.MediaRecorder) return false;

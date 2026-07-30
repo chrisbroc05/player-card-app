@@ -20,23 +20,32 @@ const PHASE = {
 };
 
 export default function HighlightVideoStep({
+  mode = "full",
   highlightCardPrice = 5,
   clipDraft,
+  onVideoReady,
   onClipConfirmed,
   onBack,
+  onChooseDifferent,
 }) {
   const fileInputRef = useRef(null);
-  const [phase, setPhase] = useState(clipDraft?.confirmed ? PHASE.TRIM : PHASE.CHOOSE);
+  const isUploadOnly = mode === "upload";
+  const isTrimOnly = mode === "trim";
+  const [phase, setPhase] = useState(() => {
+    if (isTrimOnly) return PHASE.TRIM;
+    if (clipDraft?.confirmed) return PHASE.TRIM;
+    return PHASE.CHOOSE;
+  });
   const [canRecord, setCanRecord] = useState(false);
   const [error, setError] = useState("");
   const [pendingClip, setPendingClip] = useState(clipDraft || null);
 
   useEffect(() => {
-    if (clipDraft?.confirmed) {
+    if (isTrimOnly && clipDraft) {
       setPendingClip(clipDraft);
       setPhase(PHASE.TRIM);
     }
-  }, [clipDraft]);
+  }, [isTrimOnly, clipDraft]);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,6 +64,23 @@ export default function HighlightVideoStep({
       }
     };
   }, [pendingClip, clipDraft?.objectUrl]);
+
+  async function finalizeVideoSelection(file, objectUrl, duration) {
+    const draft = {
+      file,
+      objectUrl,
+      duration,
+      trimStart: 0,
+      trimEnd: Math.min(duration, 10),
+      confirmed: false,
+    };
+    if (isUploadOnly) {
+      onVideoReady?.(draft);
+      return;
+    }
+    setPendingClip(draft);
+    setPhase(PHASE.TRIM);
+  }
 
   async function handleFileSelected(file) {
     setError("");
@@ -79,15 +105,8 @@ export default function HighlightVideoStep({
         setPhase(PHASE.CHOOSE);
         return;
       }
-      setPendingClip({
-        file,
-        objectUrl,
-        duration: meta.duration,
-        trimStart: 0,
-        trimEnd: Math.min(meta.duration, 10),
-        confirmed: false,
-      });
-      setPhase(PHASE.TRIM);
+      await finalizeVideoSelection(file, objectUrl, meta.duration);
+      if (isUploadOnly) setPhase(PHASE.CHOOSE);
     } catch (err) {
       setError(err.message || "Could not read video file.");
       setPhase(PHASE.CHOOSE);
@@ -98,16 +117,9 @@ export default function HighlightVideoStep({
     setError("");
     setPhase(PHASE.PROCESSING);
     loadVideoMetadata(file)
-      .then((meta) => {
-        setPendingClip({
-          file,
-          objectUrl,
-          duration: meta.duration,
-          trimStart: 0,
-          trimEnd: Math.min(meta.duration, 10),
-          confirmed: false,
-        });
-        setPhase(PHASE.TRIM);
+      .then((meta) => finalizeVideoSelection(file, objectUrl, meta.duration))
+      .then(() => {
+        if (isUploadOnly) setPhase(PHASE.CHOOSE);
       })
       .catch((err) => {
         setError(err.message || "Could not read recording.");
@@ -124,17 +136,63 @@ export default function HighlightVideoStep({
     setPendingClip(null);
     setPhase(PHASE.CHOOSE);
     setError("");
+    onChooseDifferent?.();
+  }
+
+  const uploadHeadline = "Upload your highlight video or record now";
+  const uploadSubtext =
+    "Upload a clip or record directly — you'll trim it to your best 10 seconds next";
+
+  if (isTrimOnly) {
+    if (!pendingClip) {
+      return (
+        <div className="grid gap-4">
+          <p className="text-sm text-slate-400">Select a video first, then trim your best 10 seconds.</p>
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
+          >
+            Back
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid gap-5">
+        <div>
+          <h3 className="text-lg font-semibold text-white">Trim your highlight</h3>
+          <p className="mt-1 text-sm text-slate-400">Pick up to 10 seconds for your card.</p>
+          <p className="mt-2 text-sm text-teal-200">Highlight upgrade: {formatMoney(highlightCardPrice)}</p>
+        </div>
+        <HighlightVideoTrimmer
+          objectUrl={pendingClip.objectUrl}
+          file={pendingClip.file}
+          duration={pendingClip.duration}
+          initialTrimStart={pendingClip.trimStart}
+          initialTrimEnd={pendingClip.trimEnd}
+          onConfirm={handleTrimConfirm}
+          onChooseDifferent={resetToChoose}
+        />
+      </div>
+    );
   }
 
   return (
     <div className="grid gap-5">
       <div>
-        <h3 className="text-lg font-semibold text-white">Add Your Highlight Clip</h3>
+        <h3 className="text-lg font-semibold text-white">
+          {isUploadOnly ? uploadHeadline : "Add Your Highlight Clip"}
+        </h3>
         <p className="mt-1 text-sm text-slate-400">
-          Upload or record your best moment, then trim to 10 seconds. Your clip plays on the card instead of AI
-          animation.
+          {isUploadOnly
+            ? uploadSubtext
+            : "Upload or record your best moment, then trim to 10 seconds. Your clip plays on the card instead of AI animation."}
         </p>
-        <p className="mt-2 text-sm text-teal-200">Highlight upgrade: {formatMoney(highlightCardPrice)}</p>
+        {!isUploadOnly ? (
+          <p className="mt-2 text-sm text-teal-200">Highlight upgrade: {formatMoney(highlightCardPrice)}</p>
+        ) : null}
       </div>
 
       {error ? (
@@ -156,7 +214,9 @@ export default function HighlightVideoStep({
               className="flex min-h-[120px] flex-col items-center justify-center gap-2 rounded-2xl border border-white/15 bg-cardBg2 px-4 py-6 text-center transition hover:border-teal-400/40 hover:bg-teal-500/5"
             >
               <span className="text-2xl">📁</span>
-              <span className="text-sm font-semibold text-white">Upload from Camera Roll</span>
+              <span className="text-sm font-semibold text-white">
+                {isUploadOnly ? "Upload Video" : "Upload from Camera Roll"}
+              </span>
               <span className="text-xs text-slate-400">MP4, MOV, WebM, or AVI · max 100 MB</span>
             </button>
 
@@ -185,13 +245,15 @@ export default function HighlightVideoStep({
             }}
           />
 
-          <button
-            type="button"
-            onClick={onBack}
-            className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
-          >
-            Back
-          </button>
+          {onBack ? (
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
+            >
+              Back
+            </button>
+          ) : null}
         </>
       ) : null}
 
@@ -199,7 +261,7 @@ export default function HighlightVideoStep({
         <HighlightVideoRecorder onRecorded={handleRecorded} onCancel={() => setPhase(PHASE.CHOOSE)} />
       ) : null}
 
-      {phase === PHASE.TRIM && pendingClip ? (
+      {!isUploadOnly && phase === PHASE.TRIM && pendingClip ? (
         <HighlightVideoTrimmer
           objectUrl={pendingClip.objectUrl}
           file={pendingClip.file}

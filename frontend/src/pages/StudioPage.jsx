@@ -39,29 +39,37 @@ import { copyChargeForQuantity, normalizeCopyTiers } from "../utils/copyPricing"
 import { formatMoney } from "../utils/marketplace";
 import { scrollAfterPaint } from "../utils/smoothScroll";
 import { uploadHighlightClip } from "../utils/uploadHighlightClip";
+import { captureVideoFrameAsFile } from "../utils/highlightVideo";
 
-const STEP_PHOTO = 1;
-const STEP_CARD_TYPE = 2;
-const STEP_ACTION = 3;
-const STEP_MOTION = 4;
-const STEP_DETAILS = 5;
-const STEP_HIGHLIGHT_VIDEO = 6;
-const STEP_TIER = 7;
-const STEP_THEME = 8;
+const STEP_DETAILS = 1;
+const STEP_TIER = 2;
+const STEP_THEME = 3;
+const STEP_CARD_TYPE = 4;
+const STEP_UPLOAD = 5;
+const STEP_ACTION = 6;
+const STEP_MOTION = 7;
+const STEP_HIGHLIGHT_VIDEO = 8;
 const STEP_REVIEW = 9;
 const TOTAL_WIZARD_STEPS = 9;
 
 const WIZARD_STEP_LABELS = {
-  [STEP_PHOTO]: "Upload Photo",
-  [STEP_CARD_TYPE]: "Choose Card Type",
-  [STEP_ACTION]: "Tag Your Action",
-  [STEP_MOTION]: "Choose Motion",
   [STEP_DETAILS]: "Player Details",
-  [STEP_HIGHLIGHT_VIDEO]: "Highlight Video",
   [STEP_TIER]: "Choose Tier",
   [STEP_THEME]: "Choose Theme",
+  [STEP_CARD_TYPE]: "Choose Card Type",
+  [STEP_UPLOAD]: "Upload",
+  [STEP_ACTION]: "Tag Your Action",
+  [STEP_MOTION]: "Choose Motion",
+  [STEP_HIGHLIGHT_VIDEO]: "Trim Highlight",
   [STEP_REVIEW]: "Review & Generate",
 };
+
+function wizardStepLabel(step, cardType) {
+  if (step === STEP_UPLOAD) {
+    return cardType === "highlight" ? "Upload Video" : "Upload Photo";
+  }
+  return WIZARD_STEP_LABELS[step] || "";
+}
 
 const ANIMATED_FLOW_STAGE = {
   IDLE: "idle",
@@ -83,28 +91,37 @@ function isHighlightOnlyStep(step) {
 function getNextWizardStep(step, cardType) {
   const isAnimated = cardType === "animated";
   const isHighlight = cardType === "highlight";
-  if (step === STEP_PHOTO) return STEP_CARD_TYPE;
-  if (step === STEP_CARD_TYPE) return isAnimated ? STEP_ACTION : STEP_DETAILS;
+  if (step === STEP_DETAILS) return STEP_TIER;
+  if (step === STEP_TIER) return STEP_THEME;
+  if (step === STEP_THEME) return STEP_CARD_TYPE;
+  if (step === STEP_CARD_TYPE) return STEP_UPLOAD;
+  if (step === STEP_UPLOAD) {
+    if (isAnimated) return STEP_ACTION;
+    if (isHighlight) return STEP_HIGHLIGHT_VIDEO;
+    return STEP_REVIEW;
+  }
   if (step === STEP_ACTION) return STEP_MOTION;
-  if (step === STEP_MOTION) return STEP_DETAILS;
-  if (step === STEP_DETAILS) return isHighlight ? STEP_HIGHLIGHT_VIDEO : STEP_TIER;
-  if (step === STEP_HIGHLIGHT_VIDEO) return STEP_TIER;
-  if (step === STEP_THEME) return STEP_REVIEW;
+  if (step === STEP_MOTION) return STEP_REVIEW;
+  if (step === STEP_HIGHLIGHT_VIDEO) return STEP_REVIEW;
   return Math.min(step + 1, STEP_REVIEW);
 }
 
 function getPrevWizardStep(step, cardType) {
   const isAnimated = cardType === "animated";
   const isHighlight = cardType === "highlight";
-  if (step === STEP_REVIEW) return STEP_THEME;
-  if (step === STEP_THEME) return STEP_TIER;
-  if (step === STEP_TIER) return isHighlight ? STEP_HIGHLIGHT_VIDEO : STEP_DETAILS;
-  if (step === STEP_HIGHLIGHT_VIDEO) return STEP_DETAILS;
-  if (step === STEP_DETAILS) return isAnimated ? STEP_MOTION : STEP_CARD_TYPE;
+  if (step === STEP_REVIEW) {
+    if (isHighlight) return STEP_HIGHLIGHT_VIDEO;
+    if (isAnimated) return STEP_MOTION;
+    return STEP_UPLOAD;
+  }
+  if (step === STEP_HIGHLIGHT_VIDEO) return STEP_UPLOAD;
   if (step === STEP_MOTION) return STEP_ACTION;
-  if (step === STEP_ACTION) return STEP_CARD_TYPE;
-  if (step === STEP_CARD_TYPE) return STEP_PHOTO;
-  return Math.max(step - 1, STEP_PHOTO);
+  if (step === STEP_ACTION) return STEP_UPLOAD;
+  if (step === STEP_UPLOAD) return STEP_CARD_TYPE;
+  if (step === STEP_CARD_TYPE) return STEP_THEME;
+  if (step === STEP_THEME) return STEP_TIER;
+  if (step === STEP_TIER) return STEP_DETAILS;
+  return Math.max(step - 1, STEP_DETAILS);
 }
 
 const TIER_UI = {
@@ -187,15 +204,16 @@ function fieldErrorClass(hasError) {
   return hasError ? "border-rose-500/60 ring-1 ring-rose-500/30" : "border-white/15";
 }
 
-function WizardProgress({ currentStep, isAnimated, isHighlight, onGoToStep }) {
+function WizardProgress({ currentStep, isAnimated, isHighlight, cardType, onGoToStep }) {
   const progressPct = Math.round((currentStep / TOTAL_WIZARD_STEPS) * 100);
+  const currentLabel = wizardStepLabel(currentStep, cardType);
   return (
     <div className="mb-6 rounded-xl border border-white/10 bg-cardBg2 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
           Step {currentStep} of {TOTAL_WIZARD_STEPS}
         </p>
-        <p className="text-sm font-semibold text-white">{WIZARD_STEP_LABELS[currentStep]}</p>
+        <p className="text-sm font-semibold text-white">{currentLabel}</p>
       </div>
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
         <div
@@ -232,7 +250,7 @@ function WizardProgress({ currentStep, isAnimated, isHighlight, onGoToStep }) {
               >
                 {done ? "✓" : step}
               </span>
-              <span className="hidden sm:inline">{WIZARD_STEP_LABELS[step]}</span>
+              <span className="hidden sm:inline">{wizardStepLabel(step, cardType)}</span>
             </button>
           );
         })}
@@ -485,7 +503,7 @@ export default function StudioPage() {
   const regenerateShortfall = Math.max(0, additionalPreviewCost - creditBalance);
   const firstGenerateShortfall = Math.max(0, firstGenerateDue - creditBalance);
   const motionDisplayName = isAnimatedCardType && selectedMotionId ? motionLabel(selectedMotionId) : "";
-  const inCreationFlow = currentStep >= STEP_PHOTO && currentStep <= STEP_REVIEW;
+  const inCreationFlow = currentStep >= STEP_DETAILS && currentStep <= STEP_REVIEW;
   const animatedChoiceModalOpen = animatedFlowStage === ANIMATED_FLOW_STAGE.CHOICE;
   const showAnimatedQuantityModal = animatedFlowStage === ANIMATED_FLOW_STAGE.QUANTITY;
 
@@ -505,26 +523,27 @@ export default function StudioPage() {
 
   const stepComplete = useMemo(
     () => ({
-      [STEP_PHOTO]: Boolean(imageFile),
-      [STEP_CARD_TYPE]: Boolean(cardType),
-      [STEP_ACTION]: !isAnimatedCardType || Boolean(actionCategory),
-      [STEP_MOTION]: !isAnimatedCardType || Boolean(selectedMotionId),
       [STEP_DETAILS]: detailsValidation.valid,
-      [STEP_HIGHLIGHT_VIDEO]: isHighlightCardType && Boolean(highlightClipDraft?.confirmed),
       [STEP_TIER]: Boolean(orderTier),
       [STEP_THEME]: Boolean(specialTheme),
+      [STEP_CARD_TYPE]: Boolean(cardType),
+      [STEP_UPLOAD]: isHighlightCardType ? Boolean(highlightClipDraft?.file) : Boolean(imageFile),
+      [STEP_ACTION]: !isAnimatedCardType || Boolean(actionCategory),
+      [STEP_MOTION]: !isAnimatedCardType || Boolean(selectedMotionId),
+      [STEP_HIGHLIGHT_VIDEO]: isHighlightCardType && Boolean(highlightClipDraft?.confirmed),
       [STEP_REVIEW]: true,
     }),
     [
-      imageFile,
-      cardType,
-      actionCategory,
-      selectedMotionId,
       detailsValidation.valid,
       orderTier,
       specialTheme,
+      cardType,
+      imageFile,
+      actionCategory,
+      selectedMotionId,
       isAnimatedCardType,
       isHighlightCardType,
+      highlightClipDraft?.file,
       highlightClipDraft?.confirmed,
     ]
   );
@@ -557,46 +576,21 @@ export default function StudioPage() {
     setCurrentStep(STEP_MOTION);
   }
 
+  function clearUploadState() {
+    if (highlightClipDraft?.objectUrl) URL.revokeObjectURL(highlightClipDraft.objectUrl);
+    setHighlightClipDraft(null);
+    setImageFile(null);
+    setPhotoStepError("");
+    setHighlightUploadState("idle");
+    setHighlightUploadProgress(0);
+    setHighlightUploadError("");
+  }
+
   function tryAdvanceStep() {
-    if (currentStep === STEP_PHOTO) {
-      if (!imageFile) {
-        setPhotoStepError("Please upload a player photo to continue");
-        return;
-      }
-      setPhotoStepError("");
-      setCurrentStep(STEP_CARD_TYPE);
-      return;
-    }
-    if (currentStep === STEP_CARD_TYPE) {
-      setCurrentStep(getNextWizardStep(STEP_CARD_TYPE, cardType));
-      return;
-    }
-    if (currentStep === STEP_ACTION) {
-      if (!actionCategory) {
-        setActionStepError("Please select the action shown in your photo");
-        return;
-      }
-      setActionStepError("");
-      handleActionCategorySelect(actionCategory);
-      return;
-    }
-    if (currentStep === STEP_MOTION) {
-      if (!selectedMotionId) {
-        setMotionStepError("Please select a motion for your animated card");
-        return;
-      }
-      setMotionStepError("");
-      setCurrentStep(STEP_DETAILS);
-      return;
-    }
     if (currentStep === STEP_DETAILS) {
       setDetailsShowErrors(true);
       setDetailsErrors(detailsValidation.errors);
       if (!detailsValidation.valid) return;
-      setCurrentStep(getNextWizardStep(STEP_DETAILS, cardType));
-      return;
-    }
-    if (currentStep === STEP_HIGHLIGHT_VIDEO) {
       setCurrentStep(STEP_TIER);
       return;
     }
@@ -615,7 +609,41 @@ export default function StudioPage() {
         return;
       }
       setThemeStepError("");
+      setCurrentStep(STEP_CARD_TYPE);
+      return;
+    }
+    if (currentStep === STEP_CARD_TYPE) {
+      setCurrentStep(STEP_UPLOAD);
+      return;
+    }
+    if (currentStep === STEP_UPLOAD) {
+      if (!isHighlightCardType) {
+        if (!imageFile) {
+          setPhotoStepError("Please upload a player photo to continue");
+          return;
+        }
+        setPhotoStepError("");
+      }
+      setCurrentStep(getNextWizardStep(STEP_UPLOAD, cardType));
+      return;
+    }
+    if (currentStep === STEP_ACTION) {
+      if (!actionCategory) {
+        setActionStepError("Please select the action shown in your photo");
+        return;
+      }
+      setActionStepError("");
+      handleActionCategorySelect(actionCategory);
+      return;
+    }
+    if (currentStep === STEP_MOTION) {
+      if (!selectedMotionId) {
+        setMotionStepError("Please select a motion for your animated card");
+        return;
+      }
+      setMotionStepError("");
       setCurrentStep(STEP_REVIEW);
+      return;
     }
   }
 
@@ -634,10 +662,10 @@ export default function StudioPage() {
 
   useEffect(() => {
     if (!isAnimatedCardType && isAnimatedOnlyStep(currentStep)) {
-      setCurrentStep(STEP_DETAILS);
+      setCurrentStep(STEP_REVIEW);
     }
     if (!isHighlightCardType && isHighlightOnlyStep(currentStep)) {
-      setCurrentStep(STEP_DETAILS);
+      setCurrentStep(STEP_REVIEW);
     }
   }, [isAnimatedCardType, isHighlightCardType, currentStep]);
 
@@ -1132,8 +1160,17 @@ export default function StudioPage() {
   }, [token, initializing]);
 
   async function createPlayerFromCurrentForm() {
+    let fileToUpload = imageFile;
+    if (!fileToUpload && isHighlightCardType && highlightClipDraft?.objectUrl) {
+      fileToUpload = await captureVideoFrameAsFile(
+        highlightClipDraft.objectUrl,
+        highlightClipDraft.trimStart ?? 0
+      );
+    }
+    if (!fileToUpload) throw new Error("Player photo is required.");
+
     const formData = new FormData();
-    formData.append("file", imageFile);
+    formData.append("file", fileToUpload);
     const uploadRes = await fetch(`${API_BASE_URL}/upload-image`, {
       method: "POST",
       headers: { ...authHeaders(token) },
@@ -1554,7 +1591,15 @@ export default function StudioPage() {
   }, [animationLoadingCardId, selectedMotionId, actionCategory, token]);
 
   function handlePhotoFileSelect(file) {
-    if (!file || !file.type.startsWith("image/")) return;
+    if (!file) return;
+    const type = (file.type || "").toLowerCase();
+    const ext = file.name.split(".").pop()?.toLowerCase() || "";
+    const acceptedTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
+    const acceptedExt = new Set(["jpg", "jpeg", "png", "webp", "heic", "heif"]);
+    if (!acceptedTypes.has(type) && !acceptedExt.has(ext)) {
+      setPhotoStepError("Please choose a JPG, PNG, WebP, or HEIC image");
+      return;
+    }
     setImageFile(file);
     setPhotoStepError("");
     setError("");
@@ -1635,6 +1680,7 @@ export default function StudioPage() {
               currentStep={currentStep}
               isAnimated={isAnimatedCardType}
               isHighlight={isHighlightCardType}
+              cardType={cardType}
               onGoToStep={goToStep}
             />
 
@@ -1646,86 +1692,112 @@ export default function StudioPage() {
 
             {!user && currentStep >= STEP_DETAILS ? (
               <StudioAuthGate
-                onBackToTiers={() => goToStep(STEP_PHOTO)}
-                backLabel="← Back to photo upload"
+                onBackToTiers={() => goToStep(STEP_DETAILS)}
+                backLabel="← Back to player details"
               />
             ) : (
               <>
-            {currentStep === STEP_PHOTO ? (
-              <div className="grid gap-4">
-                <input
-                  id="studio-photo-upload"
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    handlePhotoFileSelect(e.target.files?.[0] || null);
-                    e.target.value = "";
+            {currentStep === STEP_UPLOAD ? (
+              isHighlightCardType ? (
+                <HighlightVideoStep
+                  mode="upload"
+                  highlightCardPrice={generationPricing?.highlight_card_price ?? highlightCardPrice}
+                  clipDraft={highlightClipDraft}
+                  onVideoReady={(draft) => {
+                    setHighlightClipDraft(draft);
+                    setCurrentStep(STEP_HIGHLIGHT_VIDEO);
                   }}
+                  onBack={goBackStep}
                 />
-                {photoStepError ? (
-                  <p className="text-sm text-rose-300">{photoStepError}</p>
-                ) : null}
-                {!imageFile ? (
-                  <label
-                    htmlFor="studio-photo-upload"
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setDragActive(true);
+              ) : (
+                <div className="grid gap-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">Upload your player photo</h3>
+                    <p className="mt-1 text-sm text-slate-400">
+                      Choose a clear photo of your player for the best card result
+                    </p>
+                  </div>
+                  <input
+                    id="studio-photo-upload"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif"
+                    className="hidden"
+                    onChange={(e) => {
+                      handlePhotoFileSelect(e.target.files?.[0] || null);
+                      e.target.value = "";
                     }}
-                    onDragLeave={() => setDragActive(false)}
-                    onDrop={(e) => {
-                      handleDropFile(e);
-                      setPhotoStepError("");
-                    }}
-                    className={`flex min-h-[180px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-4 text-center transition ${
-                      dragActive
-                        ? "border-neonBlue/70 bg-neonBlue/10"
-                        : photoStepError
-                          ? "border-rose-500/50 bg-rose-500/5"
-                          : "border-white/20 bg-cardBg2 hover:border-neonBlue/40"
-                    }`}
-                  >
-                    <p className="text-sm text-slate-200">Drag & drop player photo</p>
-                    <p className="text-xs text-slate-400">or click to choose an image</p>
-                  </label>
-                ) : (
-                  <>
-                    <div className="flex min-h-[240px] items-center justify-center rounded-xl border border-white/15 bg-zinc-900/70 p-4 sm:min-h-[300px]">
-                      <img
-                        src={imagePreviewUrl}
-                        alt="Upload preview"
-                        className="max-h-[min(480px,60vh)] w-full object-contain"
-                      />
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
-                      <span className="text-emerald-300" aria-hidden>
-                        ✓
-                      </span>
-                      <p className="text-sm text-emerald-100">
-                        <span className="font-medium text-emerald-50">Photo uploaded</span>
-                        <span className="text-emerald-200/90"> — {imageFile.name}</span>
-                      </p>
-                    </div>
+                  />
+                  {photoStepError ? (
+                    <p className="text-sm text-rose-300">{photoStepError}</p>
+                  ) : null}
+                  {!imageFile ? (
                     <label
                       htmlFor="studio-photo-upload"
-                      className="inline-flex min-h-[44px] w-full cursor-pointer items-center justify-center rounded-xl border border-white/25 bg-transparent px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:border-white/40 hover:bg-white/5 sm:w-auto"
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setDragActive(true);
+                      }}
+                      onDragLeave={() => setDragActive(false)}
+                      onDrop={(e) => {
+                        handleDropFile(e);
+                        setPhotoStepError("");
+                      }}
+                      className={`flex min-h-[180px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-4 text-center transition ${
+                        dragActive
+                          ? "border-neonBlue/70 bg-neonBlue/10"
+                          : photoStepError
+                            ? "border-rose-500/50 bg-rose-500/5"
+                            : "border-white/20 bg-cardBg2 hover:border-neonBlue/40"
+                      }`}
                     >
-                      Replace Photo
+                      <p className="text-sm font-medium text-slate-200">Choose Photo</p>
+                      <p className="mt-1 text-xs text-slate-400">JPG, PNG, WebP, or HEIC</p>
                     </label>
-                  </>
-                )}
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={!canAdvanceFromStep}
-                    onClick={tryAdvanceStep}
-                    className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
-                  >
-                    Continue to Card Type
-                  </button>
+                  ) : (
+                    <>
+                      <div className="flex min-h-[240px] items-center justify-center rounded-xl border border-white/15 bg-zinc-900/70 p-4 sm:min-h-[300px]">
+                        <img
+                          src={imagePreviewUrl}
+                          alt="Upload preview"
+                          className="max-h-[min(480px,60vh)] w-full object-contain"
+                        />
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
+                        <span className="text-emerald-300" aria-hidden>
+                          ✓
+                        </span>
+                        <p className="text-sm text-emerald-100">
+                          <span className="font-medium text-emerald-50">Photo uploaded</span>
+                          <span className="text-emerald-200/90"> — {imageFile.name}</span>
+                        </p>
+                      </div>
+                      <label
+                        htmlFor="studio-photo-upload"
+                        className="inline-flex min-h-[44px] w-full cursor-pointer items-center justify-center rounded-xl border border-white/25 bg-transparent px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:border-white/40 hover:bg-white/5 sm:w-auto"
+                      >
+                        Choose Photo
+                      </label>
+                    </>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={goBackStep}
+                      className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!canAdvanceFromStep}
+                      onClick={tryAdvanceStep}
+                      className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
+                    >
+                      {isAnimatedCardType ? "Continue to Action Tagging" : "Continue to Review"}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )
             ) : null}
 
             {currentStep === STEP_CARD_TYPE ? (
@@ -1733,6 +1805,7 @@ export default function StudioPage() {
                 <CardTypeStep
                   value={cardType}
                   onChange={(type) => {
+                    if (type !== cardType) clearUploadState();
                     setCardType(type);
                     if (type === "standard" || type === "highlight") {
                       setSelectedMotionId("");
@@ -1757,11 +1830,7 @@ export default function StudioPage() {
                     onClick={tryAdvanceStep}
                     className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
                   >
-                    {isAnimatedCardType
-                      ? "Continue to Action Tagging"
-                      : isHighlightCardType
-                        ? "Continue to Player Details"
-                        : "Continue to Player Details"}
+                    Continue to Upload
                   </button>
                 </div>
               </div>
@@ -1876,7 +1945,7 @@ export default function StudioPage() {
                     onClick={tryAdvanceStep}
                     className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
                   >
-                    Continue to {isHighlightCardType ? "Highlight Video" : "Tier Selection"}
+                    Continue to Tier Selection
                   </button>
                 </div>
               </div>
@@ -1884,13 +1953,19 @@ export default function StudioPage() {
 
             {currentStep === STEP_HIGHLIGHT_VIDEO && isHighlightCardType ? (
               <HighlightVideoStep
+                mode="trim"
                 highlightCardPrice={generationPricing?.highlight_card_price ?? highlightCardPrice}
                 clipDraft={highlightClipDraft}
                 onClipConfirmed={(draft) => {
                   setHighlightClipDraft(draft);
-                  setCurrentStep(STEP_TIER);
+                  setCurrentStep(STEP_REVIEW);
                 }}
                 onBack={goBackStep}
+                onChooseDifferent={() => {
+                  if (highlightClipDraft?.objectUrl) URL.revokeObjectURL(highlightClipDraft.objectUrl);
+                  setHighlightClipDraft(null);
+                  setCurrentStep(STEP_UPLOAD);
+                }}
               />
             ) : null}
 
@@ -1983,7 +2058,7 @@ export default function StudioPage() {
                     onClick={tryAdvanceStep}
                     className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
                   >
-                    Continue to Review
+                    Continue to Card Type Selection
                   </button>
                 </div>
               </div>
@@ -2051,7 +2126,7 @@ export default function StudioPage() {
                     onClick={tryAdvanceStep}
                     className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
                   >
-                    Continue to Player Details
+                    Continue to Review
                   </button>
                 </div>
               </div>
