@@ -11,6 +11,8 @@ import StudioCreditBalance from "../components/StudioCreditBalance";
 import GenerationCostSummary from "../components/GenerationCostSummary";
 import ThemeLibraryPicker from "../components/ThemeLibraryPicker";
 import CardTypeStep from "../components/CardTypeStep";
+import HighlightVideoStep from "../components/HighlightVideoStep";
+import HighlightProcessingScreen from "../components/HighlightProcessingScreen";
 import QuantitySelector from "../components/QuantitySelector";
 import ActionCategoryStep from "../components/ActionCategoryStep";
 import MotionSelectionGrid from "../components/MotionSelectionGrid";
@@ -30,21 +32,24 @@ import {
 } from "../constants/actionCategories";
 import { API_BASE_URL, authHeaders, toApiUrl } from "../config/api";
 import { useAuth } from "../context/AuthContext";
+import { useFeatures } from "../context/FeatureContext";
 import { useNewCardCelebration } from "../context/NewCardCelebrationContext";
 import { fetchGenerationPrice } from "../utils/cardPricing";
 import { copyChargeForQuantity, normalizeCopyTiers } from "../utils/copyPricing";
 import { formatMoney } from "../utils/marketplace";
 import { scrollAfterPaint } from "../utils/smoothScroll";
+import { uploadHighlightClip } from "../utils/uploadHighlightClip";
 
 const STEP_PHOTO = 1;
 const STEP_CARD_TYPE = 2;
 const STEP_ACTION = 3;
 const STEP_MOTION = 4;
 const STEP_DETAILS = 5;
-const STEP_TIER = 6;
-const STEP_THEME = 7;
-const STEP_REVIEW = 8;
-const TOTAL_WIZARD_STEPS = 8;
+const STEP_HIGHLIGHT_VIDEO = 6;
+const STEP_TIER = 7;
+const STEP_THEME = 8;
+const STEP_REVIEW = 9;
+const TOTAL_WIZARD_STEPS = 9;
 
 const WIZARD_STEP_LABELS = {
   [STEP_PHOTO]: "Upload Photo",
@@ -52,6 +57,7 @@ const WIZARD_STEP_LABELS = {
   [STEP_ACTION]: "Tag Your Action",
   [STEP_MOTION]: "Choose Motion",
   [STEP_DETAILS]: "Player Details",
+  [STEP_HIGHLIGHT_VIDEO]: "Highlight Video",
   [STEP_TIER]: "Choose Tier",
   [STEP_THEME]: "Choose Theme",
   [STEP_REVIEW]: "Review & Generate",
@@ -70,19 +76,30 @@ function isAnimatedOnlyStep(step) {
   return step === STEP_ACTION || step === STEP_MOTION;
 }
 
-function getNextWizardStep(step, isAnimated) {
+function isHighlightOnlyStep(step) {
+  return step === STEP_HIGHLIGHT_VIDEO;
+}
+
+function getNextWizardStep(step, cardType) {
+  const isAnimated = cardType === "animated";
+  const isHighlight = cardType === "highlight";
   if (step === STEP_PHOTO) return STEP_CARD_TYPE;
   if (step === STEP_CARD_TYPE) return isAnimated ? STEP_ACTION : STEP_DETAILS;
   if (step === STEP_ACTION) return STEP_MOTION;
   if (step === STEP_MOTION) return STEP_DETAILS;
+  if (step === STEP_DETAILS) return isHighlight ? STEP_HIGHLIGHT_VIDEO : STEP_TIER;
+  if (step === STEP_HIGHLIGHT_VIDEO) return STEP_TIER;
   if (step === STEP_THEME) return STEP_REVIEW;
   return Math.min(step + 1, STEP_REVIEW);
 }
 
-function getPrevWizardStep(step, isAnimated) {
+function getPrevWizardStep(step, cardType) {
+  const isAnimated = cardType === "animated";
+  const isHighlight = cardType === "highlight";
   if (step === STEP_REVIEW) return STEP_THEME;
   if (step === STEP_THEME) return STEP_TIER;
-  if (step === STEP_TIER) return STEP_DETAILS;
+  if (step === STEP_TIER) return isHighlight ? STEP_HIGHLIGHT_VIDEO : STEP_DETAILS;
+  if (step === STEP_HIGHLIGHT_VIDEO) return STEP_DETAILS;
   if (step === STEP_DETAILS) return isAnimated ? STEP_MOTION : STEP_CARD_TYPE;
   if (step === STEP_MOTION) return STEP_ACTION;
   if (step === STEP_ACTION) return STEP_CARD_TYPE;
@@ -170,7 +187,7 @@ function fieldErrorClass(hasError) {
   return hasError ? "border-rose-500/60 ring-1 ring-rose-500/30" : "border-white/15";
 }
 
-function WizardProgress({ currentStep, isAnimated, onGoToStep }) {
+function WizardProgress({ currentStep, isAnimated, isHighlight, onGoToStep }) {
   const progressPct = Math.round((currentStep / TOTAL_WIZARD_STEPS) * 100);
   return (
     <div className="mb-6 rounded-xl border border-white/10 bg-cardBg2 p-4">
@@ -190,6 +207,7 @@ function WizardProgress({ currentStep, isAnimated, onGoToStep }) {
         {Array.from({ length: TOTAL_WIZARD_STEPS }, (_, i) => {
           const step = i + 1;
           if (isAnimatedOnlyStep(step) && !isAnimated) return null;
+          if (isHighlightOnlyStep(step) && !isHighlight) return null;
           const done = step < currentStep;
           const active = step === currentStep;
           const canClick = done && typeof onGoToStep === "function";
@@ -247,6 +265,7 @@ export default function StudioPage() {
   const navigate = useNavigate();
   const { token, user, initializing, refreshUser } = useAuth();
   const { showCelebration } = useNewCardCelebration();
+  const { highlightCardPrice } = useFeatures();
   const [currentStep, setCurrentStep] = useState(1);
   const [dragActive, setDragActive] = useState(false);
 
@@ -314,6 +333,12 @@ export default function StudioPage() {
   const [showPendingPrompt, setShowPendingPrompt] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [pendingActionLoading, setPendingActionLoading] = useState(false);
+  const [highlightClipDraft, setHighlightClipDraft] = useState(null);
+  const [highlightUploadProgress, setHighlightUploadProgress] = useState(0);
+  const [highlightUploadState, setHighlightUploadState] = useState("idle"); // idle | uploading | processing | done | error
+  const [highlightUploadError, setHighlightUploadError] = useState("");
+  const [highlightProcessingCardId, setHighlightProcessingCardId] = useState("");
+  const [highlightProcessingCard, setHighlightProcessingCard] = useState(null);
 
   const wizardPanelRef = useRef(null);
   const generationFocusRef = useRef(null);
@@ -446,6 +471,7 @@ export default function StudioPage() {
   }, []);
 
   const isAnimatedCardType = cardType === "animated";
+  const isHighlightCardType = cardType === "highlight";
   const creditBalance = Number(user?.credit_balance ?? 0);
   const animatedUpgradeCost = Number(generationPricing?.animated_upgrade_price ?? 10);
   const additionalPreviewCost = Number(generationPricing?.additional_preview_price ?? 0);
@@ -484,6 +510,7 @@ export default function StudioPage() {
       [STEP_ACTION]: !isAnimatedCardType || Boolean(actionCategory),
       [STEP_MOTION]: !isAnimatedCardType || Boolean(selectedMotionId),
       [STEP_DETAILS]: detailsValidation.valid,
+      [STEP_HIGHLIGHT_VIDEO]: isHighlightCardType && Boolean(highlightClipDraft?.confirmed),
       [STEP_TIER]: Boolean(orderTier),
       [STEP_THEME]: Boolean(specialTheme),
       [STEP_REVIEW]: true,
@@ -497,6 +524,8 @@ export default function StudioPage() {
       orderTier,
       specialTheme,
       isAnimatedCardType,
+      isHighlightCardType,
+      highlightClipDraft?.confirmed,
     ]
   );
 
@@ -539,7 +568,7 @@ export default function StudioPage() {
       return;
     }
     if (currentStep === STEP_CARD_TYPE) {
-      setCurrentStep(getNextWizardStep(STEP_CARD_TYPE, isAnimatedCardType));
+      setCurrentStep(getNextWizardStep(STEP_CARD_TYPE, cardType));
       return;
     }
     if (currentStep === STEP_ACTION) {
@@ -564,6 +593,10 @@ export default function StudioPage() {
       setDetailsShowErrors(true);
       setDetailsErrors(detailsValidation.errors);
       if (!detailsValidation.valid) return;
+      setCurrentStep(getNextWizardStep(STEP_DETAILS, cardType));
+      return;
+    }
+    if (currentStep === STEP_HIGHLIGHT_VIDEO) {
       setCurrentStep(STEP_TIER);
       return;
     }
@@ -587,14 +620,26 @@ export default function StudioPage() {
   }
 
   function goBackStep() {
-    setCurrentStep(getPrevWizardStep(currentStep, isAnimatedCardType));
+    setCurrentStep(getPrevWizardStep(currentStep, cardType));
   }
+
+  useEffect(() => {
+    if (!isHighlightCardType) {
+      setHighlightClipDraft(null);
+      setHighlightUploadState("idle");
+      setHighlightUploadProgress(0);
+      setHighlightUploadError("");
+    }
+  }, [isHighlightCardType]);
 
   useEffect(() => {
     if (!isAnimatedCardType && isAnimatedOnlyStep(currentStep)) {
       setCurrentStep(STEP_DETAILS);
     }
-  }, [isAnimatedCardType, currentStep]);
+    if (!isHighlightCardType && isHighlightOnlyStep(currentStep)) {
+      setCurrentStep(STEP_DETAILS);
+    }
+  }, [isAnimatedCardType, isHighlightCardType, currentStep]);
 
   useEffect(() => {
     return () => {
@@ -1118,6 +1163,61 @@ export default function StudioPage() {
     return playerRes.json();
   }
 
+  async function uploadHighlightForCard(cardId) {
+    if (!isHighlightCardType || !highlightClipDraft?.confirmed || !highlightClipDraft?.file || !token) return;
+    setHighlightUploadState("uploading");
+    setHighlightUploadProgress(0);
+    setHighlightUploadError("");
+    try {
+      await uploadHighlightClip({
+        token,
+        cardId,
+        file: highlightClipDraft.file,
+        trimStart: highlightClipDraft.trimStart ?? 0,
+        trimEnd: highlightClipDraft.trimEnd ?? 0,
+        onProgress: (pct) => setHighlightUploadProgress(pct),
+      });
+      setHighlightUploadState("processing");
+      await refreshUser(token);
+    } catch (err) {
+      setHighlightUploadState("error");
+      setHighlightUploadError(err.message || "Could not upload highlight video.");
+      throw err;
+    }
+  }
+
+  async function handleHighlightProcessingComplete() {
+    const cardId = highlightProcessingCardId;
+    if (!cardId) return;
+    try {
+      const detail = await fetchCardDetailById(cardId);
+      setHighlightProcessingCardId("");
+      setHighlightProcessingCard(null);
+      setHighlightUploadState("done");
+      await refreshUser(token);
+      await showCelebration({
+        card: detail,
+        source: "created",
+        showAnimateUpsell: false,
+      });
+    } catch (err) {
+      setError(err.message || "Could not load your highlight card.");
+    }
+  }
+
+  function handleHighlightProcessingFailed() {
+    setHighlightProcessingCardId("");
+    setHighlightProcessingCard(null);
+    setHighlightUploadState("error");
+    setHighlightUploadError(
+      "Your highlight video could not be processed. Your $5.00 has been refunded to your credit balance."
+    );
+    setError(
+      "Your highlight video could not be processed. Your $5.00 has been refunded to your credit balance."
+    );
+    refreshUser(token);
+  }
+
   async function handleGenerateForOrder(orderId) {
     if (isAnimatedCardType) {
       setAnimatedFlowStage(ANIMATED_FLOW_STAGE.GENERATING_STATIC);
@@ -1328,9 +1428,17 @@ export default function StudioPage() {
   async function handleConfirmAddToCollection(quantity) {
     if (!currentOrderId) return setError("Create an order first.");
     if (!selectedPreviewUrl && !generatedCardUrl) return setError("Select a preview first.");
+    const highlightDue = isHighlightCardType
+      ? Number(generationPricing?.highlight_card_price ?? highlightCardPrice ?? 5)
+      : 0;
     const { extra: extraCopies, total: extraCost } = copyChargeForQuantity(quantity, 1, copyPricingTiers);
-    if (extraCost > creditBalance) {
-      setError(`You need ${formatMoney(extraCost)} in credits for ${extraCopies} additional ${extraCopies === 1 ? "copy" : "copies"}.`);
+    const totalDue = extraCost + (isHighlightCardType ? highlightDue : 0);
+    if (totalDue > creditBalance) {
+      if (isHighlightCardType && highlightDue > 0 && creditBalance < highlightDue) {
+        setError(`You need ${formatMoney(highlightDue)} in credits for the highlight upgrade.`);
+      } else {
+        setError(`You need ${formatMoney(extraCost)} in credits for ${extraCopies} additional ${extraCopies === 1 ? "copy" : "copies"}.`);
+      }
       return;
     }
     setAddCollectionLoading(true);
@@ -1372,6 +1480,13 @@ export default function StudioPage() {
       setReviewSubPhase("approve");
       setPreviewConfigureOpen(false);
       setAnimatedSaveStaticFlow(false);
+
+      if (isHighlightCardType && cardId && highlightClipDraft?.confirmed) {
+        setHighlightProcessingCard(addedCardDetail);
+        setHighlightProcessingCardId(cardId);
+        await uploadHighlightForCard(cardId);
+        return;
+      }
 
       if (cardId && addedCardDetail) {
         await showCelebration({
@@ -1519,6 +1634,7 @@ export default function StudioPage() {
             <WizardProgress
               currentStep={currentStep}
               isAnimated={isAnimatedCardType}
+              isHighlight={isHighlightCardType}
               onGoToStep={goToStep}
             />
 
@@ -1618,12 +1734,13 @@ export default function StudioPage() {
                   value={cardType}
                   onChange={(type) => {
                     setCardType(type);
-                    if (type === "standard") {
+                    if (type === "standard" || type === "highlight") {
                       setSelectedMotionId("");
                       setActionCategory("");
                       setMotionStepMode("select");
                     }
                   }}
+                  highlightCardPrice={generationPricing?.highlight_card_price ?? highlightCardPrice}
                   animatedUpgradePrice={generationPricing?.animated_upgrade_price ?? 10}
                 />
                 <div className="flex flex-wrap gap-2">
@@ -1640,7 +1757,11 @@ export default function StudioPage() {
                     onClick={tryAdvanceStep}
                     className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
                   >
-                    {isAnimatedCardType ? "Continue to Action Tagging" : "Continue to Player Details"}
+                    {isAnimatedCardType
+                      ? "Continue to Action Tagging"
+                      : isHighlightCardType
+                        ? "Continue to Player Details"
+                        : "Continue to Player Details"}
                   </button>
                 </div>
               </div>
@@ -1755,10 +1876,22 @@ export default function StudioPage() {
                     onClick={tryAdvanceStep}
                     className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
                   >
-                    Continue to Tier Selection
+                    Continue to {isHighlightCardType ? "Highlight Video" : "Tier Selection"}
                   </button>
                 </div>
               </div>
+            ) : null}
+
+            {currentStep === STEP_HIGHLIGHT_VIDEO && isHighlightCardType ? (
+              <HighlightVideoStep
+                highlightCardPrice={generationPricing?.highlight_card_price ?? highlightCardPrice}
+                clipDraft={highlightClipDraft}
+                onClipConfirmed={(draft) => {
+                  setHighlightClipDraft(draft);
+                  setCurrentStep(STEP_TIER);
+                }}
+                onBack={goBackStep}
+              />
             ) : null}
 
             {currentStep === STEP_TIER ? (
@@ -1944,6 +2077,7 @@ export default function StudioPage() {
                   tierLabel={selectedTierLabel}
                   themeLabel={specialTheme ? selectedThemeLabel : ""}
                   isAnimated={isAnimatedCardType}
+                  isHighlight={isHighlightCardType}
                   motionName={motionDisplayName}
                   copyQuantity={copyQuantity}
                   pricing={generationPricing}
@@ -1983,8 +2117,33 @@ export default function StudioPage() {
                     tier={orderTier}
                     themeLabel={specialTheme ? selectedThemeLabel : "Default (no theme)"}
                     isAnimated={isAnimatedCardType}
+                  isHighlight={isHighlightCardType}
                     onComplete={handlePackOpeningComplete}
                   />
+                ) : null}
+                {isHighlightCardType && highlightUploadState !== "idle" ? (
+                  <div className="rounded-xl border border-teal-500/35 bg-teal-500/10 px-4 py-3">
+                    {highlightUploadState === "uploading" ? (
+                      <>
+                        <p className="text-sm font-medium text-teal-100">Uploading your highlight clip...</p>
+                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800">
+                          <div
+                            className="h-full rounded-full bg-teal-400 transition-all"
+                            style={{ width: `${Math.round(highlightUploadProgress * 100)}%` }}
+                          />
+                        </div>
+                      </>
+                    ) : null}
+                    {highlightUploadState === "processing" ? (
+                      <p className="text-sm font-medium text-teal-100">Processing your clip...</p>
+                    ) : null}
+                    {highlightUploadState === "done" ? (
+                      <p className="text-sm font-medium text-teal-100">Highlight clip uploaded.</p>
+                    ) : null}
+                    {highlightUploadState === "error" ? (
+                      <p className="text-sm text-rose-200">{highlightUploadError}</p>
+                    ) : null}
+                  </div>
                 ) : null}
                 {!packOpeningActive && (
                   <>
@@ -1999,6 +2158,7 @@ export default function StudioPage() {
                       tierLabel={selectedTierLabel}
                       themeLabel={specialTheme ? selectedThemeLabel : ""}
                       isAnimated={isAnimatedCardType}
+                  isHighlight={isHighlightCardType}
                       motionName={motionDisplayName}
                       copyQuantity={copyQuantity}
                       pricing={generationPricing}
@@ -2382,6 +2542,16 @@ export default function StudioPage() {
           handleGenerateFirstPreview();
         }}
       />
+
+      {highlightProcessingCardId ? (
+        <HighlightProcessingScreen
+          card={highlightProcessingCard}
+          cardId={highlightProcessingCardId}
+          token={token}
+          onCompleted={handleHighlightProcessingComplete}
+          onFailed={handleHighlightProcessingFailed}
+        />
+      ) : null}
 
       <AppFooter />
     </div>

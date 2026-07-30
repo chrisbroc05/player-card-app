@@ -1,5 +1,6 @@
 import React from "react";
 import AnimatedBadge from "./AnimatedBadge";
+import HighlightBadge from "./HighlightBadge";
 import {
   CARD_ASPECT_CLASS,
   CARD_DISPLAY_SIZES,
@@ -16,7 +17,10 @@ export default function CardDisplay({
   size = "default",
   className = "",
   showAnimatedBadge = false,
+  showHighlightBadge = false,
   inProgressOverlay = false,
+  inProgressLabel = "Animation in progress...",
+  inProgressTone = "border-violet-400/40 bg-violet-500/20 text-violet-100",
   topRightSlot = null,
 }) {
   const meta = resolveCardDisplayMeta(card);
@@ -52,11 +56,16 @@ export default function CardDisplay({
             <AnimatedBadge />
           </span>
         ) : null}
+        {showHighlightBadge ? (
+          <span className="absolute right-1.5 top-1.5 z-[3] sm:right-2 sm:top-2">
+            <HighlightBadge />
+          </span>
+        ) : null}
         {topRightSlot ? <div className="absolute right-1 top-1 z-[3]">{topRightSlot}</div> : null}
         {inProgressOverlay ? (
           <div className="absolute inset-0 z-[5] flex items-center justify-center bg-black/55 backdrop-blur-[2px]">
-            <span className="animate-pulse rounded-lg border border-violet-400/40 bg-violet-500/20 px-2 py-1 text-[10px] font-semibold text-violet-100 sm:px-3 sm:py-2 sm:text-xs">
-              Animation in progress...
+            <span className={`animate-pulse rounded-lg border px-2 py-1 text-[10px] font-semibold sm:px-3 sm:py-2 sm:text-xs ${inProgressTone}`}>
+              {inProgressLabel}
             </span>
           </div>
         ) : null}

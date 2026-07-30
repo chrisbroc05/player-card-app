@@ -53,6 +53,7 @@ from credit_service import InsufficientCreditsError, TX_ANIMATION, TX_GENERATION
 from card_pricing import (  # noqa: E402
     animated_upgrade_price,
     copy_charge_for_quantity,
+    highlight_card_price,
     tier_generation_price,
 )
 from card_history import build_card_history  # noqa: E402
@@ -126,6 +127,7 @@ def _card_generation_price() -> float:
 
 UPLOAD_DIR, CARD_DIR = _upload_and_card_dirs()
 ANIMATIONS_DIR = _app_data_root() / "animations"
+HIGHLIGHTS_DIR = _app_data_root() / "highlights"
 # Served via StaticFiles — must not overlap REST routes /cards, /cards/{id}
 CARD_MEDIA_URL_PREFIX = "/media/cards"
 # Layout reference for AI card generation (replace with your own asset).
@@ -142,6 +144,8 @@ _IMAGE_TYPES: dict[str, str] = {
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(CARD_DIR, exist_ok=True)
 os.makedirs(ANIMATIONS_DIR, exist_ok=True)
+os.makedirs(HIGHLIGHTS_DIR, exist_ok=True)
+os.makedirs(HIGHLIGHTS_DIR / "thumbnails", exist_ok=True)
 
 
 def _startup_validate_admin_account() -> None:
@@ -174,6 +178,8 @@ async def lifespan(_app: FastAPI):
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     os.makedirs(CARD_DIR, exist_ok=True)
     os.makedirs(ANIMATIONS_DIR, exist_ok=True)
+    os.makedirs(HIGHLIGHTS_DIR, exist_ok=True)
+    os.makedirs(HIGHLIGHTS_DIR / "thumbnails", exist_ok=True)
     Base.metadata.create_all(bind=engine)
     run_schema_migrations_after_models(engine)
     _startup_validate_admin_account()
@@ -224,7 +230,7 @@ _EDIT_IMAGE_SIZE = 1024
 # AI trading card rarity (drives different visual intensity in prompts).
 CardTier = Literal["base", "rare", "legendary"]
 OrderTier = Literal["rookie", "all_star", "legends"]
-OrderCardType = Literal["standard", "animated"]
+OrderCardType = Literal["standard", "animated", "highlight"]
 OrderStatus = Literal[
     "new_order",
     "awaiting_review",
@@ -1169,6 +1175,12 @@ class CardVaultSummary(BaseModel):
     animation_status: str | None = Field(default=None)
     animation_motion: str | None = Field(default=None)
     action_category: str | None = Field(default=None)
+    is_highlight: bool = Field(default=False)
+    highlight_video_url: str | None = Field(default=None)
+    highlight_thumbnail_url: str | None = Field(default=None)
+    highlight_status: str | None = Field(default=None)
+    highlight_trim_start: float | None = Field(default=None)
+    highlight_trim_end: float | None = Field(default=None)
 
 
 class CardDuplicateBody(BaseModel):
@@ -1209,6 +1221,12 @@ class Card(BaseModel):
     animation_status: str | None = Field(default=None)
     animation_motion: str | None = Field(default=None)
     action_category: str | None = Field(default=None)
+    is_highlight: bool = Field(default=False)
+    highlight_video_url: str | None = Field(default=None)
+    highlight_thumbnail_url: str | None = Field(default=None)
+    highlight_status: str | None = Field(default=None)
+    highlight_trim_start: float | None = Field(default=None)
+    highlight_trim_end: float | None = Field(default=None)
 
 
 class CardShareMeta(BaseModel):
@@ -1408,6 +1426,7 @@ class BetaStatusResponse(BaseModel):
 
 class FeaturesResponse(BaseModel):
     social_sharing_enabled: bool
+    highlight_card_price: float = 5.0
 
 
 class ThemeOption(BaseModel):
@@ -1500,7 +1519,10 @@ def auth_beta_status():
 
 @app.get("/config/features", response_model=FeaturesResponse)
 def config_features():
-    return FeaturesResponse(social_sharing_enabled=_social_sharing_enabled())
+    return FeaturesResponse(
+        social_sharing_enabled=_social_sharing_enabled(),
+        highlight_card_price=highlight_card_price(),
+    )
 
 
 @app.get("/themes", response_model=ThemesResponse)
@@ -2350,3 +2372,4 @@ def generate_card_set(
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 app.mount(CARD_MEDIA_URL_PREFIX, StaticFiles(directory=str(CARD_DIR)), name="card_media")
 app.mount("/animations", StaticFiles(directory=str(ANIMATIONS_DIR)), name="animations")
+app.mount("/highlights", StaticFiles(directory=str(HIGHLIGHTS_DIR)), name="highlights")

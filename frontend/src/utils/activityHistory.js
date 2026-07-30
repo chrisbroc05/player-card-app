@@ -9,6 +9,7 @@ export const ACTIVITY_FILTERS = [
   { id: "bought", label: "Bought", type: "marketplace_bought" },
   { id: "sold", label: "Sold", type: "marketplace_sold" },
   { id: "animated", label: "Animated", type: "animated_upgrade" },
+  { id: "highlight", label: "Highlight", type: "highlight_upgrade" },
 ];
 
 export const ACTIVITY_META = {
@@ -47,11 +48,18 @@ export const ACTIVITY_META = {
     badgeClass: "border-fuchsia-400/40 bg-fuchsia-500/15 text-fuchsia-100",
     iconWrapClass: "border-fuchsia-400/35 bg-fuchsia-500/15 text-fuchsia-100",
   },
+  highlight_upgrade: {
+    emoji: "🎬",
+    label: "Highlight",
+    shortLabel: "Highlight",
+    badgeClass: "border-[#D85A30]/40 bg-[#D85A30]/15 text-orange-100",
+    iconWrapClass: "border-[#D85A30]/35 bg-[#D85A30]/15 text-orange-100",
+  },
 };
 
 export function activityMeta(item, tier) {
   const base = ACTIVITY_META[item?.activity_type] || ACTIVITY_META.trade_sent;
-  if (item?.activity_type !== "animated_upgrade") return base;
+  if (item?.activity_type !== "animated_upgrade" && item?.activity_type !== "highlight_upgrade") return base;
   const badge = vaultTierBadge(tier);
   return {
     ...base,

@@ -205,6 +205,69 @@ def run_schema_migrations_after_models(engine: Engine) -> None:
                 )
             else:
                 conn.execute(text("ALTER TABLE cards ADD COLUMN action_category VARCHAR(32)"))
+        if "is_highlight" not in cols:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN IF NOT EXISTS is_highlight BOOLEAN "
+                        "NOT NULL DEFAULT FALSE"
+                    )
+                )
+            else:
+                conn.execute(
+                    text("ALTER TABLE cards ADD COLUMN is_highlight BOOLEAN NOT NULL DEFAULT 0")
+                )
+        if "highlight_video_url" not in cols:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN IF NOT EXISTS highlight_video_url VARCHAR(512)"
+                    )
+                )
+            else:
+                conn.execute(text("ALTER TABLE cards ADD COLUMN highlight_video_url VARCHAR(512)"))
+        if "highlight_status" not in cols:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN IF NOT EXISTS highlight_status VARCHAR(32)"
+                    )
+                )
+            else:
+                conn.execute(text("ALTER TABLE cards ADD COLUMN highlight_status VARCHAR(32)"))
+        if "highlight_uploaded_at" not in cols:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN IF NOT EXISTS highlight_uploaded_at "
+                        "TIMESTAMP WITH TIME ZONE"
+                    )
+                )
+            else:
+                conn.execute(text("ALTER TABLE cards ADD COLUMN highlight_uploaded_at DATETIME"))
+        if "highlight_trim_start" not in cols:
+            if dialect == "postgresql":
+                conn.execute(
+                    text("ALTER TABLE cards ADD COLUMN IF NOT EXISTS highlight_trim_start DOUBLE PRECISION")
+                )
+            else:
+                conn.execute(text("ALTER TABLE cards ADD COLUMN highlight_trim_start REAL"))
+        if "highlight_trim_end" not in cols:
+            if dialect == "postgresql":
+                conn.execute(
+                    text("ALTER TABLE cards ADD COLUMN IF NOT EXISTS highlight_trim_end DOUBLE PRECISION")
+                )
+            else:
+                conn.execute(text("ALTER TABLE cards ADD COLUMN highlight_trim_end REAL"))
+        if "highlight_thumbnail_url" not in cols:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN IF NOT EXISTS highlight_thumbnail_url VARCHAR(512)"
+                    )
+                )
+            else:
+                conn.execute(text("ALTER TABLE cards ADD COLUMN highlight_thumbnail_url VARCHAR(512)"))
 
         if "marketplace_offers" in insp.get_table_names():
             mcols = {c["name"] for c in insp.get_columns("marketplace_offers")}

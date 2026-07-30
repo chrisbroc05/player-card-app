@@ -14,8 +14,8 @@ import CollectionToast from "../components/CollectionToast";
 import DeleteCardModal from "../components/DeleteCardModal";
 import { authFetch, formatApiError } from "../utils/authFetch";
 import { canAnimateCard, isAnimatedCard, isAnimationInProgress } from "../utils/animationCard";
+import { cardMediaFrameClass, cardPlaysVideoOnHover } from "../utils/highlightCard";
 import { vaultTierBadge } from "../utils/tierStyles";
-import { CARD_IMAGE_FRAME, CARD_IMAGE_FRAME_ANIMATED } from "../utils/cardImageStyles";
 import { scrollAfterPaint } from "../utils/smoothScroll";
 
 export default function MyCollectionPage() {
@@ -359,12 +359,12 @@ export default function MyCollectionPage() {
               const badge = vaultTierBadge(card.tier);
               const pending = (card.status || "active") === "pending_trade";
               const showDelete = canDeleteCard(card);
-              const animatedCard = isAnimatedCard(card);
+              const videoCard = cardPlaysVideoOnHover(card);
               return (
                 <article
                   key={card.card_id}
                   className={`group rounded-2xl border border-white/10 bg-cardBg p-3 shadow-lg transition duration-300 hover:border-white/20 ${badge.glow} ${
-                    pending ? "opacity-70" : animatedCard ? "" : "hover:scale-[1.02]"
+                    pending ? "opacity-70" : videoCard ? "" : "hover:scale-[1.02]"
                   }`}
                 >
                   <div className="relative">
@@ -372,9 +372,7 @@ export default function MyCollectionPage() {
                       card={card}
                       alt={card.player_name}
                       cacheBust={card.created_at}
-                      frameClassName={
-                        isAnimatedCard(card) ? CARD_IMAGE_FRAME_ANIMATED : CARD_IMAGE_FRAME
-                      }
+                      frameClassName={cardMediaFrameClass(card)}
                       playOnHover
                     />
                     {stackCount ? (

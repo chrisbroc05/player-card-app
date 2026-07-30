@@ -8,6 +8,7 @@ import {
 } from "../utils/cardImageStyles";
 import { cardDisplaySizeFromFrame } from "../utils/cardTemplate";
 import { isAnimatedCard, isAnimationInProgress } from "../utils/animationCard";
+import { isHighlightCard, isHighlightInProgress } from "../utils/highlightCard";
 import { useIsMobileViewport } from "../hooks/usePrefersReducedMotion";
 import CardDisplay from "./CardDisplay";
 
@@ -18,6 +19,12 @@ function resolveCardFields(card, props) {
       animatedVideoUrl: card.animated_video_url ?? props.animatedVideoUrl,
       isAnimated: card.is_animated ?? props.isAnimated,
       animationStatus: card.animation_status ?? props.animationStatus,
+      highlightVideoUrl: card.highlight_video_url ?? props.highlightVideoUrl,
+      highlightThumbnailUrl: card.highlight_thumbnail_url ?? props.highlightThumbnailUrl,
+      isHighlight: card.is_highlight ?? props.isHighlight,
+      highlightStatus: card.highlight_status ?? props.highlightStatus,
+      highlightTrimStart: card.highlight_trim_start ?? props.highlightTrimStart,
+      highlightTrimEnd: card.highlight_trim_end ?? props.highlightTrimEnd,
     };
   }
   return {
@@ -25,6 +32,12 @@ function resolveCardFields(card, props) {
     animatedVideoUrl: props.animatedVideoUrl,
     isAnimated: props.isAnimated,
     animationStatus: props.animationStatus,
+    highlightVideoUrl: props.highlightVideoUrl,
+    highlightThumbnailUrl: props.highlightThumbnailUrl,
+    isHighlight: props.isHighlight,
+    highlightStatus: props.highlightStatus,
+    highlightTrimStart: props.highlightTrimStart,
+    highlightTrimEnd: props.highlightTrimEnd,
   };
 }
 
@@ -50,13 +63,49 @@ function buildSyntheticCard(card, imageUrl) {
   return { image_url: imageUrl, player_name: "Player" };
 }
 
+function HighlightSoundToggle({ muted, onToggle }) {
+  return (
+    <button
+      type="button"
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onToggle();
+      }}
+      title={muted ? "Tap to unmute" : "Tap to mute"}
+      aria-label={muted ? "Tap to unmute" : "Tap to mute"}
+      className="absolute bottom-2 right-2 z-[8] flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/60 text-sm text-white backdrop-blur-sm transition hover:bg-black/75"
+    >
+      {muted ? (
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M11 5L6 9H3v6h3l5 4V5z" />
+          <line x1="17" y1="9" x2="23" y2="15" />
+          <line x1="23" y1="9" x2="17" y2="15" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M11 5L6 9H3v6h3l5 4V5z" />
+          <path d="M15.5 8.5a5 5 0 010 7" />
+          <path d="M18 6a8 8 0 010 12" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
 /** Renders card media inside the fixed CardDisplay template app-wide */
 export default function CardImage({
   card,
   imageUrl,
   animatedVideoUrl,
+  highlightVideoUrl,
+  highlightThumbnailUrl,
   isAnimated: isAnimatedProp,
+  isHighlight: isHighlightProp,
   animationStatus,
+  highlightStatus,
+  highlightTrimStart,
+  highlightTrimEnd,
   alt,
   className = "",
   frameClassName = "",
@@ -64,6 +113,7 @@ export default function CardImage({
   playOnHover = false,
   forcePlay = false,
   showAnimatedBadge = true,
+  showHighlightBadge = true,
   showInProgressOverlay = true,
   showInfoBanner,
   infoBannerVariant = "default",
@@ -75,7 +125,10 @@ export default function CardImage({
   const [imgFailed, setImgFailed] = useState(false);
   const [videoFailed, setVideoFailed] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const [mobileActive, setMobileActive] = useState(false);
   const [ownerVideoBlobUrl, setOwnerVideoBlobUrl] = useState(null);
+  const [highlightMuted, setHighlightMuted] = useState(true);
+  const [needsTrimPlayback, setNeedsTrimPlayback] = useState(false);
   const videoRef = useRef(null);
   const isMobile = useIsMobileViewport();
   const isDetail = variant === "detail";
@@ -85,26 +138,53 @@ export default function CardImage({
   const fields = resolveCardFields(card, {
     imageUrl,
     animatedVideoUrl,
+    highlightVideoUrl,
+    highlightThumbnailUrl,
     isAnimated: isAnimatedProp,
+    isHighlight: isHighlightProp,
     animationStatus,
+    highlightStatus,
+    highlightTrimStart,
+    highlightTrimEnd,
   });
 
-  const displayCard = buildSyntheticCard(card, fields.imageUrl);
-  const hasVideo =
-    isAnimatedCard(fields) && fields.animatedVideoUrl && !videoFailed && !isAnimationInProgress(fields);
-  const inProgress = showInProgressOverlay && isAnimationInProgress(fields);
+  const syntheticCard = buildSyntheticCard(card, fields.imageUrl);
+  const cardForTypeChecks = card && typeof card === "object" ? card : syntheticCard;
+
+  const animatedActive =
+    isAnimatedCard({ ...cardForTypeChecks, ...fields }) &&
+    fields.animatedVideoUrl &&
+    !isAnimationInProgress(fields);
+  const highlightActive =
+    !animatedActive &&
+    isHighlightCard({ ...cardForTypeChecks, ...fields }) &&
+    fields.highlightVideoUrl &&
+    !isHighlightInProgress(fields);
+
+  const hasVideo = (animatedActive || highlightActive) && !videoFailed;
+  const inProgress =
+    showInProgressOverlay &&
+    (isAnimationInProgress(fields) || isHighlightInProgress(fields));
+
+  const posterSourceUrl = highlightActive && fields.highlightThumbnailUrl
+    ? fields.highlightThumbnailUrl
+    : fields.imageUrl;
 
   const imgSrc = useMemo(() => {
-    const base = toApiUrl(fields.imageUrl);
+    const base = toApiUrl(posterSourceUrl);
     if (!base || !cacheBust) return base;
     const sep = base.includes("?") ? "&" : "?";
     return `${base}${sep}cb=${encodeURIComponent(String(cacheBust))}`;
-  }, [fields.imageUrl, cacheBust]);
+  }, [posterSourceUrl, cacheBust]);
 
-  const publicVideoSrc = useMemo(() => toApiUrl(fields.animatedVideoUrl), [fields.animatedVideoUrl]);
+  const publicVideoSrc = useMemo(() => {
+    if (animatedActive) return toApiUrl(fields.animatedVideoUrl);
+    if (highlightActive) return toApiUrl(fields.highlightVideoUrl);
+    return "";
+  }, [animatedActive, highlightActive, fields.animatedVideoUrl, fields.highlightVideoUrl]);
 
   useEffect(() => {
-    if (!useOwnerVideoProxy || !token || !cardIdForApi || !fields.animatedVideoUrl) {
+    if (!useOwnerVideoProxy || !token || !cardIdForApi || !fields.animatedVideoUrl || !animatedActive) {
       setOwnerVideoBlobUrl(null);
       return undefined;
     }
@@ -133,18 +213,25 @@ export default function CardImage({
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [useOwnerVideoProxy, token, cardIdForApi, fields.animatedVideoUrl]);
+  }, [useOwnerVideoProxy, token, cardIdForApi, fields.animatedVideoUrl, animatedActive]);
 
-  const videoSrc = useOwnerVideoProxy ? ownerVideoBlobUrl : publicVideoSrc;
-  const videoReady = hasVideo && (!useOwnerVideoProxy || Boolean(ownerVideoBlobUrl));
+  const videoSrc = animatedActive && useOwnerVideoProxy ? ownerVideoBlobUrl : publicVideoSrc;
+  const videoReady = hasVideo && (!useOwnerVideoProxy || !animatedActive || Boolean(ownerVideoBlobUrl));
+
+  const trimStart = Number(fields.highlightTrimStart ?? 0);
+  const trimEnd = Number(fields.highlightTrimEnd ?? 0);
+
+  const browseActive = isGridBrowse && (isMobile ? mobileActive : hovered);
 
   const shouldPlayVideo =
     videoReady &&
-    (isGridBrowse ? hovered && !isMobile : forcePlay || (!playOnHover && !isGridBrowse));
+    (isGridBrowse ? browseActive : forcePlay || (!playOnHover && !isGridBrowse));
 
   const showStaticPoster = Boolean(imgSrc && !imgFailed);
   const showVideoLayer = videoReady && shouldPlayVideo;
   const showPosterImage = showStaticPoster && (!isDetail || !showVideoLayer);
+
+  const videoMuted = highlightActive && isDetail ? highlightMuted : true;
 
   const protectedMediaClass = protectMedia ? "card-media-protected" : "";
   const imgClass = [CARD_IMAGE_MEDIA_CLASS, protectedMediaClass, className].filter(Boolean).join(" ");
@@ -158,12 +245,51 @@ export default function CardImage({
     } else {
       el.pause();
       try {
-        el.currentTime = 0;
+        el.currentTime = highlightActive && needsTrimPlayback ? trimStart : 0;
       } catch {
         /* ignore */
       }
     }
-  }, [shouldPlayVideo, videoReady, videoSrc]);
+  }, [shouldPlayVideo, videoReady, videoSrc, highlightActive, needsTrimPlayback, trimStart]);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !highlightActive || !shouldPlayVideo) return undefined;
+
+    const onLoadedMetadata = () => {
+      const duration = Number(el.duration) || 0;
+      const hasTrim = trimEnd > trimStart && duration > 0 && trimEnd < duration - 0.25;
+      setNeedsTrimPlayback(hasTrim);
+      if (hasTrim) {
+        try {
+          el.currentTime = trimStart;
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+
+    const onTimeUpdate = () => {
+      if (!needsTrimPlayback) return;
+      if (el.currentTime >= trimEnd - 0.05) {
+        try {
+          el.currentTime = trimStart;
+        } catch {
+          /* ignore */
+        }
+        el.play().catch(() => {});
+      }
+    };
+
+    el.addEventListener("loadedmetadata", onLoadedMetadata);
+    el.addEventListener("timeupdate", onTimeUpdate);
+    if (el.readyState >= 1) onLoadedMetadata();
+
+    return () => {
+      el.removeEventListener("loadedmetadata", onLoadedMetadata);
+      el.removeEventListener("timeupdate", onTimeUpdate);
+    };
+  }, [highlightActive, shouldPlayVideo, trimStart, trimEnd, needsTrimPlayback, videoSrc]);
 
   const mediaProtectionProps = protectMedia
     ? {
@@ -181,8 +307,17 @@ export default function CardImage({
 
   const useTemplate =
     showInfoBanner !== false &&
-    displayCard &&
-    (showInfoBanner === true || displayCard.player_name || displayCard.playerName);
+    syntheticCard &&
+    (showInfoBanner === true || syntheticCard.player_name || syntheticCard.playerName);
+
+  const handleMobileToggle = (event) => {
+    if (!isGridBrowse || !isMobile) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setMobileActive((prev) => !prev);
+  };
+
+  const videoLabel = animatedActive ? "Animated card" : "Highlight card";
 
   let mediaInner;
   if (!showStaticPoster && !hasVideo) {
@@ -190,20 +325,23 @@ export default function CardImage({
   } else if (isDetail && showVideoLayer && videoSrc) {
     mediaInner = (
       <ProtectedMediaShell protectMedia={protectMedia}>
-        <div className={CARD_VIDEO_DETAIL_WRAPPER}>
+        <div className={`${CARD_VIDEO_DETAIL_WRAPPER} relative`}>
           <video
             ref={videoRef}
             src={videoSrc}
             className={videoClass}
             autoPlay
-            loop
-            muted
+            loop={!needsTrimPlayback}
+            muted={videoMuted}
             playsInline
             preload="metadata"
-            aria-label={alt || "Animated card"}
+            aria-label={alt || videoLabel}
             onError={() => setVideoFailed(true)}
             {...mediaProtectionProps}
           />
+          {highlightActive ? (
+            <HighlightSoundToggle muted={highlightMuted} onToggle={() => setHighlightMuted((m) => !m)} />
+          ) : null}
         </div>
       </ProtectedMediaShell>
     );
@@ -246,11 +384,11 @@ export default function CardImage({
                 ref={videoRef}
                 src={videoSrc}
                 className={videoClass}
-                loop
+                loop={!needsTrimPlayback}
                 muted
                 playsInline
                 preload="auto"
-                aria-label={alt || "Animated card"}
+                aria-label={alt || videoLabel}
                 onError={() => setVideoFailed(true)}
                 {...mediaProtectionProps}
               />
@@ -265,20 +403,37 @@ export default function CardImage({
     <div
       className="relative h-full w-full"
       onMouseEnter={isGridBrowse && !isMobile ? () => setHovered(true) : undefined}
-      onMouseLeave={isGridBrowse && !isMobile ? () => setHovered(false) : undefined}
+      onMouseLeave={
+        isGridBrowse && !isMobile
+          ? () => {
+              setHovered(false);
+            }
+          : undefined
+      }
+      onClick={handleMobileToggle}
     >
       {mediaInner}
     </div>
   );
 
+  const progressLabel = isHighlightInProgress(fields)
+    ? "Highlight processing..."
+    : "Animation in progress...";
+  const progressTone = isHighlightInProgress(fields)
+    ? "border-[#D85A30]/40 bg-[#D85A30]/20 text-orange-100"
+    : "border-violet-400/40 bg-violet-500/20 text-violet-100";
+
   if (useTemplate) {
     return (
       <CardDisplay
-        card={displayCard}
+        card={syntheticCard}
         size={displaySize}
         className={frameClassName}
-        showAnimatedBadge={showAnimatedBadge && hasVideo}
+        showAnimatedBadge={showAnimatedBadge && animatedActive}
+        showHighlightBadge={showHighlightBadge && highlightActive}
         inProgressOverlay={inProgress}
+        inProgressLabel={progressLabel}
+        inProgressTone={progressTone}
       >
         {mediaSlot}
       </CardDisplay>
@@ -290,8 +445,8 @@ export default function CardImage({
       {mediaSlot}
       {inProgress ? (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/55 backdrop-blur-[2px]">
-          <span className="animate-pulse rounded-lg border border-violet-400/40 bg-violet-500/20 px-3 py-2 text-xs font-semibold text-violet-100">
-            Animation in progress...
+          <span className={`animate-pulse rounded-lg border px-3 py-2 text-xs font-semibold ${progressTone}`}>
+            {progressLabel}
           </span>
         </div>
       ) : null}

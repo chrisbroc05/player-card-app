@@ -3,8 +3,7 @@ import { Link } from "react-router-dom";
 import CardImage from "./CardImage";
 import { CardSharePopover } from "./ShareCard";
 import { vaultTierBadge, formatEditionShort, rarityDisplay } from "../utils/tierStyles";
-import { CARD_IMAGE_FRAME, CARD_IMAGE_FRAME_ANIMATED } from "../utils/cardImageStyles";
-import { isAnimatedCard } from "../utils/animationCard";
+import { cardMediaFrameClass, cardPlaysVideoOnHover } from "../utils/highlightCard";
 
 export default function CardGallery({ cards }) {
   return (
@@ -23,12 +22,12 @@ export default function CardGallery({ cards }) {
           {cards.map((card) => {
             const badge = vaultTierBadge(card.tier);
             const key = card.card_id || card.id;
-            const animatedCard = isAnimatedCard(card);
+            const videoCard = cardPlaysVideoOnHover(card);
             return (
               <article
                 key={key}
                 className={`group rounded-xl border border-white/10 bg-cardBg2 p-3 transition duration-200 hover:border-neonBlue/50 hover:shadow-glowBlue ${
-                  animatedCard ? "" : "hover:scale-[1.02]"
+                  videoCard ? "" : "hover:scale-[1.02]"
                 }`}
               >
                 <div className="relative">
@@ -40,7 +39,7 @@ export default function CardGallery({ cards }) {
                       card={card}
                       alt={card.player_name || "Card"}
                       cacheBust={card.created_at}
-                      frameClassName={isAnimatedCard(card) ? CARD_IMAGE_FRAME_ANIMATED : CARD_IMAGE_FRAME}
+                      frameClassName={cardMediaFrameClass(card)}
                       playOnHover
                     />
                   </Link>

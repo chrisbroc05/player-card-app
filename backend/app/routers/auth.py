@@ -72,6 +72,7 @@ class UserProfileResponse(BaseModel):
     cards_traded_away: int
     cards_received_via_trade: int
     animated_cards_owned: int = 0
+    highlight_cards_owned: int = 0
     total_print_run_copies: int
     favorite_tier: str | None = Field(default=None)
     rarest_card: RarestCardOut | None = None
@@ -146,6 +147,7 @@ def get_profile(
         cards_traded_away=kpis.cards_traded_away,
         cards_received_via_trade=kpis.cards_received_via_trade,
         animated_cards_owned=kpis.animated_cards_owned,
+        highlight_cards_owned=kpis.highlight_cards_owned,
         total_print_run_copies=kpis.total_print_run_copies,
         favorite_tier=kpis.favorite_tier,
         rarest_card=rarest_out,

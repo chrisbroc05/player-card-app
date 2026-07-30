@@ -129,7 +129,7 @@ export function ActivityHistorySection({
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-white">Activity History</h2>
-          <p className="mt-1 text-sm text-slate-400">Completed trades, marketplace sales, and animated upgrades.</p>
+          <p className="mt-1 text-sm text-slate-400">Completed trades, marketplace sales, animated upgrades, and highlight cards.</p>
         </div>
         {showFilters ? (
           <div className="flex flex-wrap gap-1.5">

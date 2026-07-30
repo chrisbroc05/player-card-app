@@ -114,6 +114,11 @@ def animated_upgrade_price() -> float:
     return _parse_price(raw, 10.00)
 
 
+def highlight_card_price() -> float:
+    raw = os.environ.get("HIGHLIGHT_CARD_PRICE") or "5.00"
+    return _parse_price(raw, 5.00)
+
+
 def animated_additional_copy_unit_price(total_quantity: int) -> float:
     """Per-copy price for animated copies beyond the first (tier depends on total run)."""
     q = max(1, int(total_quantity))
@@ -158,6 +163,7 @@ def generation_price_payload(tier: str | None) -> dict:
         "first_preview_price": 0.0,
         "additional_preview_price": tier_generation_price(key),
         "animated_upgrade_price": animated_upgrade_price(),
+        "highlight_card_price": highlight_card_price(),
         "animated_copy_pricing": {
             "additional_2_to_4": animated_additional_copy_unit_price(4),
             "additional_5_plus": animated_additional_copy_unit_price(5),

@@ -167,6 +167,7 @@ export default function AdminDashboard() {
   const [userSearch, setUserSearch] = useState("");
   const [cardTierFilter, setCardTierFilter] = useState("all");
   const [cardAnimatedOnly, setCardAnimatedOnly] = useState(false);
+  const [cardHighlightOnly, setCardHighlightOnly] = useState(false);
   const [cardSearch, setCardSearch] = useState("");
 
   const clearAdminAndRedirect = useCallback(() => {
@@ -615,13 +616,14 @@ export default function AdminDashboard() {
         if (want === "legends" && t !== "legends") return false;
       }
       if (cardAnimatedOnly && !c.is_animated) return false;
+      if (cardHighlightOnly && !c.is_highlight) return false;
       if (!q) return true;
       return (
         (c.player_name || "").toLowerCase().includes(q) ||
         (c.card_id || "").toLowerCase().includes(q)
       );
     });
-  }, [cards, cardSearch, cardTierFilter, cardAnimatedOnly]);
+  }, [cards, cardSearch, cardTierFilter, cardAnimatedOnly, cardHighlightOnly]);
 
   const filteredTrades = useMemo(() => {
     if (tradeStatusFilter === "all") return trades;
@@ -852,6 +854,8 @@ export default function AdminDashboard() {
                       {kpi("Total Withdrawals", formatMoney(fin.total_withdrawals))}
                       {kpi("Stripe Connected Sellers", fin.stripe_connected_sellers ?? 0)}
                       {kpi("Average Sale Price", formatMoney(fin.average_sale_price))}
+                      {kpi("Animation Revenue", formatMoney(fin.total_animation_revenue || 0))}
+                      {kpi("Highlight Revenue", formatMoney(fin.total_highlight_revenue || 0))}
                     </div>
                     <div className="mt-3 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-xs text-cyan-100">
                       <p>
@@ -909,6 +913,16 @@ export default function AdminDashboard() {
                         "Most popular motion",
                         motionLabel(stats.animation_stats.most_popular_motion) || "—"
                       )}
+                    </div>
+                  </div>
+                ) : null}
+                {stats.highlight_stats ? (
+                  <div>
+                    <h3 className="mb-3 text-sm font-semibold text-orange-200/90">Highlights</h3>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {kpi("Total highlight cards", stats.highlight_stats.total_highlight ?? 0)}
+                      {kpi("Highlights pending", stats.highlight_stats.highlights_pending ?? 0)}
+                      {kpi("Highlights failed", stats.highlight_stats.highlights_failed ?? 0)}
                     </div>
                   </div>
                 ) : null}
@@ -1129,7 +1143,7 @@ export default function AdminDashboard() {
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <p className="text-sm text-slate-400">
                 Total cards: <span className="font-semibold text-white">{cards.length}</span>
-                {cardSearch.trim() || cardTierFilter !== "all" || cardAnimatedOnly ? (
+                {cardSearch.trim() || cardTierFilter !== "all" || cardAnimatedOnly || cardHighlightOnly ? (
                   <>
                     {" "}
                     · Shown: <span className="font-semibold text-white">{filteredCards.length}</span>
@@ -1156,6 +1170,15 @@ export default function AdminDashboard() {
                   />
                   Animated only
                 </label>
+                <label className="flex min-h-[42px] cursor-pointer items-center gap-2 rounded-lg border border-[#D85A30]/30 bg-[#D85A30]/10 px-3 text-sm text-orange-100">
+                  <input
+                    type="checkbox"
+                    checked={cardHighlightOnly}
+                    onChange={(e) => setCardHighlightOnly(e.target.checked)}
+                    className="rounded border-white/20"
+                  />
+                  Highlight only
+                </label>
                 <input
                   placeholder="Player or card ID…"
                   value={cardSearch}
@@ -1169,7 +1192,7 @@ export default function AdminDashboard() {
               <table className="w-full min-w-[960px] text-left text-sm">
                 <thead className="border-b border-white/10 bg-cardBg2 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
-                    {["Card ID", "Player", "Team", "Tier", "Theme", "Rarity", "Ed.", "Print", "Animated", "Owner", "Status", "Created"].map(
+                    {["Card ID", "Player", "Team", "Tier", "Theme", "Rarity", "Ed.", "Print", "Animated", "Highlight", "Owner", "Status", "Created"].map(
                       (h) => (
                         <th key={h} className="p-3 font-medium">
                           {h}
@@ -1181,7 +1204,7 @@ export default function AdminDashboard() {
                 <tbody>
                   {filteredCards.length === 0 ? (
                     <tr>
-                      <td colSpan={12} className="p-6 text-center text-slate-500">
+                      <td colSpan={13} className="p-6 text-center text-slate-500">
                         No cards match.
                       </td>
                     </tr>
@@ -1199,6 +1222,15 @@ export default function AdminDashboard() {
                         <td className="p-3">
                           {c.is_animated ? (
                             <span className="rounded-full border border-violet-400/40 bg-violet-500/15 px-2 py-0.5 text-[11px] font-medium text-violet-100">
+                              Yes
+                            </span>
+                          ) : (
+                            <span className="text-slate-500">No</span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          {c.is_highlight ? (
+                            <span className="rounded-full border border-[#D85A30]/40 bg-[#D85A30]/15 px-2 py-0.5 text-[11px] font-medium text-orange-100">
                               Yes
                             </span>
                           ) : (

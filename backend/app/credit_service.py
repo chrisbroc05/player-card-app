@@ -17,6 +17,7 @@ TX_CARD_SALE = "card_sale"
 TX_ROYALTY = "royalty"
 TX_GENERATION = "generation"
 TX_ANIMATION = "animation"
+TX_HIGHLIGHT = "highlight"
 TX_PRIORITY = "priority"
 TX_WITHDRAWAL = "withdrawal"
 TX_REFUND = "refund"
@@ -30,6 +31,7 @@ VALID_TRANSACTION_TYPES = frozenset(
         TX_ROYALTY,
         TX_GENERATION,
         TX_ANIMATION,
+        TX_HIGHLIGHT,
         TX_PRIORITY,
         TX_WITHDRAWAL,
         TX_REFUND,

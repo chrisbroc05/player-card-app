@@ -3,6 +3,7 @@ import { Link, Navigate } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import CardImage from "../components/CardImage";
+import { cardMediaFrameClass, cardPlaysVideoOnHover } from "../utils/highlightCard";
 import { API_BASE_URL, authHeaders } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import { useNewCardCelebration } from "../context/NewCardCelebrationContext";
@@ -185,7 +186,8 @@ export default function TradesPage() {
                             card={c}
                             alt={c.player_name}
                             cacheBust={c.created_at}
-                            frameClassName="w-full"
+                            frameClassName={cardMediaFrameClass(c)}
+                            playOnHover={cardPlaysVideoOnHover(c)}
                           />
                         </div>
                         <div className="min-w-0 flex-1 space-y-2">
@@ -258,7 +260,8 @@ export default function TradesPage() {
                             card={c}
                             alt={c.player_name}
                             cacheBust={c.created_at}
-                            frameClassName="w-full"
+                            frameClassName={cardMediaFrameClass(c)}
+                            playOnHover={cardPlaysVideoOnHover(c)}
                           />
                         </div>
                         <div className="min-w-0 flex-1 space-y-2">

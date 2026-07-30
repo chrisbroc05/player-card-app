@@ -2,38 +2,37 @@ import React from "react";
 import { Link } from "react-router-dom";
 import CardImage from "./CardImage";
 import AnimatedBadge from "./AnimatedBadge";
+import HighlightBadge from "./HighlightBadge";
 import PriorityBadge, { isPriorityListing } from "./PriorityBadge";
 import UserOfferBadge from "./UserOfferBadge";
 import { vaultTierBadge } from "../utils/tierStyles";
 import { formatMoney, listingExpiresLabel, listingExpiresSubtextClass } from "../utils/marketplace";
-import {
-  CARD_IMAGE_FRAME,
-  CARD_IMAGE_FRAME_ANIMATED,
-  CARD_IMAGE_FRAME_THUMB,
-  CARD_IMAGE_FRAME_THUMB_ANIMATED,
-} from "../utils/cardImageStyles";
 import { isAnimatedCard } from "../utils/animationCard";
+import { cardMediaFrameClass, cardPlaysVideoOnHover, isHighlightCard } from "../utils/highlightCard";
 
 /** @param {"list" | "compact"} [variant] — list = current marketplace cards; compact = thumbnail grid */
 export default function MarketplaceCardGridItem({ listing, variant = "list", currentUserId = null }) {
   const badge = vaultTierBadge(listing.tier);
   const cardPath = `/marketplace/${encodeURIComponent(listing.card_id)}`;
   const animated = isAnimatedCard(listing);
+  const highlight = isHighlightCard(listing);
+  const mediaCard = cardPlaysVideoOnHover(listing);
   const priority = isPriorityListing(listing);
 
   if (variant === "compact") {
     return (
       <Link
         to={cardPath}
-        className={`group flex flex-col rounded-xl border border-white/10 bg-cardBg p-2 shadow-md transition duration-200 hover:border-white/20 ${animated ? "" : "hover:scale-[1.02]"} ${badge.glow}`}
+        className={`group flex flex-col rounded-xl border border-white/10 bg-cardBg p-2 shadow-md transition duration-200 hover:border-white/20 ${mediaCard ? "" : "hover:scale-[1.02]"} ${badge.glow}`}
       >
         <div className="relative">
           <CardImage
             card={listing}
             alt={listing.player_name}
-            frameClassName={animated ? CARD_IMAGE_FRAME_THUMB_ANIMATED : CARD_IMAGE_FRAME_THUMB}
+            frameClassName={cardMediaFrameClass(listing, { thumb: true })}
             playOnHover
             showAnimatedBadge={false}
+            showHighlightBadge={false}
             infoBannerVariant="compact"
           />
           <div className="pointer-events-none absolute left-1 top-1 z-10 flex max-w-[calc(100%-0.5rem)] flex-col items-start gap-1">
@@ -45,6 +44,11 @@ export default function MarketplaceCardGridItem({ listing, variant = "list", cur
               <AnimatedBadge />
             </span>
           ) : null}
+          {highlight ? (
+            <span className="pointer-events-none absolute right-1 top-1 z-10">
+              <HighlightBadge />
+            </span>
+          ) : null}
         </div>
         <p className="mt-2 px-0.5 text-center text-xs font-bold text-neonTeal">{formatMoney(listing.asking_price)}</p>
       </Link>
@@ -54,15 +58,16 @@ export default function MarketplaceCardGridItem({ listing, variant = "list", cur
   return (
     <Link
       to={cardPath}
-      className={`group flex flex-col rounded-2xl border border-white/10 bg-cardBg p-3 shadow-lg transition duration-300 hover:border-white/20 ${animated ? "" : "hover:scale-[1.02]"} ${badge.glow}`}
+      className={`group flex flex-col rounded-2xl border border-white/10 bg-cardBg p-3 shadow-lg transition duration-300 hover:border-white/20 ${mediaCard ? "" : "hover:scale-[1.02]"} ${badge.glow}`}
     >
       <div className="relative">
         <CardImage
           card={listing}
           alt={listing.player_name}
-          frameClassName={animated ? CARD_IMAGE_FRAME_ANIMATED : CARD_IMAGE_FRAME}
+          frameClassName={cardMediaFrameClass(listing)}
           playOnHover
           showAnimatedBadge={false}
+          showHighlightBadge={false}
         />
         <div className="pointer-events-none absolute left-2 top-2 z-10 flex max-w-[calc(100%-1rem)] flex-col items-start gap-1">
           <UserOfferBadge listing={listing} currentUserId={currentUserId} />
@@ -71,6 +76,11 @@ export default function MarketplaceCardGridItem({ listing, variant = "list", cur
         {animated ? (
           <span className="pointer-events-none absolute right-2 top-2 z-10">
             <AnimatedBadge />
+          </span>
+        ) : null}
+        {highlight ? (
+          <span className="pointer-events-none absolute right-2 top-2 z-10">
+            <HighlightBadge />
           </span>
         ) : null}
       </div>

@@ -6,6 +6,7 @@ import CardImage from "./CardImage";
 import ShareCard from "./ShareCard";
 import QuantitySelector from "./QuantitySelector";
 import { isAnimatedCard } from "../utils/animationCard";
+import { isHighlightCard } from "../utils/highlightCard";
 
 export default function PostGenerationPanel({
   detail,
@@ -103,7 +104,7 @@ export default function PostGenerationPanel({
             alt={detail.player_name || "Card"}
             frameClassName="w-full"
             variant="detail"
-            forcePlay={isAnimatedCard(detail)}
+            forcePlay={isAnimatedCard(detail) || isHighlightCard(detail)}
           />
         </div>
       </div>

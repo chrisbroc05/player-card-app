@@ -9,7 +9,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from card_repo import animation_fields_for_card
+from card_repo import animation_fields_for_card, highlight_fields_for_card
 from models import Card, MarketplaceOffer, User, utcnow
 
 
@@ -278,6 +278,7 @@ def listing_dict(card: Card, owner_display_name: str, *, pending_offer_count: in
     row["priority_listed_at"] = _iso(card.priority_listed_at)
     row["priority_expires_at"] = _iso(card.priority_expires_at)
     row.update(animation_fields_for_card(card))
+    row.update(highlight_fields_for_card(card))
     return row
 
 
@@ -313,6 +314,7 @@ def buyer_offer_row_dict(
         "owner_display_name": seller_display_name,
     }
     row.update(animation_fields_for_card(card))
+    row.update(highlight_fields_for_card(card))
     return row
 
 

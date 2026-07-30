@@ -21,6 +21,7 @@ ACTIVITY_TYPES = frozenset(
         "marketplace_sold",
         "marketplace_bought",
         "animated_upgrade",
+        "highlight_upgrade",
     }
 )
 
@@ -211,6 +212,29 @@ def gather_user_activity_items(db: Session, user_id: int) -> list[dict]:
             _build_item(
                 item_id=f"animated_upgrade-{card.id}",
                 activity_type="animated_upgrade",
+                completed_at=when,
+                created_at=card.created_at,
+                card=card,
+                counterparty=None,
+                amount=None,
+            )
+        )
+
+    highlight_rows = (
+        db.query(Card)
+        .filter(
+            Card.creator_user_id == user_id,
+            Card.is_highlight.is_(True),
+            Card.highlight_status == "completed",
+        )
+        .all()
+    )
+    for card in highlight_rows:
+        when = card.highlight_uploaded_at or card.created_at
+        items.append(
+            _build_item(
+                item_id=f"highlight_upgrade-{card.id}",
+                activity_type="highlight_upgrade",
                 completed_at=when,
                 created_at=card.created_at,
                 card=card,

@@ -7,6 +7,8 @@ export const CARD_IMAGE_FRAME = `relative w-full min-h-0 ${CARD_ASPECT}`;
 
 export const CARD_IMAGE_FRAME_ANIMATED = `${CARD_IMAGE_FRAME} ring-1 ring-violet-400/35`;
 
+export const CARD_IMAGE_FRAME_HIGHLIGHT = `${CARD_IMAGE_FRAME} ring-1 ring-[#D85A30]/45`;
+
 export const CARD_MEDIA_SLOT = "relative h-full w-full min-h-0 overflow-hidden";
 
 export const CARD_MEDIA_SLOT_DETAIL = CARD_MEDIA_SLOT;
@@ -42,3 +44,5 @@ export const CARD_IMAGE_FRAME_XS = `relative w-full min-h-0 max-w-[100px] ${CARD
 export const CARD_IMAGE_FRAME_THUMB = `relative w-full min-h-0 ${CARD_ASPECT}`;
 
 export const CARD_IMAGE_FRAME_THUMB_ANIMATED = `${CARD_IMAGE_FRAME_THUMB} ring-1 ring-violet-400/30`;
+
+export const CARD_IMAGE_FRAME_THUMB_HIGHLIGHT = `${CARD_IMAGE_FRAME_THUMB} ring-1 ring-[#D85A30]/35`;

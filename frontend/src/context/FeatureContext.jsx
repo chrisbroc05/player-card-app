@@ -5,6 +5,7 @@ const FeatureContext = createContext(null);
 
 export function FeatureProvider({ children }) {
   const [socialSharingEnabled, setSocialSharingEnabled] = useState(true);
+  const [highlightCardPrice, setHighlightCardPrice] = useState(5);
 
   useEffect(() => {
     let cancelled = false;
@@ -13,11 +14,15 @@ export function FeatureProvider({ children }) {
         const res = await fetch(`${API_BASE_URL}/config/features`);
         if (!res.ok) return;
         const data = await res.json();
-        if (!cancelled && typeof data.social_sharing_enabled === "boolean") {
+        if (cancelled) return;
+        if (typeof data.social_sharing_enabled === "boolean") {
           setSocialSharingEnabled(data.social_sharing_enabled);
         }
+        if (Number.isFinite(Number(data.highlight_card_price))) {
+          setHighlightCardPrice(Number(data.highlight_card_price));
+        }
       } catch {
-        /* keep default true to match backend default */
+        /* keep defaults */
       }
     })();
     return () => {
@@ -25,7 +30,10 @@ export function FeatureProvider({ children }) {
     };
   }, []);
 
-  const value = useMemo(() => ({ socialSharingEnabled }), [socialSharingEnabled]);
+  const value = useMemo(
+    () => ({ socialSharingEnabled, highlightCardPrice }),
+    [socialSharingEnabled, highlightCardPrice]
+  );
 
   return <FeatureContext.Provider value={value}>{children}</FeatureContext.Provider>;
 }

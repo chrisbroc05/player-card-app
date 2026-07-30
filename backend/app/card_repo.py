@@ -176,6 +176,7 @@ def card_to_dict(card: Card, db: Session | None = None) -> dict:
 
         d["pending_trade_offer_id"] = pending_offer_id_for_card(db, card.id)
     d.update(animation_fields_for_card(card))
+    d.update(highlight_fields_for_card(card))
     return d
 
 
@@ -186,6 +187,21 @@ def animation_fields_for_card(card: Card) -> dict:
         "animation_status": getattr(card, "animation_status", None),
         "animation_motion": getattr(card, "animation_motion", None),
         "action_category": getattr(card, "action_category", None) or None,
+    }
+
+
+def highlight_fields_for_card(card: Card) -> dict:
+    uploaded = getattr(card, "highlight_uploaded_at", None)
+    trim_start = getattr(card, "highlight_trim_start", None)
+    trim_end = getattr(card, "highlight_trim_end", None)
+    return {
+        "is_highlight": bool(getattr(card, "is_highlight", False)),
+        "highlight_video_url": getattr(card, "highlight_video_url", None) or None,
+        "highlight_thumbnail_url": getattr(card, "highlight_thumbnail_url", None) or None,
+        "highlight_status": getattr(card, "highlight_status", None),
+        "highlight_uploaded_at": uploaded.isoformat() if uploaded is not None else None,
+        "highlight_trim_start": float(trim_start) if trim_start is not None else None,
+        "highlight_trim_end": float(trim_end) if trim_end is not None else None,
     }
 
 

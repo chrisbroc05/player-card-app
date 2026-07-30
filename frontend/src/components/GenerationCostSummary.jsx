@@ -53,6 +53,7 @@ export default function GenerationCostSummary({
   tierLabel,
   themeLabel,
   isAnimated,
+  isHighlight = false,
   motionName,
   copyQuantity = 1,
   pricing,
@@ -63,13 +64,14 @@ export default function GenerationCostSummary({
   if (!pricing) return null;
 
   const animated = Number(pricing.animated_upgrade_price) || 0;
+  const highlight = Number(pricing.highlight_card_price) || 0;
   const copyTiers = normalizeCopyTiers(pricing.copy_pricing_tiers);
   const balance = Number(creditBalance) || 0;
   const copies = Math.max(1, Number(copyQuantity) || 1);
   const copyCharge = copyChargeForQuantity(copies, 1, copyTiers);
   const { extra: extraCopies, unit: copyUnitPrice, total: extraCopyCost } = copyCharge;
 
-  const cardTypeLabel = isAnimated ? "Animated" : "Static";
+  const cardTypeLabel = isHighlight ? "Highlight" : isAnimated ? "Animated" : "Static";
 
   const playerRows = [
     hasDisplayValue(playerName) && { label: "Player name", value: playerName },
@@ -114,7 +116,9 @@ export default function GenerationCostSummary({
           {phase === "pre-generate" ? (
             <>
               <TotalLine label="First preview" value="FREE" free />
-              {isAnimated ? (
+              {isHighlight ? (
+                <TotalLine label="Highlight video upgrade" value={`+${formatMoney(highlight)}`} />
+              ) : isAnimated ? (
                 <TotalLine
                   label="Animated upgrade"
                   value={`${formatMoney(animated)} if you animate`}
@@ -143,7 +147,9 @@ export default function GenerationCostSummary({
               ) : (
                 <TotalLine label="Copy subtotal" value={formatMoney(0)} />
               )}
-              {isAnimated ? (
+              {isHighlight ? (
+                <TotalLine label="Highlight video upgrade" value={`+${formatMoney(highlight)} when you upload`} />
+              ) : isAnimated ? (
                 <TotalLine label="Animated upgrade" value="Charged when you confirm animation" free />
               ) : null}
             </>

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
@@ -102,6 +102,13 @@ class Card(Base):
     action_category: Mapped[str | None] = mapped_column(String(32), nullable=True)
     animation_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     animation_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_highlight: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    highlight_video_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    highlight_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    highlight_uploaded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    highlight_trim_start: Mapped[float | None] = mapped_column(Float, nullable=True)
+    highlight_trim_end: Mapped[float | None] = mapped_column(Float, nullable=True)
+    highlight_thumbnail_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     preview_session_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     draft_metadata: Mapped[str | None] = mapped_column(Text, nullable=True)
 

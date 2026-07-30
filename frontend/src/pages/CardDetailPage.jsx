@@ -12,8 +12,10 @@ import CardHistoryTimeline from "../components/CardHistoryTimeline";
 import { vaultTierBadge, rarityDisplay } from "../utils/tierStyles";
 import { motionLabel } from "../constants/animationMotions";
 import { isAnimatedCard } from "../utils/animationCard";
+import { isHighlightCard } from "../utils/highlightCard";
 import { isCardOwner } from "../utils/cardOwnership";
 import AnimatedBadge from "../components/AnimatedBadge";
+import HighlightBadge from "../components/HighlightBadge";
 import { CARD_IMAGE_FRAME_DETAIL } from "../utils/cardImageStyles";
 import { authFetch, formatApiError } from "../utils/authFetch";
 
@@ -229,8 +231,8 @@ export default function CardDetailPage() {
                 cacheBust={card.created_at}
                 frameClassName={CARD_IMAGE_FRAME_DETAIL}
                 variant="detail"
-                forcePlay={isOwner && isAnimatedCard(card)}
-                protectMedia={!isOwner}
+                forcePlay={isHighlightCard(card) || (isOwner && isAnimatedCard(card))}
+                protectMedia={!isOwner && isAnimatedCard(card)}
                 useOwnerVideoProxy={isOwner && isAnimatedCard(card)}
                 token={token || ""}
               />
@@ -247,6 +249,7 @@ export default function CardDetailPage() {
                   {rarityDisplay(card.rarity)}
                 </span>
                 {isAnimatedCard(card) ? <AnimatedBadge /> : null}
+                {isHighlightCard(card) ? <HighlightBadge /> : null}
               </div>
 
               <dl className="grid gap-3 rounded-2xl border border-white/10 bg-cardBg p-4 text-sm sm:grid-cols-2">

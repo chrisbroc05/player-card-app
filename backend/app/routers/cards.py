@@ -5,17 +5,21 @@ from __future__ import annotations
 import os
 import re
 from pathlib import Path
+from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from animation_tasks import process_animation
-from card_pricing import animated_studio_total_price, animated_upgrade_price, generation_price_payload, normalize_order_tier
+from card_pricing import animated_studio_total_price, animated_upgrade_price, generation_price_payload, highlight_card_price, normalize_order_tier
 from auth import get_current_user
-from card_repo import create_animated_upgrade_card, get_card_by_card_id
-from credit_service import InsufficientCreditsError, TX_ANIMATION, deduct_credits
+from card_repo import create_animated_upgrade_card, get_card_by_card_id, card_to_dict, highlight_fields_for_card
+from credit_service import InsufficientCreditsError, TX_ANIMATION, TX_HIGHLIGHT, deduct_credits
+from highlight_service import MAX_HIGHLIGHT_UPLOAD_BYTES, validate_upload_duration
+from highlight_tasks import run_highlight_processing
+from highlight_video_utils import video_extension_for_content_type
 from data.animation_motions import get_motion_by_id, is_motion_selectable, list_motions_public
 from database import get_db
 from email_service import _absolute_image_url
@@ -48,6 +52,13 @@ def _resolve_card(db: Session, card_id_raw: str) -> Card:
 def _animations_dir() -> Path:
     base = (os.environ.get("APP_DATA_DIR") or "").strip() or "./data"
     return Path(base).expanduser().resolve() / "animations"
+
+
+def _highlights_dir() -> Path:
+    base = (os.environ.get("APP_DATA_DIR") or "").strip() or "./data"
+    path = Path(base).expanduser().resolve() / "highlights"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def _animation_video_path(card: Card) -> Path | None:
@@ -279,6 +290,112 @@ def get_animation_status(
     if card.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="You do not own this card")
     return _animation_status_payload(card)
+
+
+@router.get("/{card_id}/highlight-status")
+def get_highlight_status(
+    card_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    card = _resolve_card(db, card_id)
+    if card.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not own this card")
+    return highlight_fields_for_card(card)
+
+
+@router.post("/{card_id}/highlight")
+async def upload_card_highlight(
+    card_id: str,
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(..., description="Highlight video (MP4, MOV, AVI, or WebM)"),
+    trim_start_seconds: float = Form(0),
+    trim_end_seconds: float | None = Form(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    card = _resolve_card(db, card_id)
+    if card.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not own this card")
+    if card.is_animated:
+        raise HTTPException(status_code=400, detail="Animated cards cannot use highlight upload")
+    if card.highlight_status == "processing":
+        raise HTTPException(status_code=409, detail="Highlight video is already processing for this card")
+    if card.is_highlight and (card.highlight_video_url or "").strip() and card.highlight_status == "completed":
+        raise HTTPException(status_code=400, detail="Highlight video is already uploaded for this card")
+
+    ext = video_extension_for_content_type(file.content_type, file.filename)
+    if ext is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Only video uploads are allowed (MP4, MOV, AVI, or WebM).",
+        )
+
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file.")
+    if len(data) > MAX_HIGHLIGHT_UPLOAD_BYTES:
+        raise HTTPException(status_code=400, detail="Video file is too large (max 100 MB).")
+
+    raw_filename = f"{card.card_id.replace('/', '_')}-raw-{uuid4().hex}{ext}"
+    out_filename = f"{card.card_id.replace('/', '_')}-{uuid4().hex}{ext}"
+    thumb_filename = f"{card.card_id.replace('/', '_')}-{uuid4().hex}.jpg"
+    raw_dest = _highlights_dir() / raw_filename
+    final_dest = _highlights_dir() / out_filename
+    thumb_dir = _highlights_dir() / "thumbnails"
+    thumb_dir.mkdir(parents=True, exist_ok=True)
+    thumb_dest = thumb_dir / thumb_filename
+    raw_dest.write_bytes(data)
+
+    try:
+        source_duration = validate_upload_duration(raw_dest)
+        trim_start = max(0.0, float(trim_start_seconds or 0))
+        trim_end = float(trim_end_seconds) if trim_end_seconds is not None else min(source_duration, trim_start + 10.0)
+        if trim_end <= trim_start:
+            trim_end = min(source_duration, trim_start + min(10.0, source_duration))
+
+        price = highlight_card_price()
+        try:
+            deduct_credits(
+                db,
+                user_id=current_user.id,
+                amount=price,
+                transaction_type=TX_HIGHLIGHT,
+                reference_id=card.card_id,
+                note=f"Highlight video upgrade for {card.card_id}",
+            )
+        except InsufficientCreditsError as exc:
+            raw_dest.unlink(missing_ok=True)
+            raise HTTPException(status_code=402, detail=str(exc)) from exc
+
+        card.is_highlight = True
+        card.highlight_status = "processing"
+        card.highlight_trim_start = round(trim_start, 3)
+        card.highlight_trim_end = round(trim_end, 3)
+        card.highlight_video_url = None
+        card.highlight_thumbnail_url = None
+        db.commit()
+
+        background_tasks.add_task(
+            run_highlight_processing,
+            card.card_id,
+            str(raw_dest),
+            str(final_dest),
+            str(thumb_dest),
+            trim_start=trim_start,
+            trim_end=trim_end,
+            user_id=current_user.id,
+        )
+        db.refresh(card)
+        return card_to_dict(card, db)
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raw_dest.unlink(missing_ok=True)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raw_dest.unlink(missing_ok=True)
+        raise HTTPException(status_code=500, detail="Could not start highlight processing.") from exc
 
 
 @router.get("/{card_id}/video")

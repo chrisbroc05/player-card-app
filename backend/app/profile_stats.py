@@ -22,6 +22,7 @@ class ProfileKpiSnapshot:
     cards_traded_away: int
     cards_received_via_trade: int
     animated_cards_owned: int
+    highlight_cards_owned: int
     total_print_run_copies: int
     favorite_tier: str | None
     rarest_card: Card | None
@@ -72,6 +73,17 @@ def compute_profile_kpis(db: Session, user: User) -> ProfileKpiSnapshot:
         .filter(
             collection_f,
             Card.is_animated.is_(True),
+        )
+        .scalar()
+        or 0
+    )
+
+    highlight_cards_owned = int(
+        db.query(func.count(Card.id))
+        .filter(
+            collection_f,
+            Card.is_highlight.is_(True),
+            Card.highlight_status == "completed",
         )
         .scalar()
         or 0
@@ -169,6 +181,7 @@ def compute_profile_kpis(db: Session, user: User) -> ProfileKpiSnapshot:
         cards_traded_away=cards_traded_away,
         cards_received_via_trade=cards_received_via_trade,
         animated_cards_owned=animated_cards_owned,
+        highlight_cards_owned=highlight_cards_owned,
         total_print_run_copies=total_print_run_copies,
         favorite_tier=favorite_tier,
         rarest_card=rarest,

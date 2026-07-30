@@ -65,6 +65,46 @@
     animation: animation-banner-glow 2s ease-in-out infinite;
   }
 
+  .highlight-processing-pulse {
+    animation: highlight-card-pulse 2.2s ease-in-out infinite;
+  }
+
+  .highlight-processing-dot {
+    animation: highlight-dot-pulse 1.2s ease-in-out infinite;
+  }
+
+  .animation-delay-150 {
+    animation-delay: 0.15s;
+  }
+
+  .animation-delay-300 {
+    animation-delay: 0.3s;
+  }
+
+  @keyframes highlight-card-pulse {
+    0%,
+    100% {
+      opacity: 0.35;
+      transform: scale(0.98);
+    }
+    50% {
+      opacity: 0.85;
+      transform: scale(1.02);
+    }
+  }
+
+  @keyframes highlight-dot-pulse {
+    0%,
+    100% {
+      opacity: 0.35;
+      transform: scale(0.85);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.15);
+    }
+  }
+
   /* Animated card video — contain within frame; never crop or zoom */
   .card-animated-video-container {
     display: flex;

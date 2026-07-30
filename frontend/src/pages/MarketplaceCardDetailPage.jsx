@@ -11,8 +11,10 @@ import { authFetch, formatApiError } from "../utils/authFetch";
 import { computeRoyaltyPreview, formatMoney, listedAgeLabel, listingExpiresSubtextClass, cashOfferButtonLabel } from "../utils/marketplace";
 import { motionLabel } from "../constants/animationMotions";
 import { isAnimatedCard } from "../utils/animationCard";
+import { isHighlightCard } from "../utils/highlightCard";
 import { isCardOwner } from "../utils/cardOwnership";
 import AnimatedBadge from "../components/AnimatedBadge";
+import HighlightBadge from "../components/HighlightBadge";
 import CardHistoryTimeline from "../components/CardHistoryTimeline";
 import { vaultTierBadge, rarityDisplay } from "../utils/tierStyles";
 import { CARD_IMAGE_FRAME_DETAIL } from "../utils/cardImageStyles";
@@ -241,8 +243,8 @@ export default function MarketplaceCardDetailPage() {
                 alt={listing.player_name}
                 frameClassName={CARD_IMAGE_FRAME_DETAIL}
                 variant="detail"
-                forcePlay={isOwner && isAnimatedCard(listing)}
-                protectMedia={!isOwner}
+                forcePlay={isHighlightCard(listing) || (isOwner && isAnimatedCard(listing))}
+                protectMedia={!isOwner && isAnimatedCard(listing)}
                 useOwnerVideoProxy={isOwner && isAnimatedCard(listing)}
                 token={token || ""}
               />
@@ -258,6 +260,7 @@ export default function MarketplaceCardDetailPage() {
                   {rarityDisplay(listing.rarity)}
                 </span>
                 {isAnimatedCard(listing) ? <AnimatedBadge /> : null}
+                {isHighlightCard(listing) ? <HighlightBadge /> : null}
               </div>
               <p className="mt-3 text-3xl font-bold text-neonTeal">{formatMoney(listing.asking_price)}</p>
               {listing.days_remaining != null && listing.listing_expires_at ? (

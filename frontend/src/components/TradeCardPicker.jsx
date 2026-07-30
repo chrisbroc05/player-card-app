@@ -1,8 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { API_BASE_URL } from "../config/api";
 import CardImage from "./CardImage";
-import { CARD_IMAGE_FRAME_THUMB } from "../utils/cardImageStyles";
-import { isAnimatedCard } from "../utils/animationCard";
+import { cardMediaFrameClass, cardPlaysVideoOnHover } from "../utils/highlightCard";
 
 const CARDS_PER_PAGE = 6;
 
@@ -198,8 +197,8 @@ export default function TradeCardPicker({
                   <CardImage
                     card={card}
                     alt={card.player_name}
-                    frameClassName={CARD_IMAGE_FRAME_THUMB}
-                    playOnHover={isAnimatedCard(card)}
+                    frameClassName={cardMediaFrameClass(card, { thumb: true })}
+                    playOnHover={cardPlaysVideoOnHover(card)}
                     infoBannerVariant="compact"
                   />
                   <p className="truncate font-mono text-[9px] text-slate-500">{card.card_id}</p>

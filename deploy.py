@@ -25,6 +25,8 @@ Backend on Render should also set:
   CARD_PRICE_LEGENDS=6.00
   ANIMATED_CARD_PRICE=10.00
     Animated card upgrade on first preview (Studio flow).
+  HIGHLIGHT_CARD_PRICE=5.00
+    Highlight video upgrade when user uploads a clip to their card.
   COPY_PRICE_TIER_1_4=0.50
   COPY_PRICE_TIER_5_9=0.40
   COPY_PRICE_TIER_10_PLUS=0.30

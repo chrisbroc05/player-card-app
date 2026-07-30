@@ -9,6 +9,7 @@ import {
   sourceLineForAcquisition,
 } from "../utils/newCardCelebration";
 import { isAnimatedCard } from "../utils/animationCard";
+import { isHighlightCard } from "../utils/highlightCard";
 import { CARD_IMAGE_FRAME_MODAL } from "../utils/cardImageStyles";
 import { useScrollModalIntoView } from "../hooks/useScrollIntoViewOnChange";
 
@@ -75,6 +76,8 @@ export default function NewCardCelebration({
 
   const badge = vaultTierBadge(card.tier);
   const animated = isAnimatedCard(card);
+  const highlight = isHighlightCard(card);
+  const mediaCard = animated || highlight;
   const headline = headlineForSource(source);
   const sourceLine = sourceLineForAcquisition({ source, counterparty, amount, formatMoney });
   const canAffordAnimate = Number(creditBalance) >= ANIMATE_COST;
@@ -101,9 +104,9 @@ export default function NewCardCelebration({
                 card={card}
                 alt={card.player_name || "Your card"}
                 frameClassName={CARD_IMAGE_FRAME_MODAL}
-                showInfoBanner={!animated}
-                forcePlay={animated}
-                playOnHover={!animated}
+                showInfoBanner={!mediaCard}
+                forcePlay={mediaCard}
+                playOnHover={!mediaCard}
               />
             </div>
 

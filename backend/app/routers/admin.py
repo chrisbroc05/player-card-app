@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session, aliased
 
 from auth import ALGORITHM, SECRET_KEY
 from beta_config import beta_mode_active, get_beta_invite_code, set_beta_invite_code
-from credit_service import InsufficientCreditsError, TX_WITHDRAWAL, deduct_credits
+from credit_service import InsufficientCreditsError, TX_ANIMATION, TX_HIGHLIGHT, TX_WITHDRAWAL, deduct_credits
 from database import get_db
 from marketplace_repo import float_from_decimal, listing_active_filter
 from models import Card, CreditLedger, MarketplaceOffer, TradeOffer, User, utcnow
@@ -202,6 +202,16 @@ def _compute_financial_summary(db: Session) -> dict[str, float | int]:
         .filter(CreditLedger.transaction_type == "royalty")
         .scalar()
     )
+    total_animation_revenue = float_from_decimal(
+        db.query(func.coalesce(func.sum(func.abs(CreditLedger.amount)), 0))
+        .filter(CreditLedger.transaction_type == TX_ANIMATION)
+        .scalar()
+    )
+    total_highlight_revenue = float_from_decimal(
+        db.query(func.coalesce(func.sum(func.abs(CreditLedger.amount)), 0))
+        .filter(CreditLedger.transaction_type == TX_HIGHLIGHT)
+        .scalar()
+    )
     stripe_balance_total = 0.0
     stripe_balance_available = 0.0
     stripe_balance_pending = 0.0
@@ -251,6 +261,8 @@ def _compute_financial_summary(db: Session) -> dict[str, float | int]:
         "stripe_balance_pending": stripe_balance_pending,
         "stripe_balance_currency": stripe_balance_currency,
         "stripe_error": stripe_error,
+        "total_animation_revenue": total_animation_revenue,
+        "total_highlight_revenue": total_highlight_revenue,
     }
 
 
@@ -537,6 +549,18 @@ def admin_stats(
     animations_failed = int(
         db.query(func.count(Card.id)).filter(Card.animation_status == "failed").scalar() or 0
     )
+    total_highlight = int(
+        db.query(func.count(Card.id))
+        .filter(Card.is_highlight.is_(True), Card.highlight_status == "completed")
+        .scalar()
+        or 0
+    )
+    highlights_pending = int(
+        db.query(func.count(Card.id)).filter(Card.highlight_status == "processing").scalar() or 0
+    )
+    highlights_failed = int(
+        db.query(func.count(Card.id)).filter(Card.highlight_status == "failed").scalar() or 0
+    )
     popular_row = (
         db.query(Card.animation_motion, func.count(Card.id).label("cnt"))
         .filter(Card.is_animated.is_(True), Card.animation_motion.isnot(None))
@@ -579,6 +603,11 @@ def admin_stats(
             "animations_pending": animations_pending,
             "animations_failed": animations_failed,
             "most_popular_motion": most_popular_motion,
+        },
+        "highlight_stats": {
+            "total_highlight": total_highlight,
+            "highlights_pending": highlights_pending,
+            "highlights_failed": highlights_failed,
         },
     }
 
@@ -1087,6 +1116,9 @@ def admin_cards(
                 "owner_display_name": (od or card.owner_name or "—").strip() or "—",
                 "owner_email": (oe or "").strip() or "—",
                 "status": card.status or "active",
+                "is_animated": bool(card.is_animated),
+                "is_highlight": bool(card.is_highlight),
+                "highlight_status": card.highlight_status,
             }
         )
     return out

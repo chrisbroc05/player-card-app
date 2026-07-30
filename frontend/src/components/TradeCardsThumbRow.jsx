@@ -1,6 +1,6 @@
 import React from "react";
 import CardImage from "./CardImage";
-import { CARD_IMAGE_FRAME_THUMB } from "../utils/cardImageStyles";
+import { cardMediaFrameClass } from "../utils/highlightCard";
 
 /** Horizontal scroll of trade offer / counter cards */
 export default function TradeCardsThumbRow({ cards, className = "" }) {
@@ -15,7 +15,7 @@ export default function TradeCardsThumbRow({ cards, className = "" }) {
           <CardImage
             card={c}
             alt={c.player_name}
-            frameClassName={CARD_IMAGE_FRAME_THUMB}
+            frameClassName={cardMediaFrameClass(c, { thumb: true })}
             playOnHover
             infoBannerVariant="compact"
           />

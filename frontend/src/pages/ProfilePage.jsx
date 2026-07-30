@@ -145,6 +145,7 @@ export default function ProfilePage() {
 
   const mp = profile?.marketplace_stats;
   const animatedCardsOwned = profile?.animated_cards_owned ?? 0;
+  const highlightCardsOwned = profile?.highlight_cards_owned ?? 0;
   const showMarketplace =
     mp &&
     (mp.total_spent > 0 ||
@@ -256,6 +257,21 @@ export default function ProfilePage() {
                     <p className="text-2xl font-semibold tabular-nums text-violet-100">{animatedCardsOwned}</p>
                     <p className="mt-1 text-xs font-medium uppercase tracking-wide text-violet-200/70">
                       Animated Cards
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+            {!loading && highlightCardsOwned > 0 ? (
+              <div className="rounded-xl border border-[#D85A30]/35 bg-gradient-to-br from-[#D85A30]/15 via-cardBg2 to-cardBg2 p-4 shadow-[0_0_24px_rgba(216,90,48,0.15)]">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#D85A30]/30 bg-[#D85A30]/20 text-orange-100">
+                    🎬
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-2xl font-semibold tabular-nums text-orange-100">{highlightCardsOwned}</p>
+                    <p className="mt-1 text-xs font-medium uppercase tracking-wide text-orange-200/70">
+                      Highlight Cards
                     </p>
                   </div>
                 </div>

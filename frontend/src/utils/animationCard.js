@@ -14,6 +14,7 @@ export function isAnimationInProgress(card) {
 
 export function canAnimateCard(card) {
   if (!card || isAnimatedCard(card)) return false;
+  if (card.is_highlight || card.isHighlight) return false;
   const st = card.animation_status ?? card.animationStatus;
   return st == null || st === "failed";
 }

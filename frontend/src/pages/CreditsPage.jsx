@@ -18,6 +18,7 @@ function txTypeLabel(type) {
     royalty: "Royalty",
     generation: "Generation",
     animation: "Animation",
+    highlight: "Highlight video",
     priority: "Priority listing",
     withdrawal: "Withdrawal",
     refund: "Refund",

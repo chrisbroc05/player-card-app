@@ -1017,6 +1017,63 @@ def send_withdrawal_confirmation_email(
         logger.error("Withdrawal confirmation email failed for %s: %s", user_email, e)
 
 
+def send_highlight_failed_email(
+    owner_email: str,
+    owner_name: str,
+    card_player_name: str,
+    collection_url: str,
+    card_id: str,
+    refund_amount: float,
+    *,
+    parent_email: str | None = None,
+) -> None:
+    try:
+        player = html_module.escape(card_player_name)
+        refund = html_module.escape(format(refund_amount, ".2f"))
+        sub_inner = (
+            f"We could not process the highlight video for your {player} card. "
+            f"Your ${refund} has been refunded to your credit balance."
+        )
+        parts = [
+            _heading("Your highlight video could not be processed"),
+            _subtext_html(sub_inner),
+            _divider(),
+            _cta_button(collection_url, "Open My Collection →"),
+        ]
+        html = _email_shell("".join(parts))
+        subject = "Your highlight video could not be processed"
+        _send_resend_html(owner_email, subject, html, 0, f"highlight_failed_{card_id}", parent_email=parent_email)
+    except Exception as e:
+        logger.error("Highlight failed email failed for card %s: %s", card_id, e)
+
+
+def send_highlight_complete_email(
+    owner_email: str,
+    owner_name: str,
+    card_player_name: str,
+    card_url: str,
+    card_id: str,
+    card_image_url: str | None,
+    *,
+    parent_email: str | None = None,
+) -> None:
+    try:
+        player = html_module.escape(card_player_name)
+        sub_inner = f"Your highlight card for {player} is ready to view."
+        parts = [
+            _heading("Your highlight card is ready!"),
+            _subtext_html(sub_inner),
+            _card_info_box(card_player_name, "all_star", "base", card_image_url),
+            _divider(),
+            _cta_button(card_url, "View highlight card →"),
+        ]
+        html = _email_shell("".join(parts))
+        subject = "Your highlight card is ready!"
+        _send_resend_html(owner_email, subject, html, 0, f"highlight_complete_{card_id}", parent_email=parent_email)
+    except Exception as e:
+        logger.error("Highlight complete email failed for card %s: %s", card_id, e)
+
+
 def send_animation_complete_email(
     owner_email: str,
     owner_name: str,
