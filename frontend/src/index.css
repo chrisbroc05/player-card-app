@@ -2409,3 +2409,68 @@
   background: #c084fc !important;
 }
 
+/* My Listings — listing row card thumbnail (no clip, fixed 120×168 desktop) */
+.my-listings-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+  width: 100%;
+}
+
+@media (min-width: 480px) {
+  .my-listings-row {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+.my-listings-row__thumb {
+  display: block;
+  width: 100%;
+  flex-shrink: 0;
+  overflow: visible;
+  padding: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  text-decoration: none;
+  color: inherit;
+}
+
+@media (min-width: 480px) {
+  .my-listings-row__thumb {
+    width: 120px;
+    min-width: 120px;
+    height: 168px;
+  }
+}
+
+@media (max-width: 479px) {
+  .my-listings-row__thumb {
+    aspect-ratio: 2.5 / 3.5;
+    height: auto;
+  }
+}
+
+.my-listings-row__thumb .card-shell {
+  min-width: 0 !important;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+}
+
+.my-listings-row__thumb--interactive {
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.my-listings-row__thumb--interactive:hover {
+  opacity: 0.92;
+}
+
+.my-listings-row__details {
+  flex: 1;
+  min-width: 0;
+}
+

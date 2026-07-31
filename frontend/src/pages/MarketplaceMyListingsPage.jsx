@@ -35,10 +35,9 @@ function formatListingExpiresDate(iso) {
   }
 }
 
-const LISTING_CARD_THUMB_CLASS =
-  "block mx-auto w-full max-w-[200px] min-w-[130px] shrink-0 overflow-hidden rounded-xl border border-white/10 sm:mx-0 sm:w-[180px] sm:max-w-none sm:min-w-[180px] md:w-[200px] md:min-w-[200px]";
+const LISTING_CARD_THUMB_CLASS = "my-listings-row__thumb";
 
-const LISTING_CARD_THUMB_INTERACTIVE_CLASS = `${LISTING_CARD_THUMB_CLASS} transition hover:border-neonTeal/60`;
+const LISTING_CARD_THUMB_INTERACTIVE_CLASS = `${LISTING_CARD_THUMB_CLASS} my-listings-row__thumb--interactive`;
 
 export default function MarketplaceMyListingsPage() {
   const navigate = useNavigate();
@@ -305,7 +304,7 @@ export default function MarketplaceMyListingsPage() {
                   key={listing.card_id}
                   className={`w-full rounded-2xl border border-white/10 bg-cardBg p-5 sm:p-6 ${badge.glow}`}
                 >
-                  <div className="flex w-full flex-col items-stretch gap-5 sm:flex-row sm:items-start sm:gap-8">
+                  <div className="my-listings-row">
                     {cardOffers.length > 0 ? (
                       <button
                         type="button"
@@ -332,7 +331,7 @@ export default function MarketplaceMyListingsPage() {
                         />
                       </Link>
                     )}
-                    <div className="w-full min-w-0 flex-1 space-y-3 sm:min-w-[16rem]">
+                    <div className="my-listings-row__details space-y-3">
                       <div className="space-y-2">
                         <h2 className="text-base font-semibold leading-snug text-white break-words whitespace-normal [overflow-wrap:anywhere]">
                           {listing.player_name}

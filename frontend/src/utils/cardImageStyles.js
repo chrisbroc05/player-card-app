@@ -38,7 +38,7 @@ export const CARD_IMAGE_MEDIA_DETAIL =
 
 export const CARD_IMAGE_FRAME_MODAL = `relative w-full min-w-[210px] max-w-[280px] ${CARD_ASPECT}`;
 
-export const CARD_IMAGE_FRAME_LISTING_ROW = `relative w-full min-w-[210px] ${CARD_ASPECT}`;
+export const CARD_IMAGE_FRAME_LISTING_ROW = "relative h-full w-full min-w-0 max-w-full";
 
 export const CARD_IMAGE_FRAME_SM = `relative w-full min-w-[210px] min-h-0 max-w-[140px] ${CARD_ASPECT}`;
 
