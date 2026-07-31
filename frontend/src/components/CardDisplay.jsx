@@ -117,13 +117,19 @@ export default function CardDisplay({
         </div>
 
         <div className="card-banner__footer shrink-0">
-          <span className={`card-banner__tier-pill ${bannerStyles.tierPillClass}`}>
-            {bannerStyles.tierPillLabel}
-          </span>
-          <span className={`card-banner__theme ${bannerStyles.themeClass}`}>
-            {bannerStyles.themeLabel || "\u00A0"}
-          </span>
-          <span className={`card-banner__edition ${bannerStyles.editionClass}`}>{meta.edition}</span>
+          <div className="card-banner__footer-col card-banner__footer-col--start">
+            <span className={`card-banner__tier-pill ${bannerStyles.tierPillClass}`}>
+              {bannerStyles.tierPillLabel}
+            </span>
+          </div>
+          <div className="card-banner__footer-col card-banner__footer-col--center">
+            <span className={`card-banner__theme ${bannerStyles.themeClass}`}>
+              {bannerStyles.themeLabel || "\u00A0"}
+            </span>
+          </div>
+          <div className="card-banner__footer-col card-banner__footer-col--end">
+            <span className={`card-banner__edition ${bannerStyles.editionClass}`}>{meta.edition}</span>
+          </div>
         </div>
       </div>
     </div>
