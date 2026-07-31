@@ -16,6 +16,7 @@ import {
   offerExpiresLabel,
   offerExpiresLineClass,
 } from "../utils/marketplace";
+import { themeDisplayLabel } from "../utils/cardBannerStyles";
 import { vaultTierBadge } from "../utils/tierStyles";
 import { CARD_IMAGE_FRAME_LISTING_ROW } from "../utils/cardImageStyles";
 import {
@@ -266,7 +267,7 @@ export default function MarketplaceMyListingsPage() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-appBg text-slate-100">
       <AppHeader />
-      <main className="mx-auto w-full max-w-6xl px-3 py-8 sm:px-6 lg:px-8">
+      <main className="my-listings-page mx-auto w-full max-w-6xl px-4 py-8">
         <div className="mb-6">
           <h1 className="text-2xl font-semibold text-white sm:text-3xl">My Listings</h1>
           <p className="mt-2 text-sm text-slate-400">Cards listed on Free Agency Marketplace and incoming offers.</p>
@@ -291,9 +292,10 @@ export default function MarketplaceMyListingsPage() {
             </Link>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="my-listings-list">
             {listings.map((listing) => {
               const badge = vaultTierBadge(listing.tier);
+              const themeLabel = themeDisplayLabel(listing.theme || listing.special_theme);
               const cardOffers = offersByCard[listing.card_id] || [];
               const dr =
                 listing.days_remaining != null && listing.listing_expires_at ? Number(listing.days_remaining) : null;
@@ -302,7 +304,7 @@ export default function MarketplaceMyListingsPage() {
               return (
                 <article
                   key={listing.card_id}
-                  className={`w-full rounded-2xl border border-white/10 bg-cardBg p-5 sm:p-6 ${badge.glow}`}
+                  className={`my-listings-item ${badge.glow}`}
                 >
                   <div className="my-listings-row">
                     {cardOffers.length > 0 ? (
@@ -331,71 +333,60 @@ export default function MarketplaceMyListingsPage() {
                         />
                       </Link>
                     )}
-                    <div className="my-listings-row__details space-y-3">
-                      <div className="space-y-2">
-                        <h2 className="text-base font-semibold leading-snug text-white break-words whitespace-normal [overflow-wrap:anywhere]">
-                          {listing.player_name}
-                        </h2>
-                        {listing.team_name ? (
-                          <p className="text-[13px] leading-relaxed text-slate-400 break-words whitespace-normal [overflow-wrap:anywhere]">
-                            {listing.team_name}
-                          </p>
+                    <div className="my-listings-row__details">
+                      <h2 className="my-listings-row__name">{listing.player_name}</h2>
+                      {listing.team_name ? (
+                        <p className="my-listings-row__team">{listing.team_name}</p>
+                      ) : null}
+                      <div className="my-listings-row__badges">
+                        <span className={`my-listings-row__tier-badge ${badge.pill}`}>{badge.label}</span>
+                        {themeLabel ? (
+                          <span className="my-listings-row__theme-badge">{themeLabel}</span>
                         ) : null}
-                        <div>
-                          <span
-                            className={`inline-flex rounded-full border px-2.5 py-0.5 text-[13px] font-medium ${badge.pill}`}
-                          >
-                            {badge.label}
-                          </span>
-                        </div>
                         {(listing.pending_offer_count || 0) > 0 ? (
-                          <div>
-                            <span className="inline-flex rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-0.5 text-[13px] font-semibold text-amber-200">
-                              {listing.pending_offer_count} Offer{listing.pending_offer_count === 1 ? "" : "s"}
-                            </span>
-                          </div>
+                          <span className="my-listings-row__offers-badge">
+                            {listing.pending_offer_count} Offer{listing.pending_offer_count === 1 ? "" : "s"}
+                          </span>
                         ) : null}
-                        <p className="font-mono text-[13px] leading-relaxed text-neonTeal/80 break-all">
-                          {listing.card_id}
-                        </p>
                       </div>
-                      <p className="text-xl font-bold text-neonTeal">{formatMoney(listing.asking_price)}</p>
+                      <p className="my-listings-row__price">{formatMoney(listing.asking_price)}</p>
                       {listing.listing_expires_at ? (
-                        <p className={`text-[13px] ${listingExpiresSubtextClass(dr)}`}>
+                        <p className={`my-listings-row__date ${listingExpiresSubtextClass(dr)}`}>
                           {listingExpiresLabel(dr)}
                           {formatListingExpiresDate(listing.listing_expires_at)
                             ? ` · ${formatListingExpiresDate(listing.listing_expires_at)}`
                             : ""}
                         </p>
                       ) : null}
+                      <p className="my-listings-row__card-id">{listing.card_id}</p>
                       {warnRelist ? (
-                        <div className="mt-3 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                        <div className="my-listings-row__warn">
                           <p className="font-medium text-amber-200">Expiring soon — relist to keep it active</p>
                           <button
                             type="button"
                             disabled={relistBusyId === listing.card_id}
                             onClick={() => relist(listing.card_id, listing.asking_price)}
-                            className="mt-2 inline-flex min-h-[36px] items-center justify-center rounded-lg bg-neonTeal px-3 text-xs font-semibold text-slate-950 disabled:opacity-50"
+                            className="my-listings-row__action-btn my-listings-row__action-btn--primary mt-2"
                           >
                             {relistBusyId === listing.card_id ? "Relisting…" : "Relist for 30 more days"}
                           </button>
                         </div>
                       ) : null}
                       {(listing.pending_offer_count || 0) > 0 ? (
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="my-listings-row__actions">
                           <button
                             type="button"
                             onClick={() => setReviewCardId(listing.card_id)}
-                            className="inline-flex min-h-[38px] items-center justify-center rounded-lg border border-amber-500/45 bg-amber-500/10 px-3 text-sm font-medium text-amber-100 transition hover:border-amber-400/70"
+                            className="my-listings-row__action-btn my-listings-row__action-btn--amber"
                           >
                             Review Incoming Offers
                           </button>
-                          <p className="min-w-0 text-xs text-amber-100/90 break-words">
+                          <p className="my-listings-row__actions-hint">
                             Sorted by highest cash offer first
                           </p>
                         </div>
                       ) : (
-                        <p className="text-sm text-slate-500">No pending offers yet</p>
+                        <p className="my-listings-row__no-offers">No pending offers yet</p>
                       )}
                     </div>
                   </div>
