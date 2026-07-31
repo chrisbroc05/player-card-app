@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
-import CardImage from "./CardImage";
+import CardImage from "../components/CardImage";
+import CardDetailHero from "./CardDetailHero";
 import { CARD_IMAGE_FRAME_DETAIL } from "../utils/cardImageStyles";
 
 export default function CardExpandModal({
@@ -32,7 +33,7 @@ export default function CardExpandModal({
 
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/88 p-8"
+      className="card-expand-modal fixed inset-0 z-[80] flex items-center justify-center bg-black/88 p-6"
       role="dialog"
       aria-modal="true"
       aria-label="Full size card preview"
@@ -42,13 +43,7 @@ export default function CardExpandModal({
         className="flex h-full w-full max-h-[calc(100vh-64px)] max-w-[calc(100vw-64px)] items-center justify-center"
         onClick={(e) => e.stopPropagation()}
       >
-        <div
-          className="card-expand-modal__card relative aspect-[5/7] h-full w-auto max-w-full"
-          style={{
-            maxHeight: "calc(100vh - 64px)",
-            maxWidth: "min(calc(100vw - 64px), calc((100vh - 64px) * 5 / 7))",
-          }}
-        >
+        <CardDetailHero>
           <button
             type="button"
             onClick={(e) => {
@@ -70,12 +65,12 @@ export default function CardExpandModal({
             variant="detail"
             forcePlay
             showInfoBanner
-            frameClassName={`${CARD_IMAGE_FRAME_DETAIL} h-full w-full max-h-full`}
+            frameClassName={CARD_IMAGE_FRAME_DETAIL}
             protectMedia={protectMedia}
             useOwnerVideoProxy={useOwnerVideoProxy}
             token={token}
           />
-        </div>
+        </CardDetailHero>
       </div>
     </div>
   );

@@ -55,9 +55,11 @@ export default function CardDisplay({
     ? `${highlightStyles.mediaClass} card-player-vignette relative h-full w-full overflow-hidden`
     : "card-player-vignette relative h-full w-full overflow-hidden";
 
+  const shellRadiusClass = size === "detail" ? "card-shell--detail rounded-[16px]" : "rounded-[12px]";
+
   return (
     <div
-      className={`relative flex w-full min-w-0 flex-col overflow-hidden rounded-[12px] ${CARD_ASPECT_CLASS} ${frameClasses} ${className}`}
+      className={`card-shell relative flex w-full min-w-[200px] min-h-0 flex-col overflow-hidden ${shellRadiusClass} ${CARD_ASPECT_CLASS} ${frameClasses} ${className}`}
     >
       {isHighlight && highlightStyles?.themeKey && highlightStyles.themeKey !== "default" ? (
         <HighlightThemeDecor themeKey={highlightStyles.themeKey} />
@@ -67,8 +69,8 @@ export default function CardDisplay({
         <div className={`pointer-events-none absolute inset-0 z-[4] ${meta.themeOverlay}`} aria-hidden />
       ) : null}
 
-      <div className="card-shell__media relative z-[1] h-[72%] min-h-0 w-full shrink-0 overflow-hidden">
-        <div className={mediaWrapperClass}>
+      <div className="card-shell__media relative z-[1] flex min-h-0 w-full flex-1 flex-col overflow-hidden">
+        <div className={`${mediaWrapperClass} h-full min-h-0 w-full flex-1`}>
           {children}
           {!isHighlight ? (
             <div className="card-player-inner-border pointer-events-none absolute inset-0" aria-hidden />
@@ -97,33 +99,25 @@ export default function CardDisplay({
       </div>
 
       <div
-        className={`card-shell__banner relative z-[2] flex h-[28%] min-h-[5rem] shrink-0 flex-col justify-between ${bannerStyles.bannerClass} ${sizeClass}`}
+        className={`card-shell__banner relative z-[2] flex shrink-0 flex-col justify-between ${bannerStyles.bannerClass} ${sizeClass}`}
       >
-        <div className="card-banner__body flex min-h-0 flex-1 flex-col justify-center text-center">
+        <div className="card-banner__body flex flex-col justify-center text-center">
           <p
             className={`card-banner__name ${bannerStyles.nameClass} ${nameModifier}`.trim()}
           >
             {meta.playerName}
           </p>
-          {meta.team ? (
-            <p className={`card-banner__team ${bannerStyles.teamClass}`}>{meta.team}</p>
-          ) : null}
-          {meta.statsLine ? (
-            <p className={`card-banner__stats ${bannerStyles.statsClass}`}>{meta.statsLine}</p>
-          ) : null}
+          <p className={`card-banner__team ${bannerStyles.teamClass}`}>{meta.team || "\u00A0"}</p>
+          <p className={`card-banner__stats ${bannerStyles.statsClass}`}>{meta.statsLine || "\u00A0"}</p>
         </div>
 
         <div className="card-banner__footer shrink-0">
           <span className={`card-banner__tier-pill ${bannerStyles.tierPillClass}`}>
             {bannerStyles.tierPillLabel}
           </span>
-          {bannerStyles.themeLabel ? (
-            <span className={`card-banner__theme ${bannerStyles.themeClass}`}>
-              {bannerStyles.themeLabel}
-            </span>
-          ) : (
-            <span className="card-banner__theme card-banner__theme--empty" aria-hidden />
-          )}
+          <span className={`card-banner__theme ${bannerStyles.themeClass}`}>
+            {bannerStyles.themeLabel || "\u00A0"}
+          </span>
           <span className={`card-banner__edition ${bannerStyles.editionClass}`}>{meta.edition}</span>
         </div>
       </div>

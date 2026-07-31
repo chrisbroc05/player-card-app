@@ -4,7 +4,7 @@ import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import { API_BASE_URL, authHeaders } from "../config/api";
 import CardImage from "../components/CardImage";
-import ExpandableCardView from "../components/ExpandableCardView";
+import CardDetailHero from "../components/CardDetailHero";
 import ShareCard from "../components/ShareCard";
 import SendCard from "../components/SendCard";
 import MarketplaceListingActions from "../components/MarketplaceListingActions";
@@ -207,7 +207,7 @@ export default function CardDetailPage() {
     <div className="min-h-screen overflow-x-hidden bg-appBg text-slate-100">
       <AppHeader />
 
-      <main className="mx-auto w-full max-w-4xl px-3 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto w-full max-w-4xl px-6 py-8">
         <Link
           to={user ? "/my-collection" : "/"}
           className="mb-6 inline-flex items-center text-sm text-slate-400 transition hover:text-white"
@@ -225,29 +225,19 @@ export default function CardDetailPage() {
           </div>
         ) : (
           <div className="animate-fadeUp">
-            <div className={`mx-auto max-w-lg ${badge?.glow ?? ""}`}>
-              <ExpandableCardView
+            <CardDetailHero className={badge?.glow ?? ""}>
+              <CardImage
                 card={card}
                 alt={card.player_name}
                 cacheBust={card.created_at}
+                frameClassName={CARD_IMAGE_FRAME_DETAIL}
+                variant="detail"
+                forcePlay={isHighlightCard(card) || (isOwner && isAnimatedCard(card))}
                 protectMedia={!isOwner && isAnimatedCard(card)}
                 useOwnerVideoProxy={isOwner && isAnimatedCard(card)}
                 token={token || ""}
-                showHint
-              >
-                <CardImage
-                  card={card}
-                  alt={card.player_name}
-                  cacheBust={card.created_at}
-                  frameClassName={CARD_IMAGE_FRAME_DETAIL}
-                  variant="detail"
-                  forcePlay={isHighlightCard(card) || (isOwner && isAnimatedCard(card))}
-                  protectMedia={!isOwner && isAnimatedCard(card)}
-                  useOwnerVideoProxy={isOwner && isAnimatedCard(card)}
-                  token={token || ""}
-                />
-              </ExpandableCardView>
-            </div>
+              />
+            </CardDetailHero>
 
             <div className="mx-auto mt-10 max-w-xl space-y-6 text-center sm:text-left">
               {card.animation_motion ? (

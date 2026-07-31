@@ -64,7 +64,7 @@ export default function AnimateCardModal({ card, open, onClose, onConfirm, busy,
             unchanged.
           </p>
 
-          <div className="mx-auto mt-4 max-w-[140px]">
+          <div className="mx-auto mt-4 min-w-[200px] max-w-[200px]">
             <CardImage
               card={card}
               alt={card.player_name}

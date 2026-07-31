@@ -2,11 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { API_BASE_URL, authHeaders, toApiUrl } from "../config/api";
 import {
   CARD_IMAGE_MEDIA_CLASS,
+  CARD_IMAGE_MEDIA_DETAIL,
   CARD_VIDEO_CLASS,
   CARD_VIDEO_DETAIL_WRAPPER,
   CARD_VIDEO_WRAPPER_OVERLAY,
 } from "../utils/cardImageStyles";
-import { cardDisplaySizeFromFrame } from "../utils/cardTemplate";
 import { isAnimatedCard, isAnimationInProgress } from "../utils/animationCard";
 import {
   highlightVideoUrl,
@@ -264,7 +264,13 @@ export default function CardImage({
   const videoMuted = highlightActive && isDetail ? highlightMuted : true;
 
   const protectedMediaClass = protectMedia ? "card-media-protected" : "";
-  const imgClass = [CARD_IMAGE_MEDIA_CLASS, protectedMediaClass, className].filter(Boolean).join(" ");
+  const imgClass = [
+    isDetail ? CARD_IMAGE_MEDIA_DETAIL : CARD_IMAGE_MEDIA_CLASS,
+    protectedMediaClass,
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
   const videoClass = [CARD_VIDEO_CLASS, protectedMediaClass, className].filter(Boolean).join(" ");
 
   const mediaProtectionProps = protectMedia
@@ -274,12 +280,7 @@ export default function CardImage({
       }
     : {};
 
-  const displaySize =
-    infoBannerVariant === "compact"
-      ? "compact"
-      : variant === "detail"
-        ? "detail"
-        : cardDisplaySizeFromFrame(frameClassName);
+  const displaySize = variant === "detail" ? "detail" : "default";
 
   const useTemplate =
     showInfoBanner !== false &&

@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import CardImage from "../components/CardImage";
+import CardDetailHero from "../components/CardDetailHero";
 import TradeCardPicker from "../components/TradeCardPicker";
 import { API_BASE_URL } from "../config/api";
 import { useAuth } from "../context/AuthContext";
@@ -224,7 +225,7 @@ export default function MarketplaceCardDetailPage() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-appBg text-slate-100">
       <AppHeader />
-      <main className="mx-auto w-full max-w-4xl px-3 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto w-full max-w-4xl px-6 py-8">
         <Link to="/marketplace" className="text-sm text-neonTeal hover:text-teal-200">
           &larr; Back to Free Agency Marketplace
         </Link>
@@ -237,7 +238,7 @@ export default function MarketplaceCardDetailPage() {
           <div className="mt-8 rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-6 text-sm text-rose-100">{error}</div>
         ) : listing ? (
           <div className="mt-8 grid gap-8 lg:grid-cols-2">
-            <div className={`rounded-2xl border border-white/10 bg-cardBg p-3 ${badge?.glow || ""}`}>
+            <CardDetailHero className={badge?.glow || ""}>
               <CardImage
                 card={listing}
                 alt={listing.player_name}
@@ -248,7 +249,7 @@ export default function MarketplaceCardDetailPage() {
                 useOwnerVideoProxy={isOwner && isAnimatedCard(listing)}
                 token={token || ""}
               />
-            </div>
+            </CardDetailHero>
             <div className="space-y-4">
               <div>
               <p className="font-mono text-sm text-neonTeal/90">{listing.card_id}</p>

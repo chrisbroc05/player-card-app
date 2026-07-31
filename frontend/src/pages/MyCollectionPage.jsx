@@ -354,7 +354,7 @@ export default function MyCollectionPage() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {displayRows.map(({ card, stackCount }) => {
               const badge = vaultTierBadge(card.tier);
               const pending = (card.status || "active") === "pending_trade";

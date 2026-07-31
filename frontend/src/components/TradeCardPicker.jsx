@@ -174,7 +174,7 @@ export default function TradeCardPicker({
             </p>
           ) : null}
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-2">
             {visibleCards.map((card) => {
               const selectable = isTradeSelectable(card, excludeSet);
               const selected = selectedSet.has((card.card_id || "").toUpperCase());
