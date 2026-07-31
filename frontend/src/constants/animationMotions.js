@@ -29,8 +29,9 @@ export const ANIMATION_MOTION_CATEGORIES = [
 ];
 
 export function motionLabel(motionId) {
-  if (!motionId) return "";
-  return ANIMATION_MOTION_LABELS[motionId] || motionId.replace(/_/g, " ");
+  if (motionId == null || motionId === "") return "";
+  const key = String(motionId);
+  return ANIMATION_MOTION_LABELS[key] || key.replace(/_/g, " ");
 }
 
 export function groupMotionsByCategory(motions) {

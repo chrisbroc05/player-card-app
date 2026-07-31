@@ -354,7 +354,7 @@ export default function MyCollectionPage() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {displayRows.map(({ card, stackCount }) => {
               const badge = vaultTierBadge(card.tier);
               const pending = (card.status || "active") === "pending_trade";
@@ -374,6 +374,7 @@ export default function MyCollectionPage() {
                       cacheBust={card.created_at}
                       frameClassName={`${cardMediaFrameClass(card)} w-full`}
                       playOnHover
+                      showInfoBanner
                     />
                     {stackCount ? (
                       <span className="absolute left-2 top-2 z-10 rounded-md border border-white/15 bg-black/70 px-2 py-0.5 text-[11px] font-semibold text-slate-200 backdrop-blur-sm">

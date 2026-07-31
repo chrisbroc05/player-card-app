@@ -81,40 +81,59 @@ function highlightThemeBadge(themeKey) {
   }
 }
 
+const ROOKIE_HIGHLIGHT_DEFAULTS = {
+  tierKey: "rookie",
+  themeKey: "default",
+  frameClass: "highlight-card highlight-card--rookie",
+  bannerClass: "highlight-card__banner highlight-card__banner--rookie",
+  mediaClass: "highlight-card__media highlight-card__media--rookie",
+  tierBadgeLabel: "ROOKIE",
+  tierBadgeClass: "highlight-card__tier-badge highlight-card__tier-badge--rookie",
+  playerNameClass: "highlight-card__player-name highlight-card__player-name--rookie",
+  themeBadge: null,
+  themeBannerLabel: "",
+};
+
 /**
  * CSS-only tier + theme classes for highlight cards.
  * Video area stays clean — border, banner, and rim light only.
  */
 export function getHighlightCardStyles(tier, theme) {
-  const tierKey = normalizeTierKey(tier);
-  const themeKey = normalizeHighlightThemeKey(theme);
+  try {
+    const tierKey = normalizeTierKey(tier);
+    const themeKey = normalizeHighlightThemeKey(theme);
 
-  const frameClass = [
-    "highlight-card",
-    `highlight-card--${tierKey}`,
-    themeKey !== "default" ? `highlight-card--theme-${themeKey}` : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+    const frameClass = [
+      "highlight-card",
+      `highlight-card--${tierKey}`,
+      themeKey !== "default" ? `highlight-card--theme-${themeKey}` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
 
-  const bannerClass = [
-    "highlight-card__banner",
-    `highlight-card__banner--${tierKey}`,
-    themeKey !== "default" ? `highlight-card__banner--theme-${themeKey}` : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+    const bannerClass = [
+      "highlight-card__banner",
+      `highlight-card__banner--${tierKey}`,
+      themeKey !== "default" ? `highlight-card__banner--theme-${themeKey}` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
 
-  return {
-    tierKey,
-    themeKey,
-    frameClass,
-    bannerClass,
-    mediaClass: `highlight-card__media highlight-card__media--${tierKey}`,
-    tierBadgeLabel: highlightTierBadgeLabel(tierKey),
-    tierBadgeClass: `highlight-card__tier-badge highlight-card__tier-badge--${tierKey}`,
-    playerNameClass: `highlight-card__player-name highlight-card__player-name--${tierKey}`,
-    themeBadge: highlightThemeBadge(themeKey),
-    themeBannerLabel: highlightThemeBannerLabel(theme),
-  };
+    return {
+      tierKey,
+      themeKey,
+      frameClass,
+      bannerClass,
+      mediaClass: `highlight-card__media highlight-card__media--${tierKey}`,
+      tierBadgeLabel: highlightTierBadgeLabel(tierKey),
+      tierBadgeClass: `highlight-card__tier-badge highlight-card__tier-badge--${tierKey}`,
+      playerNameClass: `highlight-card__player-name highlight-card__player-name--${tierKey}`,
+      themeBadge: highlightThemeBadge(themeKey),
+      themeBannerLabel: highlightThemeBannerLabel(theme),
+    };
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn("[getHighlightCardStyles] fallback to rookie styling", err);
+    return { ...ROOKIE_HIGHLIGHT_DEFAULTS };
+  }
 }

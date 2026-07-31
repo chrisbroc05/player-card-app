@@ -44,22 +44,28 @@ export default function CardDisplay({
   const bannerStyles = getCardBannerStyles(tier, theme);
   const highlightStyles = isHighlight ? getHighlightCardStyles(tier, theme) : null;
   const frame = tierFrameStyles(tier);
-  const nameModifier = bannerNameModifier(meta.playerName);
-  const sizeClass = `card-banner--size-${size}`;
+  const bannerSize = size === "detail" || size === "compact" || size === "thumb" ? size : "default";
+  const sizeClass = `card-banner--size-${bannerSize}`;
+  const nameModifier = bannerNameModifier(meta.playerName, bannerSize);
+
+  const highlightFrameClass =
+    highlightStyles?.frameClass || "highlight-card highlight-card--rookie";
+  const highlightMediaClass =
+    highlightStyles?.mediaClass || "highlight-card__media highlight-card__media--rookie";
 
   const frameClasses = isHighlight
-    ? `${highlightStyles.frameClass} bg-black`
+    ? `${highlightFrameClass} bg-black`
     : `${frame.borderClass} ${frame.glowClass} ${frame.bgClass}`;
 
   const mediaWrapperClass = isHighlight
-    ? `${highlightStyles.mediaClass} card-player-vignette relative h-full w-full overflow-hidden`
+    ? `${highlightMediaClass} card-player-vignette relative h-full w-full overflow-hidden`
     : "card-player-vignette relative h-full w-full overflow-hidden";
 
   const shellRadiusClass = size === "detail" ? "card-shell--detail rounded-[16px]" : "rounded-[12px]";
 
   return (
     <div
-      className={`card-shell relative flex w-full min-w-[200px] min-h-0 flex-col overflow-hidden ${shellRadiusClass} ${CARD_ASPECT_CLASS} ${frameClasses} ${className}`}
+      className={`card-shell relative flex w-full min-w-[210px] min-h-0 flex-col overflow-hidden ${shellRadiusClass} ${CARD_ASPECT_CLASS} ${frameClasses} ${className}`}
     >
       {isHighlight && highlightStyles?.themeKey && highlightStyles.themeKey !== "default" ? (
         <HighlightThemeDecor themeKey={highlightStyles.themeKey} />

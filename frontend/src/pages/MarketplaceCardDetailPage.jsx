@@ -10,7 +10,8 @@ import { useAuth } from "../context/AuthContext";
 import { useNewCardCelebration } from "../context/NewCardCelebrationContext";
 import { authFetch, formatApiError } from "../utils/authFetch";
 import { computeRoyaltyPreview, formatMoney, listedAgeLabel, listingExpiresSubtextClass, cashOfferButtonLabel } from "../utils/marketplace";
-import { motionLabel } from "../constants/animationMotions";
+import ErrorBoundary from "../components/ErrorBoundary";
+import { normalizeCardForDisplay, safeMotionLabel } from "../utils/cardDetailUtils";
 import { isAnimatedCard } from "../utils/animationCard";
 import { isHighlightCard } from "../utils/highlightCard";
 import { isCardOwner } from "../utils/cardOwnership";
@@ -95,8 +96,9 @@ export default function MarketplaceCardDetailPage() {
   }, [user, token, listing]);
 
   const royaltyPreview = computeRoyaltyPreview(offerAmount);
-  const badge = listing ? vaultTierBadge(listing.tier) : null;
-  const isOwner = isCardOwner(listing, user);
+  const displayListing = listing ? normalizeCardForDisplay(listing) : null;
+  const badge = displayListing ? vaultTierBadge(displayListing?.tier ?? "rookie") : null;
+  const isOwner = isCardOwner(displayListing, user);
 
   async function handleSubmitOffer(e, forcedCashAmount = null, forcedMessage = null, isBuyAtAsking = false) {
     e?.preventDefault?.();
@@ -238,30 +240,41 @@ export default function MarketplaceCardDetailPage() {
           <div className="mt-8 rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-6 text-sm text-rose-100">{error}</div>
         ) : listing ? (
           <div className="mt-8 grid gap-8 lg:grid-cols-2">
-            <CardDetailHero className={badge?.glow || ""}>
-              <CardImage
-                card={listing}
-                alt={listing.player_name}
-                frameClassName={CARD_IMAGE_FRAME_DETAIL}
-                variant="detail"
-                forcePlay={isHighlightCard(listing) || (isOwner && isAnimatedCard(listing))}
-                protectMedia={!isOwner && isAnimatedCard(listing)}
-                useOwnerVideoProxy={isOwner && isAnimatedCard(listing)}
-                token={token || ""}
-              />
-            </CardDetailHero>
+            <ErrorBoundary
+              cardId={displayListing?.card_id || cardId}
+              backTo="/marketplace"
+              title="Unable to load listing preview."
+            >
+              <CardDetailHero className={badge?.glow || ""}>
+                <CardImage
+                  card={displayListing}
+                  alt={displayListing?.player_name || "Card"}
+                  frameClassName={CARD_IMAGE_FRAME_DETAIL}
+                  variant="detail"
+                  forcePlay={
+                    isHighlightCard(displayListing) ||
+                    (isOwner && isAnimatedCard(displayListing))
+                  }
+                  protectMedia={!isOwner && isAnimatedCard(displayListing)}
+                  useOwnerVideoProxy={isOwner && isAnimatedCard(displayListing)}
+                  token={token || ""}
+                />
+              </CardDetailHero>
+            </ErrorBoundary>
             <div className="space-y-4">
               <div>
-              <p className="font-mono text-sm text-neonTeal/90">{listing.card_id}</p>
-              {listing.animation_motion ? (
-                <p className="mt-2 text-sm text-slate-500">Motion: {motionLabel(listing.animation_motion)}</p>
+              <p className="font-mono text-sm text-neonTeal/90">{displayListing?.card_id}</p>
+              {displayListing?.animation_motion ? (
+                <p className="mt-2 text-sm text-slate-500">
+                  Motion: {safeMotionLabel(displayListing.animation_motion)}
+                </p>
               ) : null}
               <div className="mt-2 flex flex-wrap gap-2">
                 <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[11px] text-slate-300">
-                  {rarityDisplay(listing.rarity)}
+                  {rarityDisplay(displayListing?.rarity)}
                 </span>
-                {isAnimatedCard(listing) ? <AnimatedBadge /> : null}
-                {isHighlightCard(listing) ? <HighlightBadge /> : null}
+                {isAnimatedCard(displayListing) ? <AnimatedBadge /> : null}
+                {isHighlightCard(displayListing) ? <HighlightBadge /> : null}
               </div>
               <p className="mt-3 text-3xl font-bold text-neonTeal">{formatMoney(listing.asking_price)}</p>
               {listing.days_remaining != null && listing.listing_expires_at ? (

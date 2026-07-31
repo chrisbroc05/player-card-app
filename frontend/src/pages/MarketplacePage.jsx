@@ -151,8 +151,8 @@ function MarketplaceBrowseLayout({
 }) {
   const isListView = viewMode === "list";
   const listingGridClass = isListView
-    ? "grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-5 sm:grid-cols-2 lg:grid-cols-3"
-    : "grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3 md:gap-4";
+    ? "grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-5 sm:grid-cols-2 lg:grid-cols-3"
+    : "grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-3 md:gap-4";
   return (
     <div className="min-h-screen overflow-x-hidden bg-appBg text-slate-100">
       <AppHeader />

@@ -1191,6 +1191,10 @@ class CardVaultSummary(BaseModel):
 
     card_id: str
     player_name: str
+    team_name: str = Field(default="", max_length=200)
+    position: str = Field(default="", max_length=80)
+    jersey_number: str = Field(default="", max_length=20)
+    grad_year: int = Field(default=2000, ge=1900, le=2100)
     tier: str
     theme: str
     rarity: str

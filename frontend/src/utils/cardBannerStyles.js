@@ -45,37 +45,57 @@ export function tierPillLabel(tierKey) {
   return "ROOKIE";
 }
 
-export function bannerNameModifier(playerName) {
-  return String(playerName || "").trim().length > 18 ? "card-banner__name--long" : "";
+export function bannerNameModifier(playerName, size = "default") {
+  const len = String(playerName || "").trim().length;
+  if (size === "detail") return len > 20 ? "card-banner__name--long" : "";
+  return len > 22 ? "card-banner__name--long" : "";
 }
 
 /** Unified tier + theme banner classes for all card types */
 export function getCardBannerStyles(tier, theme) {
-  const tierKey = normalizeTierKey(tier);
-  const themeKey = normalizeHighlightThemeKey(theme);
+  try {
+    const tierKey = normalizeTierKey(tier);
+    const themeKey = normalizeHighlightThemeKey(theme);
 
-  return {
-    tierKey,
-    themeKey,
-    bannerClass: [
-      "card-banner",
-      `card-banner--${tierKey}`,
-      themeKey !== "default" ? `card-banner--theme-${themeKey}` : "",
-    ]
-      .filter(Boolean)
-      .join(" "),
-    nameClass: `card-banner__name card-banner__name--${tierKey}`,
-    teamClass: `card-banner__team card-banner__team--${tierKey}`,
-    statsClass: `card-banner__stats card-banner__stats--${tierKey}`,
-    tierPillClass: `card-banner__tier-pill card-banner__tier-pill--${tierKey}`,
-    tierPillLabel: tierPillLabel(tierKey),
-    themeClass: [
-      "card-banner__theme",
-      themeKey !== "default" ? `card-banner__theme--${themeKey}` : "",
-    ]
-      .filter(Boolean)
-      .join(" "),
-    themeLabel: themeDisplayLabel(theme),
-    editionClass: `card-banner__edition card-banner__edition--${tierKey}`,
-  };
+    return {
+      tierKey,
+      themeKey,
+      bannerClass: [
+        "card-banner",
+        `card-banner--${tierKey}`,
+        themeKey !== "default" ? `card-banner--theme-${themeKey}` : "",
+      ]
+        .filter(Boolean)
+        .join(" "),
+      nameClass: `card-banner__name card-banner__name--${tierKey}`,
+      teamClass: `card-banner__team card-banner__team--${tierKey}`,
+      statsClass: `card-banner__stats card-banner__stats--${tierKey}`,
+      tierPillClass: `card-banner__tier-pill card-banner__tier-pill--${tierKey}`,
+      tierPillLabel: tierPillLabel(tierKey),
+      themeClass: [
+        "card-banner__theme",
+        themeKey !== "default" ? `card-banner__theme--${themeKey}` : "",
+      ]
+        .filter(Boolean)
+        .join(" "),
+      themeLabel: themeDisplayLabel(theme),
+      editionClass: `card-banner__edition card-banner__edition--${tierKey}`,
+    };
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn("[getCardBannerStyles] fallback to rookie styling", err);
+    return {
+      tierKey: "rookie",
+      themeKey: "default",
+      bannerClass: "card-banner card-banner--rookie",
+      nameClass: "card-banner__name card-banner__name--rookie",
+      teamClass: "card-banner__team card-banner__team--rookie",
+      statsClass: "card-banner__stats card-banner__stats--rookie",
+      tierPillClass: "card-banner__tier-pill card-banner__tier-pill--rookie",
+      tierPillLabel: "ROOKIE",
+      themeClass: "card-banner__theme",
+      themeLabel: "",
+      editionClass: "card-banner__edition card-banner__edition--rookie",
+    };
+  }
 }

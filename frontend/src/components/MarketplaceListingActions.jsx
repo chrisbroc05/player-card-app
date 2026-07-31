@@ -28,8 +28,8 @@ export default function MarketplaceListingActions({
   }, [priceNum, priorityBoost]);
 
   const isListed = Boolean(listingInfo);
-  const isPendingTrade = (card.status || "active") === "pending_trade";
-  const isActive = (card.status || "active") === "active";
+  const isPendingTrade = (card?.status || "active") === "pending_trade";
+  const isActive = (card?.status || "active") === "active";
 
   if (isPendingTrade || !isActive) return null;
 

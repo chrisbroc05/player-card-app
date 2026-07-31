@@ -174,7 +174,7 @@ export default function TradeCardPicker({
             </p>
           ) : null}
 
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-2">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-2">
             {visibleCards.map((card) => {
               const selectable = isTradeSelectable(card, excludeSet);
               const selected = selectedSet.has((card.card_id || "").toUpperCase());
@@ -199,6 +199,7 @@ export default function TradeCardPicker({
                     alt={card.player_name}
                     frameClassName={cardMediaFrameClass(card, { thumb: true })}
                     playOnHover={cardPlaysVideoOnHover(card)}
+                    showInfoBanner
                     infoBannerVariant="compact"
                   />
                   <p className="truncate font-mono text-[9px] text-slate-500">{card.card_id}</p>

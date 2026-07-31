@@ -66,8 +66,8 @@ export function resolveCardDisplayMeta(card) {
   const position = (card.position || "").trim();
   const jersey = (card.jersey_number ?? card.jerseyNumber ?? "").toString().trim();
   const gradYear = (card.grad_year ?? card.gradYear ?? "").toString().trim();
-  const tier = card.tier || "rookie";
-  const theme = card.theme || card.special_theme || card.specialTheme || "";
+  const tier = card.tier || card.card_tier || "rookie";
+  const theme = card.theme || card.special_theme || card.specialTheme || "standard";
   const edition = formatBannerEdition(card.edition_number, card.print_run);
   const badge = vaultTierBadge(tier);
 

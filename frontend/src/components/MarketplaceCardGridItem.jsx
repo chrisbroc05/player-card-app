@@ -33,6 +33,7 @@ export default function MarketplaceCardGridItem({ listing, variant = "list", cur
             playOnHover
             showAnimatedBadge={false}
             showHighlightBadge={false}
+            showInfoBanner
             infoBannerVariant="compact"
           />
           <div className="pointer-events-none absolute left-1 top-1 z-10 flex max-w-[calc(100%-0.5rem)] flex-col items-start gap-1">
@@ -68,6 +69,7 @@ export default function MarketplaceCardGridItem({ listing, variant = "list", cur
           playOnHover
           showAnimatedBadge={false}
           showHighlightBadge={false}
+          showInfoBanner
         />
         <div className="pointer-events-none absolute left-2 top-2 z-10 flex max-w-[calc(100%-1rem)] flex-col items-start gap-1">
           <UserOfferBadge listing={listing} currentUserId={currentUserId} />

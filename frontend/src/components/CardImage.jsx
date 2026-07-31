@@ -15,6 +15,7 @@ import {
   isHighlightType,
 } from "../utils/highlightCard";
 import { useIsMobileViewport } from "../hooks/usePrefersReducedMotion";
+import { normalizeCardForDisplay } from "../utils/cardDetailUtils";
 import CardDisplay from "./CardDisplay";
 import HighlightVideoPlayer from "./HighlightVideoPlayer";
 
@@ -64,9 +65,9 @@ function ProtectedMediaShell({ protectMedia, children }) {
 }
 
 function buildSyntheticCard(card, imageUrl) {
-  if (card && typeof card === "object") return card;
+  if (card && typeof card === "object") return normalizeCardForDisplay(card);
   if (!imageUrl) return null;
-  return { image_url: imageUrl, player_name: "Player" };
+  return normalizeCardForDisplay({ image_url: imageUrl, player_name: "Player" });
 }
 
 function HighlightProcessingPlaceholder() {
@@ -280,7 +281,14 @@ export default function CardImage({
       }
     : {};
 
-  const displaySize = variant === "detail" ? "detail" : "default";
+  const displaySize =
+    variant === "detail"
+      ? "detail"
+      : infoBannerVariant === "thumb"
+        ? "thumb"
+        : infoBannerVariant === "compact"
+          ? "compact"
+          : "default";
 
   const useTemplate =
     showInfoBanner !== false &&

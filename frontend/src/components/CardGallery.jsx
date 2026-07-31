@@ -2,7 +2,6 @@ import React from "react";
 import { Link } from "react-router-dom";
 import CardImage from "./CardImage";
 import { CardSharePopover } from "./ShareCard";
-import { vaultTierBadge, formatEditionShort, rarityDisplay } from "../utils/tierStyles";
 import { cardMediaFrameClass, cardPlaysVideoOnHover } from "../utils/highlightCard";
 
 export default function CardGallery({ cards }) {
@@ -18,9 +17,8 @@ export default function CardGallery({ cards }) {
           <p className="text-sm text-slate-400">No generated cards yet.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {cards.map((card) => {
-            const badge = vaultTierBadge(card.tier);
             const key = card.card_id || card.id;
             const videoCard = cardPlaysVideoOnHover(card);
             return (
@@ -41,21 +39,12 @@ export default function CardGallery({ cards }) {
                       cacheBust={card.created_at}
                       frameClassName={cardMediaFrameClass(card)}
                       playOnHover
+                      showInfoBanner
                     />
                   </Link>
                   <div className="absolute right-2 top-2">
                     <CardSharePopover card={card} />
                   </div>
-                </div>
-                <div className="mt-2 space-y-1 text-xs text-slate-300">
-                  <p className="font-medium text-slate-100">{card.player_name || "Player"}</p>
-                  <div className="flex flex-wrap gap-1">
-                    <span className={`rounded-full border px-2 py-0.5 text-[10px] ${badge.pill}`}>{badge.label}</span>
-                    <span className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] text-slate-400">
-                      {rarityDisplay(card.rarity)}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-500">{formatEditionShort(card.edition_number, card.print_run)}</p>
                 </div>
               </article>
             );

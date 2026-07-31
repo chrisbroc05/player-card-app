@@ -834,6 +834,7 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .card-banner__team,
@@ -916,7 +917,7 @@
 .card-shell__banner.card-banner--size-default,
 .card-shell__banner.card-banner--size-compact,
 .card-shell__banner.card-banner--size-thumb {
-  min-height: 90px;
+  min-height: 100px;
 }
 
 .card-shell__banner.card-banner--size-detail {
@@ -1076,6 +1077,7 @@
   font-family: "Cinzel", serif;
   font-size: 17px;
   font-weight: 700;
+  font-style: italic;
   letter-spacing: 1.5px;
   color: #f0d060;
 }
@@ -1089,6 +1091,7 @@
   font-family: "Cinzel", serif;
   font-size: 11px;
   font-weight: 400;
+  font-style: italic;
   color: #b89840;
   letter-spacing: 2px;
 }
@@ -1124,30 +1127,22 @@
 
 .card-banner--size-default .card-banner__name--rookie,
 .card-banner--size-compact .card-banner__name--rookie,
-.card-banner--size-thumb .card-banner__name--rookie {
-  font-size: 15px;
-  letter-spacing: 1.5px;
-}
-
+.card-banner--size-thumb .card-banner__name--rookie,
 .card-banner--size-default .card-banner__name--allstar,
 .card-banner--size-compact .card-banner__name--allstar,
-.card-banner--size-thumb .card-banner__name--allstar {
-  font-size: 15px;
-  letter-spacing: 1px;
-}
-
+.card-banner--size-thumb .card-banner__name--allstar,
 .card-banner--size-default .card-banner__name--legends,
 .card-banner--size-compact .card-banner__name--legends,
 .card-banner--size-thumb .card-banner__name--legends {
-  font-size: 15px;
+  font-size: 16px;
   letter-spacing: 1px;
 }
 
 .card-banner--size-default .card-banner__name--long,
 .card-banner--size-compact .card-banner__name--long,
 .card-banner--size-thumb .card-banner__name--long {
-  font-size: 15px;
-  letter-spacing: 1px;
+  font-size: 14px;
+  letter-spacing: 0.5px;
 }
 
 .card-banner--size-default .card-banner__team--rookie,
@@ -1155,15 +1150,12 @@
 .card-banner--size-compact .card-banner__team--rookie,
 .card-banner--size-compact .card-banner__team--allstar,
 .card-banner--size-thumb .card-banner__team--rookie,
-.card-banner--size-thumb .card-banner__team--allstar {
-  font-size: 11px;
-  letter-spacing: 1px;
-}
-
+.card-banner--size-thumb .card-banner__team--allstar,
 .card-banner--size-default .card-banner__team--legends,
 .card-banner--size-compact .card-banner__team--legends,
 .card-banner--size-thumb .card-banner__team--legends {
   font-size: 11px;
+  letter-spacing: 1px;
 }
 
 .card-banner--size-default .card-banner__stats--rookie,
@@ -1202,32 +1194,32 @@
 .card-banner--size-detail .card-banner__name--rookie,
 .card-banner--size-detail .card-banner__name--allstar,
 .card-banner--size-detail .card-banner__name--legends {
-  font-size: 24px;
+  font-size: 22px;
   letter-spacing: 1.5px;
 }
 
 .card-banner--size-detail .card-banner__name--long {
-  font-size: 20px !important;
+  font-size: 18px !important;
   letter-spacing: 1px;
 }
 
 .card-banner--size-detail .card-banner__team--rookie,
 .card-banner--size-detail .card-banner__team--allstar,
 .card-banner--size-detail .card-banner__team--legends {
-  font-size: 14px;
+  font-size: 13px;
   letter-spacing: 1.5px;
 }
 
 .card-banner--size-detail .card-banner__stats--rookie,
 .card-banner--size-detail .card-banner__stats--allstar,
 .card-banner--size-detail .card-banner__stats--legends {
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .card-banner--size-detail .card-banner__tier-pill,
 .card-banner--size-detail .card-banner__edition,
 .card-banner--size-detail .card-banner__theme {
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .card-banner--size-detail .card-banner__tier-pill {

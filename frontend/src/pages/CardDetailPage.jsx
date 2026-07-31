@@ -11,14 +11,15 @@ import MarketplaceListingActions from "../components/MarketplaceListingActions";
 import { useAuth } from "../context/AuthContext";
 import CardHistoryTimeline from "../components/CardHistoryTimeline";
 import { vaultTierBadge, rarityDisplay } from "../utils/tierStyles";
-import { motionLabel } from "../constants/animationMotions";
 import { isAnimatedCard } from "../utils/animationCard";
 import { isHighlightCard } from "../utils/highlightCard";
 import { isCardOwner } from "../utils/cardOwnership";
 import AnimatedBadge from "../components/AnimatedBadge";
 import HighlightBadge from "../components/HighlightBadge";
+import ErrorBoundary from "../components/ErrorBoundary";
 import { CARD_IMAGE_FRAME_DETAIL } from "../utils/cardImageStyles";
 import { authFetch, formatApiError } from "../utils/authFetch";
+import { normalizeCardForDisplay, safeMotionLabel } from "../utils/cardDetailUtils";
 
 function formatCreatedAt(iso) {
   if (!iso) return "—";
@@ -57,7 +58,7 @@ export default function CardDetailPage() {
       const res = await fetch(`${API_BASE_URL}/cards/${encodeURIComponent(cardId)}`, {
         headers: { ...authHeaders(token) },
       });
-      if (res.ok) setCard(await res.json());
+      if (res.ok) setCard(normalizeCardForDisplay(await res.json()));
       const res2 = await fetch(`${API_BASE_URL}/cards/${encodeURIComponent(cardId)}/copies`);
       if (res2.ok) {
         const data = await res2.json();
@@ -85,7 +86,7 @@ export default function CardDetailPage() {
         }
         if (!res.ok) throw new Error("Could not load card.");
         const data = await res.json();
-        if (!cancelled) setCard(data);
+        if (!cancelled) setCard(normalizeCardForDisplay(data));
       } catch (e) {
         if (!cancelled) setError(e.message || "Failed to load.");
       } finally {
@@ -118,10 +119,11 @@ export default function CardDetailPage() {
     };
   }, [cardId]);
 
-  const badge = card ? vaultTierBadge(card.tier) : null;
+  const badge = card ? vaultTierBadge(card?.tier ?? "rookie") : null;
   const isOwner = isCardOwner(card, user);
   const showSendTrade = isOwner && (card?.status || "active") === "active";
   const showPendingTradePanel = isOwner && card?.status === "pending_trade";
+  const displayCard = card ? normalizeCardForDisplay(card) : null;
 
   const loadListingStatus = useCallback(async () => {
     if (!token || !card?.card_id || !isOwner) {
@@ -224,111 +226,130 @@ export default function CardDetailPage() {
             {error || "Card not found."}
           </div>
         ) : (
-          <div className="animate-fadeUp">
-            <CardDetailHero className={badge?.glow ?? ""}>
-              <CardImage
-                card={card}
-                alt={card.player_name}
-                cacheBust={card.created_at}
-                frameClassName={CARD_IMAGE_FRAME_DETAIL}
-                variant="detail"
-                forcePlay={isHighlightCard(card) || (isOwner && isAnimatedCard(card))}
-                protectMedia={!isOwner && isAnimatedCard(card)}
-                useOwnerVideoProxy={isOwner && isAnimatedCard(card)}
-                token={token || ""}
-              />
-            </CardDetailHero>
+          <ErrorBoundary cardId={displayCard?.card_id || cardId} backTo={user ? "/my-collection" : "/"}>
+            <div className="animate-fadeUp">
+              <CardDetailHero className={badge?.glow ?? ""}>
+                <CardImage
+                  card={displayCard}
+                  alt={displayCard?.player_name || "Card"}
+                  cacheBust={displayCard?.created_at}
+                  frameClassName={CARD_IMAGE_FRAME_DETAIL}
+                  variant="detail"
+                  forcePlay={
+                    isHighlightCard(displayCard) || (isOwner && isAnimatedCard(displayCard))
+                  }
+                  protectMedia={!isOwner && isAnimatedCard(displayCard)}
+                  useOwnerVideoProxy={isOwner && isAnimatedCard(displayCard)}
+                  token={token || ""}
+                />
+              </CardDetailHero>
 
-            <div className="mx-auto mt-10 max-w-xl space-y-6 text-center sm:text-left">
-              {card.animation_motion ? (
-                <p className="text-sm text-slate-400">
-                  Motion: <span className="text-violet-200">{motionLabel(card.animation_motion)}</span>
-                </p>
-              ) : null}
-              <div className="flex flex-wrap justify-center gap-2 sm:justify-start">
-                <span className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs text-slate-300">
-                  {rarityDisplay(card.rarity)}
-                </span>
-                {isAnimatedCard(card) ? <AnimatedBadge /> : null}
-                {isHighlightCard(card) ? <HighlightBadge /> : null}
-              </div>
-
-              <dl className="grid gap-3 rounded-2xl border border-white/10 bg-cardBg p-4 text-sm sm:grid-cols-2">
-                <div className="sm:col-span-2">
-                  <dt className="text-slate-500">Card ID</dt>
-                  <dd className="font-mono text-xs text-neonTeal">{card.card_id}</dd>
-                </div>
-                <div className="sm:col-span-2">
-                  <dt className="text-slate-500">Created</dt>
-                  <dd className="text-slate-200">{formatCreatedAt(card.created_at)}</dd>
-                </div>
-              </dl>
-
-              <CardHistoryTimeline cardId={card.card_id} />
-
-              {copies.length > 0 ? (
-                <div className="rounded-2xl border border-white/10 bg-cardBg p-4 sm:p-5">
-                  <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">Print Run</h2>
-                  <p className="mt-2 text-sm text-slate-200">
-                    This is card #{card.edition_number} of {card.print_run}
+              <div className="mx-auto mt-10 max-w-xl space-y-6 text-center sm:text-left">
+                {displayCard?.animation_motion ? (
+                  <p className="text-sm text-slate-400">
+                    Motion:{" "}
+                    <span className="text-violet-200">
+                      {safeMotionLabel(displayCard.animation_motion)}
+                    </span>
                   </p>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {copies.map((c) => {
-                      const isCurrent = copyRowMatchesRoute(c, cardId) || c.card_id === card.card_id;
-                      const slug = c.shareable_slug || c.card_id;
-                      return (
-                        <Link
-                          key={c.card_id}
-                          to={`/card/${encodeURIComponent(slug)}`}
-                          className={`inline-flex min-h-[32px] min-w-[2rem] items-center justify-center rounded-md border px-2 text-xs font-semibold transition ${
-                            isCurrent
-                              ? "border-[#ffd700] bg-[#ffd70022] text-[#ffd700]"
-                              : "border-[#2a2a2a] bg-[#1a1a1a] text-[#888888] hover:border-white/25 hover:text-slate-200"
-                          }`}
-                        >
-                          {c.edition_number}
-                        </Link>
-                      );
-                    })}
+                ) : null}
+                <div className="flex flex-wrap justify-center gap-2 sm:justify-start">
+                  <span className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs text-slate-300">
+                    {rarityDisplay(displayCard?.rarity)}
+                  </span>
+                  {isAnimatedCard(displayCard) ? <AnimatedBadge /> : null}
+                  {isHighlightCard(displayCard) ? <HighlightBadge /> : null}
+                </div>
+
+                <dl className="grid gap-3 rounded-2xl border border-white/10 bg-cardBg p-4 text-sm sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <dt className="text-slate-500">Card ID</dt>
+                    <dd className="font-mono text-xs text-neonTeal">{displayCard?.card_id}</dd>
                   </div>
+                  <div className="sm:col-span-2">
+                    <dt className="text-slate-500">Created</dt>
+                    <dd className="text-slate-200">{formatCreatedAt(displayCard?.created_at)}</dd>
+                  </div>
+                </dl>
+
+                <CardHistoryTimeline cardId={displayCard?.card_id} />
+
+                {copies.length > 0 ? (
+                  <div className="rounded-2xl border border-white/10 bg-cardBg p-4 sm:p-5">
+                    <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      Print Run
+                    </h2>
+                    <p className="mt-2 text-sm text-slate-200">
+                      This is card #{displayCard?.edition_number ?? 1} of{" "}
+                      {displayCard?.print_run ?? 1}
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {copies.map((c) => {
+                        const isCurrent =
+                          copyRowMatchesRoute(c, cardId) || c.card_id === displayCard?.card_id;
+                        const slug = c.shareable_slug || c.card_id;
+                        return (
+                          <Link
+                            key={c.card_id}
+                            to={`/card/${encodeURIComponent(slug)}`}
+                            className={`inline-flex min-h-[32px] min-w-[2rem] items-center justify-center rounded-md border px-2 text-xs font-semibold transition ${
+                              isCurrent
+                                ? "border-[#ffd700] bg-[#ffd70022] text-[#ffd700]"
+                                : "border-[#2a2a2a] bg-[#1a1a1a] text-[#888888] hover:border-white/25 hover:text-slate-200"
+                            }`}
+                          >
+                            {c.edition_number}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+
+                <ShareCard card={displayCard} sectionTitle="Share This Card" isOwner={isOwner} />
+
+                {showSendTrade ? <SendCard card={displayCard} onSent={refetchCard} /> : null}
+                {showPendingTradePanel ? (
+                  <SendCard card={displayCard} onCancelTrade={refetchCard} />
+                ) : null}
+                {isOwner && user ? (
+                  <section className="rounded-2xl border border-white/10 bg-cardBg p-4 sm:p-5">
+                    <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      Marketplace
+                    </h2>
+                    <p className="mt-2 text-sm text-slate-300">
+                      List this card for sale or remove it from the marketplace.
+                    </p>
+                    <MarketplaceListingActions
+                      card={displayCard}
+                      listingInfo={listingInfo}
+                      busy={marketplaceBusy}
+                      onList={listCardOnMarketplace}
+                      onUnlist={unlistCardFromMarketplace}
+                      showContainerDivider={false}
+                      className="mt-3"
+                      listButtonLabel="List on Marketplace"
+                      listedActionLabel={
+                        listingInfo
+                          ? `Listed at $${Number(listingInfo.asking_price || 0).toFixed(2)} — Unlist`
+                          : undefined
+                      }
+                      listedTagLabel={null}
+                    />
+                  </section>
+                ) : null}
+
+                <div className="flex justify-center sm:justify-start">
+                  <Link
+                    to={user ? "/my-collection" : "/"}
+                    className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-6 py-2.5 text-sm font-medium text-slate-100 transition hover:border-neonBlue/40 hover:text-white"
+                  >
+                    {user ? "Back to My Collection" : "Back to Studio"}
+                  </Link>
                 </div>
-              ) : null}
-
-              <ShareCard card={card} sectionTitle="Share This Card" isOwner={isOwner} />
-
-              {showSendTrade ? <SendCard card={card} onSent={refetchCard} /> : null}
-              {showPendingTradePanel ? <SendCard card={card} onCancelTrade={refetchCard} /> : null}
-              {isOwner && user ? (
-                <section className="rounded-2xl border border-white/10 bg-cardBg p-4 sm:p-5">
-                  <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">Marketplace</h2>
-                  <p className="mt-2 text-sm text-slate-300">
-                    List this card for sale or remove it from the marketplace.
-                  </p>
-                  <MarketplaceListingActions
-                    card={card}
-                    listingInfo={listingInfo}
-                    busy={marketplaceBusy}
-                    onList={listCardOnMarketplace}
-                    onUnlist={unlistCardFromMarketplace}
-                    showContainerDivider={false}
-                    className="mt-3"
-                    listButtonLabel="List on Marketplace"
-                    listedActionLabel={listingInfo ? `Listed at $${Number(listingInfo.asking_price || 0).toFixed(2)} — Unlist` : undefined}
-                    listedTagLabel={null}
-                  />
-                </section>
-              ) : null}
-
-              <div className="flex justify-center sm:justify-start">
-                <Link
-                  to={user ? "/my-collection" : "/"}
-                  className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-6 py-2.5 text-sm font-medium text-slate-100 transition hover:border-neonBlue/40 hover:text-white"
-                >
-                  {user ? "Back to My Collection" : "Back to Studio"}
-                </Link>
               </div>
             </div>
-          </div>
+          </ErrorBoundary>
         )}
       </main>
 
