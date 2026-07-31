@@ -39,7 +39,7 @@ import { fetchGenerationPrice } from "../utils/cardPricing";
 import { copyChargeForQuantity, normalizeCopyTiers } from "../utils/copyPricing";
 import { formatMoney } from "../utils/marketplace";
 import { scrollAfterPaint } from "../utils/smoothScroll";
-import { uploadHighlightClip } from "../utils/uploadHighlightClip";
+import { cleanupFailedHighlightCard, uploadHighlightClip } from "../utils/uploadHighlightClip";
 import { captureVideoFrameAsFile } from "../utils/highlightVideo";
 
 const STEP_DETAILS = 1;
@@ -1220,7 +1220,7 @@ export default function StudioPage() {
     return playerRes.json();
   }
 
-  async function uploadHighlightForCard(cardId) {
+  async function uploadHighlightForCard(cardId, { skipCelebration = false } = {}) {
     if (!isHighlightCardType || !highlightClipDraft?.confirmed || !highlightClipDraft?.file || !token) return;
     setHighlightUploadState("uploading");
     setHighlightUploadProgress(0);
@@ -1242,16 +1242,36 @@ export default function StudioPage() {
           : await fetchCardDetailById(cardId);
       setHighlightProcessingCardId("");
       setHighlightProcessingCard(null);
-      await showCelebration({
-        card: detail,
-        source: "created",
-        showAnimateUpsell: false,
-      });
+      if (!skipCelebration) {
+        await showCelebration({
+          card: detail,
+          source: "created",
+          showAnimateUpsell: false,
+        });
+      }
       return detail;
     } catch (err) {
       setHighlightUploadState("error");
-      setHighlightUploadError(err.message || "Could not upload highlight video.");
+      setHighlightUploadError(
+        err.message || "Something went wrong saving your highlight. Please try again."
+      );
       throw err;
+    }
+  }
+
+  async function retryHighlightUpload() {
+    const sel = previewCards.find((p) => p.image_url === (selectedPreviewUrl || generatedCardUrl));
+    const cardId = sel?.card_id;
+    if (!cardId) {
+      setHighlightUploadError("Select a preview card before retrying.");
+      return;
+    }
+    setError("");
+    try {
+      await uploadHighlightForCard(cardId, { skipCelebration: true });
+      setMessage("Highlight video saved. You can add the card to your collection.");
+    } catch {
+      /* uploadHighlightForCard sets highlightUploadError */
     }
   }
 
@@ -1534,7 +1554,16 @@ export default function StudioPage() {
     setOrderActionKey(`approve-${currentOrderId}`);
     setMessage("");
     setError("");
+    let cardId = null;
+    let approved = false;
     try {
+      const sel = previewCards.find((p) => p.image_url === (selectedPreviewUrl || generatedCardUrl));
+      cardId = sel?.card_id || null;
+
+      if (isHighlightCardType && cardId && highlightClipDraft?.confirmed) {
+        await uploadHighlightForCard(cardId, { skipCelebration: true });
+      }
+
       const res = await fetch(`${API_BASE_URL}/orders/${currentOrderId}/approve-preview`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders(token) },
@@ -1542,10 +1571,9 @@ export default function StudioPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(formatApiError(data?.detail, "Failed to add card to collection."));
+      approved = true;
       if (data.final_card_url) setGeneratedCardUrl(data.final_card_url);
 
-      const sel = previewCards.find((p) => p.image_url === (selectedPreviewUrl || generatedCardUrl));
-      const cardId = sel?.card_id;
       let addedCardDetail = null;
       if (cardId) addedCardDetail = await fetchCardDetailById(cardId);
 
@@ -1563,26 +1591,38 @@ export default function StudioPage() {
       }
 
       setMessage(`Order #${currentOrderId} completed and added to your collection.`);
-      await Promise.all([fetchOrders(), refreshUser(token)]);
+      await Promise.all([fetchMyCards(), fetchOrders(), refreshUser(token)]);
       setPendingSession(null);
       setShowPendingPrompt(false);
       setReviewSubPhase("approve");
       setPreviewConfigureOpen(false);
       setAnimatedSaveStaticFlow(false);
 
-      if (isHighlightCardType && cardId && highlightClipDraft?.confirmed) {
-        await uploadHighlightForCard(cardId);
-        return;
-      }
-
       if (cardId && addedCardDetail) {
         await showCelebration({
           card: addedCardDetail,
           source: "created",
+          showAnimateUpsell: !isHighlightCardType,
         });
       }
     } catch (err) {
-      setError(err.message || "Failed to add card to collection.");
+      if (isHighlightCardType && cardId && approved) {
+        try {
+          await cleanupFailedHighlightCard({ token, cardId });
+          await Promise.all([fetchMyCards(), refreshUser(token)]);
+        } catch {
+          /* best-effort cleanup if approve succeeded but a later step failed */
+        }
+      }
+      const highlightMsg =
+        err.message || "Something went wrong saving your highlight. Please try again.";
+      if (isHighlightCardType) {
+        setHighlightUploadState("error");
+        setHighlightUploadError(highlightMsg);
+        setError(highlightMsg);
+      } else {
+        setError(err.message || "Failed to add card to collection.");
+      }
     } finally {
       setAddCollectionLoading(false);
       setOrderActionKey("");
@@ -2289,7 +2329,20 @@ export default function StudioPage() {
                       <p className="text-sm font-medium text-teal-100">Highlight clip uploaded.</p>
                     ) : null}
                     {highlightUploadState === "error" ? (
-                      <p className="text-sm text-rose-200">{highlightUploadError}</p>
+                      <div className="grid gap-3">
+                        <p className="text-sm text-rose-200">
+                          {highlightUploadError ||
+                            "Something went wrong saving your highlight. Please try again."}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={retryHighlightUpload}
+                          disabled={Boolean(orderActionKey)}
+                          className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-rose-400/40 bg-rose-500/10 px-4 py-2 text-sm font-medium text-rose-100 disabled:opacity-50"
+                        >
+                          Retry highlight upload
+                        </button>
+                      </div>
                     ) : null}
                   </div>
                 ) : null}

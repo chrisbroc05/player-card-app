@@ -99,6 +99,28 @@ def get_balance(db: Session, user_id: int) -> Decimal:
     return _user_balance(user)
 
 
+def highlight_charge_to_refund(db: Session, user_id: int, card_id: str) -> Decimal:
+    """Return highlight fees still owed as a refund (positive amount)."""
+    ref = (card_id or "").strip()
+    if not ref:
+        return Decimal("0.00")
+    rows = (
+        db.query(CreditLedger)
+        .filter(
+            CreditLedger.user_id == user_id,
+            CreditLedger.reference_id == ref,
+            CreditLedger.transaction_type.in_([TX_HIGHLIGHT, TX_REFUND]),
+        )
+        .all()
+    )
+    net = Decimal("0.00")
+    for row in rows:
+        net += _decimal_amount(row.amount)
+    if net >= Decimal("0.00"):
+        return Decimal("0.00")
+    return abs(net)
+
+
 def add_credits(
     user_id: int,
     amount: Decimal | float,

@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import re
+import traceback
 from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
@@ -16,7 +18,16 @@ from animation_tasks import process_animation
 from card_pricing import animated_studio_total_price, animated_upgrade_price, generation_price_payload, highlight_card_price, normalize_order_tier
 from auth import get_current_user
 from card_repo import create_animated_upgrade_card, get_card_by_card_id, card_to_dict, highlight_fields_for_card
-from credit_service import InsufficientCreditsError, TX_ANIMATION, TX_HIGHLIGHT, deduct_credits
+from credit_service import (
+    InsufficientCreditsError,
+    TX_ANIMATION,
+    TX_HIGHLIGHT,
+    TX_REFUND,
+    add_credits,
+    deduct_credits,
+    get_balance,
+    highlight_charge_to_refund,
+)
 from highlight_service import MAX_HIGHLIGHT_UPLOAD_BYTES, validate_trim_range, validate_upload_duration
 from highlight_video_utils import video_extension_for_content_type
 from data.animation_motions import get_motion_by_id, is_motion_selectable, list_motions_public
@@ -27,6 +38,11 @@ from parent_email_utils import parent_email_for_notify
 from models import Card, MarketplaceOffer, TradeOffer, User, utcnow
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+HIGHLIGHT_UPLOAD_USER_MESSAGE = (
+    "Video upload failed. Your credits have not been charged. Please try again."
+)
 
 _CARD_ID_PATH_PATTERN = re.compile(r"^FL-(\d{4})-(\d{6})$", re.IGNORECASE)
 
@@ -58,7 +74,32 @@ def _highlights_dir() -> Path:
     base = (os.environ.get("APP_DATA_DIR") or "").strip() or "./data"
     path = Path(base).expanduser().resolve() / "highlights"
     path.mkdir(parents=True, exist_ok=True)
+    (path / "thumbnails").mkdir(parents=True, exist_ok=True)
     return path
+
+
+def _is_failed_highlight_card(card: Card) -> bool:
+    video_url = (card.highlight_video_url or "").strip()
+    status = (card.highlight_status or "").strip().lower()
+    image_url = (card.image_url or "").strip().lower()
+    if status == "failed":
+        return True
+    if card.is_highlight and not video_url:
+        return True
+    if "highlight-placeholder" in image_url and not video_url:
+        return True
+    return False
+
+
+def _delete_owned_card(db: Session, card: Card) -> str:
+    deleted_id = card.card_id
+    cancel_pending_marketplace_offers_for_card(db, card.card_id)
+    db.query(MarketplaceOffer).filter(MarketplaceOffer.card_id == card.card_id).delete(
+        synchronize_session=False
+    )
+    db.query(TradeOffer).filter(TradeOffer.card_id == card.id).delete(synchronize_session=False)
+    db.delete(card)
+    return deleted_id
 
 
 def _animation_video_path(card: Card) -> Path | None:
@@ -314,37 +355,44 @@ async def upload_card_highlight(
     current_user: User = Depends(get_current_user),
 ):
     """Save highlight video immediately — no server-side transcoding."""
-    card = _resolve_card(db, card_id)
-    if card.owner_id != current_user.id:
-        raise HTTPException(status_code=403, detail="You do not own this card")
-    if card.is_animated:
-        raise HTTPException(status_code=400, detail="Animated cards cannot use highlight upload")
-    if card.highlight_status == "processing":
-        raise HTTPException(status_code=409, detail="Highlight video is already processing for this card")
-    if card.is_highlight and (card.highlight_video_url or "").strip() and card.highlight_status == "completed":
-        raise HTTPException(status_code=400, detail="Highlight video is already uploaded for this card")
-
-    ext = video_extension_for_content_type(file.content_type, file.filename)
-    if ext is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Only video uploads are allowed (MP4, MOV, AVI, or WebM).",
-        )
-
-    data = await file.read()
-    if not data:
-        raise HTTPException(status_code=400, detail="Empty file.")
-    if len(data) > MAX_HIGHLIGHT_UPLOAD_BYTES:
-        raise HTTPException(status_code=400, detail="Video file is too large (max 100 MB).")
-
-    safe_id = card.card_id.replace("/", "_")
-    out_filename = f"{safe_id}{ext}"
-    final_dest = _highlights_dir() / out_filename
-
-    price = highlight_card_price()
+    final_dest: Path | None = None
     charged = False
+    price = highlight_card_price()
 
     try:
+        card = _resolve_card(db, card_id)
+        if card.owner_id != current_user.id:
+            raise HTTPException(status_code=403, detail="You do not own this card")
+        if card.is_animated:
+            raise HTTPException(status_code=400, detail="Animated cards cannot use highlight upload")
+        if card.highlight_status == "processing":
+            raise HTTPException(status_code=409, detail="Highlight video is already processing for this card")
+        if card.is_highlight and (card.highlight_video_url or "").strip() and card.highlight_status == "completed":
+            raise HTTPException(status_code=400, detail="Highlight video is already uploaded for this card")
+
+        ext = video_extension_for_content_type(file.content_type, file.filename)
+        if ext is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Only video uploads are allowed (MP4, MOV, AVI, or WebM).",
+            )
+
+        data = await file.read()
+        if not data:
+            raise HTTPException(status_code=400, detail="Empty file.")
+        if len(data) > MAX_HIGHLIGHT_UPLOAD_BYTES:
+            raise HTTPException(status_code=400, detail="Video file is too large (max 100 MB).")
+
+        safe_id = card.card_id.replace("/", "_")
+        out_filename = f"{safe_id}{ext}"
+        final_dest = _highlights_dir() / out_filename
+
+        if get_balance(db, current_user.id) < price:
+            raise HTTPException(
+                status_code=402,
+                detail="Insufficient credit balance for the highlight upgrade.",
+            )
+
         final_dest.write_bytes(data)
         source_duration = validate_upload_duration(final_dest)
         trim_start = max(0.0, float(trim_start_seconds or 0))
@@ -365,12 +413,13 @@ async def upload_card_highlight(
 
         try:
             deduct_credits(
-                db,
                 user_id=current_user.id,
                 amount=price,
                 transaction_type=TX_HIGHLIGHT,
                 reference_id=card.card_id,
                 note=f"Highlight video upgrade for {card.card_id}",
+                db=db,
+                commit=False,
             )
             charged = True
         except InsufficientCreditsError as exc:
@@ -387,6 +436,7 @@ async def upload_card_highlight(
         card.highlight_uploaded_at = now
         db.commit()
         db.refresh(card)
+        charged = False
 
         owner_email = current_user.email or ""
         owner_name = current_user.display_name or ""
@@ -407,19 +457,62 @@ async def upload_card_highlight(
 
         return card_to_dict(card, db)
     except HTTPException:
-        if final_dest.is_file() and not charged:
+        db.rollback()
+        if final_dest is not None and final_dest.is_file() and not charged:
             final_dest.unlink(missing_ok=True)
         raise
     except ValueError as exc:
-        if final_dest.is_file():
+        db.rollback()
+        if final_dest is not None and final_dest.is_file():
             final_dest.unlink(missing_ok=True)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        if final_dest.is_file():
+        db.rollback()
+        if final_dest is not None and final_dest.is_file():
             final_dest.unlink(missing_ok=True)
-        if charged:
-            db.rollback()
-        raise HTTPException(status_code=500, detail="Could not save highlight video.") from exc
+        logger.error("Highlight upload error for %s: %s", card_id, traceback.format_exc())
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": {
+                    "message": HIGHLIGHT_UPLOAD_USER_MESSAGE,
+                    "error": str(exc),
+                    "traceback": traceback.format_exc(),
+                }
+            },
+        )
+
+
+@router.delete("/{card_id}/highlight-cleanup")
+def cleanup_failed_highlight_card(
+    card_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Remove a failed highlight card and refund any highlight charges."""
+    card = _resolve_card(db, card_id)
+    if card.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not own this card")
+    if not _is_failed_highlight_card(card):
+        raise HTTPException(status_code=400, detail="This card is not a failed highlight upload.")
+
+    refund_amount = highlight_charge_to_refund(db, current_user.id, card.card_id)
+    deleted_id = _delete_owned_card(db, card)
+    if refund_amount > 0:
+        add_credits(
+            user_id=current_user.id,
+            amount=refund_amount,
+            transaction_type=TX_REFUND,
+            reference_id=deleted_id,
+            note=f"Refund for failed highlight upload ({deleted_id})",
+            db=db,
+        )
+    db.commit()
+    return {
+        "success": True,
+        "card_id": deleted_id,
+        "refunded": float(refund_amount),
+    }
 
 
 @router.get("/{card_id}/video")
@@ -469,12 +562,6 @@ def delete_card(
     card = _resolve_card(db, card_id)
     _validate_delete_request(card, current_user)
 
-    deleted_id = card.card_id
-    cancel_pending_marketplace_offers_for_card(db, card.card_id)
-    db.query(MarketplaceOffer).filter(MarketplaceOffer.card_id == card.card_id).delete(
-        synchronize_session=False
-    )
-    db.query(TradeOffer).filter(TradeOffer.card_id == card.id).delete(synchronize_session=False)
-    db.delete(card)
+    deleted_id = _delete_owned_card(db, card)
     db.commit()
     return {"success": True, "card_id": deleted_id}
