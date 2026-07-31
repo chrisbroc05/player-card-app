@@ -812,3 +812,261 @@
     animation: card-legends-shimmer 3s ease-in-out infinite;
   }
 }
+
+/* ── Highlight cards: CSS-only tier + theme (video is hero, no overlays) ── */
+
+.highlight-card {
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.highlight-card__media.card-player-vignette::after,
+.highlight-card__media .card-player-inner-border {
+  display: none;
+}
+
+/* Tier: Rookie */
+.highlight-card--rookie {
+  border: 2px solid #3b6d11;
+  box-shadow: 0 0 14px rgba(59, 109, 17, 0.22);
+}
+
+.highlight-card__banner--rookie {
+  background: linear-gradient(to bottom, #1a2e1a, #0d1a0d);
+  border-top: 1px solid #3b6d11;
+}
+
+/* Tier: All-Star */
+.highlight-card--allstar {
+  border: 2px solid #185fa5;
+  box-shadow: 0 0 14px rgba(24, 95, 165, 0.22);
+}
+
+.highlight-card__banner--allstar {
+  background: linear-gradient(to bottom, #0d1a2e, #060d1a);
+  border-top: 1px solid #185fa5;
+}
+
+/* Tier: Legends */
+.highlight-card--legends {
+  border: 3px solid #ba7517;
+  box-shadow: 0 0 18px rgba(186, 117, 23, 0.28);
+}
+
+.highlight-card__banner--legends {
+  background: linear-gradient(to bottom, #2e1f0d, #1a0f06);
+  border-top: 1px solid #ba7517;
+}
+
+/* Theme: Neon */
+.highlight-card--theme-neon.highlight-card--rookie {
+  border-color: #5cb82a;
+  box-shadow: 0 0 20px rgba(92, 184, 42, 0.42), 0 0 6px rgba(92, 184, 42, 0.28);
+}
+
+.highlight-card--theme-neon.highlight-card--allstar {
+  border-color: #38bdf8;
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.45), 0 0 6px rgba(56, 189, 248, 0.3);
+}
+
+.highlight-card--theme-neon.highlight-card--legends {
+  border-color: #fbbf24;
+  box-shadow: 0 0 22px rgba(251, 191, 36, 0.48), 0 0 8px rgba(251, 191, 36, 0.32);
+}
+
+.highlight-card__banner--theme-neon.highlight-card__banner--rookie {
+  box-shadow: inset 0 1px 0 rgba(92, 184, 42, 0.35);
+}
+
+.highlight-card__banner--theme-neon.highlight-card__banner--allstar {
+  box-shadow: inset 0 1px 0 rgba(56, 189, 248, 0.35);
+}
+
+.highlight-card__banner--theme-neon.highlight-card__banner--legends {
+  box-shadow: inset 0 1px 0 rgba(251, 191, 36, 0.35);
+}
+
+/* Theme: Chrome — metallic gradient border */
+.highlight-card--theme-chrome {
+  border: 2px solid transparent;
+  background:
+    linear-gradient(#080808, #080808) padding-box,
+    linear-gradient(135deg, #d4d4d8 0%, #71717a 28%, #f4f4f5 52%, #52525b 78%, #e4e4e7 100%) border-box;
+}
+
+.highlight-card--theme-chrome.highlight-card--legends {
+  border-width: 3px;
+}
+
+.highlight-card__banner--theme-chrome {
+  background: linear-gradient(to bottom, #141418, #0a0a0c);
+  box-shadow: inset 0 1px 0 rgba(212, 212, 216, 0.2);
+}
+
+.highlight-card__banner--theme-chrome.highlight-card__banner--rookie {
+  background: linear-gradient(to bottom, #1a2a1a, #101810);
+}
+
+.highlight-card__banner--theme-chrome.highlight-card__banner--allstar {
+  background: linear-gradient(to bottom, #121a28, #0a1018);
+}
+
+.highlight-card__banner--theme-chrome.highlight-card__banner--legends {
+  background: linear-gradient(to bottom, #2a2210, #181008);
+}
+
+/* Theme: Holographic — slow border hue shift */
+@keyframes highlight-holo-border-rookie {
+  0%,
+  100% {
+    border-color: #3b6d11;
+    box-shadow: 0 0 16px rgba(59, 109, 17, 0.28);
+  }
+  33% {
+    border-color: #7c3aed;
+    box-shadow: 0 0 16px rgba(124, 58, 237, 0.28);
+  }
+  66% {
+    border-color: #06b6d4;
+    box-shadow: 0 0 16px rgba(6, 182, 212, 0.28);
+  }
+}
+
+@keyframes highlight-holo-border-allstar {
+  0%,
+  100% {
+    border-color: #185fa5;
+    box-shadow: 0 0 16px rgba(24, 95, 165, 0.28);
+  }
+  33% {
+    border-color: #a855f7;
+    box-shadow: 0 0 16px rgba(168, 85, 247, 0.28);
+  }
+  66% {
+    border-color: #22d3ee;
+    box-shadow: 0 0 16px rgba(34, 211, 238, 0.28);
+  }
+}
+
+@keyframes highlight-holo-border-legends {
+  0%,
+  100% {
+    border-color: #ba7517;
+    box-shadow: 0 0 18px rgba(186, 117, 23, 0.32);
+  }
+  33% {
+    border-color: #e879f9;
+    box-shadow: 0 0 18px rgba(232, 121, 249, 0.28);
+  }
+  66% {
+    border-color: #fcd34d;
+    box-shadow: 0 0 18px rgba(252, 211, 77, 0.32);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .highlight-card--theme-holographic.highlight-card--rookie {
+    animation: highlight-holo-border-rookie 8s ease-in-out infinite;
+  }
+
+  .highlight-card--theme-holographic.highlight-card--allstar {
+    animation: highlight-holo-border-allstar 8s ease-in-out infinite;
+  }
+
+  .highlight-card--theme-holographic.highlight-card--legends {
+    animation: highlight-holo-border-legends 8s ease-in-out infinite;
+  }
+}
+
+/* Theme: Retro / Vintage */
+.highlight-card--theme-retro.highlight-card--rookie {
+  border-color: #4a5f3a;
+  box-shadow: 0 0 12px rgba(74, 95, 58, 0.2);
+}
+
+.highlight-card--theme-retro.highlight-card--allstar {
+  border-color: #3a5a7a;
+  box-shadow: 0 0 12px rgba(58, 90, 122, 0.2);
+}
+
+.highlight-card--theme-retro.highlight-card--legends {
+  border-color: #8a6a3a;
+  box-shadow: 0 0 14px rgba(138, 106, 58, 0.22);
+}
+
+.highlight-card__banner--theme-retro {
+  filter: sepia(0.3);
+}
+
+/* Theme: Gold Edition */
+.highlight-card--theme-gold_edition.highlight-card--legends {
+  border-color: #ef9f27;
+  box-shadow: 0 0 24px rgba(239, 159, 39, 0.48), 0 0 8px rgba(239, 159, 39, 0.32);
+}
+
+.highlight-card__banner--theme-gold_edition.highlight-card__banner--legends {
+  border-top-color: #ef9f27;
+  background: linear-gradient(to bottom, #3a2810, #1f1406);
+}
+
+.highlight-card--theme-gold_edition.highlight-card--rookie {
+  border-color: #c9921a;
+  box-shadow: 0 0 18px rgba(201, 146, 26, 0.35);
+}
+
+.highlight-card--theme-gold_edition.highlight-card--allstar {
+  border-color: #d4a017;
+  box-shadow: 0 0 18px rgba(212, 160, 23, 0.35);
+}
+
+/* Theme: Midnight */
+.highlight-card--theme-midnight {
+  box-shadow: 0 0 16px rgba(15, 23, 42, 0.55);
+}
+
+.highlight-card__banner--theme-midnight {
+  background: linear-gradient(to bottom, #0a0f1a, #050810) !important;
+  border-top-color: rgba(148, 163, 184, 0.35);
+}
+
+@keyframes highlight-midnight-sparkle {
+  0%,
+  100% {
+    box-shadow:
+      0 0 14px rgba(30, 58, 138, 0.35),
+      0 -1px 0 rgba(255, 255, 255, 0.08);
+  }
+  50% {
+    box-shadow:
+      0 0 18px rgba(96, 165, 250, 0.4),
+      0 0 4px rgba(255, 255, 255, 0.15),
+      0 -1px 0 rgba(255, 255, 255, 0.12);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .highlight-card--theme-midnight {
+    animation: highlight-midnight-sparkle 4s ease-in-out infinite;
+  }
+}
+
+/* Theme: Inferno */
+.highlight-card--theme-inferno {
+  border-color: #d85a30 !important;
+  box-shadow: 0 0 18px rgba(216, 90, 48, 0.38), 0 0 6px rgba(216, 90, 48, 0.22);
+}
+
+.highlight-card__banner--theme-inferno {
+  box-shadow: inset 0 1px 0 rgba(216, 90, 48, 0.35);
+}
+
+.highlight-card__banner--theme-inferno.highlight-card__banner--rookie {
+  background: linear-gradient(to bottom, #1f1814, #120c0a);
+}
+
+.highlight-card__banner--theme-inferno.highlight-card__banner--allstar {
+  background: linear-gradient(to bottom, #141820, #0c1018);
+}
+
+.highlight-card__banner--theme-inferno.highlight-card__banner--legends {
+  background: linear-gradient(to bottom, #281808, #180e06);
+}

@@ -11,7 +11,7 @@ import StudioCreditBalance from "../components/StudioCreditBalance";
 import GenerationCostSummary from "../components/GenerationCostSummary";
 import ThemeLibraryPicker from "../components/ThemeLibraryPicker";
 import CardTypeStep from "../components/CardTypeStep";
-import HighlightVideoStep from "../components/HighlightVideoStep";
+import HighlightCardPreview from "../components/HighlightCardPreview";
 import HighlightProcessingScreen from "../components/HighlightProcessingScreen";
 import QuantitySelector from "../components/QuantitySelector";
 import ActionCategoryStep from "../components/ActionCategoryStep";
@@ -401,6 +401,15 @@ export default function StudioPage() {
       image_url: preview.image_url,
       edition_number: preview.edition_number || 1,
       print_run: preview.print_run || 1,
+      is_highlight: isHighlightCardType || preview.is_highlight,
+      highlight_video_url:
+        savedCardDetail?.highlight_video_url ||
+        (isHighlightCardType && highlightClipDraft?.objectUrl ? highlightClipDraft.objectUrl : undefined),
+      highlight_trim_start: savedCardDetail?.highlight_trim_start ?? highlightClipDraft?.trimStart ?? 0,
+      highlight_trim_end: savedCardDetail?.highlight_trim_end ?? highlightClipDraft?.trimEnd ?? null,
+      highlight_status:
+        savedCardDetail?.highlight_status ||
+        (isHighlightCardType && highlightClipDraft?.confirmed ? "preview" : undefined),
     };
   }
 
@@ -1444,6 +1453,26 @@ export default function StudioPage() {
   }
 
   async function handleGenerateFirstPreview() {
+    if (isHighlightCardType && highlightClipDraft?.confirmed) {
+      setIsCreating(true);
+      setOrderActionKey("generate-first");
+      setMessage("");
+      setError("");
+      try {
+        const orderId = await ensureOrderForGeneration();
+        if (!previewCards.length) {
+          await handleGenerateForOrder(orderId);
+        }
+        setReviewSubPhase("generate");
+        setPreviewConfigureOpen(false);
+      } catch (err) {
+        setError(err.message || "Failed to start highlight preview.");
+      } finally {
+        setIsCreating(false);
+        setOrderActionKey("");
+      }
+      return;
+    }
     setIsCreating(true);
     setOrderActionKey("generate-first");
     setMessage("");
@@ -2147,12 +2176,33 @@ export default function StudioPage() {
                 <div>
                   <h3 className="text-lg font-semibold text-white">Review & Generate</h3>
                   <p className="mt-1 text-sm text-slate-400">
-                    Confirm your choices. Your first preview is free — additional previews and copies use credits.
+                    {isHighlightCardType
+                      ? "Preview your highlight card below — your first look is free before you add to collection."
+                      : "Confirm your choices. Your first preview is free — additional previews and copies use credits."}
                   </p>
                   {pricingError ? (
                     <p className="mt-2 text-sm text-rose-300">{pricingError}</p>
                   ) : null}
                 </div>
+                {isHighlightCardType && highlightClipDraft?.confirmed ? (
+                  <div className="grid gap-3">
+                    <p className="text-center text-xs font-medium uppercase tracking-[0.18em] text-teal-300/90">
+                      Your highlight preview
+                    </p>
+                    <HighlightCardPreview
+                      playerName={playerDisplayName}
+                      teamName={teamName}
+                      position={position}
+                      jerseyNumber={jerseyNumber}
+                      gradYear={gradYear}
+                      tier={orderTier}
+                      theme={specialTheme}
+                      clipDraft={highlightClipDraft}
+                      variant="detail"
+                      forcePlay
+                    />
+                  </div>
+                ) : null}
                 <GenerationCostSummary
                   playerName={playerDisplayName}
                   teamName={teamName}
@@ -2185,7 +2235,9 @@ export default function StudioPage() {
                   >
                     {orderActionKey === "generate-first"
                       ? "Generating..."
-                      : "Generate My Card — Free Preview"}
+                      : isHighlightCardType
+                        ? "Preview My Highlight Card — Free"
+                        : "Generate My Card — Free Preview"}
                   </button>
                 </div>
               </div>
@@ -2296,11 +2348,27 @@ export default function StudioPage() {
                                 : tierTheme.card
                             }`}
                           >
-                            <CardImage
-                              card={previewToDisplayCard(preview)}
-                              alt={`Preview ${idx + 1}`}
-                              showInfoBanner
-                            />
+                            {isHighlightCardType && highlightClipDraft?.confirmed ? (
+                              <HighlightCardPreview
+                                playerName={playerDisplayName}
+                                teamName={teamName}
+                                position={position}
+                                jerseyNumber={jerseyNumber}
+                                gradYear={gradYear}
+                                tier={orderTier}
+                                theme={specialTheme}
+                                clipDraft={highlightClipDraft}
+                                forcePlay
+                              />
+                            ) : (
+                              <CardImage
+                                card={previewToDisplayCard(preview)}
+                                alt={`Preview ${idx + 1}`}
+                                showInfoBanner
+                                playOnHover={isHighlightCardType}
+                                forcePlay={isHighlightCardType}
+                              />
+                            )}
                             <div className="space-y-2 bg-cardBg2 p-3">
                               <p className="text-xs text-slate-400">
                                 <span className={`rounded-full border px-1.5 py-0.5 ${tierTheme.pill}`}>
@@ -2357,22 +2425,36 @@ export default function StudioPage() {
                       >
                         <p className="text-center text-sm font-medium text-white">Confirm your card</p>
                         <div className="mx-auto mt-4 max-w-xs">
-                          <CardImage
-                            card={
-                              featuredDisplayCard || {
-                                image_url: selectedPreviewUrl || generatedCardUrl,
-                                player_name: playerDisplayName,
-                                team_name: teamName,
-                                position,
-                                jersey_number: jerseyNumber,
-                                grad_year: gradYear,
-                                tier: orderTier || "rookie",
-                                theme: specialTheme,
+                          {isHighlightCardType && highlightClipDraft?.confirmed ? (
+                            <HighlightCardPreview
+                              playerName={playerDisplayName}
+                              teamName={teamName}
+                              position={position}
+                              jerseyNumber={jerseyNumber}
+                              gradYear={gradYear}
+                              tier={orderTier}
+                              theme={specialTheme}
+                              clipDraft={highlightClipDraft}
+                              forcePlay
+                            />
+                          ) : (
+                            <CardImage
+                              card={
+                                featuredDisplayCard || {
+                                  image_url: selectedPreviewUrl || generatedCardUrl,
+                                  player_name: playerDisplayName,
+                                  team_name: teamName,
+                                  position,
+                                  jersey_number: jerseyNumber,
+                                  grad_year: gradYear,
+                                  tier: orderTier || "rookie",
+                                  theme: specialTheme,
+                                }
                               }
-                            }
-                            alt="Selected preview"
-                            showInfoBanner
-                          />
+                              alt="Selected preview"
+                              showInfoBanner
+                            />
+                          )}
                         </div>
                         <GenerationCostSummary
                           playerName={playerDisplayName}
@@ -2383,6 +2465,7 @@ export default function StudioPage() {
                           tierLabel={selectedTierLabel}
                           themeLabel={specialTheme ? selectedThemeLabel : ""}
                           isAnimated={false}
+                          isHighlight={isHighlightCardType}
                           motionName={motionDisplayName}
                           copyQuantity={copyQuantity}
                           pricing={generationPricing}

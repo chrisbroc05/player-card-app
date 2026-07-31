@@ -104,7 +104,6 @@ export default function NewCardCelebration({
                 card={card}
                 alt={card.player_name || "Your card"}
                 frameClassName={CARD_IMAGE_FRAME_MODAL}
-                showInfoBanner={!mediaCard}
                 forcePlay={mediaCard}
                 playOnHover={!mediaCard}
               />
