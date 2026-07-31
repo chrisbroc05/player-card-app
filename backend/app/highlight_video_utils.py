@@ -1,9 +1,8 @@
-"""Highlight clip validation helpers."""
+"""Highlight clip validation helpers — no ffmpeg/ffprobe dependency."""
 
 from __future__ import annotations
 
 import struct
-import subprocess
 from pathlib import Path
 
 MAX_HIGHLIGHT_DURATION_SECONDS = 10.0
@@ -57,29 +56,7 @@ def _mp4_duration_seconds(data: bytes) -> float | None:
 
 
 def video_duration_seconds(path: Path) -> float | None:
-    """Return clip duration in seconds, or None if unknown."""
-    try:
-        proc = subprocess.run(
-            [
-                "ffprobe",
-                "-v",
-                "error",
-                "-show_entries",
-                "format=duration",
-                "-of",
-                "default=noprint_wrappers=1:nokey=1",
-                str(path),
-            ],
-            capture_output=True,
-            text=True,
-            timeout=30,
-            check=False,
-        )
-        if proc.returncode == 0 and proc.stdout.strip():
-            return float(proc.stdout.strip())
-    except (FileNotFoundError, ValueError, subprocess.TimeoutExpired, OSError):
-        pass
-
+    """Return clip duration in seconds when derivable without ffmpeg."""
     if path.suffix.lower() == ".mp4":
         try:
             data = path.read_bytes()
@@ -87,14 +64,3 @@ def video_duration_seconds(path: Path) -> float | None:
         except OSError:
             return None
     return None
-
-
-def validate_highlight_duration(path: Path) -> None:
-    duration = video_duration_seconds(path)
-    if duration is None:
-        raise ValueError("Could not determine video duration. Try MP4 format under 10 seconds.")
-    if duration > MAX_HIGHLIGHT_DURATION_SECONDS + 0.25:
-        raise ValueError(
-            f"Highlight clips must be {int(MAX_HIGHLIGHT_DURATION_SECONDS)} seconds or less "
-            f"(yours is about {duration:.1f}s)."
-        )

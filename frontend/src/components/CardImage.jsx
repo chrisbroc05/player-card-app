@@ -258,7 +258,7 @@ export default function CardImage({
 
     const onLoadedMetadata = () => {
       const duration = Number(el.duration) || 0;
-      const hasTrim = trimEnd > trimStart && duration > 0 && trimEnd < duration - 0.25;
+      const hasTrim = trimEnd > trimStart;
       setNeedsTrimPlayback(hasTrim);
       if (hasTrim) {
         try {
@@ -266,6 +266,8 @@ export default function CardImage({
         } catch {
           /* ignore */
         }
+      } else if (duration > 0) {
+        setNeedsTrimPlayback(false);
       }
     };
 

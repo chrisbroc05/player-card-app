@@ -1206,7 +1206,7 @@ export default function StudioPage() {
     setHighlightUploadProgress(0);
     setHighlightUploadError("");
     try {
-      await uploadHighlightClip({
+      const uploadedCard = await uploadHighlightClip({
         token,
         cardId,
         file: highlightClipDraft.file,
@@ -1214,8 +1214,20 @@ export default function StudioPage() {
         trimEnd: highlightClipDraft.trimEnd ?? 0,
         onProgress: (pct) => setHighlightUploadProgress(pct),
       });
-      setHighlightUploadState("processing");
+      setHighlightUploadState("done");
       await refreshUser(token);
+      const detail =
+        uploadedCard?.highlight_status === "completed"
+          ? uploadedCard
+          : await fetchCardDetailById(cardId);
+      setHighlightProcessingCardId("");
+      setHighlightProcessingCard(null);
+      await showCelebration({
+        card: detail,
+        source: "created",
+        showAnimateUpsell: false,
+      });
+      return detail;
     } catch (err) {
       setHighlightUploadState("error");
       setHighlightUploadError(err.message || "Could not upload highlight video.");
@@ -1261,7 +1273,7 @@ export default function StudioPage() {
     } else {
       setAnimatedFlowStage(ANIMATED_FLOW_STAGE.IDLE);
     }
-    setPackOpeningActive(true);
+    setPackOpeningActive(isAnimatedCardType);
     setIsGenerating(true);
     setOrderActionKey(`generate-${orderId}`);
     setMessage("");
@@ -1519,8 +1531,6 @@ export default function StudioPage() {
       setAnimatedSaveStaticFlow(false);
 
       if (isHighlightCardType && cardId && highlightClipDraft?.confirmed) {
-        setHighlightProcessingCard(addedCardDetail);
-        setHighlightProcessingCardId(cardId);
         await uploadHighlightForCard(cardId);
         return;
       }

@@ -1000,6 +1000,38 @@ def _generate_card_pillow(
     }
 
 
+def _generate_highlight_placeholder(
+    player_row: dict,
+    player_id: int,
+    tier: str = "base",
+    special_theme: str | None = None,
+) -> dict:
+    """Tier-colored gradient placeholder — highlight cards use video as primary content."""
+    tier_norm = tier.lower()
+    if tier_norm not in ("base", "rare", "legendary"):
+        tier_norm = "base"
+
+    width, height = 768, 1024
+    img = Image.new("RGBA", (width, height), (0, 0, 0, 255))
+    draw = ImageDraw.Draw(img)
+    top_fill, bottom_fill, _, _, accent_fill, _ = _tier_banner_style(tier_norm)
+    _draw_vertical_gradient(draw, 0, 0, width, height, top_fill, bottom_fill)
+    draw.line([(0, 0), (width, 0)], fill=accent_fill, width=max(2, width // 256))
+
+    card_filename = f"highlight-placeholder-{player_id}-{uuid4().hex}.png"
+    card_path = CARD_DIR / card_filename
+    img.convert("RGB").save(card_path, format="PNG")
+
+    return {
+        "filename": card_filename,
+        "path": str(card_path),
+        "url": f"{CARD_MEDIA_URL_PREFIX}/{card_filename}",
+        "mode": "highlight-placeholder",
+        "tier": tier_norm,
+        "special_theme": special_theme,
+    }
+
+
 def _generate_card_openai(
     player_row: dict,
     player_id: int,
@@ -2060,22 +2092,30 @@ def generate_card_for_order(
         "image_url": order["player_image_url"],
         "special_theme": order.get("special_theme"),
     }
-    source_path = _resolve_source_path_from_image_url(order["player_image_url"])
     card_tier = _order_tier_to_card_tier(order["tier"])
 
-    try:
-        result = _generate_card_openai(
-            player_row, order_id, source_path, tier=card_tier, special_theme=order.get("special_theme")
-        )
-    except Exception as exc:
-        logger.exception(
-            "OpenAI card generation failed for order %s, using pillow fallback: %s",
+    if card_type == "highlight":
+        result = _generate_highlight_placeholder(
+            player_row,
             order_id,
-            exc,
+            tier=card_tier,
+            special_theme=order.get("special_theme"),
         )
-        result = _generate_card_pillow(
-            player_row, order_id, source_path, tier=card_tier, special_theme=order.get("special_theme")
-        )
+    else:
+        source_path = _resolve_source_path_from_image_url(order["player_image_url"])
+        try:
+            result = _generate_card_openai(
+                player_row, order_id, source_path, tier=card_tier, special_theme=order.get("special_theme")
+            )
+        except Exception as exc:
+            logger.exception(
+                "OpenAI card generation failed for order %s, using pillow fallback: %s",
+                order_id,
+                exc,
+            )
+            result = _generate_card_pillow(
+                player_row, order_id, source_path, tier=card_tier, special_theme=order.get("special_theme")
+            )
 
     new_card_id = next_collectible_card_id(db)
     owner_id = current_user.id
