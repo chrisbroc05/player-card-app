@@ -1,4 +1,5 @@
-import { vaultTierBadge, formatEditionShort } from "./tierStyles";
+import { vaultTierBadge } from "./tierStyles";
+import { formatBannerEdition } from "./cardBannerStyles";
 
 /** Standard trading card aspect ratio 2.5 × 3.5 */
 export const CARD_ASPECT_CLASS = "aspect-[5/7]";
@@ -67,8 +68,7 @@ export function resolveCardDisplayMeta(card) {
   const gradYear = (card.grad_year ?? card.gradYear ?? "").toString().trim();
   const tier = card.tier || "rookie";
   const theme = card.theme || card.special_theme || card.specialTheme || "";
-  const cardId = (card.card_id || card.cardId || "").trim();
-  const edition = formatEditionShort(card.edition_number, card.print_run);
+  const edition = formatBannerEdition(card.edition_number, card.print_run);
   const badge = vaultTierBadge(tier);
 
   const statsLine = [
@@ -85,7 +85,6 @@ export function resolveCardDisplayMeta(card) {
     statsLine,
     tier,
     theme,
-    cardId,
     edition,
     badge,
     frame: tierFrameStyles(tier),
@@ -96,36 +95,44 @@ export function resolveCardDisplayMeta(card) {
 /** Size presets for CardDisplay typography */
 export const CARD_DISPLAY_SIZES = {
   default: {
-    name: "text-sm font-bold sm:text-base",
+    name: "text-[13px] font-semibold sm:text-[14px]",
     team: "text-[11px] sm:text-xs",
     stats: "text-[10px] sm:text-[11px]",
-    meta: "text-[9px] sm:text-[10px]",
-    pill: "text-[9px] sm:text-[10px]",
-    bannerPad: "px-2.5 py-2 sm:px-3 sm:py-2.5",
+    pill: "text-[8px] sm:text-[9px]",
+    theme: "text-[8px] sm:text-[9px]",
+    edition: "text-[8px] sm:text-[9px]",
+    footer: "text-[8px] sm:text-[9px]",
+    bannerPad: "px-2 py-1.5 sm:px-2.5 sm:py-2",
   },
   detail: {
-    name: "text-base font-bold sm:text-lg",
+    name: "text-base font-semibold sm:text-[16px]",
     team: "text-xs sm:text-sm",
     stats: "text-[11px] sm:text-xs",
-    meta: "text-[10px] sm:text-[11px]",
     pill: "text-[10px] sm:text-[11px]",
-    bannerPad: "px-3 py-3 sm:px-4 sm:py-3.5",
+    theme: "text-[10px] sm:text-[11px]",
+    edition: "text-[10px] sm:text-[11px]",
+    footer: "text-[10px] sm:text-[11px]",
+    bannerPad: "px-3 py-2.5 sm:px-3.5 sm:py-3",
   },
   compact: {
-    name: "text-[11px] font-bold leading-tight",
-    team: "text-[9px]",
-    stats: "text-[8px]",
-    meta: "text-[8px]",
-    pill: "text-[8px]",
-    bannerPad: "px-2 py-1.5",
+    name: "text-[11px] font-semibold leading-tight",
+    team: "text-[9px] leading-tight",
+    stats: "text-[8px] leading-tight",
+    pill: "text-[7px]",
+    theme: "text-[7px]",
+    edition: "text-[7px]",
+    footer: "text-[7px]",
+    bannerPad: "px-1.5 py-1.5",
   },
   thumb: {
-    name: "text-[10px] font-bold leading-tight",
-    team: "text-[8px]",
-    stats: "text-[7px]",
-    meta: "text-[7px]",
-    pill: "text-[7px]",
-    bannerPad: "px-1.5 py-1.5",
+    name: "text-[10px] font-semibold leading-tight",
+    team: "text-[8px] leading-tight",
+    stats: "text-[7px] leading-tight",
+    pill: "text-[6px]",
+    theme: "text-[6px]",
+    edition: "text-[6px]",
+    footer: "text-[6px]",
+    bannerPad: "px-1.5 py-1",
   },
 };
 

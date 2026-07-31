@@ -2,7 +2,7 @@ import { formatMoney } from "./marketplace";
 
 /** Mirror backend animated_studio_total_price. */
 export function animatedStudioTotalPrice(quantity, pricing = {}) {
-  const q = Math.max(1, Math.min(10, Number(quantity) || 1));
+  const q = Math.max(1, Math.min(100, Number(quantity) || 1));
   const base = Number(pricing.animated_upgrade_price ?? pricing.base_price ?? 10);
   const extra = Math.max(0, q - 1);
   if (extra === 0) {

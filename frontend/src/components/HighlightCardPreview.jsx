@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useEffect } from "react";
 import CardImage from "./CardImage";
 import { buildHighlightPreviewCard } from "../utils/highlightCard";
+import { normalizeTierKey } from "../utils/cardTemplate";
 
 /** Browser-only highlight preview using local video blob — no server call. */
 export default function HighlightCardPreview({
@@ -17,6 +18,14 @@ export default function HighlightCardPreview({
   forcePlay = true,
   className = "",
 }) {
+  useEffect(() => {
+    console.log("[HighlightCardPreview] tier/theme:", {
+      tier,
+      theme,
+      tierKey: normalizeTierKey(tier),
+    });
+  }, [tier, theme]);
+
   if (!clipDraft?.objectUrl) return null;
 
   const card = buildHighlightPreviewCard({

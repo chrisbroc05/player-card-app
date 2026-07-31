@@ -4,6 +4,7 @@ import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import { API_BASE_URL, authHeaders } from "../config/api";
 import CardImage from "../components/CardImage";
+import ExpandableCardView from "../components/ExpandableCardView";
 import ShareCard from "../components/ShareCard";
 import SendCard from "../components/SendCard";
 import MarketplaceListingActions from "../components/MarketplaceListingActions";
@@ -225,17 +226,27 @@ export default function CardDetailPage() {
         ) : (
           <div className="animate-fadeUp">
             <div className={`mx-auto max-w-lg ${badge?.glow ?? ""}`}>
-              <CardImage
+              <ExpandableCardView
                 card={card}
                 alt={card.player_name}
                 cacheBust={card.created_at}
-                frameClassName={CARD_IMAGE_FRAME_DETAIL}
-                variant="detail"
-                forcePlay={isHighlightCard(card) || (isOwner && isAnimatedCard(card))}
                 protectMedia={!isOwner && isAnimatedCard(card)}
                 useOwnerVideoProxy={isOwner && isAnimatedCard(card)}
                 token={token || ""}
-              />
+                showHint
+              >
+                <CardImage
+                  card={card}
+                  alt={card.player_name}
+                  cacheBust={card.created_at}
+                  frameClassName={CARD_IMAGE_FRAME_DETAIL}
+                  variant="detail"
+                  forcePlay={isHighlightCard(card) || (isOwner && isAnimatedCard(card))}
+                  protectMedia={!isOwner && isAnimatedCard(card)}
+                  useOwnerVideoProxy={isOwner && isAnimatedCard(card)}
+                  token={token || ""}
+                />
+              </ExpandableCardView>
             </div>
 
             <div className="mx-auto mt-10 max-w-xl space-y-6 text-center sm:text-left">

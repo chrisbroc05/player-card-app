@@ -1,5 +1,4 @@
-/** Helpers for highlight card UI state */
-
+import { normalizeTierKey } from "./cardTemplate";
 import { isAnimatedCard } from "./animationCard";
 import {
   CARD_IMAGE_FRAME,
@@ -66,6 +65,10 @@ export function buildHighlightPreviewCard({
   trimEnd = null,
   objectUrl = "",
 }) {
+  const tierKey = normalizeTierKey(tier);
+  const orderTier =
+    tierKey === "allstar" ? "all_star" : tierKey === "legends" ? "legends" : "rookie";
+
   return {
     card_id: cardId,
     player_name: playerName,
@@ -73,7 +76,7 @@ export function buildHighlightPreviewCard({
     position,
     jersey_number: jerseyNumber,
     grad_year: gradYear,
-    tier,
+    tier: orderTier,
     theme,
     special_theme: theme,
     is_highlight: true,

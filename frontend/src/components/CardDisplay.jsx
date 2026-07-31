@@ -5,12 +5,13 @@ import {
   CARD_ASPECT_CLASS,
   CARD_DISPLAY_SIZES,
   resolveCardDisplayMeta,
+  tierFrameStyles,
 } from "../utils/cardTemplate";
+import { getCardBannerStyles, truncateBannerPlayerName } from "../utils/cardBannerStyles";
 import { getHighlightCardStyles } from "../utils/highlightCardStyles";
 
 /**
- * Fixed 4-layer trading card shell — frame, player media, UI banner, theme overlay.
- * Media (layer 2) is injected via children; banner and frame are always UI-controlled.
+ * Fixed trading card shell — frame, player media (72%), UI banner (28%).
  */
 export default function CardDisplay({
   card,
@@ -40,30 +41,30 @@ export default function CardDisplay({
     );
   }
 
-  const { frame, badge, themeOverlay, tier, theme } = meta;
+  const { tier, theme } = meta;
+  const bannerStyles = getCardBannerStyles(tier, theme);
   const highlightStyles = isHighlight ? getHighlightCardStyles(tier, theme) : null;
+  const frame = tierFrameStyles(tier);
 
   const frameClasses = isHighlight
     ? `${highlightStyles.frameClass} bg-black`
     : `${frame.borderClass} ${frame.glowClass} ${frame.bgClass}`;
 
-  const bannerClasses = isHighlight
-    ? `${highlightStyles.bannerClass} ${styles.bannerPad}`
-    : `border-t bg-gradient-to-b ${frame.bannerClass} ${frame.accentClass} ${styles.bannerPad}`;
-
   const mediaWrapperClass = isHighlight
     ? `${highlightStyles.mediaClass} card-player-vignette relative h-full w-full overflow-hidden`
     : "card-player-vignette relative h-full w-full overflow-hidden";
+
+  const displayName = truncateBannerPlayerName(meta.playerName);
 
   return (
     <div
       className={`relative flex w-full min-w-0 flex-col overflow-hidden rounded-[12px] ${CARD_ASPECT_CLASS} ${frameClasses} ${className}`}
     >
-      {!isHighlight && themeOverlay ? (
-        <div className={`pointer-events-none absolute inset-0 z-[4] ${themeOverlay}`} aria-hidden />
+      {!isHighlight && meta.themeOverlay ? (
+        <div className={`pointer-events-none absolute inset-0 z-[4] ${meta.themeOverlay}`} aria-hidden />
       ) : null}
 
-      <div className="relative z-[1] h-[70%] min-h-0 w-full shrink-0 overflow-hidden">
+      <div className="card-shell__media relative z-[1] h-[72%] min-h-0 w-full shrink-0 overflow-hidden">
         <div className={mediaWrapperClass}>
           {children}
           {!isHighlight ? (
@@ -83,45 +84,49 @@ export default function CardDisplay({
         {topRightSlot ? <div className="absolute right-1 top-1 z-[3]">{topRightSlot}</div> : null}
         {inProgressOverlay ? (
           <div className="absolute inset-0 z-[5] flex items-center justify-center bg-black/55 backdrop-blur-[2px]">
-            <span className={`animate-pulse rounded-lg border px-2 py-1 text-[10px] font-semibold sm:px-3 sm:py-2 sm:text-xs ${inProgressTone}`}>
+            <span
+              className={`animate-pulse rounded-lg border px-2 py-1 text-[10px] font-semibold sm:px-3 sm:py-2 sm:text-xs ${inProgressTone}`}
+            >
               {inProgressLabel}
             </span>
           </div>
         ) : null}
       </div>
 
-      <div className={`relative z-[2] flex h-[30%] min-h-0 shrink-0 flex-col justify-between ${bannerClasses}`}>
-        <div className="min-h-0 flex-1">
-          <p className={`leading-tight text-white break-words [overflow-wrap:anywhere] ${styles.name}`}>
-            {meta.playerName}
+      <div
+        className={`card-shell__banner relative z-[2] flex h-[28%] min-h-[4.25rem] shrink-0 flex-col overflow-hidden ${bannerStyles.bannerClass} ${styles.bannerPad}`}
+      >
+        <div className="card-banner__body min-h-0 flex-1 overflow-hidden">
+          <p
+            className={`${bannerStyles.nameClass} ${styles.name} truncate leading-tight`}
+            title={meta.playerName.length > 20 ? meta.playerName : undefined}
+          >
+            {displayName}
           </p>
           {meta.team ? (
-            <p className={`mt-0.5 text-slate-300 break-words [overflow-wrap:anywhere] ${styles.team}`}>
-              {meta.team}
-            </p>
+            <p className={`${bannerStyles.teamClass} ${styles.team} mt-0.5 truncate leading-tight`}>{meta.team}</p>
           ) : null}
           {meta.statsLine ? (
-            <p className={`mt-0.5 text-slate-400 ${styles.stats}`}>{meta.statsLine}</p>
-          ) : null}
-          {isHighlight && highlightStyles?.themeBannerLabel ? (
-            <p className={`mt-1 text-slate-500 uppercase tracking-[0.12em] ${styles.stats}`}>
-              {highlightStyles.themeBannerLabel}
+            <p className={`${bannerStyles.statsClass} ${styles.stats} mt-0.5 truncate leading-tight`}>
+              {meta.statsLine}
             </p>
           ) : null}
         </div>
 
-        <div className="mt-1 flex items-end justify-between gap-2">
-          <span
-            className={`inline-flex shrink-0 rounded-full border px-2 py-0.5 font-semibold ${badge.pill} ${styles.pill}`}
-          >
-            {badge.label}
+        <div className={`card-banner__footer mt-1 flex shrink-0 items-center gap-1.5 ${styles.footer}`}>
+          <span className={`${bannerStyles.tierPillClass} ${styles.pill} shrink-0`}>
+            {bannerStyles.tierPillLabel}
           </span>
-          <div className={`min-w-0 text-right ${styles.meta}`}>
-            {meta.cardId ? (
-              <p className="font-mono text-slate-400 break-all leading-tight">{meta.cardId}</p>
-            ) : null}
-            {meta.edition ? <p className="mt-0.5 tabular-nums text-slate-500">{meta.edition}</p> : null}
-          </div>
+          {bannerStyles.themeLabel ? (
+            <span className={`${bannerStyles.themeClass} ${styles.theme} min-w-0 flex-1 truncate text-center`}>
+              {bannerStyles.themeLabel}
+            </span>
+          ) : (
+            <span className="min-w-0 flex-1" aria-hidden />
+          )}
+          <span className={`${bannerStyles.editionClass} ${styles.edition} shrink-0 tabular-nums`}>
+            {meta.edition}
+          </span>
         </div>
       </div>
     </div>

@@ -1,8 +1,9 @@
-/** Vault product tiers from API: rookie | allstar | legends */
+import { normalizeTierKey } from "./cardTemplate";
 
+/** Vault product tiers — accepts rookie | all_star | allstar | base | rare | legends | legendary */
 export function vaultTierBadge(tier) {
-  const t = (tier || "").toLowerCase();
-  if (t === "legends") {
+  const key = normalizeTierKey(tier);
+  if (key === "legends") {
     return {
       label: "Legends",
       glow: "shadow-[0_0_28px_rgba(255,215,0,0.35)] border-amber-400/50",
@@ -10,7 +11,7 @@ export function vaultTierBadge(tier) {
       accent: "#ffd700",
     };
   }
-  if (t === "allstar") {
+  if (key === "allstar") {
     return {
       label: "All-Star",
       glow: "shadow-[0_0_26px_rgba(0,170,255,0.35)] border-cyan-400/50",
@@ -35,7 +36,7 @@ export function formatEdition(editionNumber, printRun) {
 export function formatEditionShort(editionNumber, printRun) {
   const e = Number(editionNumber) || 1;
   const p = Number(printRun) || 1;
-  return `#${e} of ${p}`;
+  return `${e} of ${p}`;
 }
 
 export function rarityDisplay(rarity) {

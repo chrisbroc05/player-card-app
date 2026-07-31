@@ -797,6 +797,199 @@
   background: radial-gradient(circle at 80% 10%, rgba(255, 255, 255, 0.04), transparent 45%);
 }
 
+/* ── Unified card banner (all card types) ── */
+
+.card-banner {
+  position: relative;
+  border-top: none;
+}
+
+.card-banner::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  display: block;
+}
+
+.card-banner--legends::before {
+  height: 4px;
+}
+
+.card-banner__footer {
+  width: 100%;
+}
+
+.card-banner__tier-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  padding: 0.1rem 0.45rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.card-banner__theme {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  opacity: 0.92;
+}
+
+.card-banner__edition {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* Rookie */
+.card-banner--rookie {
+  background: linear-gradient(to bottom, #0d200d, #1a3a1a);
+}
+
+.card-banner--rookie::before {
+  background: #4a8a1a;
+}
+
+.card-banner__name--rookie {
+  color: #fff;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.card-banner__team--rookie,
+.card-banner__stats--rookie {
+  color: #a8c8a8;
+}
+
+.card-banner__tier-pill--rookie {
+  background: #2d5a0d;
+  border-color: #4a8a1a;
+  color: #7bc832;
+}
+
+.card-banner__edition--rookie {
+  color: #7bc832;
+}
+
+/* All-Star */
+.card-banner--allstar {
+  background: linear-gradient(to bottom, #060d1a, #0d1a2e);
+}
+
+.card-banner--allstar::before {
+  background: #2a7fd4;
+}
+
+.card-banner__name--allstar {
+  color: #fff;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.card-banner__team--allstar,
+.card-banner__stats--allstar {
+  color: #a0b8d8;
+}
+
+.card-banner__tier-pill--allstar {
+  background: #0d2a4a;
+  border-color: #2a7fd4;
+  color: #4a9eff;
+}
+
+.card-banner__edition--allstar {
+  color: #4a9eff;
+}
+
+/* Legends */
+.card-banner--legends {
+  background: linear-gradient(to bottom, #0d0900, #1a1200);
+}
+
+.card-banner--legends::before {
+  background: #d4920a;
+}
+
+.card-banner__name--legends {
+  color: #f0d060;
+  font-weight: 700;
+}
+
+.card-banner__team--legends,
+.card-banner__stats--legends {
+  color: #b89840;
+}
+
+.card-banner__tier-pill--legends {
+  background: #2a1e00;
+  border-color: #d4920a;
+  color: #f0c030;
+}
+
+.card-banner__edition--legends {
+  color: #d4920a;
+}
+
+@keyframes card-banner-legends-accent-shimmer {
+  0%,
+  100% {
+    opacity: 1;
+    filter: brightness(1);
+  }
+  50% {
+    opacity: 0.85;
+    filter: brightness(1.25);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .card-banner--legends::before {
+    animation: card-banner-legends-accent-shimmer 3s ease-in-out infinite;
+  }
+}
+
+/* Theme accents on banner (border/frame handled separately for highlights) */
+.card-banner--theme-mvp::before {
+  background: #ef9f27 !important;
+}
+
+.card-banner--theme-diamond::before {
+  background: #85b7eb !important;
+}
+
+.card-banner--theme-inferno::before {
+  background: #d85a30 !important;
+}
+
+.card-banner--theme-hall_of_fame::before {
+  background: #cd7f32 !important;
+}
+
+.card-banner--theme-gold_edition::before {
+  background: #ef9f27 !important;
+}
+
+.card-banner--theme-spring_training::before {
+  background: #4ade80 !important;
+}
+
+.card-banner--theme-summer_slam::before {
+  background: #fbbf24 !important;
+}
+
+.card-banner--theme-mvp .card-banner__theme {
+  color: #fcd34d;
+}
+
+.card-banner--theme-diamond .card-banner__theme {
+  color: #93c5fd;
+}
+
 @keyframes card-legends-shimmer {
   0%,
   100% {
@@ -824,37 +1017,272 @@
   display: none;
 }
 
+/* Video: contain within frame, tier-colored letterbox */
+.highlight-card__media {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.highlight-card__media .card-animated-video-container {
+  background: transparent;
+}
+
+.highlight-card__media .card-animated-video {
+  object-fit: contain;
+  object-position: center;
+}
+
+.highlight-card__media--rookie {
+  background: #0d200d;
+}
+
+.highlight-card__media--allstar {
+  background: #060d1a;
+}
+
+.highlight-card__media--legends {
+  background: #0d0900;
+}
+
+/* Banner accent bar (top of lower panel) */
+.highlight-card__banner {
+  position: relative;
+  border-top: none !important;
+}
+
+.highlight-card__banner::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: block;
+  height: 3px;
+}
+
+.highlight-card__banner--legends::before {
+  height: 4px;
+}
+
 /* Tier: Rookie */
 .highlight-card--rookie {
   border: 2px solid #3b6d11;
-  box-shadow: 0 0 14px rgba(59, 109, 17, 0.22);
+  box-shadow: 0 0 14px rgba(59, 109, 17, 0.28);
 }
 
 .highlight-card__banner--rookie {
-  background: linear-gradient(to bottom, #1a2e1a, #0d1a0d);
-  border-top: 1px solid #3b6d11;
+  background: linear-gradient(to bottom, #1a3a1a, #0d200d);
+}
+
+.highlight-card__banner--rookie::before {
+  background: #3b6d11;
+}
+
+.highlight-card__player-name--rookie {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.highlight-card__tier-badge--rookie {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  border: 1px solid #3b6d11;
+  background: #3b6d11;
+  color: #fff;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
 }
 
 /* Tier: All-Star */
 .highlight-card--allstar {
   border: 2px solid #185fa5;
-  box-shadow: 0 0 14px rgba(24, 95, 165, 0.22);
+  box-shadow: 0 0 16px rgba(24, 95, 165, 0.32);
 }
 
 .highlight-card__banner--allstar {
   background: linear-gradient(to bottom, #0d1a2e, #060d1a);
-  border-top: 1px solid #185fa5;
+}
+
+.highlight-card__banner--allstar::before {
+  background: #185fa5;
+}
+
+.highlight-card__player-name--allstar {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.highlight-card__tier-badge--allstar {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  border: 1px solid #185fa5;
+  background: #185fa5;
+  color: #fff;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
 }
 
 /* Tier: Legends */
 .highlight-card--legends {
   border: 3px solid #ba7517;
-  box-shadow: 0 0 18px rgba(186, 117, 23, 0.28);
+  box-shadow: 0 0 20px rgba(186, 117, 23, 0.38);
 }
 
 .highlight-card__banner--legends {
-  background: linear-gradient(to bottom, #2e1f0d, #1a0f06);
-  border-top: 1px solid #ba7517;
+  background: linear-gradient(to bottom, #1a1200, #0d0900);
+}
+
+.highlight-card__banner--legends::before {
+  background: #ba7517;
+}
+
+.highlight-card__player-name--legends {
+  font-weight: 700;
+  text-shadow: 0 0 12px rgba(186, 117, 23, 0.35);
+}
+
+.highlight-card__tier-badge--legends {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  border: 1px solid #ba7517;
+  background: linear-gradient(to bottom, #ef9f27, #ba7517);
+  color: #1a1200;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+@keyframes highlight-legends-border-shimmer {
+  0%,
+  100% {
+    box-shadow: 0 0 18px rgba(186, 117, 23, 0.35), 0 0 4px rgba(239, 159, 39, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 26px rgba(239, 159, 39, 0.55), 0 0 8px rgba(186, 117, 23, 0.35);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .highlight-card--legends {
+    animation: highlight-legends-border-shimmer 3s ease-in-out infinite;
+  }
+}
+
+/* Theme badges in banner */
+.highlight-card__theme-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  padding: 0.125rem 0.4rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.highlight-card__theme-badge--mvp {
+  border: 1px solid #ef9f27;
+  background: rgba(239, 159, 39, 0.18);
+  color: #fcd34d;
+}
+
+.highlight-card__theme-badge--hof {
+  border: 1px solid #cd7f32;
+  background: rgba(205, 127, 50, 0.2);
+  color: #f5d0a0;
+}
+
+.highlight-card__theme-badge--diamond {
+  border: 1px solid #85b7eb;
+  background: rgba(133, 183, 235, 0.15);
+  color: #dbeafe;
+}
+
+/* Theme: MVP */
+.highlight-card--theme-mvp.highlight-card--rookie,
+.highlight-card--theme-mvp.highlight-card--allstar,
+.highlight-card--theme-mvp.highlight-card--legends {
+  box-shadow:
+    0 0 0 1px rgba(239, 159, 39, 0.45),
+    0 0 18px rgba(239, 159, 39, 0.28);
+}
+
+.highlight-card__banner--theme-mvp.highlight-card__banner--rookie,
+.highlight-card__banner--theme-mvp.highlight-card__banner--allstar,
+.highlight-card__banner--theme-mvp.highlight-card__banner--legends {
+  background: linear-gradient(to bottom, rgba(239, 159, 39, 0.12), transparent),
+    var(--hl-banner-bg, #0d200d);
+}
+
+.highlight-card__banner--theme-mvp.highlight-card__banner--rookie {
+  --hl-banner-bg: linear-gradient(to bottom, #1f3a18, #0d200d);
+}
+
+.highlight-card__banner--theme-mvp.highlight-card__banner--allstar {
+  --hl-banner-bg: linear-gradient(to bottom, #122038, #060d1a);
+}
+
+.highlight-card__banner--theme-mvp.highlight-card__banner--legends {
+  --hl-banner-bg: linear-gradient(to bottom, #2a1c08, #0d0900);
+}
+
+.highlight-card__banner--theme-mvp::before {
+  background: #ef9f27 !important;
+}
+
+/* Theme: Diamond */
+.highlight-card--theme-diamond {
+  border-color: #85b7eb !important;
+  box-shadow:
+    0 0 0 1px rgba(133, 183, 235, 0.35),
+    0 0 16px rgba(133, 183, 235, 0.28);
+}
+
+.highlight-card__banner--theme-diamond::before {
+  background: #85b7eb !important;
+}
+
+@keyframes highlight-diamond-sparkle {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(133, 183, 235, 0.35),
+      0 0 14px rgba(133, 183, 235, 0.22);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(191, 219, 254, 0.55),
+      0 0 22px rgba(133, 183, 235, 0.42);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .highlight-card--theme-diamond {
+    animation: highlight-diamond-sparkle 3.5s ease-in-out infinite;
+  }
+}
+
+/* Theme: Hall of Fame */
+.highlight-card--theme-hall_of_fame {
+  border-color: #cd7f32 !important;
+  box-shadow: 0 0 16px rgba(205, 127, 50, 0.32);
+}
+
+.highlight-card__banner--theme-hall_of_fame {
+  background: linear-gradient(to bottom, #1a1008, #0a0806) !important;
+}
+
+.highlight-card__banner--theme-hall_of_fame::before {
+  background: #cd7f32 !important;
 }
 
 /* Theme: Neon */
@@ -873,19 +1301,49 @@
   box-shadow: 0 0 22px rgba(251, 191, 36, 0.48), 0 0 8px rgba(251, 191, 36, 0.32);
 }
 
-.highlight-card__banner--theme-neon.highlight-card__banner--rookie {
-  box-shadow: inset 0 1px 0 rgba(92, 184, 42, 0.35);
+@keyframes highlight-neon-pulse-rookie {
+  0%,
+  100% {
+    box-shadow: 0 0 14px rgba(92, 184, 42, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(92, 184, 42, 0.55);
+  }
 }
 
-.highlight-card__banner--theme-neon.highlight-card__banner--allstar {
-  box-shadow: inset 0 1px 0 rgba(56, 189, 248, 0.35);
+@keyframes highlight-neon-pulse-allstar {
+  0%,
+  100% {
+    box-shadow: 0 0 14px rgba(56, 189, 248, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(56, 189, 248, 0.55);
+  }
 }
 
-.highlight-card__banner--theme-neon.highlight-card__banner--legends {
-  box-shadow: inset 0 1px 0 rgba(251, 191, 36, 0.35);
+@keyframes highlight-neon-pulse-legends {
+  0%,
+  100% {
+    box-shadow: 0 0 16px rgba(251, 191, 36, 0.38);
+  }
+  50% {
+    box-shadow: 0 0 26px rgba(251, 191, 36, 0.58);
+  }
 }
 
-/* Theme: Chrome — metallic gradient border */
+@media (prefers-reduced-motion: no-preference) {
+  .highlight-card--theme-neon.highlight-card--rookie {
+    animation: highlight-neon-pulse-rookie 2.2s ease-in-out infinite;
+  }
+  .highlight-card--theme-neon.highlight-card--allstar {
+    animation: highlight-neon-pulse-allstar 2.2s ease-in-out infinite;
+  }
+  .highlight-card--theme-neon.highlight-card--legends {
+    animation: highlight-neon-pulse-legends 2.2s ease-in-out infinite;
+  }
+}
+
+/* Theme: Chrome */
 .highlight-card--theme-chrome {
   border: 2px solid transparent;
   background:
@@ -898,23 +1356,11 @@
 }
 
 .highlight-card__banner--theme-chrome {
-  background: linear-gradient(to bottom, #141418, #0a0a0c);
+  background: linear-gradient(to bottom, #141418, #0a0a0c) !important;
   box-shadow: inset 0 1px 0 rgba(212, 212, 216, 0.2);
 }
 
-.highlight-card__banner--theme-chrome.highlight-card__banner--rookie {
-  background: linear-gradient(to bottom, #1a2a1a, #101810);
-}
-
-.highlight-card__banner--theme-chrome.highlight-card__banner--allstar {
-  background: linear-gradient(to bottom, #121a28, #0a1018);
-}
-
-.highlight-card__banner--theme-chrome.highlight-card__banner--legends {
-  background: linear-gradient(to bottom, #2a2210, #181008);
-}
-
-/* Theme: Holographic — slow border hue shift */
+/* Theme: Holographic */
 @keyframes highlight-holo-border-rookie {
   0%,
   100% {
@@ -967,11 +1413,9 @@
   .highlight-card--theme-holographic.highlight-card--rookie {
     animation: highlight-holo-border-rookie 8s ease-in-out infinite;
   }
-
   .highlight-card--theme-holographic.highlight-card--allstar {
     animation: highlight-holo-border-allstar 8s ease-in-out infinite;
   }
-
   .highlight-card--theme-holographic.highlight-card--legends {
     animation: highlight-holo-border-legends 8s ease-in-out infinite;
   }
@@ -980,42 +1424,38 @@
 /* Theme: Retro / Vintage */
 .highlight-card--theme-retro.highlight-card--rookie {
   border-color: #4a5f3a;
-  box-shadow: 0 0 12px rgba(74, 95, 58, 0.2);
 }
 
 .highlight-card--theme-retro.highlight-card--allstar {
   border-color: #3a5a7a;
-  box-shadow: 0 0 12px rgba(58, 90, 122, 0.2);
 }
 
 .highlight-card--theme-retro.highlight-card--legends {
   border-color: #8a6a3a;
-  box-shadow: 0 0 14px rgba(138, 106, 58, 0.22);
 }
 
 .highlight-card__banner--theme-retro {
-  filter: sepia(0.3);
+  filter: sepia(0.2);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
 }
 
 /* Theme: Gold Edition */
-.highlight-card--theme-gold_edition.highlight-card--legends {
-  border-color: #ef9f27;
-  box-shadow: 0 0 24px rgba(239, 159, 39, 0.48), 0 0 8px rgba(239, 159, 39, 0.32);
+.highlight-card--theme-gold_edition {
+  border-color: #ef9f27 !important;
+  box-shadow: 0 0 26px rgba(239, 159, 39, 0.52), 0 0 10px rgba(239, 159, 39, 0.35);
+}
+
+.highlight-card__banner--theme-gold_edition::before {
+  background: #ef9f27 !important;
 }
 
 .highlight-card__banner--theme-gold_edition.highlight-card__banner--legends {
-  border-top-color: #ef9f27;
-  background: linear-gradient(to bottom, #3a2810, #1f1406);
+  background: linear-gradient(to bottom, #3a2810, #1f1406) !important;
 }
 
-.highlight-card--theme-gold_edition.highlight-card--rookie {
-  border-color: #c9921a;
-  box-shadow: 0 0 18px rgba(201, 146, 26, 0.35);
-}
-
-.highlight-card--theme-gold_edition.highlight-card--allstar {
-  border-color: #d4a017;
-  box-shadow: 0 0 18px rgba(212, 160, 23, 0.35);
+.highlight-card__tier-badge--legends.highlight-card__banner--theme-gold_edition,
+.highlight-card--theme-gold_edition .highlight-card__tier-badge--legends {
+  background: linear-gradient(to bottom, #fcd34d, #ef9f27);
 }
 
 /* Theme: Midnight */
@@ -1024,22 +1464,16 @@
 }
 
 .highlight-card__banner--theme-midnight {
-  background: linear-gradient(to bottom, #0a0f1a, #050810) !important;
-  border-top-color: rgba(148, 163, 184, 0.35);
+  background: linear-gradient(to bottom, #050810, #020408) !important;
 }
 
 @keyframes highlight-midnight-sparkle {
   0%,
   100% {
-    box-shadow:
-      0 0 14px rgba(30, 58, 138, 0.35),
-      0 -1px 0 rgba(255, 255, 255, 0.08);
+    box-shadow: 0 0 14px rgba(30, 58, 138, 0.35);
   }
   50% {
-    box-shadow:
-      0 0 18px rgba(96, 165, 250, 0.4),
-      0 0 4px rgba(255, 255, 255, 0.15),
-      0 -1px 0 rgba(255, 255, 255, 0.12);
+    box-shadow: 0 0 20px rgba(96, 165, 250, 0.42), 0 0 4px rgba(255, 255, 255, 0.12);
   }
 }
 
@@ -1052,21 +1486,43 @@
 /* Theme: Inferno */
 .highlight-card--theme-inferno {
   border-color: #d85a30 !important;
-  box-shadow: 0 0 18px rgba(216, 90, 48, 0.38), 0 0 6px rgba(216, 90, 48, 0.22);
+  box-shadow: 0 0 18px rgba(216, 90, 48, 0.38);
 }
 
-.highlight-card__banner--theme-inferno {
-  box-shadow: inset 0 1px 0 rgba(216, 90, 48, 0.35);
+.highlight-card__banner--theme-inferno::before {
+  background: #d85a30 !important;
 }
 
-.highlight-card__banner--theme-inferno.highlight-card__banner--rookie {
-  background: linear-gradient(to bottom, #1f1814, #120c0a);
+/* Seasonal accent themes — banner accent only */
+.highlight-card__banner--theme-spring_training::before {
+  background: #4ade80 !important;
 }
 
-.highlight-card__banner--theme-inferno.highlight-card__banner--allstar {
-  background: linear-gradient(to bottom, #141820, #0c1018);
+.highlight-card__banner--theme-summer_slam::before {
+  background: #fbbf24 !important;
 }
 
-.highlight-card__banner--theme-inferno.highlight-card__banner--legends {
-  background: linear-gradient(to bottom, #281808, #180e06);
+.highlight-card__banner--theme-halloween::before {
+  background: #f97316 !important;
 }
+
+.highlight-card__banner--theme-christmas::before {
+  background: #ef4444 !important;
+}
+
+.highlight-card__banner--theme-fourth_of_july::before {
+  background: linear-gradient(to right, #dc2626, #ffffff, #2563eb) !important;
+}
+
+.highlight-card__banner--theme-new_year::before {
+  background: #c084fc !important;
+}
+
+.highlight-card__banner--theme-rookie_of_the_year::before {
+  background: #60a5fa !important;
+}
+
+.highlight-card__banner--theme-captain::before {
+  background: #facc15 !important;
+}
+

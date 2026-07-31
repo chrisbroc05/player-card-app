@@ -12,6 +12,8 @@ import GenerationCostSummary from "../components/GenerationCostSummary";
 import ThemeLibraryPicker from "../components/ThemeLibraryPicker";
 import CardTypeStep from "../components/CardTypeStep";
 import HighlightCardPreview from "../components/HighlightCardPreview";
+import ExpandableCardView from "../components/ExpandableCardView";
+import { buildHighlightPreviewCard } from "../utils/highlightCard";
 import HighlightVideoStep from "../components/HighlightVideoStep";
 import HighlightProcessingScreen from "../components/HighlightProcessingScreen";
 import QuantitySelector from "../components/QuantitySelector";
@@ -397,8 +399,9 @@ export default function StudioPage() {
       position,
       jersey_number: jerseyNumber,
       grad_year: gradYear,
-      tier: preview.tier || orderTier || "rookie",
+      tier: orderTier || preview.tier || "rookie",
       theme: specialTheme,
+      special_theme: specialTheme,
       image_url: preview.image_url,
       edition_number: preview.edition_number || 1,
       print_run: preview.print_run || 1,
@@ -433,8 +436,9 @@ export default function StudioPage() {
       position,
       jersey_number: jerseyNumber,
       grad_year: gradYear,
-      tier: sel?.tier || orderTier || generatedTier || "rookie",
+      tier: orderTier || sel?.tier || generatedTier || "rookie",
       theme: specialTheme,
+      special_theme: specialTheme,
       image_url: sel?.image_url || generatedCardUrl,
       edition_number: sel?.edition_number || 1,
       print_run: sel?.print_run || 1,
@@ -500,6 +504,33 @@ export default function StudioPage() {
 
   const isAnimatedCardType = cardType === "animated";
   const isHighlightCardType = cardType === "highlight";
+
+  const highlightPreviewExpandCard = useMemo(() => {
+    if (!isHighlightCardType || !highlightClipDraft?.confirmed) return null;
+    return buildHighlightPreviewCard({
+      playerName: playerDisplayName,
+      teamName,
+      position,
+      jerseyNumber,
+      gradYear,
+      tier: orderTier,
+      theme: specialTheme,
+      trimStart: highlightClipDraft.trimStart ?? 0,
+      trimEnd: highlightClipDraft.trimEnd ?? null,
+      objectUrl: highlightClipDraft.objectUrl,
+    });
+  }, [
+    isHighlightCardType,
+    highlightClipDraft,
+    playerDisplayName,
+    teamName,
+    position,
+    jerseyNumber,
+    gradYear,
+    orderTier,
+    specialTheme,
+  ]);
+
   const creditBalance = Number(user?.credit_balance ?? 0);
   const animatedUpgradeCost = Number(generationPricing?.animated_upgrade_price ?? 10);
   const additionalPreviewCost = Number(generationPricing?.additional_preview_price ?? 0);
@@ -2240,18 +2271,27 @@ export default function StudioPage() {
                     <p className="text-center text-xs font-medium uppercase tracking-[0.18em] text-teal-300/90">
                       Your highlight preview
                     </p>
-                    <HighlightCardPreview
-                      playerName={playerDisplayName}
-                      teamName={teamName}
-                      position={position}
-                      jerseyNumber={jerseyNumber}
-                      gradYear={gradYear}
-                      tier={orderTier}
-                      theme={specialTheme}
-                      clipDraft={highlightClipDraft}
-                      variant="detail"
-                      forcePlay
-                    />
+                    <ExpandableCardView
+                      showHint
+                      card={highlightPreviewExpandCard}
+                      alt={`${playerDisplayName} highlight preview`}
+                      localHighlightVideoUrl={highlightClipDraft.objectUrl}
+                      highlightTrimStart={highlightClipDraft.trimStart ?? 0}
+                      highlightTrimEnd={highlightClipDraft.trimEnd ?? null}
+                    >
+                      <HighlightCardPreview
+                        playerName={playerDisplayName}
+                        teamName={teamName}
+                        position={position}
+                        jerseyNumber={jerseyNumber}
+                        gradYear={gradYear}
+                        tier={orderTier}
+                        theme={specialTheme}
+                        clipDraft={highlightClipDraft}
+                        variant="detail"
+                        forcePlay
+                      />
+                    </ExpandableCardView>
                   </div>
                 ) : null}
                 <GenerationCostSummary
@@ -2413,25 +2453,40 @@ export default function StudioPage() {
                             }`}
                           >
                             {isHighlightCardType && highlightClipDraft?.confirmed ? (
-                              <HighlightCardPreview
-                                playerName={playerDisplayName}
-                                teamName={teamName}
-                                position={position}
-                                jerseyNumber={jerseyNumber}
-                                gradYear={gradYear}
-                                tier={orderTier}
-                                theme={specialTheme}
-                                clipDraft={highlightClipDraft}
-                                forcePlay
-                              />
+                              <ExpandableCardView
+                                showHint
+                                card={highlightPreviewExpandCard}
+                                alt={`Preview ${idx + 1}`}
+                                localHighlightVideoUrl={highlightClipDraft.objectUrl}
+                                highlightTrimStart={highlightClipDraft.trimStart ?? 0}
+                                highlightTrimEnd={highlightClipDraft.trimEnd ?? null}
+                              >
+                                <HighlightCardPreview
+                                  playerName={playerDisplayName}
+                                  teamName={teamName}
+                                  position={position}
+                                  jerseyNumber={jerseyNumber}
+                                  gradYear={gradYear}
+                                  tier={orderTier}
+                                  theme={specialTheme}
+                                  clipDraft={highlightClipDraft}
+                                  forcePlay
+                                />
+                              </ExpandableCardView>
                             ) : (
-                              <CardImage
+                              <ExpandableCardView
+                                showHint
                                 card={previewToDisplayCard(preview)}
                                 alt={`Preview ${idx + 1}`}
-                                showInfoBanner
-                                playOnHover={isHighlightCardType}
-                                forcePlay={isHighlightCardType}
-                              />
+                              >
+                                <CardImage
+                                  card={previewToDisplayCard(preview)}
+                                  alt={`Preview ${idx + 1}`}
+                                  showInfoBanner
+                                  playOnHover={isHighlightCardType}
+                                  forcePlay={isHighlightCardType}
+                                />
+                              </ExpandableCardView>
                             )}
                             <div className="space-y-2 bg-cardBg2 p-3">
                               <p className="text-xs text-slate-400">
@@ -2490,19 +2545,29 @@ export default function StudioPage() {
                         <p className="text-center text-sm font-medium text-white">Confirm your card</p>
                         <div className="mx-auto mt-4 max-w-xs">
                           {isHighlightCardType && highlightClipDraft?.confirmed ? (
-                            <HighlightCardPreview
-                              playerName={playerDisplayName}
-                              teamName={teamName}
-                              position={position}
-                              jerseyNumber={jerseyNumber}
-                              gradYear={gradYear}
-                              tier={orderTier}
-                              theme={specialTheme}
-                              clipDraft={highlightClipDraft}
-                              forcePlay
-                            />
+                            <ExpandableCardView
+                              showHint
+                              card={highlightPreviewExpandCard}
+                              alt="Selected preview"
+                              localHighlightVideoUrl={highlightClipDraft.objectUrl}
+                              highlightTrimStart={highlightClipDraft.trimStart ?? 0}
+                              highlightTrimEnd={highlightClipDraft.trimEnd ?? null}
+                            >
+                              <HighlightCardPreview
+                                playerName={playerDisplayName}
+                                teamName={teamName}
+                                position={position}
+                                jerseyNumber={jerseyNumber}
+                                gradYear={gradYear}
+                                tier={orderTier}
+                                theme={specialTheme}
+                                clipDraft={highlightClipDraft}
+                                forcePlay
+                              />
+                            </ExpandableCardView>
                           ) : (
-                            <CardImage
+                            <ExpandableCardView
+                              showHint
                               card={
                                 featuredDisplayCard || {
                                   image_url: selectedPreviewUrl || generatedCardUrl,
@@ -2513,11 +2578,28 @@ export default function StudioPage() {
                                   grad_year: gradYear,
                                   tier: orderTier || "rookie",
                                   theme: specialTheme,
+                                  special_theme: specialTheme,
                                 }
                               }
                               alt="Selected preview"
-                              showInfoBanner
-                            />
+                            >
+                              <CardImage
+                                card={
+                                  featuredDisplayCard || {
+                                    image_url: selectedPreviewUrl || generatedCardUrl,
+                                    player_name: playerDisplayName,
+                                    team_name: teamName,
+                                    position,
+                                    jersey_number: jerseyNumber,
+                                    grad_year: gradYear,
+                                    tier: orderTier || "rookie",
+                                    theme: specialTheme,
+                                  }
+                                }
+                                alt="Selected preview"
+                                showInfoBanner
+                              />
+                            </ExpandableCardView>
                           )}
                         </div>
                         <GenerationCostSummary

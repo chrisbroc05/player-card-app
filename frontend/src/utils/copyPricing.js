@@ -47,6 +47,27 @@ export function formatCopyTierSummary(tiers = DEFAULT_COPY_PRICING_TIERS) {
 export function bulkDiscountMessage(quantity) {
   const q = Math.max(1, Number(quantity) || 1);
   if (q >= 10) return "Bulk discount applied! (10+ copies)";
-  if (q >= 5) return "Bulk discount applied! (5–9 copies)";
+  if (q >= 5) return "Bulk discount applied!";
   return null;
+}
+
+export const COPY_QUANTITY_MIN = 1;
+export const COPY_QUANTITY_MAX = 100;
+
+export function isValidCopyQuantity(value) {
+  if (value === "" || value === null || value === undefined) return false;
+  const n = Number(value);
+  return Number.isInteger(n) && n >= COPY_QUANTITY_MIN && n <= COPY_QUANTITY_MAX;
+}
+
+export function clampCopyQuantity(value) {
+  const n = Math.floor(Number(value));
+  if (!Number.isFinite(n)) return COPY_QUANTITY_MIN;
+  return Math.min(COPY_QUANTITY_MAX, Math.max(COPY_QUANTITY_MIN, n));
+}
+
+export function copyQuantitySummaryLine(quantity) {
+  const q = clampCopyQuantity(quantity);
+  if (q === 1) return "You will receive 1 unique card (1 of 1) in your collection.";
+  return `You will receive ${q} unique cards (#1 of ${q} through #${q} of ${q}) in your collection.`;
 }

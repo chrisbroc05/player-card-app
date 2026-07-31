@@ -1,5 +1,26 @@
 import { normalizeTierKey } from "./cardTemplate";
 
+const KNOWN_THEME_KEYS = new Set([
+  "neon",
+  "holographic",
+  "chrome",
+  "retro",
+  "gold_edition",
+  "midnight",
+  "inferno",
+  "mvp",
+  "diamond",
+  "hall_of_fame",
+  "spring_training",
+  "summer_slam",
+  "halloween",
+  "christmas",
+  "fourth_of_july",
+  "new_year",
+  "rookie_of_the_year",
+  "captain",
+]);
+
 /** Normalize theme id/slug to a highlight style modifier key */
 export function normalizeHighlightThemeKey(theme) {
   const raw = String(theme || "")
@@ -8,6 +29,7 @@ export function normalizeHighlightThemeKey(theme) {
     .replace(/[\s-]+/g, "_");
 
   if (!raw || raw === "none" || raw === "default") return "default";
+  if (KNOWN_THEME_KEYS.has(raw)) return raw;
   if (raw.includes("neon")) return "neon";
   if (raw.includes("holo")) return "holographic";
   if (raw.includes("chrome") || raw.includes("metallic")) return "chrome";
@@ -15,18 +37,48 @@ export function normalizeHighlightThemeKey(theme) {
   if (raw.includes("gold")) return "gold_edition";
   if (raw.includes("midnight")) return "midnight";
   if (raw.includes("inferno")) return "inferno";
-  return "default";
+  if (raw.includes("mvp")) return "mvp";
+  if (raw.includes("diamond")) return "diamond";
+  if (raw.includes("hall_of_fame") || raw === "hof") return "hall_of_fame";
+  if (raw.includes("spring")) return "spring_training";
+  if (raw.includes("summer")) return "summer_slam";
+  if (raw.includes("halloween")) return "halloween";
+  if (raw.includes("christmas")) return "christmas";
+  if (raw.includes("fourth") || raw.includes("july")) return "fourth_of_july";
+  if (raw.includes("new_year")) return "new_year";
+  if (raw.includes("rookie_of_the_year")) return "rookie_of_the_year";
+  if (raw.includes("captain")) return "captain";
+  return "custom";
 }
 
-/** Human-readable theme label for banner (default themes only) */
+/** Human-readable theme label for banner (custom / unnamed themes) */
 export function highlightThemeBannerLabel(theme) {
   const key = normalizeHighlightThemeKey(theme);
-  if (key !== "default") return "";
+  if (key !== "custom") return "";
   const raw = String(theme || "").trim();
   if (!raw) return "";
   return raw
     .replace(/[_-]+/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function highlightTierBadgeLabel(tierKey) {
+  if (tierKey === "legends") return "LEGENDS";
+  if (tierKey === "allstar") return "★ ALL-STAR ★";
+  return "ROOKIE";
+}
+
+function highlightThemeBadge(themeKey) {
+  switch (themeKey) {
+    case "mvp":
+      return { label: "🏆 MVP", className: "highlight-card__theme-badge highlight-card__theme-badge--mvp" };
+    case "hall_of_fame":
+      return { label: "HOF", className: "highlight-card__theme-badge highlight-card__theme-badge--hof" };
+    case "diamond":
+      return { label: "◆", className: "highlight-card__theme-badge highlight-card__theme-badge--diamond" };
+    default:
+      return null;
+  }
 }
 
 /**
@@ -58,7 +110,11 @@ export function getHighlightCardStyles(tier, theme) {
     themeKey,
     frameClass,
     bannerClass,
-    mediaClass: "highlight-card__media",
+    mediaClass: `highlight-card__media highlight-card__media--${tierKey}`,
+    tierBadgeLabel: highlightTierBadgeLabel(tierKey),
+    tierBadgeClass: `highlight-card__tier-badge highlight-card__tier-badge--${tierKey}`,
+    playerNameClass: `highlight-card__player-name highlight-card__player-name--${tierKey}`,
+    themeBadge: highlightThemeBadge(themeKey),
     themeBannerLabel: highlightThemeBannerLabel(theme),
   };
 }

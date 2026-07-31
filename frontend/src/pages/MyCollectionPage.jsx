@@ -367,12 +367,12 @@ export default function MyCollectionPage() {
                     pending ? "opacity-70" : videoCard ? "" : "hover:scale-[1.02]"
                   }`}
                 >
-                  <div className="relative">
+                  <div className="relative min-h-[280px] sm:min-h-[320px]">
                     <CardImage
                       card={card}
                       alt={card.player_name}
                       cacheBust={card.created_at}
-                      frameClassName={cardMediaFrameClass(card)}
+                      frameClassName={`${cardMediaFrameClass(card)} w-full`}
                       playOnHover
                     />
                     {stackCount ? (
