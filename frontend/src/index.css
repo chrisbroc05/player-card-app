@@ -802,6 +802,8 @@
 .card-banner {
   position: relative;
   border-top: none;
+  padding: 8px 10px;
+  text-align: center;
 }
 
 .card-banner::before {
@@ -818,35 +820,97 @@
   height: 4px;
 }
 
-.card-banner__footer {
+.card-banner__body {
   width: 100%;
+}
+
+.card-banner__name {
+  margin: 0;
+  text-align: center;
+  line-height: 1.1;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.card-banner__team,
+.card-banner__stats {
+  margin: 0;
+  text-align: center;
+  line-height: 1.15;
+  word-break: break-word;
+}
+
+.card-banner__team {
+  margin-top: 2px;
+  text-transform: uppercase;
+}
+
+.card-banner__stats {
+  margin-top: 2px;
+}
+
+.card-banner__footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  margin-top: 4px;
 }
 
 .card-banner__tier-pill {
   display: inline-flex;
   align-items: center;
+  justify-self: start;
   border-radius: 9999px;
   border: 1px solid transparent;
   padding: 0.1rem 0.45rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
   line-height: 1.2;
   white-space: nowrap;
+  text-transform: uppercase;
 }
 
 .card-banner__theme {
+  justify-self: center;
+  text-align: center;
   font-weight: 600;
   letter-spacing: 0.04em;
   opacity: 0.92;
-}
-
-.card-banner__edition {
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* Rookie */
+.card-banner--rookie .card-banner__theme {
+  font-family: "Barlow Condensed", sans-serif;
+}
+
+.card-banner--allstar .card-banner__theme {
+  font-family: "Rajdhani", sans-serif;
+}
+
+.card-banner--legends .card-banner__theme {
+  font-family: "Cinzel", serif;
+}
+
+.card-banner__theme--empty {
+  visibility: hidden;
+}
+
+.card-banner__edition {
+  justify-self: end;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Rookie typography */
 .card-banner--rookie {
   background: linear-gradient(to bottom, #0d200d, #1a3a1a);
 }
@@ -856,27 +920,49 @@
 }
 
 .card-banner__name--rookie {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 20px;
+  font-weight: 400;
+  letter-spacing: 2px;
   color: #fff;
-  font-weight: 600;
-  letter-spacing: 0.5px;
 }
 
-.card-banner__team--rookie,
-.card-banner__stats--rookie {
+.card-banner__name--rookie.card-banner__name--long {
+  font-size: 15px;
+  letter-spacing: 1.5px;
+}
+
+.card-banner__team--rookie {
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
   color: #a8c8a8;
+  letter-spacing: 1.5px;
+}
+
+.card-banner__stats--rookie {
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  color: #7aaa7a;
 }
 
 .card-banner__tier-pill--rookie {
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 9px;
+  font-weight: 700;
   background: #2d5a0d;
   border-color: #4a8a1a;
   color: #7bc832;
 }
 
 .card-banner__edition--rookie {
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 10px;
   color: #7bc832;
 }
 
-/* All-Star */
+/* All-Star typography */
 .card-banner--allstar {
   background: linear-gradient(to bottom, #060d1a, #0d1a2e);
 }
@@ -886,27 +972,49 @@
 }
 
 .card-banner__name--allstar {
+  font-family: "Russo One", sans-serif;
+  font-size: 18px;
+  font-weight: 400;
+  letter-spacing: 1px;
   color: #fff;
-  font-weight: 600;
-  letter-spacing: 0.3px;
 }
 
-.card-banner__team--allstar,
-.card-banner__stats--allstar {
+.card-banner__name--allstar.card-banner__name--long {
+  font-size: 15px;
+  letter-spacing: 0.75px;
+}
+
+.card-banner__team--allstar {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
   color: #a0b8d8;
+  letter-spacing: 2px;
+}
+
+.card-banner__stats--allstar {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: #7aaad8;
 }
 
 .card-banner__tier-pill--allstar {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 9px;
+  font-weight: 700;
   background: #0d2a4a;
   border-color: #2a7fd4;
   color: #4a9eff;
 }
 
 .card-banner__edition--allstar {
+  font-family: "Rajdhani", sans-serif;
+  font-size: 10px;
   color: #4a9eff;
 }
 
-/* Legends */
+/* Legends typography */
 .card-banner--legends {
   background: linear-gradient(to bottom, #0d0900, #1a1200);
 }
@@ -916,23 +1024,183 @@
 }
 
 .card-banner__name--legends {
-  color: #f0d060;
+  font-family: "Cinzel", serif;
+  font-size: 17px;
   font-weight: 700;
+  letter-spacing: 1.5px;
+  color: #f0d060;
 }
 
-.card-banner__team--legends,
-.card-banner__stats--legends {
+.card-banner__name--legends.card-banner__name--long {
+  font-size: 15px;
+  letter-spacing: 1px;
+}
+
+.card-banner__team--legends {
+  font-family: "Cinzel", serif;
+  font-size: 11px;
+  font-weight: 400;
   color: #b89840;
+  letter-spacing: 2px;
+}
+
+.card-banner__stats--legends {
+  font-family: "Cinzel", serif;
+  font-size: 10px;
+  font-weight: 400;
+  color: #a08030;
 }
 
 .card-banner__tier-pill--legends {
+  font-family: "Cinzel", serif;
+  font-size: 9px;
+  font-weight: 600;
   background: #2a1e00;
   border-color: #d4920a;
   color: #f0c030;
 }
 
 .card-banner__edition--legends {
+  font-family: "Cinzel", serif;
+  font-size: 10px;
   color: #d4920a;
+}
+
+/* Grid / compact sizes (My Collection, vault thumbnails) */
+.card-banner--size-default .card-banner__name--rookie {
+  font-size: 13px;
+  letter-spacing: 1.5px;
+}
+
+.card-banner--size-default .card-banner__name--rookie.card-banner__name--long {
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+.card-banner--size-default .card-banner__name--allstar {
+  font-size: 13px;
+  letter-spacing: 0.75px;
+}
+
+.card-banner--size-default .card-banner__name--allstar.card-banner__name--long {
+  font-size: 12px;
+}
+
+.card-banner--size-default .card-banner__name--legends {
+  font-size: 13px;
+  letter-spacing: 1px;
+}
+
+.card-banner--size-default .card-banner__name--legends.card-banner__name--long {
+  font-size: 12px;
+}
+
+.card-banner--size-default .card-banner__team--rookie,
+.card-banner--size-default .card-banner__team--allstar {
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+
+.card-banner--size-default .card-banner__team--legends {
+  font-size: 10px;
+}
+
+.card-banner--size-default .card-banner__stats--rookie,
+.card-banner--size-default .card-banner__stats--allstar,
+.card-banner--size-default .card-banner__stats--legends {
+  font-size: 10px;
+}
+
+.card-banner--size-default .card-banner__tier-pill {
+  font-size: 7px;
+  padding: 0.08rem 0.35rem;
+}
+
+.card-banner--size-default .card-banner__edition {
+  font-size: 9px;
+}
+
+.card-banner--size-default .card-banner__theme {
+  font-size: 8px;
+}
+
+/* Detail / full-size views */
+.card-banner--size-detail .card-banner__name--rookie {
+  font-size: 20px;
+}
+
+.card-banner--size-detail .card-banner__name--rookie.card-banner__name--long {
+  font-size: 15px;
+}
+
+.card-banner--size-detail .card-banner__name--allstar {
+  font-size: 18px;
+}
+
+.card-banner--size-detail .card-banner__name--allstar.card-banner__name--long {
+  font-size: 15px;
+}
+
+.card-banner--size-detail .card-banner__name--legends {
+  font-size: 17px;
+}
+
+.card-banner--size-detail .card-banner__name--legends.card-banner__name--long {
+  font-size: 15px;
+}
+
+.card-banner--size-detail .card-banner__tier-pill {
+  font-size: 10px;
+}
+
+.card-banner--size-detail .card-banner__edition,
+.card-banner--size-detail .card-banner__theme {
+  font-size: 10px;
+}
+
+/* Compact / thumb */
+.card-banner--size-compact,
+.card-banner--size-thumb {
+  padding: 6px 8px;
+  min-height: 4.25rem !important;
+}
+
+.card-banner--size-compact .card-banner__name--rookie,
+.card-banner--size-compact .card-banner__name--allstar,
+.card-banner--size-compact .card-banner__name--legends,
+.card-banner--size-thumb .card-banner__name--rookie,
+.card-banner--size-thumb .card-banner__name--allstar,
+.card-banner--size-thumb .card-banner__name--legends {
+  font-size: 11px;
+  letter-spacing: 0.75px;
+}
+
+.card-banner--size-compact .card-banner__name--long,
+.card-banner--size-thumb .card-banner__name--long {
+  font-size: 10px !important;
+}
+
+.card-banner--size-compact .card-banner__team,
+.card-banner--size-thumb .card-banner__team,
+.card-banner--size-compact .card-banner__stats,
+.card-banner--size-thumb .card-banner__stats {
+  font-size: 8px;
+}
+
+.card-banner--size-compact .card-banner__tier-pill,
+.card-banner--size-thumb .card-banner__tier-pill {
+  font-size: 6px;
+  padding: 0.06rem 0.3rem;
+}
+
+.card-banner--size-compact .card-banner__edition,
+.card-banner--size-thumb .card-banner__edition {
+  font-size: 8px;
+}
+
+.card-banner--size-compact .card-banner__theme,
+.card-banner--size-thumb .card-banner__theme {
+  font-size: 7px;
 }
 
 @keyframes card-banner-legends-accent-shimmer {
@@ -1017,12 +1285,53 @@
   display: none;
 }
 
-/* Video: contain within frame, tier-colored letterbox */
+/* Video: blurred backdrop fill + sharp foreground (no gray letterbox) */
+.highlight-video-fill {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.highlight-video-fill__bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  filter: blur(12px) saturate(1.2);
+  opacity: 0.7;
+  transform: scale(1.1);
+  pointer-events: none;
+}
+
+.highlight-video-fill__fg {
+  position: relative;
+  z-index: 1;
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  object-position: center;
+}
+
 .highlight-card__media {
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+}
+
+.highlight-card__media .highlight-video-fill {
+  background: transparent;
 }
 
 .highlight-card__media .card-animated-video-container {
@@ -1207,160 +1516,272 @@
   color: #dbeafe;
 }
 
-/* Theme: MVP */
-.highlight-card--theme-mvp.highlight-card--rookie,
-.highlight-card--theme-mvp.highlight-card--allstar,
-.highlight-card--theme-mvp.highlight-card--legends {
-  box-shadow:
-    0 0 0 1px rgba(239, 159, 39, 0.45),
-    0 0 18px rgba(239, 159, 39, 0.28);
+/* Theme decoration layer (highlight cards) */
+.highlight-card__decor {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+  overflow: hidden;
 }
 
-.highlight-card__banner--theme-mvp.highlight-card__banner--rookie,
-.highlight-card__banner--theme-mvp.highlight-card__banner--allstar,
-.highlight-card__banner--theme-mvp.highlight-card__banner--legends {
-  background: linear-gradient(to bottom, rgba(239, 159, 39, 0.12), transparent),
-    var(--hl-banner-bg, #0d200d);
+.highlight-card__gem {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #85b7eb;
+  transform: rotate(45deg);
 }
 
-.highlight-card__banner--theme-mvp.highlight-card__banner--rookie {
-  --hl-banner-bg: linear-gradient(to bottom, #1f3a18, #0d200d);
+.highlight-card__gem--tl {
+  top: 6px;
+  left: 6px;
 }
 
-.highlight-card__banner--theme-mvp.highlight-card__banner--allstar {
-  --hl-banner-bg: linear-gradient(to bottom, #122038, #060d1a);
+.highlight-card__gem--tr {
+  top: 6px;
+  right: 6px;
 }
 
-.highlight-card__banner--theme-mvp.highlight-card__banner--legends {
-  --hl-banner-bg: linear-gradient(to bottom, #2a1c08, #0d0900);
+.highlight-card__gem--bl {
+  bottom: calc(28% + 6px);
+  left: 6px;
 }
 
-.highlight-card__banner--theme-mvp::before {
-  background: #ef9f27 !important;
+.highlight-card__gem--br {
+  bottom: calc(28% + 6px);
+  right: 6px;
 }
 
-/* Theme: Diamond */
-.highlight-card--theme-diamond {
-  border-color: #85b7eb !important;
-  box-shadow:
-    0 0 0 1px rgba(133, 183, 235, 0.35),
-    0 0 16px rgba(133, 183, 235, 0.28);
+.highlight-card__trophy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 18px;
+  line-height: 1;
+  opacity: 0.8;
+  filter: drop-shadow(0 0 4px rgba(239, 159, 39, 0.6));
 }
 
-.highlight-card__banner--theme-diamond::before {
-  background: #85b7eb !important;
+.highlight-card__hof-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #cd7f32;
+  text-shadow: 0 0 8px rgba(205, 127, 50, 0.5);
+}
+
+.highlight-card__ribbon {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #cd7f32 0%, #cd7f32 48%, transparent 48%);
+  opacity: 0.85;
+}
+
+.highlight-card__star {
+  position: absolute;
+  font-size: 12px;
+  color: #4ade80;
+  text-shadow: 0 0 6px rgba(74, 222, 128, 0.7);
+}
+
+.highlight-card__star--tl {
+  top: 5px;
+  left: 6px;
+}
+
+.highlight-card__star--tr {
+  top: 5px;
+  right: 6px;
+}
+
+.highlight-card__star--bl {
+  bottom: calc(28% + 5px);
+  left: 6px;
+}
+
+.highlight-card__star--br {
+  bottom: calc(28% + 5px);
+  right: 6px;
+}
+
+.highlight-card__roy-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid #4ade80;
+  background: rgba(22, 101, 52, 0.75);
+  color: #bbf7d0;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.highlight-card__anchor {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 16px;
+  opacity: 0.85;
+  filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.5));
+}
+
+.highlight-card__captain-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 1px solid #93c5fd;
+  background: rgba(30, 58, 138, 0.85);
+  color: #dbeafe;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.highlight-card__flame {
+  position: absolute;
+  bottom: calc(28% - 2px);
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: linear-gradient(to top, rgba(216, 90, 48, 0.55), transparent);
+  box-shadow: 0 -4px 14px rgba(216, 90, 48, 0.45);
+}
+
+.highlight-card__holo-shimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.12) 50%,
+    transparent 60%
+  );
+  background-size: 200% 200%;
+  mix-blend-mode: screen;
+}
+
+/* Expand modal close — overlaps card corner */
+.card-expand-modal__card {
+  overflow: visible;
+}
+
+.card-expand-modal__close {
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  z-index: 100;
+  display: flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 1px solid #fff;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.card-expand-modal__close:hover {
+  background: #000;
+  transform: scale(1.1);
+}
+
+@keyframes highlight-gem-sparkle {
+  0%,
+  100% {
+    opacity: 0.75;
+    filter: brightness(1);
+  }
+  50% {
+    opacity: 1;
+    filter: brightness(1.45);
+  }
+}
+
+@keyframes highlight-holo-shimmer {
+  0% {
+    background-position: 0% 0%;
+  }
+  100% {
+    background-position: 200% 200%;
+  }
+}
+
+@keyframes highlight-gold-border-shimmer {
+  0%,
+  100% {
+    box-shadow:
+      0 0 24px rgba(255, 215, 0, 0.55),
+      inset 0 0 0 1px rgba(255, 215, 0, 0.35);
+  }
+  50% {
+    box-shadow:
+      0 0 36px rgba(255, 215, 0, 0.75),
+      inset 0 0 0 2px rgba(255, 235, 150, 0.55);
+  }
+}
+
+@keyframes highlight-inferno-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 18px rgba(216, 90, 48, 0.45), 0 0 6px rgba(239, 68, 68, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 28px rgba(239, 68, 68, 0.55), 0 0 12px rgba(216, 90, 48, 0.45);
+  }
+}
+
+@keyframes highlight-midnight-twinkle {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+@keyframes highlight-holo-rainbow {
+  0% {
+    filter: hue-rotate(0deg);
+  }
+  100% {
+    filter: hue-rotate(360deg);
+  }
 }
 
 @keyframes highlight-diamond-sparkle {
   0%,
   100% {
     box-shadow:
-      0 0 0 1px rgba(133, 183, 235, 0.35),
-      0 0 14px rgba(133, 183, 235, 0.22);
+      0 0 16px rgba(133, 183, 235, 0.45),
+      0 0 28px rgba(133, 183, 235, 0.25);
   }
   50% {
     box-shadow:
-      0 0 0 1px rgba(191, 219, 254, 0.55),
-      0 0 22px rgba(133, 183, 235, 0.42);
+      0 0 24px rgba(191, 219, 254, 0.65),
+      0 0 36px rgba(133, 183, 235, 0.45);
   }
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .highlight-card--theme-diamond {
-    animation: highlight-diamond-sparkle 3.5s ease-in-out infinite;
-  }
-}
-
-/* Theme: Hall of Fame */
-.highlight-card--theme-hall_of_fame {
-  border-color: #cd7f32 !important;
-  box-shadow: 0 0 16px rgba(205, 127, 50, 0.32);
-}
-
-.highlight-card__banner--theme-hall_of_fame {
-  background: linear-gradient(to bottom, #1a1008, #0a0806) !important;
-}
-
-.highlight-card__banner--theme-hall_of_fame::before {
-  background: #cd7f32 !important;
-}
-
-/* Theme: Neon */
-.highlight-card--theme-neon.highlight-card--rookie {
-  border-color: #5cb82a;
-  box-shadow: 0 0 20px rgba(92, 184, 42, 0.42), 0 0 6px rgba(92, 184, 42, 0.28);
-}
-
-.highlight-card--theme-neon.highlight-card--allstar {
-  border-color: #38bdf8;
-  box-shadow: 0 0 20px rgba(56, 189, 248, 0.45), 0 0 6px rgba(56, 189, 248, 0.3);
-}
-
-.highlight-card--theme-neon.highlight-card--legends {
-  border-color: #fbbf24;
-  box-shadow: 0 0 22px rgba(251, 191, 36, 0.48), 0 0 8px rgba(251, 191, 36, 0.32);
-}
-
-@keyframes highlight-neon-pulse-rookie {
-  0%,
-  100% {
-    box-shadow: 0 0 14px rgba(92, 184, 42, 0.35);
-  }
-  50% {
-    box-shadow: 0 0 24px rgba(92, 184, 42, 0.55);
-  }
-}
-
-@keyframes highlight-neon-pulse-allstar {
-  0%,
-  100% {
-    box-shadow: 0 0 14px rgba(56, 189, 248, 0.35);
-  }
-  50% {
-    box-shadow: 0 0 24px rgba(56, 189, 248, 0.55);
-  }
-}
-
-@keyframes highlight-neon-pulse-legends {
-  0%,
-  100% {
-    box-shadow: 0 0 16px rgba(251, 191, 36, 0.38);
-  }
-  50% {
-    box-shadow: 0 0 26px rgba(251, 191, 36, 0.58);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .highlight-card--theme-neon.highlight-card--rookie {
-    animation: highlight-neon-pulse-rookie 2.2s ease-in-out infinite;
-  }
-  .highlight-card--theme-neon.highlight-card--allstar {
-    animation: highlight-neon-pulse-allstar 2.2s ease-in-out infinite;
-  }
-  .highlight-card--theme-neon.highlight-card--legends {
-    animation: highlight-neon-pulse-legends 2.2s ease-in-out infinite;
-  }
-}
-
-/* Theme: Chrome */
-.highlight-card--theme-chrome {
-  border: 2px solid transparent;
-  background:
-    linear-gradient(#080808, #080808) padding-box,
-    linear-gradient(135deg, #d4d4d8 0%, #71717a 28%, #f4f4f5 52%, #52525b 78%, #e4e4e7 100%) border-box;
-}
-
-.highlight-card--theme-chrome.highlight-card--legends {
-  border-width: 3px;
-}
-
-.highlight-card__banner--theme-chrome {
-  background: linear-gradient(to bottom, #141418, #0a0a0c) !important;
-  box-shadow: inset 0 1px 0 rgba(212, 212, 216, 0.2);
-}
-
-/* Theme: Holographic */
 @keyframes highlight-holo-border-rookie {
   0%,
   100% {
@@ -1409,120 +1830,439 @@
   }
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .highlight-card--theme-holographic.highlight-card--rookie {
-    animation: highlight-holo-border-rookie 8s ease-in-out infinite;
-  }
-  .highlight-card--theme-holographic.highlight-card--allstar {
-    animation: highlight-holo-border-allstar 8s ease-in-out infinite;
-  }
-  .highlight-card--theme-holographic.highlight-card--legends {
-    animation: highlight-holo-border-legends 8s ease-in-out infinite;
-  }
+/* ── Highlight theme treatments (frame + .card-banner) ── */
+
+/* MVP */
+.highlight-card--theme-mvp {
+  border: 3px solid #ef9f27 !important;
+  box-shadow:
+    0 0 20px #ef9f27,
+    0 0 40px rgba(239, 159, 39, 0.4) !important;
+  animation: none !important;
 }
 
-/* Theme: Retro / Vintage */
-.highlight-card--theme-retro.highlight-card--rookie {
-  border-color: #4a5f3a;
-}
-
-.highlight-card--theme-retro.highlight-card--allstar {
-  border-color: #3a5a7a;
-}
-
-.highlight-card--theme-retro.highlight-card--legends {
-  border-color: #8a6a3a;
-}
-
-.highlight-card__banner--theme-retro {
-  filter: sepia(0.2);
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
-}
-
-/* Theme: Gold Edition */
-.highlight-card--theme-gold_edition {
-  border-color: #ef9f27 !important;
-  box-shadow: 0 0 26px rgba(239, 159, 39, 0.52), 0 0 10px rgba(239, 159, 39, 0.35);
-}
-
-.highlight-card__banner--theme-gold_edition::before {
+.highlight-card--theme-mvp .card-banner::before {
+  height: 5px !important;
   background: #ef9f27 !important;
 }
 
-.highlight-card__banner--theme-gold_edition.highlight-card__banner--legends {
-  background: linear-gradient(to bottom, #3a2810, #1f1406) !important;
+.highlight-card--theme-mvp.highlight-card--rookie .card-banner {
+  background: linear-gradient(to bottom, rgba(239, 159, 39, 0.28), rgba(239, 159, 39, 0.06)),
+    linear-gradient(to bottom, #0d200d, #1a3a1a) !important;
 }
 
-.highlight-card__tier-badge--legends.highlight-card__banner--theme-gold_edition,
-.highlight-card--theme-gold_edition .highlight-card__tier-badge--legends {
-  background: linear-gradient(to bottom, #fcd34d, #ef9f27);
+.highlight-card--theme-mvp.highlight-card--allstar .card-banner {
+  background: linear-gradient(to bottom, rgba(239, 159, 39, 0.28), rgba(239, 159, 39, 0.06)),
+    linear-gradient(to bottom, #060d1a, #0d1a2e) !important;
 }
 
-/* Theme: Midnight */
-.highlight-card--theme-midnight {
-  box-shadow: 0 0 16px rgba(15, 23, 42, 0.55);
+.highlight-card--theme-mvp.highlight-card--legends .card-banner {
+  background: linear-gradient(to bottom, rgba(239, 159, 39, 0.32), rgba(239, 159, 39, 0.08)),
+    linear-gradient(to bottom, #0d0900, #1a1200) !important;
 }
 
-.highlight-card__banner--theme-midnight {
-  background: linear-gradient(to bottom, #050810, #020408) !important;
+.highlight-card--theme-mvp .card-banner__tier-pill {
+  border-color: #ef9f27 !important;
 }
 
-@keyframes highlight-midnight-sparkle {
-  0%,
-  100% {
-    box-shadow: 0 0 14px rgba(30, 58, 138, 0.35);
-  }
-  50% {
-    box-shadow: 0 0 20px rgba(96, 165, 250, 0.42), 0 0 4px rgba(255, 255, 255, 0.12);
-  }
+.highlight-card--theme-mvp .card-banner__theme {
+  color: #fcd34d !important;
+  font-weight: 700;
+}
+
+/* Diamond */
+.highlight-card--theme-diamond {
+  border: 2px solid #85b7eb !important;
+  box-shadow:
+    0 0 16px rgba(133, 183, 235, 0.45),
+    0 0 28px rgba(133, 183, 235, 0.25) !important;
+  animation: highlight-diamond-sparkle 3.5s ease-in-out infinite !important;
+}
+
+.highlight-card--theme-diamond .card-banner::before {
+  background: #85b7eb !important;
+  height: 4px !important;
+}
+
+.highlight-card--theme-diamond .card-banner__theme {
+  color: #93c5fd !important;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .highlight-card--theme-midnight {
-    animation: highlight-midnight-sparkle 4s ease-in-out infinite;
+  .highlight-card__decor--diamond .highlight-card__gem {
+    animation: highlight-gem-sparkle 2.5s ease-in-out infinite;
   }
 }
 
-/* Theme: Inferno */
-.highlight-card--theme-inferno {
-  border-color: #d85a30 !important;
-  box-shadow: 0 0 18px rgba(216, 90, 48, 0.38);
+/* Hall of Fame */
+.highlight-card--theme-hall_of_fame {
+  border: 3px solid #cd7f32 !important;
+  box-shadow: 0 0 20px rgba(205, 127, 50, 0.45) !important;
+  animation: none !important;
 }
 
-.highlight-card__banner--theme-inferno::before {
-  background: #d85a30 !important;
+.highlight-card--theme-hall_of_fame .card-banner {
+  background: linear-gradient(to bottom, #1a1008, #0a0806) !important;
 }
 
-/* Seasonal accent themes — banner accent only */
-.highlight-card__banner--theme-spring_training::before {
+.highlight-card--theme-hall_of_fame .card-banner::before {
+  background: #cd7f32 !important;
+  height: 4px !important;
+}
+
+/* Gold Edition */
+.highlight-card--theme-gold_edition {
+  border: 4px solid #ffd700 !important;
+  box-shadow:
+    0 0 28px rgba(255, 215, 0, 0.65),
+    0 0 48px rgba(255, 215, 0, 0.35) !important;
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .highlight-card--theme-gold_edition {
+    animation: highlight-gold-border-shimmer 4s ease-in-out infinite !important;
+  }
+}
+
+.highlight-card--theme-gold_edition .card-banner {
+  background: linear-gradient(to bottom, #2a1e00, #3d2d00) !important;
+}
+
+.highlight-card--theme-gold_edition .card-banner::before {
+  background: #ffd700 !important;
+  height: 5px !important;
+}
+
+.highlight-card--theme-gold_edition .card-banner__name,
+.highlight-card--theme-gold_edition .card-banner__team,
+.highlight-card--theme-gold_edition .card-banner__stats,
+.highlight-card--theme-gold_edition .card-banner__edition,
+.highlight-card--theme-gold_edition .card-banner__theme {
+  color: #ffd700 !important;
+}
+
+.highlight-card--theme-gold_edition .card-banner__tier-pill {
+  border-color: #ffd700 !important;
+  color: #ffd700 !important;
+  background: rgba(42, 30, 0, 0.9) !important;
+}
+
+/* Rookie of the Year */
+.highlight-card--theme-rookie_of_the_year {
+  border: 2px solid #4ade80 !important;
+  box-shadow:
+    0 0 16px rgba(74, 222, 128, 0.4),
+    0 0 0 2px rgba(34, 197, 94, 0.25) !important;
+  animation: none !important;
+}
+
+.highlight-card--theme-rookie_of_the_year .card-banner {
+  background: linear-gradient(to bottom, #0a1f0a, #061406) !important;
+}
+
+.highlight-card--theme-rookie_of_the_year .card-banner::before {
   background: #4ade80 !important;
 }
 
-.highlight-card__banner--theme-summer_slam::before {
+/* Captain */
+.highlight-card--theme-captain {
+  border: 2px solid #1e3a8a !important;
+  box-shadow: 0 0 18px rgba(30, 58, 138, 0.55) !important;
+  animation: none !important;
+}
+
+.highlight-card--theme-captain .card-banner {
+  background: linear-gradient(to bottom, #0a1628, #060d18) !important;
+}
+
+.highlight-card--theme-captain .card-banner::before {
+  background: #3b82f6 !important;
+}
+
+/* Neon — pulsing tier-colored glow */
+.highlight-card--theme-neon.highlight-card--rookie {
+  border-color: #5cb82a !important;
+  animation: highlight-neon-pulse-rookie 2s ease-in-out infinite !important;
+}
+
+.highlight-card--theme-neon.highlight-card--allstar {
+  border-color: #38bdf8 !important;
+  animation: highlight-neon-pulse-allstar 2s ease-in-out infinite !important;
+}
+
+.highlight-card--theme-neon.highlight-card--legends {
+  border-color: #fbbf24 !important;
+  animation: highlight-neon-pulse-legends 2s ease-in-out infinite !important;
+}
+
+@keyframes highlight-neon-pulse-rookie {
+  0%,
+  100% {
+    box-shadow: 0 0 10px rgba(92, 184, 42, 0.45);
+  }
+  50% {
+    box-shadow:
+      0 0 30px rgba(92, 184, 42, 0.75),
+      0 0 60px rgba(92, 184, 42, 0.35);
+  }
+}
+
+@keyframes highlight-neon-pulse-allstar {
+  0%,
+  100% {
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.45);
+  }
+  50% {
+    box-shadow:
+      0 0 30px rgba(56, 189, 248, 0.75),
+      0 0 60px rgba(56, 189, 248, 0.35);
+  }
+}
+
+@keyframes highlight-neon-pulse-legends {
+  0%,
+  100% {
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.45);
+  }
+  50% {
+    box-shadow:
+      0 0 30px rgba(251, 191, 36, 0.75),
+      0 0 60px rgba(251, 191, 36, 0.35);
+  }
+}
+
+.highlight-card--theme-neon .card-banner::before {
+  height: 4px !important;
+}
+
+.highlight-card--theme-neon.highlight-card--rookie .card-banner::before {
+  background: #5cb82a !important;
+  box-shadow: 0 0 8px rgba(92, 184, 42, 0.6);
+}
+
+.highlight-card--theme-neon.highlight-card--allstar .card-banner::before {
+  background: #38bdf8 !important;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
+}
+
+.highlight-card--theme-neon.highlight-card--legends .card-banner::before {
+  background: #fbbf24 !important;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+}
+
+/* Holographic — rainbow border + iridescent shimmer */
+.highlight-card--theme-holographic {
+  animation: highlight-holo-border-rookie 8s ease-in-out infinite !important;
+}
+
+.highlight-card--theme-holographic.highlight-card--allstar {
+  animation: highlight-holo-border-allstar 8s ease-in-out infinite !important;
+}
+
+.highlight-card--theme-holographic.highlight-card--legends {
+  animation: highlight-holo-border-legends 8s ease-in-out infinite !important;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .highlight-card--theme-holographic::after {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    border: 2px solid transparent;
+    background: linear-gradient(90deg, #f472b6, #60a5fa, #34d399, #fbbf24, #f472b6) border-box;
+    -webkit-mask:
+      linear-gradient(#fff 0 0) padding-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: highlight-holo-rainbow 8s linear infinite;
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  .highlight-card__decor--holographic .highlight-card__holo-shimmer {
+    animation: highlight-holo-shimmer 3s linear infinite;
+  }
+}
+
+.highlight-card--theme-holographic .card-banner::before {
+  background: linear-gradient(90deg, #f472b6, #60a5fa, #34d399) !important;
+}
+
+/* Chrome */
+.highlight-card--theme-chrome {
+  border: 2px solid transparent !important;
+  background:
+    linear-gradient(#080808, #080808) padding-box,
+    linear-gradient(135deg, #d4d4d8 0%, #71717a 28%, #f4f4f5 52%, #52525b 78%, #e4e4e7 100%) border-box !important;
+  box-shadow:
+    0 0 12px rgba(212, 212, 216, 0.25),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+  animation: none !important;
+}
+
+.highlight-card--theme-chrome .card-banner {
+  background: linear-gradient(to bottom, rgba(148, 163, 184, 0.18), rgba(15, 23, 42, 0.95)) !important;
+  box-shadow: inset 0 1px 0 rgba(212, 212, 216, 0.25);
+}
+
+.highlight-card--theme-chrome .card-banner::before {
+  background: linear-gradient(90deg, #94a3b8, #e2e8f0, #94a3b8) !important;
+}
+
+/* Inferno */
+.highlight-card--theme-inferno {
+  border: 3px solid #d85a30 !important;
+  animation: highlight-inferno-pulse 2.5s ease-in-out infinite !important;
+}
+
+.highlight-card--theme-inferno .card-banner::before {
+  background: #d85a30 !important;
+  height: 4px !important;
+}
+
+/* Midnight */
+.highlight-card--theme-midnight {
+  border: 2px solid #1e3a5f !important;
+  background-image: radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.35) 1px, transparent 1px),
+    radial-gradient(circle at 78% 32%, rgba(255, 255, 255, 0.25) 1px, transparent 1px),
+    radial-gradient(circle at 45% 72%, rgba(255, 255, 255, 0.2) 1px, transparent 1px);
+  background-size: 100% 72%;
+  background-repeat: no-repeat;
+  box-shadow: 0 0 20px rgba(15, 23, 42, 0.65) !important;
+  animation: none !important;
+}
+
+.highlight-card--theme-midnight .card-banner {
+  background: linear-gradient(to bottom, #050810, #020408) !important;
+  background-image: radial-gradient(circle at 20% 40%, rgba(147, 197, 253, 0.08) 1px, transparent 1px),
+    radial-gradient(circle at 70% 60%, rgba(147, 197, 253, 0.06) 1px, transparent 1px);
+}
+
+.highlight-card--theme-midnight .card-banner::before {
+  background: #1e40af !important;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .highlight-card--theme-midnight::before {
+    content: "";
+    position: absolute;
+    top: 14%;
+    left: 18%;
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 120px 40px 0 #fff, 60px 90px 0 rgba(255, 255, 255, 0.7);
+    animation: highlight-midnight-twinkle 3s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 5;
+  }
+}
+
+/* Retro / Vintage */
+.highlight-card--theme-retro {
+  border-radius: 14px !important;
+  animation: none !important;
+}
+
+.highlight-card--theme-retro.highlight-card--rookie {
+  border: 2px solid #4a5f3a !important;
+}
+
+.highlight-card--theme-retro.highlight-card--allstar {
+  border: 2px solid #3a5a7a !important;
+}
+
+.highlight-card--theme-retro.highlight-card--legends {
+  border: 2px solid #8a6a3a !important;
+}
+
+.highlight-card--theme-retro::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  pointer-events: none;
+  z-index: 5;
+}
+
+.highlight-card--theme-retro .card-banner {
+  filter: sepia(0.15) saturate(0.85);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+}
+
+/* Custom / unlisted themes — prominent theme label */
+.highlight-card--theme-custom .card-banner__theme {
+  font-weight: 800 !important;
+  font-size: 11px !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase !important;
+  color: #e2e8f0 !important;
+  opacity: 1 !important;
+}
+
+.highlight-card--theme-custom .card-banner::before {
+  background: linear-gradient(90deg, #6366f1, #a855f7, #6366f1) !important;
+  height: 4px !important;
+}
+
+.card-banner--theme-custom .card-banner__theme {
+  font-weight: 800 !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase !important;
+  opacity: 1 !important;
+}
+
+/* Seasonal themes — visible accent on frame + banner */
+.highlight-card--theme-spring_training {
+  box-shadow: 0 0 16px rgba(74, 222, 128, 0.35) !important;
+}
+
+.highlight-card--theme-summer_slam {
+  box-shadow: 0 0 16px rgba(251, 191, 36, 0.35) !important;
+}
+
+.highlight-card--theme-halloween {
+  box-shadow: 0 0 16px rgba(249, 115, 22, 0.35) !important;
+}
+
+.highlight-card--theme-christmas {
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.35) !important;
+}
+
+.highlight-card--theme-fourth_of_july {
+  box-shadow: 0 0 16px rgba(37, 99, 235, 0.35) !important;
+}
+
+.highlight-card--theme-new_year {
+  box-shadow: 0 0 16px rgba(192, 132, 252, 0.35) !important;
+}
+
+.highlight-card--theme-spring_training .card-banner::before {
+  background: #4ade80 !important;
+}
+
+.highlight-card--theme-summer_slam .card-banner::before {
   background: #fbbf24 !important;
 }
 
-.highlight-card__banner--theme-halloween::before {
+.highlight-card--theme-halloween .card-banner::before {
   background: #f97316 !important;
 }
 
-.highlight-card__banner--theme-christmas::before {
+.highlight-card--theme-christmas .card-banner::before {
   background: #ef4444 !important;
 }
 
-.highlight-card__banner--theme-fourth_of_july::before {
+.highlight-card--theme-fourth_of_july .card-banner::before {
   background: linear-gradient(to right, #dc2626, #ffffff, #2563eb) !important;
 }
 
-.highlight-card__banner--theme-new_year::before {
+.highlight-card--theme-new_year .card-banner::before {
   background: #c084fc !important;
-}
-
-.highlight-card__banner--theme-rookie_of_the_year::before {
-  background: #60a5fa !important;
-}
-
-.highlight-card__banner--theme-captain::before {
-  background: #facc15 !important;
 }
 

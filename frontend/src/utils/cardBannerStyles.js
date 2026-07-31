@@ -45,10 +45,8 @@ export function tierPillLabel(tierKey) {
   return "ROOKIE";
 }
 
-export function truncateBannerPlayerName(name, max = 20) {
-  const s = String(name || "").trim();
-  if (s.length <= max) return s;
-  return `${s.slice(0, max)}…`;
+export function bannerNameModifier(playerName) {
+  return String(playerName || "").trim().length > 18 ? "card-banner__name--long" : "";
 }
 
 /** Unified tier + theme banner classes for all card types */

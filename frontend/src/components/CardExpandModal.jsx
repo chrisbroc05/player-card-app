@@ -38,26 +38,28 @@ export default function CardExpandModal({
       aria-label="Full size card preview"
       onClick={() => onClose?.()}
     >
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onClose?.();
-        }}
-        className="absolute right-4 top-4 z-[2] flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/60 text-xl text-white backdrop-blur-sm transition hover:bg-black/80"
-        aria-label="Close full size preview"
-      >
-        ×
-      </button>
-
       <div
         className="flex h-full w-full max-h-[calc(100vh-64px)] max-w-[calc(100vw-64px)] items-center justify-center"
         onClick={(e) => e.stopPropagation()}
       >
         <div
-          className="aspect-[5/7] h-full w-auto max-w-full"
-          style={{ maxHeight: "calc(100vh - 64px)", maxWidth: "min(calc(100vw - 64px), calc((100vh - 64px) * 5 / 7))" }}
+          className="card-expand-modal__card relative aspect-[5/7] h-full w-auto max-w-full"
+          style={{
+            maxHeight: "calc(100vh - 64px)",
+            maxWidth: "min(calc(100vw - 64px), calc((100vh - 64px) * 5 / 7))",
+          }}
         >
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose?.();
+            }}
+            className="card-expand-modal__close"
+            aria-label="Close full size preview"
+          >
+            ×
+          </button>
           <CardImage
             card={card}
             alt={alt}

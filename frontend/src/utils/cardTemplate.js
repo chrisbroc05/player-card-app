@@ -77,7 +77,7 @@ export function resolveCardDisplayMeta(card) {
     gradYear || null,
   ]
     .filter(Boolean)
-    .join(" | ");
+    .join(" • ");
 
   return {
     playerName,
@@ -92,48 +92,12 @@ export function resolveCardDisplayMeta(card) {
   };
 }
 
-/** Size presets for CardDisplay typography */
+/** Size presets — typography is tier-driven in CSS via card-banner--size-* */
 export const CARD_DISPLAY_SIZES = {
-  default: {
-    name: "text-[13px] font-semibold sm:text-[14px]",
-    team: "text-[11px] sm:text-xs",
-    stats: "text-[10px] sm:text-[11px]",
-    pill: "text-[8px] sm:text-[9px]",
-    theme: "text-[8px] sm:text-[9px]",
-    edition: "text-[8px] sm:text-[9px]",
-    footer: "text-[8px] sm:text-[9px]",
-    bannerPad: "px-2 py-1.5 sm:px-2.5 sm:py-2",
-  },
-  detail: {
-    name: "text-base font-semibold sm:text-[16px]",
-    team: "text-xs sm:text-sm",
-    stats: "text-[11px] sm:text-xs",
-    pill: "text-[10px] sm:text-[11px]",
-    theme: "text-[10px] sm:text-[11px]",
-    edition: "text-[10px] sm:text-[11px]",
-    footer: "text-[10px] sm:text-[11px]",
-    bannerPad: "px-3 py-2.5 sm:px-3.5 sm:py-3",
-  },
-  compact: {
-    name: "text-[11px] font-semibold leading-tight",
-    team: "text-[9px] leading-tight",
-    stats: "text-[8px] leading-tight",
-    pill: "text-[7px]",
-    theme: "text-[7px]",
-    edition: "text-[7px]",
-    footer: "text-[7px]",
-    bannerPad: "px-1.5 py-1.5",
-  },
-  thumb: {
-    name: "text-[10px] font-semibold leading-tight",
-    team: "text-[8px] leading-tight",
-    stats: "text-[7px] leading-tight",
-    pill: "text-[6px]",
-    theme: "text-[6px]",
-    edition: "text-[6px]",
-    footer: "text-[6px]",
-    bannerPad: "px-1.5 py-1",
-  },
+  default: {},
+  detail: {},
+  compact: {},
+  thumb: {},
 };
 
 export function cardDisplaySizeFromFrame(frameClassName = "") {

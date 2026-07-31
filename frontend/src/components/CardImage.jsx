@@ -14,9 +14,9 @@ import {
   isHighlightInProgress,
   isHighlightType,
 } from "../utils/highlightCard";
-import { useHighlightTrimVideo } from "../hooks/useHighlightTrimVideo";
 import { useIsMobileViewport } from "../hooks/usePrefersReducedMotion";
 import CardDisplay from "./CardDisplay";
+import HighlightVideoPlayer from "./HighlightVideoPlayer";
 
 function resolveCardFields(card, props) {
   if (card && typeof card === "object") {
@@ -67,36 +67,6 @@ function buildSyntheticCard(card, imageUrl) {
   if (card && typeof card === "object") return card;
   if (!imageUrl) return null;
   return { image_url: imageUrl, player_name: "Player" };
-}
-
-function HighlightSoundToggle({ muted, onToggle }) {
-  return (
-    <button
-      type="button"
-      onClick={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        onToggle();
-      }}
-      title={muted ? "Tap to unmute" : "Tap to mute"}
-      aria-label={muted ? "Tap to unmute" : "Tap to mute"}
-      className="absolute bottom-2 right-2 z-[8] flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/60 text-sm text-white backdrop-blur-sm transition hover:bg-black/75"
-    >
-      {muted ? (
-        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M11 5L6 9H3v6h3l5 4V5z" />
-          <line x1="17" y1="9" x2="23" y2="15" />
-          <line x1="23" y1="9" x2="17" y2="15" />
-        </svg>
-      ) : (
-        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M11 5L6 9H3v6h3l5 4V5z" />
-          <path d="M15.5 8.5a5 5 0 010 7" />
-          <path d="M18 6a8 8 0 010 12" />
-        </svg>
-      )}
-    </button>
-  );
 }
 
 function HighlightProcessingPlaceholder() {
@@ -271,14 +241,6 @@ export default function CardImage({
 
   const highlightPlaying = highlightActive && shouldPlayVideo;
 
-  const { hasTrimWindow } = useHighlightTrimVideo({
-    videoRef,
-    videoSrc: highlightActive ? videoSrc : "",
-    trimStart,
-    trimEnd,
-    playing: highlightPlaying,
-  });
-
   useEffect(() => {
     const el = videoRef.current;
     if (!el || !videoReady || highlightActive) return;
@@ -300,7 +262,6 @@ export default function CardImage({
   const showPosterImage = showStaticPoster && (!isDetail || !showVideoLayer);
 
   const videoMuted = highlightActive && isDetail ? highlightMuted : true;
-  const videoLoop = highlightActive ? !hasTrimWindow : true;
 
   const protectedMediaClass = protectMedia ? "card-media-protected" : "";
   const imgClass = [CARD_IMAGE_MEDIA_CLASS, protectedMediaClass, className].filter(Boolean).join(" ");
@@ -336,24 +297,21 @@ export default function CardImage({
 
   const renderHighlightVideo = (wrapperClass = "") => (
     <ProtectedMediaShell protectMedia={protectMedia}>
-      <div className={`${wrapperClass || CARD_VIDEO_DETAIL_WRAPPER} relative h-full w-full`}>
-        <video
-          ref={videoRef}
-          src={videoSrc}
-          className={videoClass}
-          autoPlay={highlightPlaying && isDetail}
-          loop={videoLoop}
-          muted={videoMuted}
-          playsInline
-          preload="auto"
-          aria-label={alt || videoLabel}
-          onError={() => setVideoFailed(true)}
-          {...mediaProtectionProps}
-        />
-        {isDetail ? (
-          <HighlightSoundToggle muted={highlightMuted} onToggle={() => setHighlightMuted((m) => !m)} />
-        ) : null}
-      </div>
+      <HighlightVideoPlayer
+        videoSrc={videoSrc}
+        playing={highlightPlaying}
+        trimStart={trimStart}
+        trimEnd={trimEnd}
+        muted={videoMuted}
+        autoPlay={highlightPlaying && isDetail}
+        wrapperClass={wrapperClass || CARD_VIDEO_DETAIL_WRAPPER}
+        ariaLabel={alt || videoLabel}
+        onError={() => setVideoFailed(true)}
+        mediaProtectionProps={mediaProtectionProps}
+        showSoundToggle={isDetail}
+        soundMuted={highlightMuted}
+        onToggleSound={() => setHighlightMuted((m) => !m)}
+      />
     </ProtectedMediaShell>
   );
 
