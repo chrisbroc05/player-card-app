@@ -14,7 +14,7 @@ export function normalizeCardForDisplay(card) {
     position: card.position ?? "",
     jersey_number: card.jersey_number ?? card.jerseyNumber ?? "",
     grad_year: card.grad_year ?? card.gradYear ?? null,
-    is_highlight: Boolean(card.is_highlight ?? card.isHighlight ?? false),
+    is_highlight: card.is_highlight === true || card.isHighlight === true,
     is_animated: Boolean(card.is_animated ?? card.isAnimated ?? false),
     highlight_video_url: card.highlight_video_url ?? card.highlightVideoUrl ?? null,
     highlight_thumbnail_url: card.highlight_thumbnail_url ?? card.highlightThumbnailUrl ?? null,

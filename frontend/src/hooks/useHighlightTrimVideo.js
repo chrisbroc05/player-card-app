@@ -1,7 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef } from "react";
+
+function normalizeTrimBounds(trimStart, trimEnd) {
+  const start = Number(trimStart);
+  const safeStart = Number.isFinite(start) && start >= 0 ? start : 0;
+  const endRaw = trimEnd != null && trimEnd !== "" ? Number(trimEnd) : null;
+  const safeEnd =
+    endRaw != null && Number.isFinite(endRaw) && endRaw > safeStart ? endRaw : null;
+  return { start: safeStart, end: safeEnd, hasTrimWindow: safeEnd != null };
+}
 
 /**
- * HTML5 trim loop: seek to trimStart on load, loop trimmed section via timeupdate.
+ * HTML5 trim loop on a single video element — no React state updates during playback.
  */
 export function useHighlightTrimVideo({
   videoRef,
@@ -10,20 +19,9 @@ export function useHighlightTrimVideo({
   trimEnd = null,
   playing = false,
 }) {
-  const start = Number(trimStart) || 0;
-  const end = trimEnd != null && trimEnd !== "" ? Number(trimEnd) : null;
-  const hasTrimWindow = end != null && end > start;
-
-  const [ready, setReady] = useState(false);
-
-  const loopEnd = useMemo(() => {
-    if (!hasTrimWindow) return null;
-    return end;
-  }, [hasTrimWindow, end]);
-
-  useEffect(() => {
-    setReady(false);
-  }, [videoSrc]);
+  const { start, end, hasTrimWindow } = normalizeTrimBounds(trimStart, trimEnd);
+  const playingRef = useRef(playing);
+  playingRef.current = playing;
 
   useEffect(() => {
     const el = videoRef.current;
@@ -33,22 +31,22 @@ export function useHighlightTrimVideo({
       try {
         el.currentTime = start;
       } catch {
-        /* ignore */
+        /* ignore seek errors during load */
       }
     };
 
     const onLoadedMetadata = () => {
-      setReady(true);
       seekToStart();
     };
 
     const onTimeUpdate = () => {
-      const duration = Number(el.duration) || 0;
-      const stopAt = loopEnd ?? duration;
-      if (stopAt <= start || duration <= 0) return;
+      if (!hasTrimWindow || end == null) return;
+      const duration = Number(el.duration);
+      const stopAt = Number.isFinite(duration) && duration > 0 ? Math.min(end, duration) : end;
+      if (stopAt <= start) return;
       if (el.currentTime >= stopAt - 0.05) {
         seekToStart();
-        if (playing) el.play().catch(() => {});
+        if (playingRef.current) el.play().catch(() => {});
       }
     };
 
@@ -60,7 +58,7 @@ export function useHighlightTrimVideo({
       el.removeEventListener("loadedmetadata", onLoadedMetadata);
       el.removeEventListener("timeupdate", onTimeUpdate);
     };
-  }, [videoSrc, start, loopEnd, playing, videoRef]);
+  }, [videoSrc, start, end, hasTrimWindow]);
 
   useEffect(() => {
     const el = videoRef.current;
@@ -75,7 +73,7 @@ export function useHighlightTrimVideo({
         /* ignore */
       }
     }
-  }, [playing, videoSrc, start, videoRef, ready]);
+  }, [playing, videoSrc, start]);
 
-  return { hasTrimWindow: Boolean(loopEnd && loopEnd > start), ready };
+  return { hasTrimWindow };
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { memo, useRef } from "react";
 import { useHighlightTrimVideo } from "../hooks/useHighlightTrimVideo";
 
 function HighlightSoundToggle({ muted, onToggle }) {
@@ -33,10 +33,11 @@ function HighlightSoundToggle({ muted, onToggle }) {
 
 /**
  * Two-layer highlight video: blurred cover backdrop + sharp contain foreground.
- * Trim logic applies to foreground only; background loops freely and syncs via timeupdate.
+ * Both layers autoplay independently from the same src — no timeupdate sync.
  */
-export default function HighlightVideoPlayer({
+function HighlightVideoPlayer({
   videoSrc,
+  videoKey = "highlight",
   playing = false,
   trimStart = 0,
   trimEnd = null,
@@ -51,7 +52,6 @@ export default function HighlightVideoPlayer({
   onToggleSound,
 }) {
   const foregroundRef = useRef(null);
-  const backgroundRef = useRef(null);
 
   const { hasTrimWindow } = useHighlightTrimVideo({
     videoRef: foregroundRef,
@@ -61,71 +61,33 @@ export default function HighlightVideoPlayer({
     playing,
   });
 
-  useEffect(() => {
-    const fg = foregroundRef.current;
-    const bg = backgroundRef.current;
-    if (!fg || !bg || !videoSrc) return undefined;
+  if (!videoSrc) return null;
 
-    const syncBackgroundTime = () => {
-      if (Math.abs(bg.currentTime - fg.currentTime) > 0.08) {
-        try {
-          bg.currentTime = fg.currentTime;
-        } catch {
-          /* ignore seek errors during load */
-        }
-      }
-    };
-
-    fg.addEventListener("timeupdate", syncBackgroundTime);
-    fg.addEventListener("seeked", syncBackgroundTime);
-
-    return () => {
-      fg.removeEventListener("timeupdate", syncBackgroundTime);
-      fg.removeEventListener("seeked", syncBackgroundTime);
-    };
-  }, [videoSrc]);
-
-  useEffect(() => {
-    const bg = backgroundRef.current;
-    const fg = foregroundRef.current;
-    if (!bg || !videoSrc) return;
-
-    if (playing) {
-      bg.play().catch(() => {});
-      if (fg && fg.readyState >= 1) {
-        try {
-          bg.currentTime = fg.currentTime;
-        } catch {
-          /* ignore */
-        }
-      }
-    } else {
-      bg.pause();
-    }
-  }, [playing, videoSrc]);
-
+  const shouldPlay = playing || autoPlay;
   const foregroundLoop = !hasTrimWindow;
 
   return (
     <div className={`highlight-video-fill ${wrapperClass}`.trim()}>
       <video
-        ref={backgroundRef}
+        key={`${videoKey}-bg`}
         src={videoSrc}
         className="highlight-video-fill__bg"
+        autoPlay={shouldPlay}
         loop
         muted
         playsInline
-        preload="auto"
+        preload="metadata"
         aria-hidden
         tabIndex={-1}
         onError={() => {}}
         {...mediaProtectionProps}
       />
       <video
+        key={`${videoKey}-fg`}
         ref={foregroundRef}
         src={videoSrc}
         className="highlight-video-fill__fg"
-        autoPlay={autoPlay && playing}
+        autoPlay={shouldPlay}
         loop={foregroundLoop}
         muted={muted}
         playsInline
@@ -140,3 +102,21 @@ export default function HighlightVideoPlayer({
     </div>
   );
 }
+
+export default memo(HighlightVideoPlayer, (prev, next) => {
+  return (
+    prev.videoSrc === next.videoSrc &&
+    prev.videoKey === next.videoKey &&
+    prev.playing === next.playing &&
+    prev.trimStart === next.trimStart &&
+    prev.trimEnd === next.trimEnd &&
+    prev.muted === next.muted &&
+    prev.autoPlay === next.autoPlay &&
+    prev.wrapperClass === next.wrapperClass &&
+    prev.ariaLabel === next.ariaLabel &&
+    prev.showSoundToggle === next.showSoundToggle &&
+    prev.soundMuted === next.soundMuted &&
+    prev.onError === next.onError &&
+    prev.onToggleSound === next.onToggleSound
+  );
+});

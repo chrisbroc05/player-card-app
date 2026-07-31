@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
@@ -123,7 +123,10 @@ export default function CardDetailPage() {
   const isOwner = isCardOwner(card, user);
   const showSendTrade = isOwner && (card?.status || "active") === "active";
   const showPendingTradePanel = isOwner && card?.status === "pending_trade";
-  const displayCard = card ? normalizeCardForDisplay(card) : null;
+  const displayCard = useMemo(
+    () => (card ? normalizeCardForDisplay(card) : null),
+    [card]
+  );
 
   const loadListingStatus = useCallback(async () => {
     if (!token || !card?.card_id || !isOwner) {

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { API_BASE_URL, authHeaders, toApiUrl } from "../config/api";
 import {
   CARD_IMAGE_MEDIA_CLASS,
@@ -81,6 +81,27 @@ function HighlightProcessingPlaceholder() {
   );
 }
 
+function HighlightVideoUnavailable({ posterSrc, alt }) {
+  return (
+    <div className="flex h-full min-h-[80px] w-full flex-col items-center justify-center gap-2 bg-gradient-to-b from-slate-900 to-slate-950 p-4 text-center">
+      {posterSrc ? (
+        <img
+          src={posterSrc}
+          alt={alt || "Card"}
+          className="mb-2 max-h-[45%] max-w-full rounded object-contain opacity-80"
+          loading="lazy"
+          decoding="async"
+        />
+      ) : (
+        <span className="text-xl opacity-50" aria-hidden>
+          ▶
+        </span>
+      )}
+      <p className="text-xs text-slate-400">Video unavailable</p>
+    </div>
+  );
+}
+
 /** Renders card media inside the fixed CardDisplay template app-wide */
 export default function CardImage({
   card,
@@ -121,7 +142,7 @@ export default function CardImage({
   const isMobile = useIsMobileViewport();
   const isDetail = variant === "detail";
   const isGridBrowse = variant === "grid" && playOnHover;
-  const cardIdForApi = card?.card_id || "";
+  const cardIdForApi = card?.card_id || card?.cardId || "";
 
   const fields = resolveCardFields(card, {
     imageUrl,
@@ -140,11 +161,13 @@ export default function CardImage({
   const cardForTypeChecks = card && typeof card === "object" ? card : syntheticCard;
 
   const localVideo = localHighlightVideoUrl || "";
+  const highlightUrlPath =
+    highlightVideoUrl(cardForTypeChecks, "") || fields.highlightVideoUrl || "";
+
   const highlightSrc = useMemo(() => {
     if (localVideo) return localVideo;
-    const url = highlightVideoUrl(cardForTypeChecks, "") || fields.highlightVideoUrl;
-    return url ? toApiUrl(url) : "";
-  }, [localVideo, cardForTypeChecks, fields.highlightVideoUrl]);
+    return highlightUrlPath ? toApiUrl(highlightUrlPath) : "";
+  }, [localVideo, highlightUrlPath, cardIdForApi]);
 
   const animatedActive =
     isAnimatedCard({ ...cardForTypeChecks, ...fields }) &&
@@ -159,11 +182,13 @@ export default function CardImage({
       isHighlightType(cardForTypeChecks) ||
       Boolean(localVideo));
 
+  const highlightInProgress = isHighlightInProgress({ ...cardForTypeChecks, ...fields });
+
   const highlightMissingVideo =
-    !animatedActive &&
-    isHighlightType(cardForTypeChecks) &&
-    !highlightSrc &&
-    !isHighlightInProgress({ ...cardForTypeChecks, ...fields });
+    !animatedActive && isHighlightType(cardForTypeChecks) && !highlightSrc && highlightInProgress;
+
+  const highlightVideoUnavailable =
+    !animatedActive && isHighlightType(cardForTypeChecks) && !highlightSrc && !highlightInProgress;
 
   const hasVideo = (animatedActive || highlightActive) && !videoFailed;
   const inProgress =
@@ -222,9 +247,15 @@ export default function CardImage({
   const videoSrc = animatedActive && useOwnerVideoProxy ? ownerVideoBlobUrl : publicVideoSrc;
   const videoReady = hasVideo && (!useOwnerVideoProxy || !animatedActive || Boolean(ownerVideoBlobUrl));
 
-  const trimStart = Number(fields.highlightTrimStart ?? highlightTrimStart ?? 0);
-  const trimEndRaw = fields.highlightTrimEnd ?? highlightTrimEnd;
-  const trimEnd = trimEndRaw != null && trimEndRaw !== "" ? Number(trimEndRaw) : null;
+  const trimStart = Number(fields.highlightTrimStart ?? highlightTrimStart ?? 0) || 0;
+  const trimEndRaw = fields.highlightTrimEnd ?? highlightTrimEnd ?? null;
+  const trimEndParsed =
+    trimEndRaw != null && trimEndRaw !== "" ? Number(trimEndRaw) : null;
+  const trimEnd =
+    trimEndParsed != null && Number.isFinite(trimEndParsed) ? trimEndParsed : null;
+
+  const handleHighlightVideoError = useCallback(() => setVideoFailed(true), []);
+  const handleToggleHighlightSound = useCallback(() => setHighlightMuted((m) => !m), []);
 
   const browseActive = isGridBrowse && (isMobile ? mobileActive : hovered);
 
@@ -274,12 +305,16 @@ export default function CardImage({
     .join(" ");
   const videoClass = [CARD_VIDEO_CLASS, protectedMediaClass, className].filter(Boolean).join(" ");
 
-  const mediaProtectionProps = protectMedia
-    ? {
-        draggable: false,
-        onContextMenu: (e) => e.preventDefault(),
-      }
-    : {};
+  const mediaProtectionProps = useMemo(
+    () =>
+      protectMedia
+        ? {
+            draggable: false,
+            onContextMenu: (e) => e.preventDefault(),
+          }
+        : {},
+    [protectMedia]
+  );
 
   const displaySize =
     variant === "detail"
@@ -304,33 +339,55 @@ export default function CardImage({
 
   const videoLabel = animatedActive ? "Animated card" : "Highlight card";
 
-  const renderHighlightVideo = (wrapperClass = "") => (
-    <ProtectedMediaShell protectMedia={protectMedia}>
-      <HighlightVideoPlayer
-        videoSrc={videoSrc}
-        playing={highlightPlaying}
-        trimStart={trimStart}
-        trimEnd={trimEnd}
-        muted={videoMuted}
-        autoPlay={highlightPlaying && isDetail}
-        wrapperClass={wrapperClass || CARD_VIDEO_DETAIL_WRAPPER}
-        ariaLabel={alt || videoLabel}
-        onError={() => setVideoFailed(true)}
-        mediaProtectionProps={mediaProtectionProps}
-        showSoundToggle={isDetail}
-        soundMuted={highlightMuted}
-        onToggleSound={() => setHighlightMuted((m) => !m)}
-      />
-    </ProtectedMediaShell>
-  );
+  const highlightVideoElement = useMemo(() => {
+    if (!highlightActive || !highlightSrc) return null;
+    return (
+      <ProtectedMediaShell protectMedia={protectMedia}>
+        <HighlightVideoPlayer
+          videoSrc={highlightSrc}
+          videoKey={cardIdForApi || "highlight"}
+          playing={highlightPlaying}
+          trimStart={trimStart}
+          trimEnd={trimEnd}
+          muted={videoMuted}
+          autoPlay={highlightPlaying && isDetail}
+          wrapperClass={isDetail ? CARD_VIDEO_DETAIL_WRAPPER : CARD_VIDEO_WRAPPER_OVERLAY}
+          ariaLabel={alt || videoLabel}
+          onError={handleHighlightVideoError}
+          mediaProtectionProps={mediaProtectionProps}
+          showSoundToggle={isDetail}
+          soundMuted={highlightMuted}
+          onToggleSound={handleToggleHighlightSound}
+        />
+      </ProtectedMediaShell>
+    );
+  }, [
+    highlightActive,
+    highlightSrc,
+    cardIdForApi,
+    highlightPlaying,
+    trimStart,
+    trimEnd,
+    videoMuted,
+    isDetail,
+    alt,
+    videoLabel,
+    handleHighlightVideoError,
+    handleToggleHighlightSound,
+    highlightMuted,
+    protectMedia,
+    mediaProtectionProps,
+  ]);
 
   let mediaInner;
-  if (highlightMissingVideo) {
+  if (highlightVideoUnavailable) {
+    mediaInner = <HighlightVideoUnavailable posterSrc={imgSrc} alt={alt} />;
+  } else if (highlightMissingVideo) {
     mediaInner = <HighlightProcessingPlaceholder />;
   } else if (!showStaticPoster && !hasVideo && !highlightActive) {
     mediaInner = <PlaceholderInner alt={alt} />;
   } else if (highlightActive && showHighlightVideoFrame) {
-    mediaInner = renderHighlightVideo(isDetail ? CARD_VIDEO_DETAIL_WRAPPER : CARD_VIDEO_WRAPPER_OVERLAY);
+    mediaInner = highlightVideoElement;
   } else if (isDetail && showVideoLayer && videoSrc) {
     mediaInner = (
       <ProtectedMediaShell protectMedia={protectMedia}>
@@ -422,10 +479,10 @@ export default function CardImage({
     </div>
   );
 
-  const progressLabel = isHighlightInProgress({ ...cardForTypeChecks, ...fields })
+  const progressLabel = highlightInProgress
     ? "Highlight processing..."
     : "Animation in progress...";
-  const progressTone = isHighlightInProgress({ ...cardForTypeChecks, ...fields })
+  const progressTone = highlightInProgress
     ? "border-[#D85A30]/40 bg-[#D85A30]/20 text-orange-100"
     : "border-violet-400/40 bg-violet-500/20 text-violet-100";
 

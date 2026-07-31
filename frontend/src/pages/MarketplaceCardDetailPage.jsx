@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
@@ -96,7 +96,10 @@ export default function MarketplaceCardDetailPage() {
   }, [user, token, listing]);
 
   const royaltyPreview = computeRoyaltyPreview(offerAmount);
-  const displayListing = listing ? normalizeCardForDisplay(listing) : null;
+  const displayListing = useMemo(
+    () => (listing ? normalizeCardForDisplay(listing) : null),
+    [listing]
+  );
   const badge = displayListing ? vaultTierBadge(displayListing?.tier ?? "rookie") : null;
   const isOwner = isCardOwner(displayListing, user);
 
