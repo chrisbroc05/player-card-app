@@ -339,6 +339,14 @@ export default function CardImage({
 
   const videoLabel = animatedActive ? "Animated card" : "Highlight card";
 
+  const cardTheme =
+    cardForTypeChecks?.theme ??
+    cardForTypeChecks?.special_theme ??
+    cardForTypeChecks?.specialTheme ??
+    "";
+  const cardTier = cardForTypeChecks?.tier ?? cardForTypeChecks?.card_tier ?? "rookie";
+  const highlightTintScale = isDetail ? 1 : 0.7;
+
   const highlightVideoElement = useMemo(() => {
     if (!highlightActive || !highlightSrc) return null;
     return (
@@ -346,6 +354,9 @@ export default function CardImage({
         <HighlightVideoPlayer
           videoSrc={highlightSrc}
           videoKey={cardIdForApi || "highlight"}
+          theme={cardTheme}
+          tier={cardTier}
+          tintOpacityScale={highlightTintScale}
           playing={highlightPlaying}
           trimStart={trimStart}
           trimEnd={trimEnd}
@@ -365,6 +376,9 @@ export default function CardImage({
     highlightActive,
     highlightSrc,
     cardIdForApi,
+    cardTheme,
+    cardTier,
+    highlightTintScale,
     highlightPlaying,
     trimStart,
     trimEnd,

@@ -1,5 +1,12 @@
 import React, { useRef } from "react";
 import { useHighlightTrimVideo } from "../hooks/useHighlightTrimVideo";
+import ThemeVideoIcon from "./ThemeVideoIcon";
+import {
+  getHighlightTierBackgroundColor,
+  getThemeOverlayColor,
+  isHolographicTheme,
+} from "../utils/themeOverlayColor";
+import { normalizeHighlightThemeKey } from "../utils/highlightCardStyles";
 
 function HighlightSoundToggle({ muted, onToggle }) {
   return (
@@ -12,7 +19,7 @@ function HighlightSoundToggle({ muted, onToggle }) {
       }}
       title={muted ? "Tap to unmute" : "Tap to mute"}
       aria-label={muted ? "Tap to unmute" : "Tap to mute"}
-      className="absolute bottom-2 right-2 z-[8] flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/60 text-sm text-white backdrop-blur-sm transition hover:bg-black/75"
+      className="card-video-area__sound-toggle absolute bottom-2 left-2 z-[8] flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/60 text-sm text-white backdrop-blur-sm transition hover:bg-black/75"
     >
       {muted ? (
         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
@@ -32,12 +39,15 @@ function HighlightSoundToggle({ muted, onToggle }) {
 }
 
 /**
- * Two-layer highlight video: blurred cover backdrop + sharp contain foreground.
- * Both layers autoplay independently from the same src — no timeupdate sync.
+ * Highlight video stack: oversized blurred backdrop, theme tint, sharp foreground, theme icon.
+ * Both videos share the same src — no sync listeners.
  */
 function HighlightVideoPlayer({
   videoSrc,
   videoKey = "highlight",
+  theme = "",
+  tier = "rookie",
+  tintOpacityScale = 1,
   playing = false,
   trimStart = 0,
   trimEnd = null,
@@ -65,13 +75,22 @@ function HighlightVideoPlayer({
 
   const shouldPlay = playing || autoPlay;
   const foregroundLoop = !hasTrimWindow;
+  const tierBackground = getHighlightTierBackgroundColor(tier);
+  const themeKey = normalizeHighlightThemeKey(theme);
+  const holoTint = isHolographicTheme(theme);
+  const overlayColor = holoTint
+    ? null
+    : getThemeOverlayColor(theme, tier, { opacityScale: tintOpacityScale });
 
   return (
-    <div className={`highlight-video-fill ${wrapperClass}`.trim()}>
+    <div
+      className={`card-video-area highlight-video-fill ${wrapperClass}`.trim()}
+      style={{ backgroundColor: tierBackground }}
+    >
       <video
         key={`${videoKey}-bg`}
         src={videoSrc}
-        className="highlight-video-fill__bg"
+        className="card-video-area__bg highlight-video-fill__bg"
         autoPlay={shouldPlay}
         loop
         muted
@@ -82,11 +101,27 @@ function HighlightVideoPlayer({
         onError={() => {}}
         {...mediaProtectionProps}
       />
+
+      {holoTint ? (
+        <div
+          className={`card-video-area__tint card-video-area__tint--holo${
+            tintOpacityScale < 1 ? " card-video-area__tint--subtle" : ""
+          }`}
+          aria-hidden
+        />
+      ) : overlayColor && overlayColor !== "rgba(0, 0, 0, 0)" ? (
+        <div
+          className="card-video-area__tint"
+          style={{ backgroundColor: overlayColor }}
+          aria-hidden
+        />
+      ) : null}
+
       <video
         key={`${videoKey}-fg`}
         ref={foregroundRef}
         src={videoSrc}
-        className="highlight-video-fill__fg"
+        className="card-video-area__fg highlight-video-fill__fg"
         autoPlay={shouldPlay}
         loop={foregroundLoop}
         muted={muted}
@@ -96,6 +131,9 @@ function HighlightVideoPlayer({
         onError={onError}
         {...mediaProtectionProps}
       />
+
+      <ThemeVideoIcon themeKey={themeKey} />
+
       {showSoundToggle && onToggleSound ? (
         <HighlightSoundToggle muted={soundMuted} onToggle={onToggleSound} />
       ) : null}
@@ -107,6 +145,9 @@ export default React.memo(HighlightVideoPlayer, (prev, next) => {
   return (
     prev.videoSrc === next.videoSrc &&
     prev.videoKey === next.videoKey &&
+    prev.theme === next.theme &&
+    prev.tier === next.tier &&
+    prev.tintOpacityScale === next.tintOpacityScale &&
     prev.playing === next.playing &&
     prev.trimStart === next.trimStart &&
     prev.trimEnd === next.trimEnd &&

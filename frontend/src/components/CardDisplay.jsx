@@ -8,7 +8,7 @@ import {
 } from "../utils/cardTemplate";
 import { bannerNameModifier, getCardBannerStyles } from "../utils/cardBannerStyles";
 import { getHighlightCardStyles } from "../utils/highlightCardStyles";
-import HighlightThemeDecor from "./HighlightThemeDecor";
+import ThemeVideoIcon from "./ThemeVideoIcon";
 
 /**
  * Fixed trading card shell — frame, player media (72%), UI banner (28%).
@@ -67,10 +67,6 @@ export default function CardDisplay({
     <div
       className={`card-shell relative flex w-full min-w-[210px] min-h-0 flex-col overflow-hidden ${shellRadiusClass} ${CARD_ASPECT_CLASS} ${frameClasses} ${className}`}
     >
-      {isHighlight && highlightStyles?.themeKey && highlightStyles.themeKey !== "default" ? (
-        <HighlightThemeDecor themeKey={highlightStyles.themeKey} />
-      ) : null}
-
       {!isHighlight && meta.themeOverlay ? (
         <div className={`pointer-events-none absolute inset-0 z-[4] ${meta.themeOverlay}`} aria-hidden />
       ) : null}
@@ -78,17 +74,20 @@ export default function CardDisplay({
       <div className="card-shell__media relative z-[1] flex min-h-0 w-full flex-1 flex-col overflow-hidden">
         <div className={`${mediaWrapperClass} h-full min-h-0 w-full flex-1`}>
           {children}
+          {!isHighlight && size === "detail" ? (
+            <ThemeVideoIcon theme={theme} />
+          ) : null}
           {!isHighlight ? (
             <div className="card-player-inner-border pointer-events-none absolute inset-0" aria-hidden />
           ) : null}
         </div>
         {showAnimatedBadge ? (
-          <span className="absolute right-1.5 top-1.5 z-[3] sm:right-2 sm:top-2">
+          <span className="absolute right-2 top-2 z-[3]">
             <AnimatedBadge />
           </span>
         ) : null}
         {showHighlightBadge ? (
-          <span className="absolute right-1.5 top-1.5 z-[3] sm:right-2 sm:top-2">
+          <span className="absolute right-2 top-2 z-[3]">
             <HighlightBadge />
           </span>
         ) : null}
