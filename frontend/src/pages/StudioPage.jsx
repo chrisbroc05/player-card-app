@@ -12,6 +12,7 @@ import GenerationCostSummary from "../components/GenerationCostSummary";
 import ThemeLibraryPicker from "../components/ThemeLibraryPicker";
 import CardTypeStep from "../components/CardTypeStep";
 import HighlightCardPreview from "../components/HighlightCardPreview";
+import HighlightVideoStep from "../components/HighlightVideoStep";
 import HighlightProcessingScreen from "../components/HighlightProcessingScreen";
 import QuantitySelector from "../components/QuantitySelector";
 import ActionCategoryStep from "../components/ActionCategoryStep";
@@ -1150,22 +1151,32 @@ export default function StudioPage() {
   async function fetchOrders() {
     if (!token) {
       setOrders([]);
-      return;
+      return [];
     }
-    const res = await fetch(`${API_BASE_URL}/orders`, {
-      headers: { ...authHeaders(token) },
-    });
-    if (!res.ok) throw new Error("Failed to load orders.");
-    const data = await res.json();
-    const list = Array.isArray(data) ? data : [];
-    setOrders(list);
+    try {
+      const res = await fetch(`${API_BASE_URL}/orders`, {
+        headers: { ...authHeaders(token) },
+      });
+      if (!res.ok) {
+        setOrders([]);
+        return [];
+      }
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : [];
+      setOrders(list);
+      return list;
+    } catch {
+      setOrders([]);
+      return [];
+    }
   }
 
   useEffect(() => {
     if (initializing) return;
-    Promise.all([fetchMyCards(), fetchOrders()]).catch((err) => {
+    fetchMyCards().catch((err) => {
       setError(err.message || "Could not load data.");
     });
+    fetchOrders();
   }, [token, initializing]);
 
   async function createPlayerFromCurrentForm() {
