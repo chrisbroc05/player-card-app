@@ -1,4 +1,4 @@
-import React, { memo, useRef } from "react";
+import React, { useRef } from "react";
 import { useHighlightTrimVideo } from "../hooks/useHighlightTrimVideo";
 
 function HighlightSoundToggle({ muted, onToggle }) {
@@ -103,7 +103,7 @@ function HighlightVideoPlayer({
   );
 }
 
-export default memo(HighlightVideoPlayer, (prev, next) => {
+export default React.memo(HighlightVideoPlayer, (prev, next) => {
   return (
     prev.videoSrc === next.videoSrc &&
     prev.videoKey === next.videoKey &&
