@@ -2875,8 +2875,8 @@
 
 .activity-row {
   display: grid;
-  /* Thumb/amount tracks include their own left margin (100px + 12px) */
-  grid-template-columns: 48px 112px minmax(0, 1fr) 112px;
+  /* Thumb/amount tracks include their own left margin (140px + 12px, 100px + 12px) */
+  grid-template-columns: 48px 152px minmax(0, 1fr) 112px;
   grid-template-areas:
     "badge thumb details amount"
     "badge thumb foot    amount";
@@ -2906,8 +2906,8 @@
 .activity-row__thumb {
   grid-area: thumb;
   flex-shrink: 0;
-  width: 100px;
-  height: 140px;
+  width: 140px;
+  height: 196px;
   margin-left: 12px;
   overflow: visible;
   border-radius: 8px;
@@ -2929,37 +2929,10 @@
   border-radius: 8px;
 }
 
-/* Scale the card template down for the 100px activity thumbnail */
+/* The name/tier/theme/edition all live in the details column, so drop the
+   banner here and let the card art use the full thumbnail height. */
 .activity-row__thumb .card-shell__banner {
-  min-height: 0 !important;
-}
-
-.activity-row__thumb .card-banner {
-  padding: 6px 5px 4px;
-}
-
-.activity-row__thumb .card-banner__name {
-  font-size: 10px !important;
-  letter-spacing: 0.4px !important;
-}
-
-.activity-row__thumb .card-banner__team {
-  font-size: 7px !important;
-  letter-spacing: 0.4px !important;
-}
-
-.activity-row__thumb .card-banner__stats {
-  font-size: 6px !important;
-}
-
-.activity-row__thumb .card-banner__tier-pill,
-.activity-row__thumb .card-banner__theme,
-.activity-row__thumb .card-banner__edition {
-  font-size: 6px !important;
-}
-
-.activity-row__thumb .card-banner__tier-pill {
-  padding: 0 0.25rem !important;
+  display: none;
 }
 
 .activity-row__details {
@@ -2986,12 +2959,29 @@
 
 .activity-row__name {
   margin: 2px 0 0;
-  font-size: 16px !important;
-  font-weight: 700 !important;
+  font-size: 16px;
+  font-weight: 700;
   line-height: 1.25;
-  letter-spacing: 0.03em !important;
   color: var(--text-primary);
   word-break: break-word;
+}
+
+.activity-row__name--rookie {
+  font-family: "Bebas Neue", sans-serif;
+  font-weight: 400;
+  letter-spacing: 1px;
+}
+
+.activity-row__name--allstar {
+  font-family: "Russo One", sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.5px;
+}
+
+.activity-row__name--legends {
+  font-family: "Cinzel", serif;
+  font-style: italic;
+  letter-spacing: 0.75px;
 }
 
 .activity-row__meta {
@@ -3138,8 +3128,8 @@
 /* Mobile — row 1: badge + thumb + name/label, row 2: counterparty/date + amount */
 @media (max-width: 599px) {
   .activity-row {
-    /* Thumb track includes its 12px left margin (80px + 12px) */
-    grid-template-columns: 40px 92px minmax(0, 1fr);
+    /* Thumb track includes its 12px left margin (110px + 12px) */
+    grid-template-columns: 40px 122px minmax(0, 1fr);
     grid-template-areas:
       "badge thumb details"
       "foot  foot  amount";
@@ -3148,8 +3138,8 @@
   }
 
   .activity-row__thumb {
-    width: 80px;
-    height: 112px;
+    width: 110px;
+    height: 154px;
   }
 
   .activity-row__details {

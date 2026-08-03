@@ -14,6 +14,7 @@ import {
   relativeTimeAgo,
 } from "../utils/activityHistory";
 import { getCardBannerStyles, themeDisplayLabel } from "../utils/cardBannerStyles";
+import { normalizeTierKey } from "../utils/cardTemplate";
 import { formatEditionShort, vaultTierBadge } from "../utils/tierStyles";
 
 const ACTIVITY_PAGE_SIZE = 20;
@@ -111,6 +112,7 @@ function ActivityRow({ item }) {
   const card = item?.card || null;
   const style = activityRowStyle(item);
   const tier = card?.tier || "rookie";
+  const tierKey = normalizeTierKey(tier);
   const theme = card?.theme ?? card?.special_theme ?? "";
   const badge = vaultTierBadge(tier);
   const bannerStyles = getCardBannerStyles(tier, theme);
@@ -143,7 +145,7 @@ function ActivityRow({ item }) {
         <p className="activity-row__label" style={{ color: style.labelColor }}>
           {style.label}
         </p>
-        <h3 className={`activity-row__name ${bannerStyles.nameClass}`.trim()}>
+        <h3 className={`activity-row__name activity-row__name--${tierKey}`}>
           {card?.player_name || "Card"}
         </h3>
 
