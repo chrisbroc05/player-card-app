@@ -19,9 +19,30 @@ class ActivityCardOut(BaseModel):
 
     card_id: str
     player_name: str
+    team_name: str = ""
+    position: str = ""
+    jersey_number: str = ""
+    grad_year: int = 0
     tier: str
     theme: str
+    rarity: str = ""
+    edition_number: int = 1
+    print_run: int = 1
     image_url: str
+
+    is_animated: bool = False
+    animated_video_url: str | None = None
+    animation_status: str | None = None
+    animation_motion: str | None = None
+    action_category: str | None = None
+
+    is_highlight: bool = False
+    highlight_video_url: str | None = None
+    highlight_thumbnail_url: str | None = None
+    highlight_status: str | None = None
+    highlight_uploaded_at: str | None = None
+    highlight_trim_start: float | None = None
+    highlight_trim_end: float | None = None
 
 
 class ActivityCounterpartyOut(BaseModel):

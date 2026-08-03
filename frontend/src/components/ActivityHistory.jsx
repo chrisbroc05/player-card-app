@@ -2,16 +2,21 @@ import React from "react";
 import { Link } from "react-router-dom";
 import CardImage from "./CardImage";
 import { API_BASE_URL, authHeaders } from "../config/api";
-import { CARD_IMAGE_FRAME_XS } from "../utils/cardImageStyles";
 import {
   ACTIVITY_FILTERS,
+  activityAmountDisplay,
   activityMeta,
+  activityRowStyle,
   amountDisplay,
   counterpartyLine,
-  formatActivityTimestamp,
+  filterActivityItems,
+  formatActivityFullTimestamp,
   relativeTimeAgo,
 } from "../utils/activityHistory";
-import { vaultTierBadge } from "../utils/tierStyles";
+import { getCardBannerStyles, themeDisplayLabel } from "../utils/cardBannerStyles";
+import { formatEditionShort, vaultTierBadge } from "../utils/tierStyles";
+
+const ACTIVITY_PAGE_SIZE = 20;
 
 function ActivityTypeBadge({ item }) {
   const meta = activityMeta(item, item?.card?.tier);
@@ -102,6 +107,76 @@ export function ActivityHistoryCompactList({ items, loading }) {
   );
 }
 
+function ActivityRow({ item }) {
+  const card = item?.card || null;
+  const style = activityRowStyle(item);
+  const tier = card?.tier || "rookie";
+  const theme = card?.theme ?? card?.special_theme ?? "";
+  const badge = vaultTierBadge(tier);
+  const bannerStyles = getCardBannerStyles(tier, theme);
+  const themeLabel = themeDisplayLabel(theme);
+  const edition = formatEditionShort(card?.edition_number, card?.print_run);
+  const counterparty = counterpartyLine(item);
+  const amount = activityAmountDisplay(item);
+  const timestamp = formatActivityFullTimestamp(item?.completed_at || item?.created_at);
+
+  return (
+    <li className="activity-row">
+      <div className="activity-row__badge" style={style.badgeStyle} aria-hidden>
+        {style.glyph}
+      </div>
+
+      <div className="activity-row__thumb">
+        {card ? (
+          <CardImage
+            card={card}
+            alt={card.player_name || "Card"}
+            frameClassName="activity-row__frame"
+            infoBannerVariant="thumb"
+            showInfoBanner
+            playOnHover
+          />
+        ) : null}
+      </div>
+
+      <div className="activity-row__details">
+        <p className="activity-row__label" style={{ color: style.labelColor }}>
+          {style.label}
+        </p>
+        <h3 className={`activity-row__name ${bannerStyles.nameClass}`.trim()}>
+          {card?.player_name || "Card"}
+        </h3>
+
+        <div className="activity-row__meta">
+          <span className={`activity-row__tier-pill ${bannerStyles.tierPillClass}`}>
+            {bannerStyles.tierPillLabel}
+          </span>
+          {themeLabel ? <span className="activity-row__theme">{themeLabel}</span> : null}
+          <span className="activity-row__edition" style={{ color: badge.accent }}>
+            {edition}
+          </span>
+        </div>
+      </div>
+
+      <div className="activity-row__foot">
+        {counterparty ? <p className="activity-row__counterparty">{counterparty}</p> : null}
+        {timestamp ? <p className="activity-row__time">{timestamp}</p> : null}
+      </div>
+
+      <div className="activity-row__amount">
+        <span
+          className={`activity-row__amount-value activity-row__amount-value--${amount.tone}${
+            amount.small ? " activity-row__amount-value--sm" : ""
+          }${amount.italic ? " activity-row__amount-value--italic" : ""}`}
+        >
+          {amount.text}
+        </span>
+        {amount.subtext ? <span className="activity-row__amount-sub">{amount.subtext}</span> : null}
+      </div>
+    </li>
+  );
+}
+
 export function ActivityHistorySection({
   items,
   loading,
@@ -109,39 +184,41 @@ export function ActivityHistorySection({
   filter,
   onFilterChange,
   showFilters = true,
-  emptyMessage = "No activity yet. Start by creating your first card!",
+  emptyMessage = "No activity yet — start by creating your first card!",
 }) {
-  const filtered = showFilters
-    ? (() => {
-        const f = ACTIVITY_FILTERS.find((x) => x.id === filter) || ACTIVITY_FILTERS[0];
-        if (!f.type) return items;
-        if (f.type === "trades") {
-          return items.filter(
-            (i) => i.activity_type === "trade_sent" || i.activity_type === "trade_received"
-          );
-        }
-        return items.filter((i) => i.activity_type === f.type);
-      })()
-    : items;
+  const [page, setPage] = React.useState(0);
+
+  const filtered = React.useMemo(
+    () => (showFilters ? filterActivityItems(items || [], filter) : items || []),
+    [items, filter, showFilters]
+  );
+
+  React.useEffect(() => {
+    setPage(0);
+  }, [filter, items]);
+
+  const total = filtered.length;
+  const pageCount = Math.max(1, Math.ceil(total / ACTIVITY_PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const start = safePage * ACTIVITY_PAGE_SIZE;
+  const visible = filtered.slice(start, start + ACTIVITY_PAGE_SIZE);
 
   return (
-    <section>
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-white">Activity History</h2>
-          <p className="mt-1 text-sm text-slate-400">Completed trades, marketplace sales, animated upgrades, and highlight cards.</p>
-        </div>
+    <section className="activity-history">
+      <div className="activity-history__head">
+        <h2 className="activity-history__title">Activity History</h2>
+        <p className="activity-history__subtitle">
+          Completed trades, marketplace sales, animated upgrades, and highlight cards.
+        </p>
         {showFilters ? (
-          <div className="flex flex-wrap gap-1.5">
+          <div className="activity-history__tabs">
             {ACTIVITY_FILTERS.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => onFilterChange?.(tab.id)}
-                className={`min-h-[36px] rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-                  filter === tab.id
-                    ? "border-neonBlue/50 bg-neonBlue/15 text-white"
-                    : "border-white/15 bg-cardBg2 text-slate-400 hover:border-white/25 hover:text-slate-200"
+                className={`activity-history__tab${
+                  filter === tab.id ? " activity-history__tab--active" : ""
                 }`}
               >
                 {tab.label}
@@ -151,82 +228,48 @@ export function ActivityHistorySection({
         ) : null}
       </div>
 
-      {error ? (
-        <div className="mb-4 rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
-          {error}
-        </div>
-      ) : null}
+      {error ? <div className="activity-history__error">{error}</div> : null}
 
       {loading ? (
-        <div className="flex min-h-[160px] items-center justify-center rounded-xl border border-white/10 bg-cardBg/40">
+        <div className="activity-history__loading">
           <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/15 border-t-neonBlue" />
         </div>
-      ) : filtered.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-white/15 bg-cardBg/40 px-4 py-12 text-center text-sm text-slate-500">
-          {emptyMessage}
-        </p>
+      ) : total === 0 ? (
+        <p className="activity-history__empty">{emptyMessage}</p>
       ) : (
-        <ul className="overflow-hidden rounded-2xl border border-white/10 bg-cardBg divide-y divide-white/10">
-          {filtered.map((item) => {
-            const cp = counterpartyLine(item);
-            const amt = amountDisplay(item);
-            const badge = vaultTierBadge(item.card?.tier);
-            const meta = activityMeta(item, item.card?.tier);
-            return (
-              <li
-                key={item.id}
-                className="px-4 py-4 sm:px-5 sm:py-5"
-              >
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
-                  <div className="mx-auto w-24 shrink-0 flex-none sm:mx-0">
-                    <CardImage
-                      card={item.card}
-                      alt={item.card?.player_name}
-                      frameClassName={CARD_IMAGE_FRAME_XS}
-                    />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <ActivityIcon item={item} />
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${meta.badgeClass}`}
-                      >
-                        <span aria-hidden>{meta.emoji}</span>
-                        {meta.label}
-                      </span>
-                    </div>
+        <>
+          <ul className="activity-history__list">
+            {visible.map((item) => (
+              <ActivityRow key={item.id} item={item} />
+            ))}
+          </ul>
 
-                    <p className="mt-2 text-base font-semibold leading-snug text-white break-words">
-                      {item.card?.player_name || "Card"}
-                    </p>
-                    <div className="mt-2">
-                      <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${badge.pill}`}>
-                        {badge.label}
-                      </span>
-                    </div>
-
-                    <p className="mt-2 font-mono text-xs text-slate-500 break-all">{item.card?.card_id}</p>
-                    {cp ? <p className="mt-2 text-sm text-slate-300">{cp}</p> : null}
-                    <p className="mt-2 text-xs text-slate-500">
-                      {formatActivityTimestamp(item.completed_at || item.created_at)}
-                      <span className="mx-2 text-white/20">·</span>
-                      {relativeTimeAgo(item.completed_at || item.created_at)}
-                    </p>
-                  </div>
-
-                  <div className="flex shrink-0 flex-col items-start gap-0.5 border-t border-white/10 pt-3 sm:min-w-[150px] sm:items-end sm:border-t-0 sm:pt-0">
-                    <span className="text-[11px] uppercase tracking-wide text-slate-500">Amount</span>
-                    {amt ? (
-                      <ActivityAmount amount={amt} variant="full" />
-                    ) : (
-                      <span className="text-xs text-slate-500">Free</span>
-                    )}
-                  </div>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+          {total > ACTIVITY_PAGE_SIZE ? (
+            <div className="activity-history__pager">
+              <span className="activity-history__pager-label">
+                Showing {start + 1}-{Math.min(start + ACTIVITY_PAGE_SIZE, total)} of {total} activities
+              </span>
+              <div className="activity-history__pager-btns">
+                <button
+                  type="button"
+                  disabled={safePage === 0}
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  className="activity-history__pager-btn"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  disabled={safePage >= pageCount - 1}
+                  onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+                  className="activity-history__pager-btn"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </>
       )}
     </section>
   );

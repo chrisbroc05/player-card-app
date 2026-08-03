@@ -8,6 +8,9 @@
     --border: rgba(255, 255, 255, 0.1);
     --text-primary: #f1f5f9;
     --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --text-success: #4ade80;
+    --text-danger: #fb7185;
     --bg-warning: rgba(245, 158, 11, 0.18);
     --text-warning: #fcd34d;
   }
@@ -2773,5 +2776,398 @@
 
 .my-listings-v2__empty-btn:hover {
   background: #5eead4;
+}
+
+/* ── Activity History — four-column activity rows ── */
+.activity-history {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.activity-history__head {
+  margin-bottom: 16px;
+}
+
+.activity-history__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.activity-history__subtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.activity-history__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.activity-history__tab {
+  min-height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+
+.activity-history__tab:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  color: var(--text-primary);
+}
+
+.activity-history__tab--active {
+  border-color: rgba(74, 158, 255, 0.5);
+  background: rgba(74, 158, 255, 0.15);
+  color: #fff;
+}
+
+.activity-history__error {
+  margin-bottom: 16px;
+  border: 1px solid rgba(244, 63, 94, 0.4);
+  border-radius: 12px;
+  background: rgba(244, 63, 94, 0.1);
+  padding: 12px 16px;
+  font-size: 14px;
+  color: #fecdd3;
+}
+
+.activity-history__loading {
+  display: flex;
+  min-height: 160px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-1);
+}
+
+.activity-history__empty {
+  margin: 0;
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  background: var(--surface-1);
+  padding: 48px 24px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.activity-history__list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.activity-row {
+  display: grid;
+  /* Thumb/amount tracks include their own left margin (100px + 12px) */
+  grid-template-columns: 48px 112px minmax(0, 1fr) 112px;
+  grid-template-areas:
+    "badge thumb details amount"
+    "badge thumb foot    amount";
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-1);
+  padding: 16px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.activity-row__badge {
+  grid-area: badge;
+  display: flex;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  justify-self: center;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.activity-row__thumb {
+  grid-area: thumb;
+  flex-shrink: 0;
+  width: 100px;
+  height: 140px;
+  margin-left: 12px;
+  overflow: visible;
+  border-radius: 8px;
+}
+
+.activity-row__frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.activity-row__thumb .card-shell {
+  min-width: 0 !important;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  border-radius: 8px;
+}
+
+/* Scale the card template down for the 100px activity thumbnail */
+.activity-row__thumb .card-shell__banner {
+  min-height: 0 !important;
+}
+
+.activity-row__thumb .card-banner {
+  padding: 6px 5px 4px;
+}
+
+.activity-row__thumb .card-banner__name {
+  font-size: 10px !important;
+  letter-spacing: 0.4px !important;
+}
+
+.activity-row__thumb .card-banner__team {
+  font-size: 7px !important;
+  letter-spacing: 0.4px !important;
+}
+
+.activity-row__thumb .card-banner__stats {
+  font-size: 6px !important;
+}
+
+.activity-row__thumb .card-banner__tier-pill,
+.activity-row__thumb .card-banner__theme,
+.activity-row__thumb .card-banner__edition {
+  font-size: 6px !important;
+}
+
+.activity-row__thumb .card-banner__tier-pill {
+  padding: 0 0.25rem !important;
+}
+
+.activity-row__details {
+  grid-area: details;
+  min-width: 0;
+  margin-left: 16px;
+  align-self: end;
+}
+
+.activity-row__foot {
+  grid-area: foot;
+  min-width: 0;
+  margin-left: 16px;
+  align-self: start;
+}
+
+.activity-row__label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.activity-row__name {
+  margin: 2px 0 0;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  line-height: 1.25;
+  letter-spacing: 0.03em !important;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.activity-row__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.activity-row__tier-pill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 9999px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.activity-row__theme {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.activity-row__edition {
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.activity-row__counterparty {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  word-break: break-word;
+}
+
+.activity-row__time {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.activity-row__amount {
+  grid-area: amount;
+  display: flex;
+  width: 100px;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  margin-left: 12px;
+  text-align: right;
+}
+
+.activity-row__amount-value {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-row__amount-value--sm {
+  font-size: 16px;
+}
+
+.activity-row__amount-value--italic {
+  font-size: 14px;
+  font-style: italic;
+  font-weight: 500;
+}
+
+.activity-row__amount-value--success {
+  color: var(--text-success);
+}
+
+.activity-row__amount-value--danger {
+  color: var(--text-danger);
+}
+
+.activity-row__amount-value--muted {
+  color: var(--text-muted);
+}
+
+.activity-row__amount-sub {
+  font-size: 10px;
+  line-height: 1.3;
+  color: var(--text-muted);
+}
+
+.activity-history__pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.activity-history__pager-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.activity-history__pager-btns {
+  display: flex;
+  gap: 8px;
+}
+
+.activity-history__pager-btn {
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.activity-history__pager-btn:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.activity-history__pager-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Mobile — row 1: badge + thumb + name/label, row 2: counterparty/date + amount */
+@media (max-width: 599px) {
+  .activity-row {
+    /* Thumb track includes its 12px left margin (80px + 12px) */
+    grid-template-columns: 40px 92px minmax(0, 1fr);
+    grid-template-areas:
+      "badge thumb details"
+      "foot  foot  amount";
+    align-items: start;
+    row-gap: 12px;
+  }
+
+  .activity-row__thumb {
+    width: 80px;
+    height: 112px;
+  }
+
+  .activity-row__details {
+    margin-left: 12px;
+    align-self: start;
+  }
+
+  .activity-row__foot {
+    margin-left: 0;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+
+  .activity-row__amount {
+    width: auto;
+    margin-left: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
 }
 

@@ -52,7 +52,7 @@ export default function TradesPage() {
     setActivityLoading(true);
     setActivityError("");
     try {
-      const res = await fetch(`${API_BASE_URL}/activity/history?limit=50`, {
+      const res = await fetch(`${API_BASE_URL}/activity/history?limit=200`, {
         headers: { ...authHeaders(token) },
         cache: "no-store",
       });

@@ -7,7 +7,12 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session, joinedload
 
-from card_repo import ANIMATED_UPGRADE_STYLE_PREFIX
+from card_pricing import animated_upgrade_price, highlight_card_price
+from card_repo import (
+    ANIMATED_UPGRADE_STYLE_PREFIX,
+    animation_fields_for_card,
+    highlight_fields_for_card,
+)
 from marketplace_repo import float_from_decimal
 from marketplace_trade_repo import OFFER_TYPE_CASH
 from models import Card, MarketplaceOffer, TradeOffer, User
@@ -42,14 +47,32 @@ def _completed_ts(dt: datetime | None) -> datetime:
     return dt
 
 
+def _grad_year_int(card: Card) -> int:
+    try:
+        return int(card.grad_year or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def _card_snapshot(card: Card) -> dict:
-    return {
-        "card_id": card.card_id,
-        "player_name": card.player_name,
-        "tier": card.tier,
+    """Full media-capable card payload so highlight/animated thumbnails can render."""
+    row = {
+        "card_id": card.card_id or "",
+        "player_name": card.player_name or "",
+        "team_name": card.team_name or "",
+        "position": card.position or "",
+        "jersey_number": card.jersey_number or "",
+        "grad_year": _grad_year_int(card),
+        "tier": card.tier or "rookie",
         "theme": card.theme or "none",
-        "image_url": card.image_url,
+        "rarity": card.rarity or "",
+        "edition_number": int(card.edition_number or 1),
+        "print_run": int(card.print_run or 1),
+        "image_url": card.image_url or "",
     }
+    row.update(animation_fields_for_card(card))
+    row.update(highlight_fields_for_card(card))
+    return row
 
 
 def _counterparty(display_name: str | None, user_id: int | None = None) -> dict | None:
@@ -206,6 +229,7 @@ def gather_user_activity_items(db: Session, user_id: int) -> list[dict]:
         )
         .all()
     )
+    animated_price = animated_upgrade_price()
     for card in animated_rows:
         when = card.animation_completed_at or card.created_at
         items.append(
@@ -216,7 +240,7 @@ def gather_user_activity_items(db: Session, user_id: int) -> list[dict]:
                 created_at=card.created_at,
                 card=card,
                 counterparty=None,
-                amount=None,
+                amount=animated_price,
             )
         )
 
@@ -229,6 +253,7 @@ def gather_user_activity_items(db: Session, user_id: int) -> list[dict]:
         )
         .all()
     )
+    highlight_price = highlight_card_price()
     for card in highlight_rows:
         when = card.highlight_uploaded_at or card.created_at
         items.append(
@@ -239,7 +264,7 @@ def gather_user_activity_items(db: Session, user_id: int) -> list[dict]:
                 created_at=card.created_at,
                 card=card,
                 counterparty=None,
-                amount=None,
+                amount=highlight_price,
             )
         )
 

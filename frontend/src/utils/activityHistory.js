@@ -68,6 +68,56 @@ export function activityMeta(item, tier) {
   };
 }
 
+/**
+ * Row presentation for the full Activity History layout — circular badge colors,
+ * glyph, and uppercase eyebrow label.
+ */
+const ACTIVITY_ROW_STYLES = {
+  trade_sent: {
+    label: "TRADE SENT",
+    glyph: "→",
+    badgeStyle: { backgroundColor: "#2563eb", color: "#ffffff" },
+    labelColor: "#93c5fd",
+  },
+  trade_received: {
+    label: "TRADE RECEIVED",
+    glyph: "←",
+    badgeStyle: { backgroundColor: "#16a34a", color: "#ffffff" },
+    labelColor: "#86efac",
+  },
+  marketplace_sold: {
+    label: "CARD SOLD",
+    glyph: "$",
+    badgeStyle: { backgroundColor: "#f0c030", color: "#1f1400" },
+    labelColor: "#fcd34d",
+  },
+  marketplace_bought: {
+    label: "MARKETPLACE PURCHASE",
+    glyph: "🛍",
+    badgeStyle: { backgroundColor: "#7c3aed", color: "#ffffff" },
+    labelColor: "#c4b5fd",
+  },
+  animated_upgrade: {
+    label: "ANIMATED UPGRADE",
+    glyph: "✦",
+    badgeStyle: { backgroundColor: "#a855f7", color: "#ffffff" },
+    labelColor: "#d8b4fe",
+  },
+  highlight_upgrade: {
+    label: "HIGHLIGHT CREATED",
+    glyph: "▶",
+    badgeStyle: { backgroundColor: "#D85A30", color: "#ffffff" },
+    labelColor: "#fdba74",
+  },
+};
+
+export function activityRowStyle(item) {
+  const base = ACTIVITY_ROW_STYLES[item?.activity_type] || ACTIVITY_ROW_STYLES.trade_sent;
+  if (item?.activity_type !== "animated_upgrade") return base;
+  const accent = vaultTierBadge(item?.card?.tier).accent;
+  return { ...base, badgeStyle: { backgroundColor: accent, color: "#ffffff" } };
+}
+
 export function relativeTimeAgo(iso) {
   if (!iso) return "";
   try {
@@ -102,19 +152,76 @@ export function formatActivityTimestamp(iso) {
 }
 
 export function counterpartyLine(item) {
+  const type = item?.activity_type;
+  if (type === "animated_upgrade" || type === "highlight_upgrade") {
+    return "Upgraded by you";
+  }
   const name = item?.counterparty?.display_name;
   if (!name) return null;
-  const type = item.activity_type;
-  if (type === "trade_sent" || type === "trade_received") {
-    return `Traded with ${name}`;
-  }
-  if (type === "marketplace_bought") {
-    return `Bought from ${name}`;
-  }
-  if (type === "marketplace_sold") {
-    return `Sold to ${name}`;
-  }
+  if (type === "trade_sent") return `Traded to @${name}`;
+  if (type === "trade_received") return `Received from @${name}`;
+  if (type === "marketplace_bought") return `Purchased from @${name}`;
+  if (type === "marketplace_sold") return `Sold to @${name}`;
   return name;
+}
+
+/** Full timestamp for the activity row, e.g. "July 31, 2026 at 2:41 PM". */
+export function formatActivityFullTimestamp(iso) {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    const date = d.toLocaleDateString(undefined, {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
+    const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    return `${date} at ${time}`;
+  } catch {
+    return iso;
+  }
+}
+
+/**
+ * Amount column content for the full Activity History row.
+ * Returns { text, tone, subtext } where tone is success | danger | muted.
+ */
+export function activityAmountDisplay(item) {
+  const type = item?.activity_type;
+
+  if (type === "trade_sent" || type === "trade_received") {
+    return { text: "Free", tone: "muted", italic: true };
+  }
+
+  const raw = Number(item?.amount);
+  if (!Number.isFinite(raw)) return { text: "—", tone: "muted" };
+
+  if (type === "marketplace_sold") {
+    const royalty = Number(item?.royalty_amount);
+    const fee = Number.isFinite(royalty)
+      ? Math.max(0, Math.round(royalty * 100) / 100)
+      : Math.max(0, Math.round(raw * 0.02 * 100) / 100);
+    const net = Math.max(0, Math.round((raw - fee) * 100) / 100);
+    return {
+      text: `+${formatMoney(net)}`,
+      tone: "success",
+      subtext: `−${formatMoney(fee)} fee`,
+    };
+  }
+
+  if (type === "marketplace_bought") {
+    return { text: `−${formatMoney(Math.abs(raw))}`, tone: "danger" };
+  }
+
+  if (type === "animated_upgrade") {
+    return { text: `−${formatMoney(Math.abs(raw))}`, tone: "danger", subtext: "Animation", small: true };
+  }
+
+  if (type === "highlight_upgrade") {
+    return { text: `−${formatMoney(Math.abs(raw))}`, tone: "danger", subtext: "Highlight", small: true };
+  }
+
+  return { text: formatMoney(Math.abs(raw)), tone: "muted" };
 }
 
 export function marketplaceSoldAmountDisplay(item) {
