@@ -11,13 +11,12 @@ import { authFetch, formatApiError } from "../utils/authFetch";
 import {
   counterOfferButtonLabel,
   formatMoney,
-  listingExpiresLabel,
-  listingExpiresSubtextClass,
+  isActivePriorityListing,
   offerExpiresLabel,
   offerExpiresLineClass,
 } from "../utils/marketplace";
-import { themeDisplayLabel } from "../utils/cardBannerStyles";
-import { vaultTierBadge } from "../utils/tierStyles";
+import { getCardBannerStyles, themeDisplayLabel } from "../utils/cardBannerStyles";
+import { formatEditionShort, vaultTierBadge } from "../utils/tierStyles";
 import { CARD_IMAGE_FRAME_LISTING_ROW } from "../utils/cardImageStyles";
 import {
   MARKETPLACE_MODAL_OVERLAY_CLASS,
@@ -26,19 +25,25 @@ import {
   marketplaceModalPanelClass,
 } from "../components/MarketplaceModalLayout";
 
-function formatListingExpiresDate(iso) {
+function formatLongDate(iso) {
   if (!iso) return "";
   try {
     const d = new Date(iso);
-    return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    return d.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
   } catch {
     return "";
   }
 }
 
-const LISTING_CARD_THUMB_CLASS = "my-listings-row__thumb";
+function formatListedLine(iso) {
+  const date = formatLongDate(iso);
+  return date ? `Listed ${date}` : "";
+}
 
-const LISTING_CARD_THUMB_INTERACTIVE_CLASS = `${LISTING_CARD_THUMB_CLASS} my-listings-row__thumb--interactive`;
+function formatExpiresLine(iso) {
+  const date = formatLongDate(iso);
+  return date ? `Expires ${date}` : "";
+}
 
 export default function MarketplaceMyListingsPage() {
   const navigate = useNavigate();
@@ -49,6 +54,7 @@ export default function MarketplaceMyListingsPage() {
   const [error, setError] = useState("");
   const [actionKey, setActionKey] = useState("");
   const [relistBusyId, setRelistBusyId] = useState("");
+  const [unlistBusyId, setUnlistBusyId] = useState("");
   const [counterFormOfferId, setCounterFormOfferId] = useState(null);
   const [counterAmount, setCounterAmount] = useState("");
   const [counterTradeCardIds, setCounterTradeCardIds] = useState([]);
@@ -167,6 +173,31 @@ export default function MarketplaceMyListingsPage() {
     }
   }
 
+  async function unlistListing(cardId) {
+    if (!token) return;
+    setUnlistBusyId(cardId);
+    setError("");
+    try {
+      const { res, unauthorized } = await authFetch(token, "/marketplace/unlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ card_id: cardId }),
+      });
+      if (unauthorized) {
+        setError("Session expired. Please sign in again.");
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not remove listing."));
+      await load({ silent: true });
+      refreshNavBadges?.();
+    } catch (e) {
+      setError(e.message || "Could not remove listing.");
+    } finally {
+      setUnlistBusyId("");
+    }
+  }
+
   async function relist(cardId, askingPrice) {
     if (!token) return;
     setRelistBusyId(cardId);
@@ -281,118 +312,31 @@ export default function MarketplaceMyListingsPage() {
             <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/15 border-t-neonTeal" />
           </div>
         ) : listings.length === 0 ? (
-          <div className="flex min-h-[200px] flex-col items-center justify-center rounded-2xl border border-dashed border-white/15 bg-cardBg/50 px-6 py-12 text-center">
-            <p className="text-lg text-slate-300">No active listings</p>
-            <p className="mt-2 text-sm text-slate-500">List a card from My Collection to start receiving offers.</p>
-            <Link
-              to="/my-collection"
-              className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-neonTeal px-5 text-sm font-semibold text-slate-950"
-            >
-              My Collection
+          <div className="my-listings-v2__empty">
+            <div className="my-listings-v2__empty-icon" aria-hidden>
+              🃏
+            </div>
+            <h2 className="my-listings-v2__empty-title">No cards listed yet</h2>
+            <p className="my-listings-v2__empty-text">
+              Head to My Collection to list a card on the marketplace
+            </p>
+            <Link to="/my-collection" className="my-listings-v2__empty-btn">
+              Go to My Collection
             </Link>
           </div>
         ) : (
-          <div className="my-listings-list">
-            {listings.map((listing) => {
-              const badge = vaultTierBadge(listing.tier);
-              const themeLabel = themeDisplayLabel(listing.theme || listing.special_theme);
-              const cardOffers = offersByCard[listing.card_id] || [];
-              const dr =
-                listing.days_remaining != null && listing.listing_expires_at ? Number(listing.days_remaining) : null;
-              const warnRelist = dr != null && dr <= 3;
-
-              return (
-                <article
-                  key={listing.card_id}
-                  className={`my-listings-item ${badge.glow}`}
-                >
-                  <div className="my-listings-row">
-                    {cardOffers.length > 0 ? (
-                      <button
-                        type="button"
-                        onClick={() => setReviewCardId(listing.card_id)}
-                        className={LISTING_CARD_THUMB_INTERACTIVE_CLASS}
-                      >
-                        <CardImage
-                          card={listing}
-                          alt={listing.player_name}
-                          frameClassName={CARD_IMAGE_FRAME_LISTING_ROW}
-                          playOnHover
-                        />
-                      </button>
-                    ) : (
-                      <Link
-                        to={`/marketplace/${encodeURIComponent(listing.card_id)}`}
-                        className={LISTING_CARD_THUMB_CLASS}
-                      >
-                        <CardImage
-                          card={listing}
-                          alt={listing.player_name}
-                          frameClassName={CARD_IMAGE_FRAME_LISTING_ROW}
-                          playOnHover
-                        />
-                      </Link>
-                    )}
-                    <div className="my-listings-row__details">
-                      <h2 className="my-listings-row__name">{listing.player_name}</h2>
-                      {listing.team_name ? (
-                        <p className="my-listings-row__team">{listing.team_name}</p>
-                      ) : null}
-                      <div className="my-listings-row__badges">
-                        <span className={`my-listings-row__tier-badge ${badge.pill}`}>{badge.label}</span>
-                        {themeLabel ? (
-                          <span className="my-listings-row__theme-badge">{themeLabel}</span>
-                        ) : null}
-                        {(listing.pending_offer_count || 0) > 0 ? (
-                          <span className="my-listings-row__offers-badge">
-                            {listing.pending_offer_count} Offer{listing.pending_offer_count === 1 ? "" : "s"}
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="my-listings-row__price">{formatMoney(listing.asking_price)}</p>
-                      {listing.listing_expires_at ? (
-                        <p className={`my-listings-row__date ${listingExpiresSubtextClass(dr)}`}>
-                          {listingExpiresLabel(dr)}
-                          {formatListingExpiresDate(listing.listing_expires_at)
-                            ? ` · ${formatListingExpiresDate(listing.listing_expires_at)}`
-                            : ""}
-                        </p>
-                      ) : null}
-                      <p className="my-listings-row__card-id">{listing.card_id}</p>
-                      {warnRelist ? (
-                        <div className="my-listings-row__warn">
-                          <p className="font-medium text-amber-200">Expiring soon — relist to keep it active</p>
-                          <button
-                            type="button"
-                            disabled={relistBusyId === listing.card_id}
-                            onClick={() => relist(listing.card_id, listing.asking_price)}
-                            className="my-listings-row__action-btn my-listings-row__action-btn--primary mt-2"
-                          >
-                            {relistBusyId === listing.card_id ? "Relisting…" : "Relist for 30 more days"}
-                          </button>
-                        </div>
-                      ) : null}
-                      {(listing.pending_offer_count || 0) > 0 ? (
-                        <div className="my-listings-row__actions">
-                          <button
-                            type="button"
-                            onClick={() => setReviewCardId(listing.card_id)}
-                            className="my-listings-row__action-btn my-listings-row__action-btn--amber"
-                          >
-                            Review Incoming Offers
-                          </button>
-                          <p className="my-listings-row__actions-hint">
-                            Sorted by highest cash offer first
-                          </p>
-                        </div>
-                      ) : (
-                        <p className="my-listings-row__no-offers">No pending offers yet</p>
-                      )}
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
+          <div className="my-listings-v2__list">
+            {listings.map((listing) => (
+              <MyListingRow
+                key={listing.card_id}
+                listing={listing}
+                onReviewOffers={setReviewCardId}
+                onRelist={relist}
+                onUnlist={unlistListing}
+                relistBusyId={relistBusyId}
+                unlistBusyId={unlistBusyId}
+              />
+            ))}
           </div>
         )}
       </main>
@@ -452,6 +396,134 @@ export default function MarketplaceMyListingsPage() {
       />
       <AppFooter />
     </div>
+  );
+}
+
+function MyListingRow({ listing, onReviewOffers, onRelist, onUnlist, relistBusyId, unlistBusyId }) {
+  const badge = vaultTierBadge(listing.tier);
+  const bannerStyles = getCardBannerStyles(listing.tier, listing.theme || listing.special_theme);
+  const themeLabel = themeDisplayLabel(listing.theme || listing.special_theme);
+  const offerCount = Number(listing.pending_offer_count) || 0;
+  const hasOffers = offerCount > 0;
+  const dr =
+    listing.days_remaining != null && listing.listing_expires_at ? Number(listing.days_remaining) : null;
+  const warnRelist = dr != null && dr <= 3;
+  const expiryWarn = dr != null && dr <= 7;
+  const isPriority = isActivePriorityListing(listing);
+  const edition = formatEditionShort(listing.edition_number, listing.print_run);
+  const cardDetailPath = `/marketplace/${encodeURIComponent(listing.card_id)}`;
+
+  return (
+    <article className={`my-listings-v2__item ${badge.glow}`}>
+      {isPriority ? (
+        <div className="my-listings-v2__priority">
+          ⭐ Priority Listing — expires {formatLongDate(listing.priority_expires_at) || "soon"}
+        </div>
+      ) : null}
+
+      <div className="my-listings-v2__row">
+        <div className="my-listings-v2__thumb">
+          <CardImage
+            card={listing}
+            alt={listing.player_name}
+            frameClassName={CARD_IMAGE_FRAME_LISTING_ROW}
+            playOnHover
+          />
+        </div>
+
+        <div className="my-listings-v2__details">
+          <h2
+            className={`my-listings-v2__name ${bannerStyles.nameClass}`.trim()}
+          >
+            {listing.player_name}
+          </h2>
+
+          <div className="my-listings-v2__badges">
+            <span className={`my-listings-v2__tier-pill ${bannerStyles.tierPillClass}`}>
+              {bannerStyles.tierPillLabel}
+            </span>
+            {themeLabel ? (
+              <span className="my-listings-v2__theme-pill">{themeLabel}</span>
+            ) : null}
+          </div>
+
+          <div className="my-listings-v2__price-block">
+            <span className="my-listings-v2__price-label">Listed at</span>
+            <span className="my-listings-v2__price">{formatMoney(listing.asking_price)}</span>
+          </div>
+
+          <div className="my-listings-v2__meta">
+            {listing.listed_at ? (
+              <p className="my-listings-v2__meta-line">{formatListedLine(listing.listed_at)}</p>
+            ) : null}
+            {listing.listing_expires_at ? (
+              <p
+                className={`my-listings-v2__meta-line ${
+                  expiryWarn ? "my-listings-v2__meta-line--warn" : ""
+                }`}
+              >
+                {formatExpiresLine(listing.listing_expires_at)}
+              </p>
+            ) : null}
+            <p className="my-listings-v2__meta-line my-listings-v2__edition" style={{ color: badge.accent }}>
+              {edition}
+            </p>
+          </div>
+
+          {warnRelist ? (
+            <div className="my-listings-v2__relist-warn">
+              <p>Expiring soon — relist to keep it active</p>
+              <button
+                type="button"
+                disabled={relistBusyId === listing.card_id}
+                onClick={() => onRelist(listing.card_id, listing.asking_price)}
+                className="my-listings-v2__btn my-listings-v2__btn--primary"
+              >
+                {relistBusyId === listing.card_id ? "Relisting…" : "Relist for 30 more days"}
+              </button>
+            </div>
+          ) : null}
+
+          <div className="my-listings-v2__offers-row">
+            {hasOffers ? (
+              <button
+                type="button"
+                onClick={() => onReviewOffers(listing.card_id)}
+                className="my-listings-v2__offers-badge"
+              >
+                {offerCount} active offer{offerCount === 1 ? "" : "s"}
+              </button>
+            ) : (
+              <span className="my-listings-v2__offers-none">No offers yet</span>
+            )}
+          </div>
+        </div>
+
+        <div className="my-listings-v2__divider" aria-hidden />
+
+        <div className="my-listings-v2__actions">
+          <button
+            type="button"
+            disabled={!hasOffers}
+            onClick={() => hasOffers && onReviewOffers(listing.card_id)}
+            className="my-listings-v2__btn my-listings-v2__btn--primary"
+          >
+            {hasOffers ? "Manage Offers" : "No Offers Yet"}
+          </button>
+          <button
+            type="button"
+            disabled={unlistBusyId === listing.card_id}
+            onClick={() => onUnlist(listing.card_id)}
+            className="my-listings-v2__btn my-listings-v2__btn--danger"
+          >
+            {unlistBusyId === listing.card_id ? "Unlisting…" : "Unlist Card"}
+          </button>
+          <Link to={cardDetailPath} className="my-listings-v2__btn my-listings-v2__btn--ghost">
+            View Card
+          </Link>
+        </div>
+      </div>
+    </article>
   );
 }
 
