@@ -1823,6 +1823,7 @@ export default function StudioPage() {
                 <HighlightVideoStep
                   mode="upload"
                   highlightCardPrice={generationPricing?.highlight_card_price ?? highlightCardPrice}
+                  tier={orderTier || "rookie"}
                   clipDraft={highlightClipDraft}
                   onVideoReady={(draft) => {
                     setHighlightClipDraft(draft);
@@ -2076,6 +2077,7 @@ export default function StudioPage() {
               <HighlightVideoStep
                 mode="trim"
                 highlightCardPrice={generationPricing?.highlight_card_price ?? highlightCardPrice}
+                tier={orderTier || "rookie"}
                 clipDraft={highlightClipDraft}
                 onClipConfirmed={(draft) => {
                   setHighlightClipDraft(draft);

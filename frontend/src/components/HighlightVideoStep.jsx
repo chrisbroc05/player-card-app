@@ -22,6 +22,7 @@ const PHASE = {
 export default function HighlightVideoStep({
   mode = "full",
   highlightCardPrice = 5,
+  tier = "rookie",
   clipDraft,
   onVideoReady,
   onClipConfirmed,
@@ -172,6 +173,7 @@ export default function HighlightVideoStep({
           duration={pendingClip.duration}
           initialTrimStart={pendingClip.trimStart}
           initialTrimEnd={pendingClip.trimEnd}
+          tier={tier}
           onConfirm={handleTrimConfirm}
           onChooseDifferent={resetToChoose}
         />
@@ -268,6 +270,7 @@ export default function HighlightVideoStep({
           duration={pendingClip.duration}
           initialTrimStart={pendingClip.trimStart}
           initialTrimEnd={pendingClip.trimEnd}
+          tier={tier}
           onConfirm={handleTrimConfirm}
           onChooseDifferent={resetToChoose}
         />

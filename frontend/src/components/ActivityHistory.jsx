@@ -277,6 +277,60 @@ export function ActivityHistorySection({
   );
 }
 
+export function ProfileActivityCompactList({ items, loading }) {
+  if (loading) {
+    return (
+      <div className="profile-page__loading">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-neonBlue" />
+      </div>
+    );
+  }
+
+  if (!items?.length) {
+    return (
+      <p className="rounded-xl border border-dashed border-white/15 bg-cardBg2/40 px-4 py-8 text-center text-sm text-slate-500">
+        No activity yet. Start by creating your first card!
+      </p>
+    );
+  }
+
+  return (
+    <ul className="profile-activity-list">
+      {items.map((item) => {
+        const style = activityRowStyle(item);
+        const amount = activityAmountDisplay(item);
+        const meta = activityMeta(item, item?.card?.tier);
+        return (
+          <li key={item.id} className="profile-activity-row">
+            <span className="profile-activity-row__badge" style={style.badgeStyle} aria-hidden>
+              {style.glyph}
+            </span>
+            <div className="profile-activity-row__main">
+              <p className="profile-activity-row__name">{item.card?.player_name || "Card"}</p>
+              <p className="profile-activity-row__type">{meta.label}</p>
+            </div>
+            <span
+              className={`profile-activity-row__amount profile-activity-row__amount--${amount.tone}`}
+              style={
+                amount.tone === "success"
+                  ? { color: "var(--text-success)" }
+                  : amount.tone === "danger"
+                    ? { color: "var(--text-danger)" }
+                    : undefined
+              }
+            >
+              {amount.text}
+            </span>
+            <span className="profile-activity-row__time">
+              {relativeTimeAgo(item.completed_at || item.created_at)}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 export function RecentActivitySection({ token, limit = 5 }) {
   const [items, setItems] = React.useState([]);
   const [loading, setLoading] = React.useState(true);

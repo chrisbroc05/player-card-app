@@ -5,18 +5,58 @@ import {
   formatHighlightTime,
   initialTrimRange,
 } from "../utils/highlightVideo";
+import { vaultTierBadge } from "../utils/tierStyles";
+
+const MIN_TRIM_GAP_SECONDS = 1;
 
 function spanSeconds(trimStart, trimEnd) {
   return Math.max(0, trimEnd - trimStart);
 }
 
-export default function HighlightVideoTrimmer({ objectUrl, file, duration, initialTrimStart, initialTrimEnd, onConfirm, onChooseDifferent }) {
+function clampHandleTime(handle, time, trimStart, trimEnd, duration) {
+  const safeDuration = Math.max(0, Number(duration) || 0);
+  let nextStart = trimStart;
+  let nextEnd = trimEnd;
+
+  if (handle === "start") {
+    nextStart = Math.max(0, Math.min(time, nextEnd - MIN_TRIM_GAP_SECONDS));
+    if (nextEnd - nextStart > MAX_HIGHLIGHT_CLIP_SECONDS) {
+      nextStart = nextEnd - MAX_HIGHLIGHT_CLIP_SECONDS;
+    }
+  } else {
+    nextEnd = Math.min(safeDuration, Math.max(time, nextStart + MIN_TRIM_GAP_SECONDS));
+    if (nextEnd - nextStart > MAX_HIGHLIGHT_CLIP_SECONDS) {
+      nextEnd = nextStart + MAX_HIGHLIGHT_CLIP_SECONDS;
+    }
+  }
+
+  return clampTrimRange(nextStart, nextEnd, safeDuration);
+}
+
+export default function HighlightVideoTrimmer({
+  objectUrl,
+  file,
+  duration,
+  initialTrimStart,
+  initialTrimEnd,
+  tier = "rookie",
+  onConfirm,
+  onChooseDifferent,
+}) {
   const videoRef = useRef(null);
   const trackRef = useRef(null);
-  const dragRef = useRef(null);
+  const rafRef = useRef(null);
+  const trimRef = useRef({ trimStart: 0, trimEnd: 0 });
 
   const [trimStart, setTrimStart] = useState(initialTrimStart ?? 0);
   const [trimEnd, setTrimEnd] = useState(initialTrimEnd ?? Math.min(duration, MAX_HIGHLIGHT_CLIP_SECONDS));
+  const [isDragging, setIsDragging] = useState(null);
+
+  const tierAccent = vaultTierBadge(tier).accent;
+
+  useEffect(() => {
+    trimRef.current = { trimStart, trimEnd };
+  }, [trimStart, trimEnd]);
 
   useEffect(() => {
     const initial = initialTrimRange(duration);
@@ -25,33 +65,50 @@ export default function HighlightVideoTrimmer({ objectUrl, file, duration, initi
   }, [duration, initialTrimStart, initialTrimEnd, objectUrl]);
 
   const selectedSpan = useMemo(() => spanSeconds(trimStart, trimEnd), [trimStart, trimEnd]);
+  const atMaxDuration = selectedSpan >= MAX_HIGHLIGHT_CLIP_SECONDS - 0.01;
 
   const readout = useMemo(() => {
-    const secs = Math.round(selectedSpan);
-    return `Selected: ${formatHighlightTime(trimStart)} — ${formatHighlightTime(trimEnd)} (${secs} ${secs === 1 ? "second" : "seconds"})`;
+    const secs = Math.round(selectedSpan * 10) / 10;
+    const secsLabel = Number.isInteger(secs) ? `${secs}s` : `${secs.toFixed(1)}s`;
+    return `Selected: ${formatHighlightTime(trimStart)} → ${formatHighlightTime(trimEnd)} (${secsLabel})`;
   }, [trimStart, trimEnd, selectedSpan]);
+
+  const scheduleScrub = useCallback((time) => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      const video = videoRef.current;
+      if (!video) return;
+      try {
+        video.currentTime = time;
+      } catch {
+        /* ignore seek errors during drag */
+      }
+    });
+  }, []);
 
   const playTrimmedSection = useCallback(() => {
     const video = videoRef.current;
-    if (!video) return;
-    video.currentTime = trimStart;
+    if (!video || isDragging) return;
+    video.currentTime = trimRef.current.trimStart;
     video.play().catch(() => {});
-  }, [trimStart]);
+  }, [isDragging]);
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || isDragging) return undefined;
 
     const onTimeUpdate = () => {
-      if (video.currentTime >= trimEnd - 0.05) {
-        video.pause();
-        video.currentTime = trimStart;
+      const { trimStart: start, trimEnd: end } = trimRef.current;
+      if (video.currentTime >= end - 0.05) {
+        video.currentTime = start;
+        if (!video.paused) video.play().catch(() => {});
       }
     };
 
     video.addEventListener("timeupdate", onTimeUpdate);
     return () => video.removeEventListener("timeupdate", onTimeUpdate);
-  }, [trimStart, trimEnd]);
+  }, [isDragging, trimStart, trimEnd]);
 
   const positionToTime = useCallback(
     (clientX) => {
@@ -64,40 +121,65 @@ export default function HighlightVideoTrimmer({ objectUrl, file, duration, initi
     [duration]
   );
 
-  const beginDrag = (handle) => (event) => {
-    event.preventDefault();
-    dragRef.current = { handle, pointerId: event.pointerId };
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-  };
+  const applyDrag = useCallback(
+    (clientX, handle) => {
+      const { trimStart: currentStart, trimEnd: currentEnd } = trimRef.current;
+      const time = positionToTime(clientX);
+      const clamped = clampHandleTime(handle, time, currentStart, currentEnd, duration);
+      trimRef.current = clamped;
+      setTrimStart(clamped.trimStart);
+      setTrimEnd(clamped.trimEnd);
+      scheduleScrub(handle === "start" ? clamped.trimStart : clamped.trimEnd);
+    },
+    [duration, positionToTime, scheduleScrub]
+  );
 
-  const onPointerMove = (event) => {
-    const drag = dragRef.current;
-    if (!drag) return;
-    const time = positionToTime(event.clientX);
-    if (drag.handle === "start") {
-      let nextStart = time;
-      let nextEnd = trimEnd;
-      if (nextEnd - nextStart > MAX_HIGHLIGHT_CLIP_SECONDS) {
-        nextStart = nextEnd - MAX_HIGHLIGHT_CLIP_SECONDS;
-      }
-      const clamped = clampTrimRange(nextStart, nextEnd, duration);
-      setTrimStart(clamped.trimStart);
-      setTrimEnd(clamped.trimEnd);
-    } else {
-      let nextEnd = time;
-      let nextStart = trimStart;
-      if (nextEnd - nextStart > MAX_HIGHLIGHT_CLIP_SECONDS) {
-        nextEnd = nextStart + MAX_HIGHLIGHT_CLIP_SECONDS;
-      }
-      const clamped = clampTrimRange(nextStart, nextEnd, duration);
-      setTrimStart(clamped.trimStart);
-      setTrimEnd(clamped.trimEnd);
+  const handleTrimDragStart = useCallback((handle) => {
+    videoRef.current?.pause();
+    setIsDragging(handle);
+  }, []);
+
+  const handleTrimDragEnd = useCallback(() => {
+    setIsDragging(null);
+    const video = videoRef.current;
+    if (!video) return;
+    const { trimStart: start } = trimRef.current;
+    try {
+      video.currentTime = start;
+    } catch {
+      /* ignore */
     }
-  };
+    video.play().catch(() => {});
+  }, []);
 
-  const endDrag = () => {
-    dragRef.current = null;
-  };
+  useEffect(() => {
+    if (!isDragging) return undefined;
+
+    const onPointerMove = (event) => {
+      event.preventDefault();
+      applyDrag(event.clientX, isDragging);
+    };
+
+    const onPointerEnd = () => {
+      handleTrimDragEnd();
+    };
+
+    window.addEventListener("pointermove", onPointerMove, { passive: false });
+    window.addEventListener("pointerup", onPointerEnd);
+    window.addEventListener("pointercancel", onPointerEnd);
+
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerEnd);
+      window.removeEventListener("pointercancel", onPointerEnd);
+    };
+  }, [isDragging, applyDrag, handleTrimDragEnd]);
+
+  useEffect(() => {
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
 
   const startPct = duration > 0 ? (trimStart / duration) * 100 : 0;
   const endPct = duration > 0 ? (trimEnd / duration) * 100 : 100;
@@ -114,73 +196,93 @@ export default function HighlightVideoTrimmer({ objectUrl, file, duration, initi
   };
 
   return (
-    <div className="grid gap-5">
-      <div className="overflow-hidden rounded-2xl border border-white/15 bg-black">
+    <div className="highlight-trimmer">
+      <div className="highlight-trimmer__player-wrap">
         <video
           ref={videoRef}
           src={objectUrl}
-          className="aspect-video w-full bg-black object-contain"
+          className="highlight-trimmer__video"
           playsInline
+          muted
           controls={false}
+          preload="auto"
           onClick={playTrimmedSection}
         />
-        <div className="flex items-center justify-between gap-2 border-t border-white/10 bg-cardBg2 px-3 py-2">
-          <p className="text-xs text-slate-400">Tap video to play selected clip</p>
-          <button
-            type="button"
-            onClick={playTrimmedSection}
-            className="rounded-lg border border-white/15 px-3 py-1 text-xs font-medium text-slate-100"
-          >
+        <div className="highlight-trimmer__player-bar">
+          <p className="highlight-trimmer__player-hint">Tap video to play selected clip</p>
+          <button type="button" onClick={playTrimmedSection} className="highlight-trimmer__play-btn">
             Play Clip
           </button>
         </div>
       </div>
 
-      <div>
-        <p className="mb-2 text-sm font-medium text-white">{readout}</p>
+      <div className="highlight-trimmer__controls">
         <div
           ref={trackRef}
-          className="relative h-12 select-none rounded-xl border border-white/15 bg-slate-900/80"
-          onPointerMove={onPointerMove}
-          onPointerUp={endDrag}
-          onPointerCancel={endDrag}
+          className="highlight-trimmer__track"
+          style={{ "--trim-accent": tierAccent }}
         >
-          <div className="absolute inset-y-3 left-2 right-2 rounded-full bg-slate-800" />
+          <div className="highlight-trimmer__track-bg" aria-hidden />
           <div
-            className="absolute inset-y-3 rounded-full bg-teal-500/35"
-            style={{ left: `calc(${startPct}% + 8px)`, right: `calc(${100 - endPct}% + 8px)` }}
+            className="highlight-trimmer__selection"
+            style={{ left: `${startPct}%`, width: `${Math.max(0, endPct - startPct)}%` }}
+            aria-hidden
           />
+
           <button
             type="button"
             aria-label="Trim start"
-            onPointerDown={beginDrag("start")}
-            className="absolute top-1/2 z-10 h-9 w-5 -translate-y-1/2 rounded-md border border-teal-300/70 bg-teal-400 shadow"
-            style={{ left: `calc(${startPct}% - 10px)` }}
-          />
+            className={`highlight-trimmer__handle highlight-trimmer__handle--start${
+              isDragging === "start" ? " highlight-trimmer__handle--active" : ""
+            }`}
+            style={{ left: `${startPct}%` }}
+            onPointerDown={(event) => {
+              event.preventDefault();
+              event.currentTarget.setPointerCapture?.(event.pointerId);
+              handleTrimDragStart("start");
+            }}
+          >
+            {isDragging === "start" ? (
+              <span className="highlight-trimmer__handle-label">Start: {formatHighlightTime(trimStart)}</span>
+            ) : null}
+          </button>
+
           <button
             type="button"
             aria-label="Trim end"
-            onPointerDown={beginDrag("end")}
-            className="absolute top-1/2 z-10 h-9 w-5 -translate-y-1/2 rounded-md border border-teal-300/70 bg-teal-400 shadow"
-            style={{ left: `calc(${endPct}% - 10px)` }}
-          />
+            className={`highlight-trimmer__handle highlight-trimmer__handle--end${
+              isDragging === "end" ? " highlight-trimmer__handle--active" : ""
+            }`}
+            style={{ left: `${endPct}%` }}
+            onPointerDown={(event) => {
+              event.preventDefault();
+              event.currentTarget.setPointerCapture?.(event.pointerId);
+              handleTrimDragStart("end");
+            }}
+          >
+            {isDragging === "end" ? (
+              <span className="highlight-trimmer__handle-label">End: {formatHighlightTime(trimEnd)}</span>
+            ) : null}
+          </button>
         </div>
-        <p className="mt-2 text-xs text-slate-400">Drag handles to pick up to 10 seconds.</p>
+
+        <p className="highlight-trimmer__readout">{readout}</p>
+        {isDragging && atMaxDuration ? (
+          <p className="highlight-trimmer__warn">Maximum 10 seconds — adjust your trim</p>
+        ) : (
+          <p className="highlight-trimmer__hint">Drag handles to pick up to 10 seconds.</p>
+        )}
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={onChooseDifferent}
-          className="inline-flex min-h-[46px] flex-1 items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
-        >
+      <div className="highlight-trimmer__actions">
+        <button type="button" onClick={onChooseDifferent} className="highlight-trimmer__btn highlight-trimmer__btn--secondary">
           Choose Different Video
         </button>
         <button
           type="button"
           onClick={handleConfirm}
           disabled={selectedSpan <= 0}
-          className="inline-flex min-h-[46px] flex-1 items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
+          className="highlight-trimmer__btn highlight-trimmer__btn--primary"
         >
           Use This Clip
         </button>

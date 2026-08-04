@@ -16,6 +16,7 @@ import {
   offerExpiresLineClass,
 } from "../utils/marketplace";
 import { getCardBannerStyles, themeDisplayLabel } from "../utils/cardBannerStyles";
+import { normalizeTierKey } from "../utils/cardTemplate";
 import { formatEditionShort, vaultTierBadge } from "../utils/tierStyles";
 import { CARD_IMAGE_FRAME_LISTING_ROW } from "../utils/cardImageStyles";
 import {
@@ -401,6 +402,7 @@ export default function MarketplaceMyListingsPage() {
 
 function MyListingRow({ listing, onReviewOffers, onRelist, onUnlist, relistBusyId, unlistBusyId }) {
   const badge = vaultTierBadge(listing.tier);
+  const tierKey = normalizeTierKey(listing.tier);
   const bannerStyles = getCardBannerStyles(listing.tier, listing.theme || listing.special_theme);
   const themeLabel = themeDisplayLabel(listing.theme || listing.special_theme);
   const offerCount = Number(listing.pending_offer_count) || 0;
@@ -432,9 +434,7 @@ function MyListingRow({ listing, onReviewOffers, onRelist, onUnlist, relistBusyI
         </div>
 
         <div className="my-listings-v2__details">
-          <h2
-            className={`my-listings-v2__name ${bannerStyles.nameClass}`.trim()}
-          >
+          <h2 className={`my-listings-v2__name my-listings-v2__name--${tierKey}`}>
             {listing.player_name}
           </h2>
 

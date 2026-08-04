@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass
 
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from card_repo import cards_created_by_user_filter, owned_collection_filter
 from marketplace_repo import float_from_decimal
@@ -32,6 +32,7 @@ class ProfileKpiSnapshot:
     active_listings: int
     top_purchase: MarketplaceOffer | None
     top_sale: MarketplaceOffer | None
+    marketplace_activity_count: int
 
 
 def _tier_display(db_tier: str) -> str:
@@ -142,6 +143,7 @@ def compute_profile_kpis(db: Session, user: User) -> ProfileKpiSnapshot:
 
     top_purchase = (
         db.query(MarketplaceOffer)
+        .options(joinedload(MarketplaceOffer.card), joinedload(MarketplaceOffer.buyer))
         .filter(MarketplaceOffer.buyer_id == uid, MarketplaceOffer.status == "accepted")
         .order_by(MarketplaceOffer.offer_amount.desc())
         .first()
@@ -149,9 +151,20 @@ def compute_profile_kpis(db: Session, user: User) -> ProfileKpiSnapshot:
 
     top_sale = (
         db.query(MarketplaceOffer)
+        .options(joinedload(MarketplaceOffer.card), joinedload(MarketplaceOffer.buyer))
         .filter(MarketplaceOffer.seller_id == uid, MarketplaceOffer.status == "accepted")
         .order_by(MarketplaceOffer.offer_amount.desc())
         .first()
+    )
+
+    marketplace_activity_count = int(
+        db.query(func.count(MarketplaceOffer.id))
+        .filter(
+            MarketplaceOffer.status == "accepted",
+            (MarketplaceOffer.buyer_id == uid) | (MarketplaceOffer.seller_id == uid),
+        )
+        .scalar()
+        or 0
     )
 
     logger.info(
@@ -191,4 +204,5 @@ def compute_profile_kpis(db: Session, user: User) -> ProfileKpiSnapshot:
         active_listings=active_listings,
         top_purchase=top_purchase,
         top_sale=top_sale,
+        marketplace_activity_count=marketplace_activity_count,
     )

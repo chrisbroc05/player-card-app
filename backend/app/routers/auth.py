@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from card_repo import animation_fields_for_card, highlight_fields_for_card
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
@@ -24,25 +25,50 @@ class UpdateProfileBody(BaseModel):
     parent_email: str | None = Field(default=None, max_length=320)
 
 
-class RarestCardOut(BaseModel):
+class ProfileCardOut(BaseModel):
+    """Full card payload for profile highlight sections (video-capable thumbnails)."""
+
     model_config = ConfigDict(extra="forbid")
 
     card_id: str
     player_name: str
+    team_name: str = ""
+    position: str = ""
+    jersey_number: str = ""
+    grad_year: int = 0
     tier: str
     theme: str
-    rarity: str
-    print_run: int
+    rarity: str = ""
+    edition_number: int = 1
+    print_run: int = 1
     image_url: str
+
+    is_animated: bool = False
+    animated_video_url: str | None = None
+    animation_status: str | None = None
+    animation_motion: str | None = None
+    action_category: str | None = None
+
+    is_highlight: bool = False
+    highlight_video_url: str | None = None
+    highlight_thumbnail_url: str | None = None
+    highlight_status: str | None = None
+    highlight_uploaded_at: str | None = None
+    highlight_trim_start: float | None = None
+    highlight_trim_end: float | None = None
+
+
+class RarestCardOut(ProfileCardOut):
+    pass
 
 
 class MarketplaceHighlightOut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    card_id: str
-    player_name: str
     offer_amount: float
-    image_url: str
+    buyer_display_name: str | None = None
+    accepted_at: str | None = None
+    card: ProfileCardOut
 
 
 class MarketplaceStatsOut(BaseModel):
@@ -76,6 +102,7 @@ class UserProfileResponse(BaseModel):
     total_print_run_copies: int
     favorite_tier: str | None = Field(default=None)
     rarest_card: RarestCardOut | None = None
+    marketplace_activity_count: int = 0
     marketplace_stats: MarketplaceStatsOut
 
 
@@ -85,17 +112,58 @@ def _member_since_label(created_at: datetime) -> str:
     return created_at.strftime("%B %Y")
 
 
+def _grad_year_int(card: Card) -> int:
+    try:
+        return int(card.grad_year or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _profile_card_out(card: Card) -> ProfileCardOut:
+    row = {
+        "card_id": card.card_id or "",
+        "player_name": card.player_name or "",
+        "team_name": card.team_name or "",
+        "position": card.position or "",
+        "jersey_number": card.jersey_number or "",
+        "grad_year": _grad_year_int(card),
+        "tier": card.tier or "rookie",
+        "theme": card.theme or "none",
+        "rarity": card.rarity or "",
+        "edition_number": int(card.edition_number or 1),
+        "print_run": int(card.print_run or 1),
+        "image_url": card.image_url or "",
+    }
+    row.update(animation_fields_for_card(card))
+    row.update(highlight_fields_for_card(card))
+    return ProfileCardOut(**row)
+
+
+def _iso_dt(dt: datetime | None) -> str | None:
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.isoformat()
+
+
 def _highlight_from_offer(db: Session, offer: MarketplaceOffer | None) -> MarketplaceHighlightOut | None:
     if offer is None:
         return None
-    card_row = db.query(Card).filter(Card.card_id == offer.card_id).first()
+    card_row = offer.card
+    if card_row is None:
+        card_row = db.query(Card).filter(Card.card_id == offer.card_id).first()
     if card_row is None:
         return None
+    buyer_name = None
+    if offer.buyer is not None:
+        buyer_name = (offer.buyer.display_name or "").strip() or None
+    when = offer.updated_at or offer.created_at
     return MarketplaceHighlightOut(
-        card_id=card_row.card_id,
-        player_name=card_row.player_name,
         offer_amount=float_from_decimal(offer.offer_amount),
-        image_url=card_row.image_url,
+        buyer_display_name=buyer_name,
+        accepted_at=_iso_dt(when),
+        card=_profile_card_out(card_row),
     )
 
 
@@ -109,16 +177,7 @@ def get_profile(
 
     rarest_out: RarestCardOut | None = None
     if kpis.rarest_card is not None:
-        rarest = kpis.rarest_card
-        rarest_out = RarestCardOut(
-            card_id=rarest.card_id,
-            player_name=rarest.player_name,
-            tier=rarest.tier,
-            theme=rarest.theme or "none",
-            rarity=rarest.rarity,
-            print_run=int(rarest.print_run or 1),
-            image_url=rarest.image_url,
-        )
+        rarest_out = RarestCardOut(**_profile_card_out(kpis.rarest_card).model_dump())
 
     created = user.created_at
     if created.tzinfo is None:
@@ -151,6 +210,7 @@ def get_profile(
         total_print_run_copies=kpis.total_print_run_copies,
         favorite_tier=kpis.favorite_tier,
         rarest_card=rarest_out,
+        marketplace_activity_count=kpis.marketplace_activity_count,
         marketplace_stats=marketplace_stats,
     )
 
