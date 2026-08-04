@@ -204,7 +204,7 @@ export default function ProfilePage() {
     : null;
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-appBg text-slate-100">
+    <div className="min-h-screen bg-appBg text-slate-100">
       <AppHeader />
 
       <main className="profile-page">
@@ -282,7 +282,7 @@ export default function ProfilePage() {
             <hr className="profile-page__divider" />
 
             {/* Section 3 — Highlight cards */}
-            <section>
+            <section className="profile-page__highlights-section">
               <div className="profile-page__highlights">
                 <ProfileHighlightCard
                   label="Biggest Sale"

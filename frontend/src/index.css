@@ -3192,15 +3192,17 @@
 /* ── Profile page ── */
 .profile-page {
   width: 100%;
-  max-width: 900px;
+  max-width: 960px;
   margin: 0 auto;
   padding: 24px;
+  overflow: visible;
 }
 
 .profile-page__sections {
   display: flex;
   flex-direction: column;
   gap: 32px;
+  overflow: visible;
 }
 
 .profile-page__section-title {
@@ -3311,29 +3313,32 @@
   color: var(--text-secondary);
 }
 
+.profile-page__highlights-section {
+  overflow: visible;
+}
+
 .profile-page__highlights {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  overflow-x: auto;
+  gap: 24px;
+  overflow: visible;
 }
 
-@media (min-width: 640px) {
+@media (min-width: 800px) {
   .profile-page__highlights {
     flex-direction: row;
     align-items: stretch;
-    overflow-x: visible;
   }
 }
 
 .profile-highlight {
   flex: 1;
-  min-width: 240px;
+  min-width: 300px;
   overflow: visible;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 16px;
   background: var(--surface-1);
-  padding: 20px;
+  padding: 24px;
   text-align: center;
 }
 
@@ -3354,55 +3359,99 @@
 }
 
 .profile-highlight__thumb {
-  width: 200px;
-  min-width: 200px;
-  height: 280px;
+  width: 260px;
+  min-width: 260px;
+  height: 364px;
   flex-shrink: 0;
   margin: 0 auto;
   overflow: visible;
-  border-radius: 8px;
+  border-radius: 12px;
 }
 
 .profile-highlight__frame {
   position: relative;
-  width: 100%;
-  height: 100%;
-  min-width: 200px;
-  max-width: 100%;
+  width: 260px;
+  height: 364px;
+  min-width: 260px;
+  flex-shrink: 0;
   overflow: visible;
 }
 
 .profile-highlight__thumb .card-shell {
-  min-width: 200px !important;
+  min-width: 260px !important;
+  width: 260px !important;
+  height: 364px !important;
+  max-width: none !important;
+  aspect-ratio: auto !important;
+  overflow: visible !important;
+  border-radius: 12px;
+}
+
+.profile-highlight__thumb .card-shell__media {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.profile-highlight__thumb .card-shell__media > div,
+.profile-highlight__thumb .card-shell__media .card-media-protected-wrap,
+.profile-highlight__thumb .card-shell__media .card-video-area,
+.profile-highlight__thumb .card-shell__media video,
+.profile-highlight__thumb .card-shell__media img {
   width: 100%;
   height: 100%;
-  max-width: 100%;
-  overflow: visible;
-  border-radius: 8px;
+}
+
+.profile-highlight__thumb .card-shell__media .card-media-protected-wrap {
+  min-height: 0;
+}
+
+.profile-highlight__thumb .card-shell__banner {
+  flex-shrink: 0;
+  min-height: 110px !important;
+}
+
+.profile-highlight__thumb .card-banner__name {
+  font-size: 17px !important;
+  letter-spacing: 1px !important;
+}
+
+.profile-highlight__thumb .card-banner__team {
+  font-size: 12px !important;
+}
+
+.profile-highlight__thumb .card-banner__stats {
+  font-size: 11px !important;
+}
+
+.profile-highlight__thumb .card-banner__tier-pill,
+.profile-highlight__thumb .card-banner__theme,
+.profile-highlight__thumb .card-banner__edition {
+  font-size: 10px !important;
 }
 
 .profile-highlight__footer {
-  margin-top: 12px;
+  margin-top: 16px;
   text-align: center;
 }
 
 .profile-highlight__amount {
   margin: 0;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--text-success);
 }
 
 .profile-highlight__meta {
   margin: 4px 0 0;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.4;
   color: var(--text-muted);
 }
 
 .profile-highlight__rarity {
   margin: 0;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
 }
 
@@ -3424,9 +3473,9 @@
 
 .profile-highlight__placeholder {
   display: flex;
-  width: 200px;
-  min-width: 200px;
-  height: 280px;
+  width: 260px;
+  min-width: 260px;
+  height: 364px;
   flex-shrink: 0;
   flex-direction: column;
   align-items: center;
@@ -3438,6 +3487,29 @@
   background: rgba(255, 255, 255, 0.02);
   padding: 16px;
   text-align: center;
+}
+
+@media (max-width: 799px) {
+  .profile-highlight__thumb,
+  .profile-highlight__frame,
+  .profile-highlight__thumb .card-shell,
+  .profile-highlight__placeholder {
+    width: 220px;
+    min-width: 220px;
+    height: 308px;
+  }
+
+  .profile-highlight__thumb .card-shell {
+    width: 220px !important;
+    min-width: 220px !important;
+    height: 308px !important;
+  }
+
+  .profile-highlight__frame {
+    width: 220px;
+    min-width: 220px;
+    height: 308px;
+  }
 }
 
 .profile-highlight__placeholder-icon {
