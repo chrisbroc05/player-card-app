@@ -3192,7 +3192,7 @@
 /* ── Profile page ── */
 .profile-page {
   width: 100%;
-  max-width: 800px;
+  max-width: 900px;
   margin: 0 auto;
   padding: 24px;
 }
@@ -3312,22 +3312,28 @@
 }
 
 .profile-page__highlights {
-  display: grid;
-  grid-template-columns: 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 16px;
+  overflow-x: auto;
 }
 
 @media (min-width: 640px) {
   .profile-page__highlights {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    flex-direction: row;
+    align-items: stretch;
+    overflow-x: visible;
   }
 }
 
 .profile-highlight {
+  flex: 1;
+  min-width: 240px;
+  overflow: visible;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface-1);
-  padding: 16px;
+  padding: 20px;
   text-align: center;
 }
 
@@ -3341,9 +3347,17 @@
   text-align: center;
 }
 
+.profile-highlight__card-stage {
+  display: flex;
+  justify-content: center;
+  overflow: visible;
+}
+
 .profile-highlight__thumb {
-  width: 160px;
-  height: 224px;
+  width: 200px;
+  min-width: 200px;
+  height: 280px;
+  flex-shrink: 0;
   margin: 0 auto;
   overflow: visible;
   border-radius: 8px;
@@ -3353,20 +3367,22 @@
   position: relative;
   width: 100%;
   height: 100%;
-  min-width: 0;
+  min-width: 200px;
   max-width: 100%;
+  overflow: visible;
 }
 
 .profile-highlight__thumb .card-shell {
-  min-width: 0 !important;
+  min-width: 200px !important;
   width: 100%;
   height: 100%;
   max-width: 100%;
+  overflow: visible;
   border-radius: 8px;
 }
 
 .profile-highlight__footer {
-  margin-top: 16px;
+  margin-top: 12px;
   text-align: center;
 }
 
@@ -3408,8 +3424,10 @@
 
 .profile-highlight__placeholder {
   display: flex;
-  width: 160px;
-  height: 224px;
+  width: 200px;
+  min-width: 200px;
+  height: 280px;
+  flex-shrink: 0;
   flex-direction: column;
   align-items: center;
   justify-content: center;

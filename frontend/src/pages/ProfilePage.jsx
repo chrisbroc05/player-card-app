@@ -55,7 +55,7 @@ function ProfileHighlightCard({ label, children, footer }) {
   return (
     <div className="profile-highlight">
       <p className="profile-highlight__label">{label}</p>
-      {children}
+      <div className="profile-highlight__card-stage">{children}</div>
       {footer ? <div className="profile-highlight__footer">{footer}</div> : null}
     </div>
   );
