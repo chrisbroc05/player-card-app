@@ -10,10 +10,12 @@ import { useAuth } from "../context/AuthContext";
 import { authFetch, formatApiError } from "../utils/authFetch";
 import {
   counterOfferButtonLabel,
+  computeRoyaltyPreview,
   formatMoney,
   isActivePriorityListing,
   offerExpiresLabel,
   offerExpiresLineClass,
+  platformRoyaltyPercentLabel,
 } from "../utils/marketplace";
 import { getCardBannerStyles, themeDisplayLabel } from "../utils/cardBannerStyles";
 import { normalizeTierKey } from "../utils/cardTemplate";
@@ -260,7 +262,7 @@ export default function MarketplaceMyListingsPage() {
     const offer = acceptConfirm.offer;
     const isTrade = (offer.offer_type || "cash") === "card_trade";
     const gross = Number(offer.offer_amount || 0);
-    const fee = isTrade ? 0 : Math.round(gross * 2) / 100;
+    const fee = isTrade ? 0 : computeRoyaltyPreview(gross);
     const net = isTrade ? 0 : Math.max(0, Math.round((gross - fee) * 100) / 100);
     let newBalance = sellerBalance;
     if (!isTrade && token) {
@@ -746,7 +748,7 @@ function AcceptOfferConfirmModal({ open, payload, actionBusy, onBack, onConfirm 
   const offer = payload.offer;
   const isTrade = (offer.offer_type || "cash") === "card_trade";
   const gross = Number(offer.offer_amount || 0);
-  const fee = Math.round(gross * 2) / 100;
+  const fee = computeRoyaltyPreview(gross);
   const net = Math.max(0, Math.round((gross - fee) * 100) / 100);
   return (
     <div className="fixed inset-0 z-[73] flex items-center justify-center bg-black/70 px-3 py-4 sm:px-4">
@@ -767,7 +769,7 @@ function AcceptOfferConfirmModal({ open, payload, actionBusy, onBack, onConfirm 
                 Amount: <span className="font-semibold text-white">{formatMoney(gross)}</span> will be added to your credit
                 balance
               </p>
-              <p className="text-slate-400">2% platform fee ({formatMoney(fee)}) has been deducted</p>
+              <p className="text-slate-400">{platformRoyaltyPercentLabel()} platform fee ({formatMoney(fee)}) has been deducted</p>
               <p className="text-slate-300">
                 Net amount you receive: <span className="font-semibold text-neonTeal">{formatMoney(net)}</span>
               </p>

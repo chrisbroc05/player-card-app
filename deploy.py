@@ -31,6 +31,14 @@ Backend on Render should also set:
   COPY_PRICE_TIER_5_9=0.40
   COPY_PRICE_TIER_10_PLUS=0.30
     Bulk pricing for additional card copies (not preview regeneration).
+  PLATFORM_ROYALTY_RATE=0.08
+    Marketplace platform fee on completed cash sales (seller net = sale − royalty).
+    Override without redeploying code; must match frontend PLATFORM_ROYALTY_RATE for previews.
+  MIN_CREDIT_LOAD=10.00
+    Minimum Stripe credit purchase amount (loads below this are rejected).
+  DAILY_GENERATION_CAP=50
+  MONTHLY_GENERATION_CAP=200
+    Generation caps — set high for beta; tighten post-launch based on usage data.
 
 Backend on Render: card PNGs and uploads live under APP_DATA_DIR (e.g. /var/render/data
 with subdirs cards/ and uploads/). Without a persistent disk, redeploys clear files while

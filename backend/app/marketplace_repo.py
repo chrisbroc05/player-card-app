@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -13,7 +14,18 @@ from card_repo import animation_fields_for_card, highlight_fields_for_card
 from models import Card, MarketplaceOffer, User, utcnow
 
 
-ROYALTY_RATE = Decimal("0.02")
+def _parse_royalty_rate(raw: str | None, default: float = 0.08) -> Decimal:
+    try:
+        value = float(raw if raw is not None else default)
+        if 0 <= value <= 1:
+            return Decimal(str(value))
+    except (TypeError, ValueError):
+        pass
+    return Decimal(str(default))
+
+
+PLATFORM_ROYALTY_RATE = _parse_royalty_rate(os.environ.get("PLATFORM_ROYALTY_RATE"), 0.08)
+ROYALTY_RATE = PLATFORM_ROYALTY_RATE
 PRIORITY_LISTING_FEE = Decimal("2.00")
 PRIORITY_LISTING_DAYS = 7
 
@@ -21,7 +33,13 @@ logger = logging.getLogger(__name__)
 
 
 def compute_royalty_amount(offer_amount: Decimal) -> Decimal:
-    return (offer_amount * ROYALTY_RATE).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return (offer_amount * PLATFORM_ROYALTY_RATE).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def royalty_rate_percent_label() -> str:
+    """Human-readable fee label, e.g. '8%'."""
+    pct = int((PLATFORM_ROYALTY_RATE * 100).to_integral_value())
+    return f"{pct}%"
 
 
 def decimal_from_float(value: float) -> Decimal:

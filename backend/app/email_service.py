@@ -9,6 +9,8 @@ from typing import Any
 
 import resend
 
+from marketplace_repo import royalty_rate_percent_label
+
 logger = logging.getLogger(__name__)
 
 _api_key = (os.environ.get("RESEND_API_KEY") or "").strip()
@@ -659,7 +661,7 @@ def send_marketplace_sale_confirmed_seller_email(
             _card_info_box(card_player_name, card_tier, card_rarity, card_image_url),
             _subtext_plain(
                 f"Sale amount: {_money_label(offer_amount)}\n"
-                f"Platform fee (2%): {_money_label(platform_fee)}\n"
+                f"Platform fee ({royalty_rate_percent_label()}): {_money_label(platform_fee)}\n"
                 f"Your earnings: {_money_label(earnings)} added to your balance\n"
                 f"Your new credit balance: {_money_label(new_credit_balance)}\n"
                 + (
@@ -908,7 +910,7 @@ def send_marketplace_counter_accepted_seller_email(
             _subtext_html(sub_inner),
             _subtext_plain(
                 f"Sale amount: {_money_label(counter_amount)}\n"
-                f"Platform fee (2%): {_money_label(platform_fee)}\n"
+                f"Platform fee ({royalty_rate_percent_label()}): {_money_label(platform_fee)}\n"
                 f"Your earnings: {_money_label(earnings)} added to your balance\n"
                 f"Your new credit balance: {_money_label(new_credit_balance)}\n"
                 + (

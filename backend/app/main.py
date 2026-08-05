@@ -2057,6 +2057,11 @@ def generate_card_for_order(
     if preview_count >= preview_limit:
         raise HTTPException(status_code=400, detail="Preview limit reached")
 
+    from utils.usage import require_generation_capacity
+
+    if (blocked := require_generation_capacity(db, current_user.id)) is not None:
+        return blocked
+
     order_tier = str(order.get("tier", "rookie"))
     card_type = str(order.get("card_type", "standard") or "standard")
     player_label = _player_display_name(
@@ -2319,6 +2324,11 @@ def generate_card(
     player_row, source_path = _resolve_player_and_source_path(player_id)
     _ensure_card_generation_limit(db, player_id, cards_to_generate=1)
 
+    from utils.usage import require_generation_capacity
+
+    if (blocked := require_generation_capacity(db, current_user.id)) is not None:
+        return blocked
+
     price = _card_generation_price()
     try:
         deduct_credits(
@@ -2374,6 +2384,12 @@ def generate_card_set(
     """
     player_row, source_path = _resolve_player_and_source_path(player_id)
     _ensure_card_generation_limit(db, player_id, cards_to_generate=3)
+
+    from utils.usage import require_generation_capacity
+
+    if (blocked := require_generation_capacity(db, current_user.id)) is not None:
+        return blocked
+
     price = _card_generation_price() * 3
     try:
         deduct_credits(

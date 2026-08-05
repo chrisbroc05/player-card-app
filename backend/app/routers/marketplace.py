@@ -48,6 +48,7 @@ from marketplace_repo import (
     get_listed_card_or_none,
     listing_active_filter,
     listing_dict,
+    royalty_rate_percent_label,
     log_priority_listing_pending_charge,
     partition_and_sort_marketplace_rows,
     buyer_offer_row_dict,
@@ -277,7 +278,7 @@ def _settle_cash_offer_credits(
     if float(buyer.credit_balance or 0) < offer_amount:
         raise HTTPException(status_code=400, detail="Buyer has insufficient credits")
 
-    royalty_amount_f = round(offer_amount * 0.02, 2)
+    royalty_amount_f = float_from_decimal(compute_royalty_amount(amount_decimal))
     seller_receives_f = round(offer_amount - royalty_amount_f, 2)
 
     try:
@@ -309,7 +310,7 @@ def _settle_cash_offer_credits(
         transaction_type=TX_ROYALTY,
         reference_id=str(offer.id),
         note=(
-            "2% royalty - "
+            f"{royalty_rate_percent_label()} royalty - "
             f"{buyer.display_name} purchased {card.player_name} ({card.card_id}) "
             f"from {seller.display_name} for ${offer_amount:.2f}"
         ),

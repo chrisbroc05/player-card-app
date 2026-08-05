@@ -9,7 +9,8 @@ import { API_BASE_URL } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import { useNewCardCelebration } from "../context/NewCardCelebrationContext";
 import { authFetch, formatApiError } from "../utils/authFetch";
-import { computeRoyaltyPreview, formatMoney, listedAgeLabel, listingExpiresSubtextClass, cashOfferButtonLabel } from "../utils/marketplace";
+import { computeRoyaltyPreview, formatMoney, listedAgeLabel, listingExpiresSubtextClass, cashOfferButtonLabel, platformRoyaltyPercentLabel } from "../utils/marketplace";
+import { creditTopUpShortfallMessage } from "../utils/credits";
 import ErrorBoundary from "../components/ErrorBoundary";
 import { normalizeCardForDisplay, safeMotionLabel } from "../utils/cardDetailUtils";
 import { isAnimatedCard } from "../utils/animationCard";
@@ -407,6 +408,8 @@ function OfferPanel({
   const canSubmitTrade = tradeCardIds.length >= 1;
   const askingPrice = Number(listing?.asking_price || 0);
   const insufficientAtAsking = !isTrade && buyerBalance != null && buyerBalance < askingPrice;
+  const askingShortfall = Math.max(0, askingPrice - Number(buyerBalance ?? 0));
+  const offerShortfall = Math.max(0, Number(offerAmount || 0) - Number(buyerBalance ?? 0));
   const cashButtonLabel = cashOfferButtonLabel(offerAmount, askingPrice);
 
   function handleFormSubmit(e) {
@@ -485,13 +488,13 @@ function OfferPanel({
               />
               <p className="mt-1 text-xs text-slate-500">Enter your offer amount</p>
               <p className="mt-1 text-xs text-slate-500">
-                Platform royalty (2%): {formatMoney(royaltyPreview)} · Asking: {formatMoney(listing.asking_price)}
+                Platform royalty ({platformRoyaltyPercentLabel()}): {formatMoney(royaltyPreview)} · Asking: {formatMoney(listing.asking_price)}
               </p>
               {insufficientAtAsking ? (
                 <p className="mt-2 text-xs text-amber-200">
-                  Insufficient credits — Add credits to your account{" "}
+                  {creditTopUpShortfallMessage(askingShortfall)}{" "}
                   <Link to="/credits" className="text-neonTeal underline">
-                    here
+                    Add credits
                   </Link>
                 </p>
               ) : null}
@@ -499,9 +502,9 @@ function OfferPanel({
               buyerBalance != null &&
               Number(offerAmount || 0) > buyerBalance ? (
                 <p className="mt-2 text-xs text-amber-200">
-                  Insufficient credits — Add credits to your account{" "}
+                  {creditTopUpShortfallMessage(offerShortfall)}{" "}
                   <Link to="/credits" className="text-neonTeal underline">
-                    here
+                    Add credits
                   </Link>
                 </p>
               ) : null}
@@ -601,7 +604,7 @@ function CashOfferConfirmModal({
         {insufficient ? (
           <div className="mt-4 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-3 text-sm text-amber-100">
             <p>
-              You need <span className="font-semibold">{formatMoney(shortfall)}</span> more to submit this offer.
+              {creditTopUpShortfallMessage(shortfall)}
             </p>
             <Link
               to="/credits"
@@ -769,7 +772,7 @@ function BuyAtAskingConfirmModal({
         {insufficient ? (
           <div className="mt-4 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-3 text-sm text-amber-100">
             <p>
-              You need <span className="font-semibold">{formatMoney(shortfall)}</span> more to complete this purchase.
+              {creditTopUpShortfallMessage(shortfall)}
             </p>
             <Link
               to="/credits"

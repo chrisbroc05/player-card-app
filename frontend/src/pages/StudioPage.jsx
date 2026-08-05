@@ -9,6 +9,7 @@ import PostGenerationPanel from "../components/PostGenerationPanel";
 import StudioAuthGate from "../components/StudioAuthGate";
 import StudioCreditBalance from "../components/StudioCreditBalance";
 import GenerationCostSummary from "../components/GenerationCostSummary";
+import GenerationCapNotice, { GenerationDailyUsageHint } from "../components/GenerationCapNotice";
 import ThemeLibraryPicker from "../components/ThemeLibraryPicker";
 import CardTypeStep from "../components/CardTypeStep";
 import HighlightCardPreview from "../components/HighlightCardPreview";
@@ -40,6 +41,12 @@ import { useNewCardCelebration } from "../context/NewCardCelebrationContext";
 import { fetchGenerationPrice } from "../utils/cardPricing";
 import { copyChargeForQuantity, normalizeCopyTiers } from "../utils/copyPricing";
 import { formatMoney } from "../utils/marketplace";
+import { creditTopUpShortfallMessage } from "../utils/credits";
+import {
+  fetchGenerationUsage,
+  generationCapBlocked,
+  generationUsageFromPayload,
+} from "../utils/generationUsage";
 import { scrollAfterPaint } from "../utils/smoothScroll";
 import { cleanupFailedHighlightCard, uploadHighlightClip } from "../utils/uploadHighlightClip";
 import { captureVideoFrameAsFile } from "../utils/highlightVideo";
@@ -360,6 +367,18 @@ export default function StudioPage() {
   const [highlightUploadError, setHighlightUploadError] = useState("");
   const [highlightProcessingCardId, setHighlightProcessingCardId] = useState("");
   const [highlightProcessingCard, setHighlightProcessingCard] = useState(null);
+  const [generationUsage, setGenerationUsage] = useState(null);
+
+  const generationCap = useMemo(() => generationCapBlocked(generationUsage), [generationUsage]);
+
+  const loadGenerationUsage = useCallback(async () => {
+    if (!token) {
+      setGenerationUsage(null);
+      return;
+    }
+    const usage = await fetchGenerationUsage(token);
+    setGenerationUsage(usage);
+  }, [token]);
 
   const wizardPanelRef = useRef(null);
   const generationFocusRef = useRef(null);
@@ -702,7 +721,14 @@ export default function StudioPage() {
   }, [isHighlightCardType]);
 
   useEffect(() => {
-    if (!isAnimatedCardType && isAnimatedOnlyStep(currentStep)) {
+    if (!token) {
+      setGenerationUsage(null);
+      return;
+    }
+    loadGenerationUsage();
+  }, [token, loadGenerationUsage]);
+
+  useEffect(() => {
       setCurrentStep(STEP_REVIEW);
     }
     if (!isHighlightCardType && isHighlightOnlyStep(currentStep)) {
@@ -1282,6 +1308,12 @@ export default function StudioPage() {
       }
       return detail;
     } catch (err) {
+      if (err.generationCap) {
+        setGenerationUsage(err.generationCap);
+        setHighlightUploadState("idle");
+        setHighlightUploadError("");
+        return;
+      }
       setHighlightUploadState("error");
       setHighlightUploadError(
         err.message || "Something went wrong saving your highlight. Please try again."
@@ -1360,6 +1392,11 @@ export default function StudioPage() {
         headers: { ...authHeaders(token) },
       });
       const data = await res.json();
+      if (res.status === 429) {
+        const usage = generationUsageFromPayload(data);
+        if (usage) setGenerationUsage(usage);
+        return;
+      }
       if (!res.ok) throw new Error(formatApiError(data?.detail, "Failed to generate order card."));
       const preview = {
         card_id: data.card_id,
@@ -1372,7 +1409,7 @@ export default function StudioPage() {
       setSelectedPreviewUrl(data.image_url || "");
       setGeneratedTier(data.tier || "base");
       setMessage(`Preview generated for order #${orderId}.`);
-      await Promise.all([fetchMyCards(), fetchOrders(), refreshUser(token)]);
+      await Promise.all([fetchMyCards(), fetchOrders(), refreshUser(token), loadGenerationUsage()]);
     } catch (err) {
       setPackOpeningActive(false);
       setAnimatedFlowStage(ANIMATED_FLOW_STAGE.IDLE);
@@ -1495,6 +1532,13 @@ export default function StudioPage() {
         }
       );
       const animData = await animRes.json().catch(() => ({}));
+      if (animRes.status === 429) {
+        const usage = generationUsageFromPayload(animData);
+        if (usage) setGenerationUsage(usage);
+        setAnimationLoadingCardId(null);
+        setAnimatedFlowStage(ANIMATED_FLOW_STAGE.CHOICE);
+        return;
+      }
       if (!animRes.ok) {
         throw new Error(formatApiError(animData?.detail, "Could not start animation."));
       }
@@ -2320,24 +2364,38 @@ export default function StudioPage() {
                   >
                     Back
                   </button>
-                  <button
-                    type="button"
-                    onClick={requestGenerateFirstPreview}
-                    disabled={!canCreateOrder || !generationPricing || Boolean(orderActionKey)}
-                    className="inline-flex min-h-[52px] flex-1 items-center justify-center rounded-xl bg-neonTeal px-6 py-3 text-base font-semibold text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400 sm:flex-none"
-                  >
-                    {orderActionKey === "generate-first"
-                      ? "Generating..."
-                      : isHighlightCardType
-                        ? "Preview My Highlight Card — Free"
-                        : "Generate My Card — Free Preview"}
-                  </button>
+                  {generationCap.blocked ? (
+                    <GenerationCapNotice
+                      usage={generationUsage}
+                      period={generationCap.period}
+                      className="flex-1"
+                    />
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={requestGenerateFirstPreview}
+                        disabled={!canCreateOrder || !generationPricing || Boolean(orderActionKey)}
+                        className="inline-flex min-h-[52px] flex-1 items-center justify-center rounded-xl bg-neonTeal px-6 py-3 text-base font-semibold text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400 sm:flex-none"
+                      >
+                        {orderActionKey === "generate-first"
+                          ? "Generating..."
+                          : isHighlightCardType
+                            ? "Preview My Highlight Card — Free"
+                            : "Generate My Card — Free Preview"}
+                      </button>
+                      <GenerationDailyUsageHint usage={generationUsage} className="w-full basis-full text-center sm:text-left" />
+                    </>
+                  )}
                 </div>
               </div>
             ) : null}
 
             {currentStep === STEP_REVIEW && reviewSubPhase === "generate" ? (
               <div ref={generationFocusRef} className="scroll-focus-target grid gap-6">
+                {generationCap.blocked ? (
+                  <GenerationCapNotice usage={generationUsage} period={generationCap.period} />
+                ) : null}
                 {packOpeningActive ? (
                   <PackOpeningLoader
                     active={packOpeningActive}
@@ -2422,14 +2480,21 @@ export default function StudioPage() {
                 ) : null}
 
                 {previewCards.length === 0 ? (
-                  <button
-                    type="button"
-                    onClick={requestGenerateFirstPreview}
-                    disabled={Boolean(orderActionKey)}
-                    className={`inline-flex min-h-[52px] w-full items-center justify-center rounded-xl px-6 py-3 text-base font-semibold text-white disabled:opacity-50 ${tierTheme.loading}`}
-                  >
-                    {"Generate My Card — Free Preview"}
-                  </button>
+                  generationCap.blocked ? (
+                    <GenerationCapNotice usage={generationUsage} period={generationCap.period} />
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={requestGenerateFirstPreview}
+                        disabled={Boolean(orderActionKey)}
+                        className={`inline-flex min-h-[52px] w-full items-center justify-center rounded-xl px-6 py-3 text-base font-semibold text-white disabled:opacity-50 ${tierTheme.loading}`}
+                      >
+                        {"Generate My Card — Free Preview"}
+                      </button>
+                      <GenerationDailyUsageHint usage={generationUsage} className="mt-2 text-center" />
+                    </>
+                  )
                 ) : (
                   <>
                     {previewCards.length > 1 ? (
@@ -2651,55 +2716,66 @@ export default function StudioPage() {
 
                     {!previewConfigureOpen && !animatedSaveStaticFlow && previewCards.length === 1 ? (
                       <div className="text-center">
-                        <p className="text-sm text-slate-400">
-                          Not happy with it? Generate another preview for {formatMoney(additionalPreviewCost)}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!canAffordRegenerate) {
-                              setError(
-                                `You need ${formatMoney(additionalPreviewCost)} to generate another preview.`
-                              );
-                              return;
-                            }
-                            setShowRegenerateConfirm(true);
-                          }}
-                          disabled={isPreviewLimitReached || Boolean(orderActionKey)}
-                          className="mt-3 inline-flex min-h-[44px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-5 py-2 text-sm font-medium text-slate-100 disabled:opacity-50"
-                        >
-                          Try Again — {formatMoney(additionalPreviewCost)}
-                        </button>
+                        {generationCap.blocked ? (
+                          <GenerationCapNotice usage={generationUsage} period={generationCap.period} className="text-left" />
+                        ) : (
+                          <>
+                            <p className="text-sm text-slate-400">
+                              Not happy with it? Generate another preview for {formatMoney(additionalPreviewCost)}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!canAffordRegenerate) {
+                                  setError(
+                                    `You need ${formatMoney(additionalPreviewCost)} to generate another preview.`
+                                  );
+                                  return;
+                                }
+                                setShowRegenerateConfirm(true);
+                              }}
+                              disabled={isPreviewLimitReached || Boolean(orderActionKey)}
+                              className="mt-3 inline-flex min-h-[44px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-5 py-2 text-sm font-medium text-slate-100 disabled:opacity-50"
+                            >
+                              Try Again — {formatMoney(additionalPreviewCost)}
+                            </button>
+                            <GenerationDailyUsageHint usage={generationUsage} className="mt-2" />
+                          </>
+                        )}
                       </div>
                     ) : null}
 
                     {!previewConfigureOpen && !animatedSaveStaticFlow && previewCards.length > 1 && !isPreviewLimitReached ? (
                       <div className="text-center">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!canAffordRegenerate) {
-                              setError(
-                                `You need ${formatMoney(additionalPreviewCost)} to generate another preview.`
-                              );
-                              return;
-                            }
-                            setShowRegenerateConfirm(true);
-                          }}
-                          disabled={Boolean(orderActionKey)}
-                          className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-5 py-2 text-sm font-medium text-slate-100 disabled:opacity-50"
-                        >
-                          Generate Another Preview — {formatMoney(additionalPreviewCost)}
-                        </button>
+                        {generationCap.blocked ? (
+                          <GenerationCapNotice usage={generationUsage} period={generationCap.period} className="text-left" />
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!canAffordRegenerate) {
+                                  setError(
+                                    `You need ${formatMoney(additionalPreviewCost)} to generate another preview.`
+                                  );
+                                  return;
+                                }
+                                setShowRegenerateConfirm(true);
+                              }}
+                              disabled={Boolean(orderActionKey)}
+                              className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-5 py-2 text-sm font-medium text-slate-100 disabled:opacity-50"
+                            >
+                              Generate Another Preview — {formatMoney(additionalPreviewCost)}
+                            </button>
+                            <GenerationDailyUsageHint usage={generationUsage} className="mt-2" />
+                          </>
+                        )}
                       </div>
                     ) : null}
 
                     {!canAffordRegenerate && activePreviewCount > 0 ? (
                       <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-100">
-                        <p>
-                          You need {formatMoney(additionalPreviewCost)} to generate another preview.
-                        </p>
-                        <p className="mt-1">Your balance: {formatMoney(creditBalance)}</p>
+                        <p>{creditTopUpShortfallMessage(Math.max(0, additionalPreviewCost - creditBalance))}</p>
                         <a
                           href="/credits"
                           target="_blank"
@@ -2790,23 +2866,31 @@ export default function StudioPage() {
             <p className="mt-2 text-sm text-slate-400">
               Your balance: <span className="font-semibold text-neonTeal">{formatMoney(creditBalance)}</span>
             </p>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowRegenerateConfirm(false)}
-                className="min-h-[42px] rounded-lg border border-white/15 px-4 py-2 text-sm text-slate-200"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleGeneratePreviewForCurrentOrder}
-                disabled={!canAffordRegenerate}
-                className="min-h-[42px] rounded-lg bg-neonTeal px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50"
-              >
-                {`Generate — ${formatMoney(additionalPreviewCost)}`}
-              </button>
-            </div>
+            {generationCap.blocked ? (
+              <GenerationCapNotice
+                usage={generationUsage}
+                period={generationCap.period}
+                className="mt-4"
+              />
+            ) : (
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowRegenerateConfirm(false)}
+                  className="min-h-[42px] rounded-lg border border-white/15 px-4 py-2 text-sm text-slate-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGeneratePreviewForCurrentOrder}
+                  disabled={!canAffordRegenerate}
+                  className="min-h-[42px] rounded-lg bg-neonTeal px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50"
+                >
+                  {`Generate — ${formatMoney(additionalPreviewCost)}`}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       ) : null}

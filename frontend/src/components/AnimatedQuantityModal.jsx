@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import CardImage from "./CardImage";
 import { formatMoney } from "../utils/marketplace";
+import { creditTopUpShortfallMessage } from "../utils/credits";
 import {
   animatedStudioBreakdown,
   animatedStudioPriceLine,
@@ -200,7 +201,7 @@ export default function AnimatedQuantityModal({
 
           {pricing && !canAfford ? (
             <div className="mt-4 rounded-xl border border-amber-400/35 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-              <p>You need {formatMoney(shortfall)} more to continue.</p>
+              <p>{creditTopUpShortfallMessage(shortfall)}</p>
               <Link
                 to="/credits"
                 className="mt-3 inline-flex min-h-[44px] w-full items-center justify-center rounded-xl bg-neonTeal px-4 text-sm font-semibold text-slate-950"

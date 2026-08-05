@@ -187,6 +187,26 @@ def get_generation_price(tier: str = Query(..., min_length=1, max_length=40)):
     return generation_price_payload(normalize_order_tier(tier))
 
 
+@router.get("/generation-usage")
+def get_generation_usage(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Authenticated user's card generation usage vs daily/monthly caps."""
+    from utils.usage import generation_usage_payload
+
+    return generation_usage_payload(db, current_user.id)
+
+
+def _enforce_generation_cap(db: Session, user_id: int):
+    from utils.usage import require_generation_capacity
+
+    blocked = require_generation_capacity(db, user_id)
+    if blocked is not None:
+        return blocked
+    return None
+
+
 @router.post("/{card_id}/animate")
 def animate_card(
     card_id: str,
@@ -197,6 +217,9 @@ def animate_card(
 ):
     card = _resolve_card(db, card_id)
     _validate_animate_request(card, current_user, body.motion_id)
+
+    if (blocked := _enforce_generation_cap(db, current_user.id)) is not None:
+        return blocked
 
     _apply_motion_to_card(card, body.motion_id, body.action_category)
     db.commit()
@@ -237,6 +260,9 @@ def start_studio_animation(
     """
     card = _resolve_card(db, card_id)
     _validate_animate_request(card, current_user, body.motion_id)
+
+    if (blocked := _enforce_generation_cap(db, current_user.id)) is not None:
+        return blocked
 
     pricing = animated_studio_total_price(body.quantity)
     try:
@@ -293,6 +319,10 @@ def animate_card_upgrade(
 ):
     source = _resolve_card(db, card_id)
     _validate_animate_request(source, current_user, body.motion_id)
+
+    if (blocked := _enforce_generation_cap(db, current_user.id)) is not None:
+        return blocked
+
     upgrade_price = animated_upgrade_price()
     if upgrade_price <= 0:
         upgrade_price = 10.00
@@ -369,6 +399,9 @@ async def upload_card_highlight(
             raise HTTPException(status_code=409, detail="Highlight video is already processing for this card")
         if card.is_highlight and (card.highlight_video_url or "").strip() and card.highlight_status == "completed":
             raise HTTPException(status_code=400, detail="Highlight video is already uploaded for this card")
+
+        if (blocked := _enforce_generation_cap(db, current_user.id)) is not None:
+            return blocked
 
         ext = video_extension_for_content_type(file.content_type, file.filename)
         if ext is None:

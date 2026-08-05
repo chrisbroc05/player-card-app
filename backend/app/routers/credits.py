@@ -24,8 +24,8 @@ from email_service import send_withdrawal_confirmation_email
 from marketplace_repo import float_from_decimal
 from models import User
 from parent_email_utils import parent_email_for_notify
-from payments_config import require_payments_enabled
-from stripe_checkout import MIN_CHECKOUT_DOLLARS, create_credit_checkout_session
+from payments_config import MIN_CREDIT_LOAD, require_payments_enabled
+from stripe_checkout import create_credit_checkout_session
 
 router = APIRouter()
 
@@ -82,8 +82,11 @@ def credits_checkout(
     require_payments_enabled()
 
     amt = Decimal(str(body.amount_dollars)).quantize(Decimal("0.01"))
-    if amt < MIN_CHECKOUT_DOLLARS:
-        raise HTTPException(status_code=400, detail="Minimum checkout amount is $5.00")
+    if amt < Decimal(str(MIN_CREDIT_LOAD)):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Minimum credit purchase is ${MIN_CREDIT_LOAD:.2f}",
+        )
 
     recipient_id = user.id
     if body.recipient_user_id is not None:

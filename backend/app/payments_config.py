@@ -14,3 +14,6 @@ def payments_enabled() -> bool:
 def require_payments_enabled() -> None:
     if not payments_enabled():
         raise HTTPException(status_code=503, detail="Payments not yet enabled")
+
+
+MIN_CREDIT_LOAD = float(os.environ.get("MIN_CREDIT_LOAD", "10.00"))

@@ -12,7 +12,7 @@ import { useNavigate } from "react-router-dom";
 import AppFooter from "../components/AppFooter";
 import { ADMIN_TOKEN_STORAGE_KEY, API_BASE_URL, adminHeaders } from "../config/api";
 import { motionLabel } from "../constants/animationMotions";
-import { formatMoney } from "../utils/marketplace";
+import { formatMoney, platformRoyaltyPercentLabel } from "../utils/marketplace";
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -752,6 +752,15 @@ export default function AdminDashboard() {
               In-memory override resets on server redeploy (see backend beta_config).
             </span>
           </p>
+          {stats?.generation_stats ? (
+            <div className="mt-4 rounded-lg border border-white/10 bg-cardBg2/80 px-3 py-2 text-xs text-slate-400">
+              <p className="font-medium text-slate-300">Generation caps (read-only)</p>
+              <p className="mt-1">
+                Daily: {stats.generation_stats.daily_generation_cap} · Monthly:{" "}
+                {stats.generation_stats.monthly_generation_cap}
+              </p>
+            </div>
+          ) : null}
         </div>
         <form onSubmit={handleInviteUpdate} className="flex w-full max-w-md flex-col gap-2 sm:flex-row sm:items-end">
           <div className="min-w-0 flex-1">
@@ -843,6 +852,14 @@ export default function AdminDashboard() {
                   {kpi("Trades accepted", stats.trades_accepted)}
                   {kpi("Trades declined", stats.trades_declined)}
                 </div>
+                {stats.generation_stats ? (
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    {kpi("Cards generated today", stats.generation_stats.cards_generated_today)}
+                    {kpi("Cards generated this month", stats.generation_stats.cards_generated_this_month)}
+                    {kpi("Daily generation cap", stats.generation_stats.daily_generation_cap)}
+                    {kpi("Monthly generation cap", stats.generation_stats.monthly_generation_cap)}
+                  </div>
+                ) : null}
                 {fin ? (
                   <div>
                     <h3 className="mb-3 text-sm font-semibold text-emerald-200/90">Financial Overview</h3>
@@ -1084,6 +1101,7 @@ export default function AdminDashboard() {
                       ["email", "Email"],
                       ["parent_email", "Parent Email"],
                       ["card_count", "Cards"],
+                      ["monthly_generations", "Usage"],
                       ["trades_sent", "Trades sent"],
                       ["trades_received", "Trades received"],
                       ["credit_balance", "Credit Balance"],
@@ -1102,7 +1120,7 @@ export default function AdminDashboard() {
                 <tbody>
                   {filteredSortedUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="p-6 text-center text-slate-500">
+                      <td colSpan={10} className="p-6 text-center text-slate-500">
                         No users found.
                       </td>
                     </tr>
@@ -1113,6 +1131,7 @@ export default function AdminDashboard() {
                         <td className="p-3 text-slate-400">{u.email}</td>
                         <td className="p-3 text-slate-400">{u.parent_email || "—"}</td>
                         <td className="p-3 text-slate-300">{u.card_count}</td>
+                        <td className="p-3 text-slate-300">{u.monthly_generations ?? 0}</td>
                         <td className="p-3 text-slate-300">{u.trades_sent}</td>
                         <td className="p-3 text-slate-300">{u.trades_received}</td>
                         <td className="p-3 tabular-nums text-slate-200">{formatMoney(u.credit_balance ?? 0)}</td>
@@ -1865,7 +1884,7 @@ export default function AdminDashboard() {
                 <table className="w-full min-w-[900px] text-left text-sm">
                   <thead className="border-b border-white/10 bg-cardBg2 text-xs uppercase tracking-wide text-slate-500">
                     <tr>
-                      {["Card", "Seller", "Buyer", "Sale Amount", "Royalty Earned (2%)", "Date"].map((h) => (
+                      {["Card", "Seller", "Buyer", "Sale Amount", `Royalty Earned (${platformRoyaltyPercentLabel()})`, "Date"].map((h) => (
                         <th key={h} className="p-3 font-medium">
                           {h}
                         </th>

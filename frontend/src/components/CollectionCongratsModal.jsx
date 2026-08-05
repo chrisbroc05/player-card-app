@@ -6,6 +6,7 @@ import { motionLabel } from "../constants/animationMotions";
 import { vaultTierBadge } from "../utils/tierStyles";
 import { tierConfettiClass } from "../utils/collectionCongrats";
 import { formatMoney } from "../utils/marketplace";
+import { creditTopUpShortfallMessage } from "../utils/credits";
 import { CARD_IMAGE_FRAME_MODAL } from "../utils/cardImageStyles";
 import { useScrollModalIntoView } from "../hooks/useScrollIntoViewOnChange";
 
@@ -81,6 +82,7 @@ export default function CollectionCongratsModal({
   const cost = Number(animationCost) || 10;
   const balance = Number(creditBalance) || 0;
   const canAfford = balance >= cost;
+  const shortfall = Math.max(0, cost - balance);
   const selectedMotionLabel = motionId ? motionLabel(motionId) : "";
   const showMotionPicker = showUpsell && !initialMotionId;
 
@@ -188,7 +190,7 @@ export default function CollectionCongratsModal({
                   ) : (
                     <>
                       <p className="text-center text-sm text-amber-100">
-                        You need {formatMoney(cost)} to animate. Load credits and come back anytime!
+                        {creditTopUpShortfallMessage(shortfall)}
                       </p>
                       <Link
                         to="/credits"

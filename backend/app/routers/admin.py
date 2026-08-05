@@ -28,6 +28,7 @@ from database import get_db
 from marketplace_repo import float_from_decimal, listing_active_filter
 from models import Card, CreditLedger, MarketplaceOffer, TradeOffer, User, utcnow
 from stripe_connect import configure_stripe_client, create_onboarding_link
+from utils.usage import get_generation_caps, get_platform_generation_count, get_user_generation_count
 
 router = APIRouter()
 admin_security = HTTPBearer(auto_error=False)
@@ -570,6 +571,10 @@ def admin_stats(
     )
     most_popular_motion = popular_row[0] if popular_row and popular_row[0] else ""
 
+    daily_cap, monthly_cap = get_generation_caps()
+    cards_generated_today = get_platform_generation_count(db, "daily")
+    cards_generated_this_month = get_platform_generation_count(db, "monthly")
+
     return {
         "total_users": total_users,
         "total_cards": total_cards,
@@ -609,6 +614,12 @@ def admin_stats(
             "highlights_pending": highlights_pending,
             "highlights_failed": highlights_failed,
         },
+        "generation_stats": {
+            "cards_generated_today": cards_generated_today,
+            "cards_generated_this_month": cards_generated_this_month,
+            "daily_generation_cap": daily_cap,
+            "monthly_generation_cap": monthly_cap,
+        },
     }
 
 
@@ -635,6 +646,9 @@ def admin_users(
         .group_by(TradeOffer.recipient_id)
         .all()
     }
+    monthly_generation_counts = {
+        u.id: get_user_generation_count(db, u.id, "monthly") for u in users
+    }
     return [
         {
             "id": u.id,
@@ -643,6 +657,7 @@ def admin_users(
             "parent_email": u.parent_email or "",
             "created_at": _iso(u.created_at),
             "card_count": card_counts.get(u.id, 0),
+            "monthly_generations": monthly_generation_counts.get(u.id, 0),
             "trades_sent": sent_counts.get(u.id, 0),
             "trades_received": recv_counts.get(u.id, 0),
             "credit_balance": float_from_decimal(u.credit_balance),

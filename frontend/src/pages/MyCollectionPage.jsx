@@ -10,6 +10,7 @@ import MarketplaceListingActions, { ListedSuccessModal } from "../components/Mar
 import AnimateCardModal from "../components/AnimateCardModal";
 import AnimationLoadingScreen from "../components/AnimationLoadingScreen";
 import AnimationProgressBanner from "../components/AnimationProgressBanner";
+import GenerationCapNotice from "../components/GenerationCapNotice";
 import CollectionToast from "../components/CollectionToast";
 import DeleteCardModal from "../components/DeleteCardModal";
 import { authFetch, formatApiError } from "../utils/authFetch";
@@ -17,6 +18,7 @@ import { canAnimateCard, isAnimatedCard, isAnimationInProgress } from "../utils/
 import { cardMediaFrameClass, cardPlaysVideoOnHover } from "../utils/highlightCard";
 import { vaultTierBadge } from "../utils/tierStyles";
 import { scrollAfterPaint } from "../utils/smoothScroll";
+import { generationUsageFromPayload } from "../utils/generationUsage";
 
 export default function MyCollectionPage() {
   const { token, user, initializing, refreshIncomingTradeCount, refreshNavBadges } = useAuth();
@@ -33,6 +35,7 @@ export default function MyCollectionPage() {
   const animationLoadingCardIdRef = useRef(null);
   const lastAnimateMotionRef = useRef("");
   const [bannerDismissed, setBannerDismissed] = useState({});
+  const [generationCapUsage, setGenerationCapUsage] = useState(null);
   const [deleteModalCard, setDeleteModalCard] = useState(null);
   const [deleteBusyId, setDeleteBusyId] = useState("");
   const [toast, setToast] = useState({ message: "", variant: "success" });
@@ -183,6 +186,12 @@ export default function MyCollectionPage() {
       });
       if (unauthorized) throw new Error("Session expired.");
       const data = await res.json().catch(() => ({}));
+      if (res.status === 429) {
+        const usage = generationUsageFromPayload(data);
+        if (usage) setGenerationCapUsage(usage);
+        setAnimateModalCard(null);
+        return;
+      }
       if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not start animation."));
       const newCardId = data?.card_id;
       if (!newCardId) throw new Error("Animation started but no card id was returned.");
@@ -321,7 +330,11 @@ export default function MyCollectionPage() {
         </div>
 
         {error ? (
-          <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{error}</div>
+          <div className="mb-4 rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{error}</div>
+        ) : null}
+
+        {generationCapUsage?.cap_hit ? (
+          <GenerationCapNotice usage={generationCapUsage} period={generationCapUsage.cap_hit} className="mb-4" />
         ) : null}
 
         {animationLoadingCardId ? (

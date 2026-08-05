@@ -5,6 +5,13 @@ import AppFooter from "../components/AppFooter";
 import { useAuth } from "../context/AuthContext";
 import { authFetch, formatApiError } from "../utils/authFetch";
 import { formatMoney } from "../utils/marketplace";
+import {
+  MIN_CREDIT_LOAD,
+  creditTopUpShortfallMessage,
+  isValidCreditLoadAmount,
+  minCreditPurchaseError,
+  minCreditPurchaseLabel,
+} from "../utils/credits";
 
 const PRESET_AMOUNTS = [10, 20, 50, 100];
 
@@ -100,12 +107,20 @@ export default function CreditsPage() {
 
   const loadCreditsButtonLabel = useMemo(() => {
     if (checkoutBusy) return "Redirecting to Stripe…";
-    if (resolvedAmount == null || resolvedAmount < 5) return "Load Credits";
+    if (resolvedAmount == null || !isValidCreditLoadAmount(resolvedAmount)) return "Load Credits";
     const amountLabel = Number.isInteger(resolvedAmount)
       ? `$${resolvedAmount}`
       : formatMoney(resolvedAmount);
     return `Load ${amountLabel} Credits`;
   }, [checkoutBusy, resolvedAmount]);
+
+  const customAmountBelowMinimum = useMemo(() => {
+    if (selectedAmount != null || customAmount === "") return false;
+    const n = Number(customAmount);
+    return Number.isFinite(n) && n > 0 && n < MIN_CREDIT_LOAD;
+  }, [selectedAmount, customAmount]);
+
+  const checkoutAmountValid = resolvedAmount != null && isValidCreditLoadAmount(resolvedAmount);
 
   const loadLedger = useCallback(async () => {
     if (!token) return;
@@ -262,8 +277,8 @@ export default function CreditsPage() {
     if (!token) return;
     setError("");
     const n = resolvedAmount;
-    if (n == null || n < 5) {
-      setError("Select or enter an amount of at least $5.00");
+    if (n == null || !isValidCreditLoadAmount(n)) {
+      setError(`Select or enter an amount of at least ${minCreditPurchaseLabel()}`);
       return;
     }
     setCheckoutBusy(true);
@@ -364,7 +379,7 @@ export default function CreditsPage() {
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
               <input
                 type="number"
-                min="5"
+                min={MIN_CREDIT_LOAD}
                 step="0.01"
                 disabled={paymentsDisabled || checkoutBusy}
                 value={customAmount}
@@ -372,16 +387,23 @@ export default function CreditsPage() {
                   setCustomAmount(e.target.value);
                   setSelectedAmount(null);
                 }}
-                placeholder="5.00"
-                className="min-h-[44px] w-full rounded-xl border border-white/15 bg-cardBg2 py-2 pl-7 pr-3 text-slate-100"
+                placeholder={minCreditPurchaseLabel().replace("$", "")}
+                className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 py-2 pl-7 pr-3 text-slate-100 ${
+                  customAmountBelowMinimum ? "border-rose-500/50" : "border-white/15"
+                }`}
               />
             </div>
-            <p className="mt-1 text-xs text-slate-500">Minimum $5.00</p>
+            {customAmountBelowMinimum ? (
+              <p className="mt-1 text-xs text-rose-300">{minCreditPurchaseError()}</p>
+            ) : null}
+            <p className="mt-1 text-[12px]" style={{ color: "var(--text-muted)" }}>
+              Minimum purchase: {minCreditPurchaseLabel()}
+            </p>
           </div>
 
           <button
             type="button"
-            disabled={paymentsDisabled || checkoutBusy || resolvedAmount == null || resolvedAmount < 5}
+            disabled={paymentsDisabled || checkoutBusy || !checkoutAmountValid}
             onClick={() => startCheckout(null)}
             className="mt-5 min-h-[48px] w-full rounded-xl bg-neonTeal font-semibold text-slate-950 disabled:opacity-50"
           >
@@ -537,8 +559,7 @@ export default function CreditsPage() {
               paymentsDisabled ||
               checkoutBusy ||
               !giftRecipient ||
-              resolvedAmount == null ||
-              resolvedAmount < 5
+              !checkoutAmountValid
             }
             onClick={() => startCheckout(giftRecipient?.id)}
             className="mt-5 min-h-[48px] w-full rounded-xl border border-teal-500/40 bg-teal-500/10 font-semibold text-neonTeal disabled:opacity-50"

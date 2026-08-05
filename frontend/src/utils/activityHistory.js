@@ -1,6 +1,6 @@
 /** Shared activity history display helpers */
 
-import { formatMoney } from "./marketplace";
+import { formatMoney, PLATFORM_ROYALTY_RATE, platformRoyaltyPercentLabel } from "./marketplace";
 import { vaultTierBadge } from "./tierStyles";
 
 export const ACTIVITY_FILTERS = [
@@ -200,7 +200,7 @@ export function activityAmountDisplay(item) {
     const royalty = Number(item?.royalty_amount);
     const fee = Number.isFinite(royalty)
       ? Math.max(0, Math.round(royalty * 100) / 100)
-      : Math.max(0, Math.round(raw * 0.02 * 100) / 100);
+      : Math.max(0, Math.round(raw * PLATFORM_ROYALTY_RATE * 100) / 100);
     const net = Math.max(0, Math.round((raw - fee) * 100) / 100);
     return {
       text: `+${formatMoney(net)}`,
@@ -230,12 +230,12 @@ export function marketplaceSoldAmountDisplay(item) {
   const royaltyRaw = Number(item?.royalty_amount);
   const fee = Number.isFinite(royaltyRaw)
     ? Math.max(0, Math.round(royaltyRaw * 100) / 100)
-    : Math.max(0, Math.round(gross * 0.02 * 100) / 100);
+    : Math.max(0, Math.round(gross * PLATFORM_ROYALTY_RATE * 100) / 100);
   const net = Math.max(0, Math.round((gross - fee) * 100) / 100);
   return {
     text: `+${formatMoney(net)} received`,
     className: "text-emerald-300",
-    subtext: `Sale price ${formatMoney(gross)} — 2% platform fee (${formatMoney(fee)})`,
+    subtext: `Sale price ${formatMoney(gross)} — ${platformRoyaltyPercentLabel()} platform fee (${formatMoney(fee)})`,
     subtextClassName: "text-[11px] leading-tight text-slate-500",
   };
 }

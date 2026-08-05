@@ -8,8 +8,9 @@ from decimal import Decimal
 import stripe
 
 from email_service import frontend_url
+from payments_config import MIN_CREDIT_LOAD
 
-MIN_CHECKOUT_DOLLARS = Decimal("5.00")
+_MIN_CHECKOUT_DOLLARS = Decimal(str(MIN_CREDIT_LOAD))
 
 
 def _stripe_secret_key() -> str:
@@ -27,8 +28,8 @@ def create_credit_checkout_session(
 ) -> str:
     """Create a Stripe Checkout session and return its URL."""
     amt = Decimal(str(amount_dollars)).quantize(Decimal("0.01"))
-    if amt < MIN_CHECKOUT_DOLLARS:
-        raise ValueError(f"Amount must be at least ${MIN_CHECKOUT_DOLLARS}")
+    if amt < _MIN_CHECKOUT_DOLLARS:
+        raise ValueError(f"Minimum credit purchase is ${MIN_CREDIT_LOAD:.2f}")
 
     stripe.api_key = _stripe_secret_key()
     cents = int(amt * 100)

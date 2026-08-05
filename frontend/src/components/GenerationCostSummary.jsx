@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { formatMoney } from "../utils/marketplace";
+import { creditTopUpShortfallMessage } from "../utils/credits";
 import { copyChargeForQuantity, normalizeCopyTiers } from "../utils/copyPricing";
 
 function hasDisplayValue(value) {
@@ -178,7 +179,7 @@ export default function GenerationCostSummary({
             You need {formatMoney(totalDue)} in credits to continue.
           </p>
           <p className="mt-1">Your current balance: {formatMoney(balance)}</p>
-          <p className="mt-1">You need {formatMoney(shortfall)} more.</p>
+          <p className="mt-1">{creditTopUpShortfallMessage(shortfall)}</p>
           <Link
             to="/credits"
             target="_blank"

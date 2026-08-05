@@ -2,6 +2,13 @@
 
 export const PRIORITY_LISTING_FEE = 2;
 
+/** Marketplace platform royalty on completed cash sales (must match backend PLATFORM_ROYALTY_RATE). */
+export const PLATFORM_ROYALTY_RATE = 0.08;
+
+export function platformRoyaltyPercentLabel() {
+  return `${Math.round(PLATFORM_ROYALTY_RATE * 100)}%`;
+}
+
 export function isActivePriorityListing(listing) {
   if (!listing) return false;
   if (!listing.is_priority_listing) return false;
@@ -62,7 +69,7 @@ export function formatMoney(amount) {
 export function computeRoyaltyPreview(amount) {
   const n = Number(amount);
   if (!Number.isFinite(n) || n <= 0) return 0;
-  return Math.round(n * 0.02 * 100) / 100;
+  return Math.round(n * PLATFORM_ROYALTY_RATE * 100) / 100;
 }
 
 export function normalizeTierKey(tier) {

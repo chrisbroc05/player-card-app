@@ -1,5 +1,6 @@
 import { API_BASE_URL, authHeaders } from "../config/api";
 import { formatApiError } from "./authFetch";
+import { generationUsageFromPayload } from "./generationUsage";
 
 export function cleanupFailedHighlightCard({ token, cardId }) {
   return fetch(`${API_BASE_URL}/cards/${encodeURIComponent(cardId)}/highlight-cleanup`, {
@@ -50,14 +51,18 @@ export function uploadHighlightClip({ token, cardId, file, trimStart, trimEnd, o
         resolve(data);
         return;
       }
-      reject(
-        new Error(
-          formatApiError(
-            data?.detail,
-            "Something went wrong saving your highlight. Please try again."
-          )
+      const err = new Error(
+        formatApiError(
+          data?.detail,
+          xhr.status === 429
+            ? "Generation limit reached."
+            : "Something went wrong saving your highlight. Please try again."
         )
       );
+      if (xhr.status === 429) {
+        err.generationCap = generationUsageFromPayload(data);
+      }
+      reject(err);
     };
 
     xhr.onerror = () => reject(new Error("Network error while uploading highlight video."));
