@@ -729,6 +729,7 @@ export default function StudioPage() {
   }, [token, loadGenerationUsage]);
 
   useEffect(() => {
+    if (!isAnimatedCardType && isAnimatedOnlyStep(currentStep)) {
       setCurrentStep(STEP_REVIEW);
     }
     if (!isHighlightCardType && isHighlightOnlyStep(currentStep)) {
