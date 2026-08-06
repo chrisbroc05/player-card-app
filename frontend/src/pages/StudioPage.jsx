@@ -350,6 +350,7 @@ export default function StudioPage() {
   const [themeStepError, setThemeStepError] = useState("");
   const [animationLoadingCardId, setAnimationLoadingCardId] = useState(null);
   const [animationFailed, setAnimationFailed] = useState(false);
+  const [animationConfirmed, setAnimationConfirmed] = useState(false);
   const [generationPricing, setGenerationPricing] = useState(null);
   const [pricingError, setPricingError] = useState("");
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
@@ -401,6 +402,7 @@ export default function StudioPage() {
   const prevAnimationLoadingRef = useRef(null);
   const animatedChoiceShownForRef = useRef("");
   const animatedFlowStageRef = useRef(ANIMATED_FLOW_STAGE.IDLE);
+  const animationConfirmedRef = useRef(false);
   const previewPollGenerationRef = useRef(0);
 
   const selectedTierLabel = (TIER_UI[orderTier] || TIER_UI.all_star).label;
@@ -672,8 +674,12 @@ export default function StudioPage() {
   const firstGenerateShortfall = Math.max(0, firstGenerateDue - creditBalance);
   const motionDisplayName = isAnimatedCardType && selectedMotionId ? motionLabel(selectedMotionId) : "";
   const inCreationFlow = currentStep >= STEP_DETAILS && currentStep <= STEP_REVIEW;
-  const animatedChoiceModalOpen = animatedFlowStage === ANIMATED_FLOW_STAGE.CHOICE;
-  const showAnimatedQuantityModal = animatedFlowStage === ANIMATED_FLOW_STAGE.QUANTITY;
+  const animatedChoiceModalOpen =
+    animatedFlowStage === ANIMATED_FLOW_STAGE.CHOICE &&
+    !animationConfirmed &&
+    !animationLoadingCardId;
+  const showAnimatedQuantityModal =
+    animatedFlowStage === ANIMATED_FLOW_STAGE.QUANTITY && !animationConfirmed;
 
   const detailsValidation = useMemo(
     () =>
@@ -910,10 +916,14 @@ export default function StudioPage() {
   }, [animationLoadingCardId]);
 
   useEffect(() => {
+    animationConfirmedRef.current = animationConfirmed;
+  }, [animationConfirmed]);
+
+  useEffect(() => {
     animatedFlowStageRef.current = animatedFlowStage;
     console.log("[AnimatedFlow] stage changed:", animatedFlowStage);
     if (animatedFlowStage === ANIMATED_FLOW_STAGE.ANIMATING) {
-      console.log("[AnimatedFlow] animation loading screen should now be visible");
+      console.log("Step: showing loading screen");
     }
   }, [animatedFlowStage]);
 
@@ -1040,6 +1050,7 @@ export default function StudioPage() {
       animatedFlowStage !== ANIMATED_FLOW_STAGE.GENERATING_STATIC ||
       animatedSaveStaticFlow ||
       animationLoadingCardId ||
+      animationConfirmedRef.current ||
       previewConfigureOpen ||
       reviewSubPhase !== "generate"
     ) {
@@ -1313,6 +1324,7 @@ export default function StudioPage() {
     setCopyQuantity(1);
     setAnimationLoadingCardId(null);
     setAnimationFailed(false);
+    setAnimationConfirmed(false);
     setPhotoStepError("");
     setActionStepError("");
     setMotionStepError("");
@@ -1685,6 +1697,7 @@ export default function StudioPage() {
   }
 
   function handleAnimatedChoiceAnimate() {
+    console.log("Step: animate button clicked");
     setAnimatedFlowStage(ANIMATED_FLOW_STAGE.QUANTITY);
   }
 
@@ -1704,28 +1717,33 @@ export default function StudioPage() {
   }
 
   async function handleApproveAndAnimate(quantity = 1) {
+    console.log("Step: quantity selected", quantity);
     if (!currentOrderId) return setError("Create an order first.");
     if (!selectedPreviewUrl && !generatedCardUrl) return setError("Select a preview first.");
     if (!selectedMotionId) return setError("Select a motion before animating.");
 
-    setAnimatedFlowStage(ANIMATED_FLOW_STAGE.STARTING_ANIMATION);
-    console.log("[AnimatedFlow] quantity confirmed, closing modal");
+    const sel =
+      previewCards.find((p) => p.image_url === (selectedPreviewUrl || generatedCardUrl)) ||
+      latestGeneratedPreview;
+    const cardId = sel?.card_id;
+    if (!cardId) {
+      setError("Could not find the selected preview card.");
+      return;
+    }
+
+    console.log("Step: charge confirmed");
+    setAnimationConfirmed(true);
+    setAnimationFailed(false);
+    setAnimationLoadingCardId(cardId);
+    setAnimatedFlowStage(ANIMATED_FLOW_STAGE.ANIMATING);
     setAddCollectionLoading(true);
     setOrderActionKey(`approve-animate-${currentOrderId}`);
     setMessage("");
     setError("");
+    console.log("Step: showing loading screen", { cardId });
+
     try {
-      const sel =
-        previewCards.find((p) => p.image_url === (selectedPreviewUrl || generatedCardUrl)) ||
-        latestGeneratedPreview;
-      const cardId = sel?.card_id;
-      if (!cardId) throw new Error("Could not find the selected preview card.");
-
-      setAnimationFailed(false);
-      setAnimationLoadingCardId(cardId);
-      setAnimatedFlowStage(ANIMATED_FLOW_STAGE.ANIMATING);
-      console.log("[AnimatedFlow] loading screen state applied", { cardId });
-
+      console.log("Step: animation starting", { cardId, motionId: selectedMotionId, quantity });
       const animRes = await fetch(
         `${API_BASE_URL}/cards/${encodeURIComponent(cardId)}/start-studio-animation`,
         {
@@ -1743,21 +1761,23 @@ export default function StudioPage() {
         const usage = generationUsageFromPayload(animData);
         if (usage) setGenerationUsage(usage);
         setAnimationLoadingCardId(null);
-        setAnimatedFlowStage(ANIMATED_FLOW_STAGE.CHOICE);
+        setAnimationConfirmed(false);
+        setAnimatedFlowStage(ANIMATED_FLOW_STAGE.QUANTITY);
         return;
       }
       if (!animRes.ok) {
         throw new Error(formatApiError(animData?.detail, "Could not start animation."));
       }
 
+      console.log("Step: animation API accepted", animData);
       await Promise.all([fetchOrders(), refreshUser(token)]);
       setPendingSession(null);
       setShowPendingPrompt(false);
       setLatestGeneratedPreview(null);
       setPreviewPollCardId("");
     } catch (err) {
-      setAnimationLoadingCardId(null);
-      setAnimatedFlowStage(ANIMATED_FLOW_STAGE.CHOICE);
+      console.error("Animation start failed:", err);
+      setAnimationFailed(true);
       setError(err.message || "Failed to start animation.");
     } finally {
       setAddCollectionLoading(false);

@@ -275,7 +275,10 @@ export default function AnimatedQuantityModal({
                 <button
                   type="button"
                   disabled={busy}
-                  onClick={() => onConfirm?.(effectiveQty)}
+                  onClick={() => {
+                    console.log("Step: charge confirmed (modal)");
+                    onConfirm?.(effectiveQty);
+                  }}
                   className="inline-flex min-h-[48px] flex-1 items-center justify-center rounded-xl bg-violet-500 px-4 text-sm font-semibold text-white transition hover:bg-violet-400 disabled:opacity-50"
                 >
                   {busy ? "Processing…" : "Yes, Animate My Card"}

@@ -136,7 +136,13 @@ def _animation_status_payload(card: Card) -> dict:
     }
 
 
-def _validate_animate_request(card: Card, current_user: User, motion_id: str) -> None:
+def _validate_animate_request(
+    card: Card,
+    current_user: User,
+    motion_id: str,
+    *,
+    allow_preview: bool = False,
+) -> None:
     if card.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="You do not own this card")
     if card.is_animated:
@@ -151,7 +157,8 @@ def _validate_animate_request(card: Card, current_user: User, motion_id: str) ->
             status_code=400,
             detail="This motion is no longer available for new cards. Please choose a different motion.",
         )
-    if (card.status or "active") not in ("active",):
+    allowed_statuses = ("active", "preview") if allow_preview else ("active",)
+    if (card.status or "active") not in allowed_statuses:
         raise HTTPException(
             status_code=400,
             detail="Complete your order and add the card to your collection before animating.",
@@ -261,7 +268,7 @@ def start_studio_animation(
     Called after the user confirms quantity on the static preview popup.
     """
     card = _resolve_card(db, card_id)
-    _validate_animate_request(card, current_user, body.motion_id)
+    _validate_animate_request(card, current_user, body.motion_id, allow_preview=True)
 
     if (blocked := _enforce_generation_cap(db, current_user.id)) is not None:
         return blocked
