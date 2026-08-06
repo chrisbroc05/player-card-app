@@ -15,7 +15,16 @@ from models import Card, utcnow
 
 _CARD_ID_PATTERN = re.compile(r"^FL-\d{4}-\d{6}$", re.IGNORECASE)
 
-PRINT_RUN_ALLOWED_QUANTITIES = frozenset({1, 2, 5, 10})
+PRINT_RUN_ALLOWED_QUANTITIES = frozenset({1, 2, 5, 10})  # legacy presets; validation uses range below
+COPY_QUANTITY_MIN = 1
+COPY_QUANTITY_MAX = 100
+
+
+def validate_print_run_quantity(quantity: int) -> None:
+    if not isinstance(quantity, int):
+        raise ValueError("invalid_quantity_type")
+    if quantity < COPY_QUANTITY_MIN or quantity > COPY_QUANTITY_MAX:
+        raise ValueError("invalid_quantity")
 PENDING_CARD_TTL_HOURS = 24
 
 # Same rows surfaced in My Collection and profile "Cards in Collection" KPI.
@@ -358,12 +367,11 @@ def expand_print_run_for_owner_image(
     target_quantity: int,
 ) -> list[Card]:
     """
-    Grow the owner's print run for this image to target_quantity (allowed: 1,2,5,10).
+    Grow the owner's print run for this image to target_quantity (1–100).
     Updates print_run on all existing family rows, appends new rows with new card_ids.
     Returns only newly created Card ORM rows (empty if already at target).
     """
-    if target_quantity not in PRINT_RUN_ALLOWED_QUANTITIES:
-        raise ValueError("invalid_quantity")
+    validate_print_run_quantity(target_quantity)
     family = list_print_family_for_owner_image(db, template.owner_id, template.image_url)
     n = len(family)
     if target_quantity < n:

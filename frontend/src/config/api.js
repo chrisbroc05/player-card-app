@@ -34,7 +34,12 @@ export function authHeaders(token) {
 
 export function toApiUrl(pathOrUrl) {
   if (!pathOrUrl) return "";
-  if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")) {
+  if (
+    pathOrUrl.startsWith("http://") ||
+    pathOrUrl.startsWith("https://") ||
+    pathOrUrl.startsWith("blob:") ||
+    pathOrUrl.startsWith("data:")
+  ) {
     return pathOrUrl;
   }
   const base = (API_BASE_URL || "").replace(/\/+$/, "");

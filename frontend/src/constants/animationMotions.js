@@ -2,6 +2,7 @@
 
 export const ANIMATION_MOTION_LABELS = {
   pitch_windup: "Winding Up and Throwing",
+  throwing: "Throwing",
   pitch_delivery: "Full Pitch Delivery",
   pitch_strikeout_roar: "Strikeout Roar",
   hit_homerun: "Powerful Home Run Swing",
@@ -22,6 +23,7 @@ export const ANIMATION_MOTION_LABELS = {
 /** Display order for motion picker group headers (selectable motions only). */
 export const ANIMATION_MOTION_CATEGORIES = [
   "Pitching",
+  "Throwing",
   "Hitting",
   "Fielding",
   "Catching",

@@ -4,31 +4,33 @@ export const ACTION_CATEGORIES = [
   {
     id: "pitching",
     label: "Pitching",
-    icon: "⚾",
+    description: "Pitching from the mound — full wind-up or stretch delivery",
     motionIds: ["pitch_windup"],
+  },
+  {
+    id: "throwing",
+    label: "Throwing",
+    description: "Throwing from the field — infield, outfield, or any position player throw",
+    motionIds: ["throwing"],
   },
   {
     id: "hitting",
     label: "Hitting",
-    icon: "🏏",
     motionIds: ["hit_homerun"],
   },
   {
     id: "fielding",
     label: "Fielding",
-    icon: "🧤",
     motionIds: ["field_dive"],
   },
   {
     id: "catching",
     label: "Catching",
-    icon: "🎯",
     motionIds: ["catch_framing_throw"],
   },
   {
     id: "celebrating",
     label: "Celebrating",
-    icon: "🎉",
     motionIds: ["celebrate_fist", "celebrate_energy", "celebrate_homerun_trot"],
   },
 ];

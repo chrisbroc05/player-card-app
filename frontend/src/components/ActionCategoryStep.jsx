@@ -1,7 +1,11 @@
 import React from "react";
 import { ACTION_CATEGORIES } from "../constants/actionCategories";
+import { normalizeExperienceTier } from "../utils/cardCreationExperience";
+import ActionCategoryIcon from "./ActionCategoryIcon";
 
-export default function ActionCategoryStep({ value, onSelect, error = "" }) {
+export default function ActionCategoryStep({ value, onSelect, error = "", tier = "rookie" }) {
+  const tierConfig = normalizeExperienceTier(tier);
+
   return (
     <div className="grid gap-5">
       <div>
@@ -11,7 +15,7 @@ export default function ActionCategoryStep({ value, onSelect, error = "" }) {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {ACTION_CATEGORIES.map((cat) => {
           const selected = value === cat.id;
           return (
@@ -19,23 +23,36 @@ export default function ActionCategoryStep({ value, onSelect, error = "" }) {
               key={cat.id}
               type="button"
               onClick={() => onSelect(cat.id)}
-              className={`relative flex min-h-[120px] flex-col items-center justify-center rounded-2xl border p-5 text-center transition ${
-                selected
-                  ? "border-neonTeal/70 bg-neonTeal/10 shadow-[0_0_28px_rgba(45,212,191,0.2)]"
-                  : "border-white/10 bg-cardBg2 hover:border-white/25 hover:bg-cardBg"
-              }`}
+              className="action-category-btn relative flex min-h-[128px] flex-col items-center justify-center rounded-2xl border p-4 text-center transition will-change-transform hover:scale-[1.02]"
+              style={{
+                borderColor: selected ? tierConfig.color : "rgba(255, 255, 255, 0.12)",
+                backgroundColor: selected ? `${tierConfig.color}18` : "rgba(15, 15, 20, 0.85)",
+                boxShadow: selected ? `0 0 24px ${tierConfig.color}33` : "none",
+                fontFamily: tierConfig.font,
+              }}
             >
               {selected ? (
-                <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-neonTeal text-[10px] font-bold text-slate-950">
+                <span
+                  className="absolute right-2.5 top-2.5 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-slate-950"
+                  style={{ backgroundColor: tierConfig.color }}
+                >
                   ✓
                 </span>
               ) : null}
-              <span className="text-3xl" aria-hidden>
-                {cat.icon}
-              </span>
-              <p className={`mt-3 text-base font-semibold ${selected ? "text-teal-50" : "text-white"}`}>
+              <ActionCategoryIcon
+                categoryId={cat.id}
+                className="mb-2 transition-transform"
+                style={{ color: tierConfig.color }}
+              />
+              <p
+                className="text-[13px] font-bold leading-tight"
+                style={{ color: selected ? "#f8fafc" : "#e2e8f0" }}
+              >
                 {cat.label}
               </p>
+              {cat.description ? (
+                <p className="mt-1 text-[11px] leading-snug text-slate-400">{cat.description}</p>
+              ) : null}
             </button>
           );
         })}

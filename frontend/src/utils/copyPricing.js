@@ -54,10 +54,25 @@ export function bulkDiscountMessage(quantity) {
 export const COPY_QUANTITY_MIN = 1;
 export const COPY_QUANTITY_MAX = 100;
 
-export function isValidCopyQuantity(value) {
-  if (value === "" || value === null || value === undefined) return false;
+export function copyQuantityError(value) {
+  if (value === "" || value === null || value === undefined) {
+    return "Please enter a quantity";
+  }
   const n = Number(value);
-  return Number.isInteger(n) && n >= COPY_QUANTITY_MIN && n <= COPY_QUANTITY_MAX;
+  if (!Number.isInteger(n)) {
+    return "Quantity must be a whole number";
+  }
+  if (n < COPY_QUANTITY_MIN) {
+    return "Quantity must be at least 1";
+  }
+  if (n > COPY_QUANTITY_MAX) {
+    return "Quantity must be 100 or less";
+  }
+  return null;
+}
+
+export function isValidCopyQuantity(value) {
+  return copyQuantityError(value) === null;
 }
 
 export function clampCopyQuantity(value) {

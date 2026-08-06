@@ -26,6 +26,7 @@ import AnimateCardConfirmModal from "../components/AnimateCardConfirmModal";
 import AnimatedCardChoiceModal from "../components/AnimatedCardChoiceModal";
 import AnimatedQuantityModal from "../components/AnimatedQuantityModal";
 import CardCreationExperience from "../components/CardCreationExperience";
+import StartOverConfirmModal, { StartOverButton } from "../components/StartOverConfirmModal";
 import AnimatedFlowExplainer from "../components/AnimatedFlowExplainer";
 import AnimatedAiDisclaimer from "../components/AnimatedAiDisclaimer";
 import { motionLabel } from "../constants/animationMotions";
@@ -116,12 +117,15 @@ function getNextWizardStep(step, cardType) {
   return Math.min(step + 1, STEP_REVIEW);
 }
 
-function getPrevWizardStep(step, cardType) {
+function getPrevWizardStep(step, cardType, actionCategory = "") {
   const isAnimated = cardType === "animated";
   const isHighlight = cardType === "highlight";
   if (step === STEP_REVIEW) {
     if (isHighlight) return STEP_HIGHLIGHT_VIDEO;
-    if (isAnimated) return STEP_MOTION;
+    if (isAnimated) {
+      if (isSingleMotionCategory(actionCategory)) return STEP_ACTION;
+      return STEP_MOTION;
+    }
     return STEP_UPLOAD;
   }
   if (step === STEP_HIGHLIGHT_VIDEO) return STEP_UPLOAD;
@@ -305,6 +309,8 @@ export default function StudioPage() {
   const [gradYear, setGradYear] = useState("");
   const [teamName, setTeamName] = useState("");
   const [imageFile, setImageFile] = useState(null);
+  const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState("");
+  const [photoUploading, setPhotoUploading] = useState(false);
 
   const [playerId, setPlayerId] = useState(null);
   const [currentPlayer, setCurrentPlayer] = useState(null);
@@ -349,6 +355,8 @@ export default function StudioPage() {
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
   const [showAnimateConfirm, setShowAnimateConfirm] = useState(false);
   const [showAnimatedFlowExplainer, setShowAnimatedFlowExplainer] = useState(false);
+  const [showStartOverConfirm, setShowStartOverConfirm] = useState(false);
+  const [startOverBusy, setStartOverBusy] = useState(false);
   const [packOpeningActive, setPackOpeningActive] = useState(false);
   const [previewConfigureOpen, setPreviewConfigureOpen] = useState(false);
   const [animatedFlowStage, setAnimatedFlowStage] = useState(ANIMATED_FLOW_STAGE.IDLE);
@@ -406,9 +414,14 @@ export default function StudioPage() {
     return specialTheme;
   }, [specialTheme, themeCategories]);
   const tierTheme = TIER_UI[orderTier] || TIER_UI.all_star;
-  const imagePreviewUrl = useMemo(() => (imageFile ? URL.createObjectURL(imageFile) : ""), [imageFile]);
+  const imagePreviewUrl = useMemo(() => {
+    if (uploadedPhotoUrl) return uploadedPhotoUrl;
+    return imageFile ? URL.createObjectURL(imageFile) : "";
+  }, [imageFile, uploadedPhotoUrl]);
   const generatedCardFullUrl = useMemo(() => toApiUrl(generatedCardUrl), [generatedCardUrl]);
   const playerDisplayName = playerNameFromForm(firstName, lastName, displayName);
+  const isAnimatedCardType = cardType === "animated";
+  const isHighlightCardType = cardType === "highlight";
 
   function previewToDisplayCard(preview) {
     return {
@@ -442,12 +455,51 @@ export default function StudioPage() {
   );
   const previewCards = activeOrder?.generated_cards || [];
 
+  const highlightRevealCardId = useMemo(() => {
+    if (!isHighlightCardType) return "";
+    return (
+      previewPollCardId ||
+      previewCards[previewCards.length - 1]?.card_id ||
+      savedCardDetail?.card_id ||
+      ""
+    );
+  }, [isHighlightCardType, previewPollCardId, previewCards, savedCardDetail?.card_id]);
+
+  const handleHighlightVideoReady = useCallback((data) => {
+    if (!data?.highlight_video_url) return;
+    setSavedCardDetail((prev) => ({
+      ...(prev && typeof prev === "object" ? prev : {}),
+      ...data,
+      highlight_video_url: data.highlight_video_url,
+      is_highlight: true,
+      highlight_status: data.highlight_status || "completed",
+    }));
+  }, []);
+
   const featuredDisplayCard = useMemo(() => {
-    if (savedCardDetail) return savedCardDetail;
+    if (savedCardDetail) {
+      if (
+        isHighlightCardType &&
+        !savedCardDetail.highlight_video_url &&
+        highlightClipDraft?.objectUrl
+      ) {
+        return {
+          ...savedCardDetail,
+          is_highlight: true,
+          highlight_video_url: highlightClipDraft.objectUrl,
+          highlight_trim_start: highlightClipDraft.trimStart ?? 0,
+          highlight_trim_end: highlightClipDraft.trimEnd ?? null,
+        };
+      }
+      return savedCardDetail;
+    }
     const sel =
       previewCards.find((p) => p.image_url === (selectedPreviewUrl || generatedCardUrl)) ||
       previewCards[previewCards.length - 1];
     if (!sel && !generatedCardUrl) return null;
+    const highlightVideoUrl =
+      savedCardDetail?.highlight_video_url ||
+      (isHighlightCardType && highlightClipDraft?.objectUrl ? highlightClipDraft.objectUrl : undefined);
     return {
       card_id: sel?.card_id,
       player_name: sel?.player_name || playerDisplayName,
@@ -461,6 +513,15 @@ export default function StudioPage() {
       image_url: sel?.image_url || generatedCardUrl,
       edition_number: sel?.edition_number || 1,
       print_run: sel?.print_run || 1,
+      is_highlight: isHighlightCardType || Boolean(highlightVideoUrl),
+      highlight_video_url: highlightVideoUrl,
+      highlight_status:
+        savedCardDetail?.highlight_status ||
+        (highlightVideoUrl && highlightVideoUrl.startsWith("http") ? "completed" : undefined),
+      highlight_trim_start:
+        savedCardDetail?.highlight_trim_start ?? highlightClipDraft?.trimStart ?? 0,
+      highlight_trim_end:
+        savedCardDetail?.highlight_trim_end ?? highlightClipDraft?.trimEnd ?? null,
     };
   }, [
     savedCardDetail,
@@ -475,6 +536,10 @@ export default function StudioPage() {
     orderTier,
     generatedTier,
     specialTheme,
+    isHighlightCardType,
+    highlightClipDraft?.objectUrl,
+    highlightClipDraft?.trimStart,
+    highlightClipDraft?.trimEnd,
   ]);
 
   const activePreviewCount = Number(activeOrder?.preview_count ?? 0);
@@ -520,9 +585,6 @@ export default function StudioPage() {
       setThemesLoading(false);
     }
   }, []);
-
-  const isAnimatedCardType = cardType === "animated";
-  const isHighlightCardType = cardType === "highlight";
 
   const highlightPreviewExpandCard = useMemo(() => {
     if (!isHighlightCardType || !highlightClipDraft?.confirmed) return null;
@@ -587,7 +649,9 @@ export default function StudioPage() {
       [STEP_TIER]: Boolean(orderTier),
       [STEP_THEME]: Boolean(specialTheme),
       [STEP_CARD_TYPE]: Boolean(cardType),
-      [STEP_UPLOAD]: isHighlightCardType ? Boolean(highlightClipDraft?.file) : Boolean(imageFile),
+      [STEP_UPLOAD]: isHighlightCardType
+        ? Boolean(highlightClipDraft?.file)
+        : Boolean(uploadedPhotoUrl) && !photoUploading,
       [STEP_ACTION]: !isAnimatedCardType || Boolean(actionCategory),
       [STEP_MOTION]: !isAnimatedCardType || Boolean(selectedMotionId),
       [STEP_HIGHLIGHT_VIDEO]: isHighlightCardType && Boolean(highlightClipDraft?.confirmed),
@@ -599,6 +663,8 @@ export default function StudioPage() {
       specialTheme,
       cardType,
       imageFile,
+      uploadedPhotoUrl,
+      photoUploading,
       actionCategory,
       selectedMotionId,
       isAnimatedCardType,
@@ -629,17 +695,20 @@ export default function StudioPage() {
     if (motionIds.length === 1) {
       setSelectedMotionId(motionIds[0]);
       setMotionStepMode("confirm");
+      setCurrentStep(STEP_REVIEW);
     } else {
       setSelectedMotionId("");
       setMotionStepMode("select");
+      setCurrentStep(STEP_MOTION);
     }
-    setCurrentStep(STEP_MOTION);
   }
 
   function clearUploadState() {
     if (highlightClipDraft?.objectUrl) URL.revokeObjectURL(highlightClipDraft.objectUrl);
     setHighlightClipDraft(null);
     setImageFile(null);
+    setUploadedPhotoUrl("");
+    setPhotoUploading(false);
     setPhotoStepError("");
     setHighlightUploadState("idle");
     setHighlightUploadProgress(0);
@@ -678,7 +747,7 @@ export default function StudioPage() {
     }
     if (currentStep === STEP_UPLOAD) {
       if (!isHighlightCardType) {
-        if (!imageFile) {
+        if (!uploadedPhotoUrl || photoUploading) {
           setPhotoStepError("Please upload a player photo to continue");
           return;
         }
@@ -708,7 +777,7 @@ export default function StudioPage() {
   }
 
   function goBackStep() {
-    setCurrentStep(getPrevWizardStep(currentStep, cardType));
+    setCurrentStep(getPrevWizardStep(currentStep, cardType, actionCategory));
   }
 
   useEffect(() => {
@@ -739,7 +808,9 @@ export default function StudioPage() {
 
   useEffect(() => {
     return () => {
-      if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+      if (imagePreviewUrl && imagePreviewUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(imagePreviewUrl);
+      }
     };
   }, [imagePreviewUrl]);
 
@@ -1149,6 +1220,83 @@ export default function StudioPage() {
     }
   }
 
+  function resetWizardToStart() {
+    setCurrentStep(STEP_DETAILS);
+    setFirstName("");
+    setLastName("");
+    setDisplayName("");
+    setJerseyNumber("");
+    setPosition("");
+    setGradYear("");
+    setTeamName("");
+    setImageFile(null);
+    setUploadedPhotoUrl("");
+    setPhotoUploading(false);
+    setPlayerId(null);
+    setCurrentPlayer(null);
+    setCurrentOrderId(null);
+    setGeneratedCardUrl("");
+    setGeneratedTier("base");
+    setSelectedPreviewUrl("");
+    setSavedCardDetail(null);
+    setOrderTier("");
+    setSpecialTheme("");
+    setCardType("standard");
+    setSelectedMotionId("");
+    setActionCategory("");
+    setMotionStepMode("select");
+    setReviewSubPhase("setup");
+    setPreviewConfigureOpen(false);
+    setPackOpeningActive(false);
+    setIsGenerating(false);
+    setOrderActionKey("");
+    setLatestGeneratedPreview(null);
+    setPreviewPollCardId("");
+    setAnimatedFlowStage(ANIMATED_FLOW_STAGE.IDLE);
+    setAnimatedSaveStaticFlow(false);
+    animatedChoiceShownForRef.current = "";
+    setHighlightClipDraft(null);
+    setHighlightUploadState("idle");
+    setHighlightUploadProgress(0);
+    setHighlightUploadError("");
+    setHighlightProcessingCardId("");
+    setHighlightProcessingCard(null);
+    setCopyQuantity(1);
+    setAnimationLoadingCardId(null);
+    setAnimationFailed(false);
+    setPhotoStepError("");
+    setActionStepError("");
+    setMotionStepError("");
+    setDetailsErrors({});
+    setDetailsShowErrors(false);
+    setTierStepError("");
+    setThemeStepError("");
+    setMessage("");
+    setError("");
+    setShowStartOverConfirm(false);
+    setShowRegenerateConfirm(false);
+  }
+
+  async function handleStartOverConfirm() {
+    setStartOverBusy(true);
+    setError("");
+    try {
+      const sessionId = activeOrder?.preview_session_id || pendingSession?.preview_session_id;
+      if (sessionId && token) {
+        await fetch(
+          `${API_BASE_URL}/cards/pending?preview_session_id=${encodeURIComponent(sessionId)}`,
+          { method: "DELETE", headers: { ...authHeaders(token) } }
+        );
+      }
+      resetWizardToStart();
+      await fetchOrders();
+    } catch {
+      resetWizardToStart();
+    } finally {
+      setStartOverBusy(false);
+    }
+  }
+
   useEffect(() => {
     const sel = previewCards.find((p) => p.image_url === selectedPreviewUrl);
     if (!sel?.card_id) {
@@ -1238,24 +1386,32 @@ export default function StudioPage() {
   }, [token, initializing]);
 
   async function createPlayerFromCurrentForm() {
-    let fileToUpload = imageFile;
-    if (!fileToUpload && isHighlightCardType && highlightClipDraft?.objectUrl) {
-      fileToUpload = await captureVideoFrameAsFile(
-        highlightClipDraft.objectUrl,
-        highlightClipDraft.trimStart ?? 0
-      );
-    }
-    if (!fileToUpload) throw new Error("Player photo is required.");
+    let imageUrl = uploadedPhotoUrl;
 
-    const formData = new FormData();
-    formData.append("file", fileToUpload);
-    const uploadRes = await fetch(`${API_BASE_URL}/upload-image`, {
-      method: "POST",
-      headers: { ...authHeaders(token) },
-      body: formData,
-    });
-    if (!uploadRes.ok) throw new Error("Image upload failed.");
-    const uploadData = await uploadRes.json();
+    if (!imageUrl) {
+      let fileToUpload = imageFile;
+      if (!fileToUpload && isHighlightCardType && highlightClipDraft?.objectUrl) {
+        fileToUpload = await captureVideoFrameAsFile(
+          highlightClipDraft.objectUrl,
+          highlightClipDraft.trimStart ?? 0
+        );
+      }
+      if (!fileToUpload) throw new Error("Player photo is required.");
+
+      const formData = new FormData();
+      formData.append("file", fileToUpload);
+      const uploadRes = await fetch(`${API_BASE_URL}/upload-image`, {
+        method: "POST",
+        headers: { ...authHeaders(token) },
+        body: formData,
+      });
+      const uploadData = await uploadRes.json().catch(() => ({}));
+      if (!uploadRes.ok) {
+        throw new Error(formatApiError(uploadData?.detail, "Image upload failed."));
+      }
+      imageUrl = uploadData.url;
+      setUploadedPhotoUrl(imageUrl);
+    }
 
     const playerRes = await fetch(`${API_BASE_URL}/players`, {
       method: "POST",
@@ -1268,7 +1424,7 @@ export default function StudioPage() {
         position: position.trim(),
         grad_year: Number(gradYear),
         team_name: teamName.trim(),
-        image_url: uploadData.url,
+        image_url: imageUrl,
       }),
     });
     if (!playerRes.ok) {
@@ -1413,6 +1569,11 @@ export default function StudioPage() {
       setGeneratedTier(data.tier || "base");
       setMessage(`Preview generated for order #${orderId}.`);
       await Promise.all([fetchMyCards(), fetchOrders(), refreshUser(token), loadGenerationUsage()]);
+      if (isHighlightCardType && data.card_id && highlightClipDraft?.confirmed) {
+        void uploadHighlightForCard(data.card_id, { skipCelebration: true }).then((detail) => {
+          if (detail?.highlight_video_url) setSavedCardDetail(detail);
+        });
+      }
     } catch (err) {
       setPackOpeningActive(false);
       setAnimatedFlowStage(ANIMATED_FLOW_STAGE.IDLE);
@@ -1639,7 +1800,12 @@ export default function StudioPage() {
       cardId = sel?.card_id || null;
 
       if (isHighlightCardType && cardId && highlightClipDraft?.confirmed) {
-        await uploadHighlightForCard(cardId, { skipCelebration: true });
+        const alreadyUploaded =
+          highlightUploadState === "done" ||
+          (savedCardDetail?.card_id === cardId && savedCardDetail?.highlight_video_url);
+        if (!alreadyUploaded) {
+          await uploadHighlightForCard(cardId, { skipCelebration: true });
+        }
       }
 
       const res = await fetch(`${API_BASE_URL}/orders/${currentOrderId}/approve-preview`, {
@@ -1758,7 +1924,7 @@ export default function StudioPage() {
     await startCardAnimation(animationLoadingCardId);
   }, [animationLoadingCardId, selectedMotionId, actionCategory, token]);
 
-  function handlePhotoFileSelect(file) {
+  async function handlePhotoFileSelect(file) {
     if (!file) return;
     const type = (file.type || "").toLowerCase();
     const ext = file.name.split(".").pop()?.toLowerCase() || "";
@@ -1768,10 +1934,43 @@ export default function StudioPage() {
       setPhotoStepError("Please choose a JPG, PNG, WebP, or HEIC image");
       return;
     }
+    if (!token) {
+      setPhotoStepError("Please sign in before uploading a photo.");
+      return;
+    }
+
     setImageFile(file);
+    setUploadedPhotoUrl("");
     setPhotoStepError("");
     setError("");
-    setMessage(`Photo uploaded: ${file.name}`);
+    setPhotoUploading(true);
+    setMessage("Uploading your photo...");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const uploadRes = await fetch(`${API_BASE_URL}/upload-image`, {
+        method: "POST",
+        headers: { ...authHeaders(token) },
+        body: formData,
+      });
+      const uploadData = await uploadRes.json().catch(() => ({}));
+      if (!uploadRes.ok) {
+        throw new Error(formatApiError(uploadData?.detail, "Photo upload failed."));
+      }
+      if (!uploadData?.url) {
+        throw new Error("Photo upload did not return a URL.");
+      }
+      setUploadedPhotoUrl(uploadData.url);
+      setMessage(`Photo uploaded: ${file.name}`);
+    } catch (err) {
+      setImageFile(null);
+      setUploadedPhotoUrl("");
+      setPhotoStepError(err.message || "Photo upload failed.");
+      setError(err.message || "Photo upload failed.");
+    } finally {
+      setPhotoUploading(false);
+    }
   }
 
   function handleDropFile(e) {
@@ -1905,7 +2104,7 @@ export default function StudioPage() {
                   {photoStepError ? (
                     <p className="text-sm text-rose-300">{photoStepError}</p>
                   ) : null}
-                  {!imageFile ? (
+                  {!imageFile && !uploadedPhotoUrl ? (
                     <label
                       htmlFor="studio-photo-upload"
                       onDragOver={(e) => {
@@ -1930,25 +2129,37 @@ export default function StudioPage() {
                     </label>
                   ) : (
                     <>
-                      <div className="flex min-h-[240px] items-center justify-center rounded-xl border border-white/15 bg-zinc-900/70 p-4 sm:min-h-[300px]">
-                        <img
-                          src={imagePreviewUrl}
-                          alt="Upload preview"
-                          className="max-h-[min(480px,60vh)] w-full object-contain"
-                        />
+                      <div className="relative flex min-h-[240px] items-center justify-center rounded-xl border border-white/15 bg-zinc-900/70 p-4 sm:min-h-[300px]">
+                        {photoUploading ? (
+                          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-xl bg-black/50">
+                            <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-neonBlue" />
+                            <p className="mt-3 text-sm text-slate-200">Uploading to secure storage...</p>
+                          </div>
+                        ) : null}
+                        {imagePreviewUrl ? (
+                          <img
+                            src={imagePreviewUrl}
+                            alt="Upload preview"
+                            className="max-h-[min(480px,60vh)] w-full object-contain"
+                          />
+                        ) : null}
                       </div>
                       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
                         <span className="text-emerald-300" aria-hidden>
                           ✓
                         </span>
                         <p className="text-sm text-emerald-100">
-                          <span className="font-medium text-emerald-50">Photo uploaded</span>
-                          <span className="text-emerald-200/90"> — {imageFile.name}</span>
+                          <span className="font-medium text-emerald-50">
+                            {photoUploading ? "Uploading photo..." : "Photo uploaded"}
+                          </span>
+                          {imageFile?.name ? (
+                            <span className="text-emerald-200/90"> — {imageFile.name}</span>
+                          ) : null}
                         </p>
                       </div>
                       <label
                         htmlFor="studio-photo-upload"
-                        className="inline-flex min-h-[44px] w-full cursor-pointer items-center justify-center rounded-xl border border-white/25 bg-transparent px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:border-white/40 hover:bg-white/5 sm:w-auto"
+                        className={`inline-flex min-h-[44px] w-full items-center justify-center rounded-xl border border-white/25 bg-transparent px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:border-white/40 hover:bg-white/5 sm:w-auto ${photoUploading ? "pointer-events-none opacity-50" : "cursor-pointer"}`}
                       >
                         Choose Photo
                       </label>
@@ -2017,6 +2228,7 @@ export default function StudioPage() {
                   value={actionCategory}
                   onSelect={handleActionCategorySelect}
                   error={actionStepError}
+                  tier={orderTier || "rookie"}
                 />
                 <div className="flex flex-wrap gap-2">
                   <button
@@ -2418,6 +2630,9 @@ export default function StudioPage() {
                     generationComplete={!isGenerating && Boolean(generatedCardUrl || selectedPreviewUrl)}
                     cardImageUrl={generatedCardUrl || selectedPreviewUrl}
                     card={featuredDisplayCard}
+                    highlightCardId={highlightRevealCardId}
+                    token={token || ""}
+                    onHighlightVideoReady={handleHighlightVideoReady}
                     onRevealComplete={handlePackOpeningComplete}
                   />
                 ) : null}
@@ -2723,6 +2938,25 @@ export default function StudioPage() {
                         >
                           ← Back
                         </button>
+                        <div className="mt-4 flex justify-center">
+                          <StartOverButton
+                            onClick={() => setShowStartOverConfirm(true)}
+                            disabled={startOverBusy || addCollectionLoading || Boolean(orderActionKey)}
+                          />
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {previewCards.length > 0 &&
+                    !packOpeningActive &&
+                    !isGenerating &&
+                    !previewConfigureOpen &&
+                    reviewSubPhase === "generate" ? (
+                      <div className="flex justify-center pt-1">
+                        <StartOverButton
+                          onClick={() => setShowStartOverConfirm(true)}
+                          disabled={startOverBusy || Boolean(orderActionKey)}
+                        />
                       </div>
                     ) : null}
 
@@ -2865,6 +3099,13 @@ export default function StudioPage() {
         {user ? <CardGallery cards={cards} /> : null}
       </main>
 
+      <StartOverConfirmModal
+        open={showStartOverConfirm}
+        onClose={() => setShowStartOverConfirm(false)}
+        onConfirm={handleStartOverConfirm}
+        busy={startOverBusy}
+      />
+
       {showRegenerateConfirm ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-3 py-4 sm:px-4">
           <div
@@ -2937,7 +3178,7 @@ export default function StudioPage() {
           setShowAnimatedFlowExplainer(true);
         }}
         busy={addCollectionLoading || Boolean(orderActionKey)}
-        previewImageUrl={imagePreviewUrl}
+        previewImageUrl={uploadedPhotoUrl || imagePreviewUrl}
         previewAlt={playerDisplayName || "Your photo"}
         motionName={motionDisplayName}
         cost={animatedUpgradeCost}

@@ -4,6 +4,7 @@ import {
   bulkDiscountMessage,
   clampCopyQuantity,
   copyChargeForQuantity,
+  copyQuantityError,
   copyQuantitySummaryLine,
   formatCopyTierSummary,
   isValidCopyQuantity,
@@ -54,10 +55,10 @@ export default function QuantitySelector({
 
   const bulkMsg = effectiveQty ? bulkDiscountMessage(effectiveQty) : null;
   const customError =
-    mode === "custom" && customInput !== "" && !isValidCopyQuantity(customInput)
-      ? `Please enter a valid quantity (${COPY_QUANTITY_MIN}-${COPY_QUANTITY_MAX})`
+    mode === "custom" && customInput !== ""
+      ? copyQuantityError(customInput)
       : mode === "custom" && customInput === ""
-        ? "Please enter a valid quantity (1-100)"
+        ? "Please enter a quantity"
         : null;
 
   const canConfirm = effectiveQty !== null && !customError;

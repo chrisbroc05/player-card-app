@@ -1,9 +1,15 @@
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CardImage from "./CardImage";
+import { toApiUrl } from "../config/api";
 import {
+  MIN_DURATION_MS,
   POST_REVEAL_DISPLAY_MS,
   useCardCreationTiming,
 } from "../hooks/useCardCreationTiming";
+import {
+  HIGHLIGHT_CREATION_POLL_INTERVAL_MS,
+  useHighlightStatusPolling,
+} from "../hooks/useHighlightStatusPolling";
 import {
   AWAKENING_CYCLE_TEXT,
   AWAKENING_FLIP_TEXT,
@@ -14,7 +20,8 @@ import {
 } from "../utils/cardCreationExperience";
 import "../styles/cardCreationExperience.css";
 
-const TEXT_FADE_MS = 300;
+const TEXT_FADE_MS = 500;
+const PHASE_CROSSFADE_MS = 500;
 
 function ExperienceText({ text, visible }) {
   return (
@@ -25,6 +32,32 @@ function ExperienceText({ text, visible }) {
       {text || "\u00a0"}
     </p>
   );
+}
+
+function usePhaseText(phaseIndex, getTextForPhase, cycleMessages = [], cyclePhase = -1) {
+  const [visible, setVisible] = React.useState(true);
+  const [displayPhase, setDisplayPhase] = React.useState(phaseIndex);
+  const prevPhaseRef = useRef(phaseIndex);
+
+  useEffect(() => {
+    if (phaseIndex === prevPhaseRef.current) return undefined;
+    setVisible(false);
+    const timer = window.setTimeout(() => {
+      prevPhaseRef.current = phaseIndex;
+      setDisplayPhase(phaseIndex);
+      setVisible(true);
+    }, PHASE_CROSSFADE_MS);
+    return () => window.clearTimeout(timer);
+  }, [phaseIndex]);
+
+  const cycleEnabled = displayPhase === cyclePhase;
+  const cycled = useCyclingText(cycleMessages, 2000, cycleEnabled);
+  const staticText = getTextForPhase(displayPhase);
+
+  if (cycleEnabled) {
+    return { text: cycled.text, visible: visible && cycled.visible };
+  }
+  return { text: staticText, visible };
 }
 
 function useCyclingText(messages, intervalMs, enabled) {
@@ -68,89 +101,82 @@ function ForgeExperience({ phaseIndex, themeLabel, tierConfig, playerName, teamN
   const theme = themeDisplayName(themeLabel);
   const phaseTexts = FORGE_PHASE_TEXT(theme, tierConfig.label);
 
-  const staticText =
-    phaseIndex === 0
-      ? phaseTexts[0]
-      : phaseIndex === 1
-        ? phaseTexts[1]
-        : phaseIndex === 3
-          ? phaseTexts[5]
-          : "";
+  const getTextForPhase = (phase) => {
+    if (phase === 0) return phaseTexts[0];
+    if (phase === 1) return phaseTexts[1];
+    if (phase === 3) return phaseTexts[5];
+    return "";
+  };
 
-  const cycleEnabled = phaseIndex === 2;
-  const cycleMessages = useMemo(
-    () => [phaseTexts[2], phaseTexts[3], phaseTexts[4]],
-    [phaseTexts]
+  const { text: displayText, visible: textVisible } = usePhaseText(
+    phaseIndex,
+    getTextForPhase,
+    [phaseTexts[2], phaseTexts[3], phaseTexts[4]],
+    2
   );
-  const cycled = useCyclingText(cycleMessages, 2000, cycleEnabled);
-  const displayText = cycleEnabled ? cycled.text : staticText;
-  const textVisible = cycleEnabled ? cycled.visible : true;
+
+  const sparkLayerClass =
+    phaseIndex === 0 ? "cce-forge-spark-layer--active" : phaseIndex === 1 ? "cce-forge-spark-layer--exit" : "";
+  const frameLayerClass = phaseIndex >= 1 ? "cce-forge-frame-layer--visible" : "";
+  const scanLayerClass = phaseIndex >= 2 ? "cce-forge-inner-layer--visible" : "";
+  const bannerLayerClass = phaseIndex >= 3 ? "cce-forge-inner-layer--visible" : "";
 
   return (
     <>
-      <div className="cce-stage">
-        {phaseIndex === 0 ? (
-          <>
-            <div className="cce-forge-heat" aria-hidden />
-            <div className="cce-forge-spark" aria-hidden />
-          </>
-        ) : null}
+      <div className="cce-forge-intro" aria-hidden />
+      <div className="cce-stage cce-stage--forge">
+        <div className={`cce-forge-spark-layer ${sparkLayerClass}`}>
+          <div className="cce-forge-heat" aria-hidden />
+          <div className="cce-forge-spark" aria-hidden />
+        </div>
 
-        {phaseIndex >= 1 ? (
+        <div className={`cce-forge-frame-layer ${frameLayerClass}`}>
           <div className="cce-card-frame">
-            {phaseIndex === 1 ? (
-              <svg className="cce-card-frame__svg" viewBox="0 0 200 280" aria-hidden>
-                <rect
-                  className="cce-card-frame__rect cce-card-frame__rect--draw"
-                  x="4"
-                  y="4"
-                  width="192"
-                  height="272"
-                />
-              </svg>
-            ) : null}
+            <svg className="cce-card-frame__svg" viewBox="0 0 200 280" aria-hidden>
+              <rect
+                className={`cce-card-frame__rect ${phaseIndex >= 1 ? "cce-card-frame__rect--draw" : ""}`}
+                x="4"
+                y="4"
+                width="192"
+                height="272"
+              />
+            </svg>
             <div
               className={`cce-card-frame__glow ${phaseIndex === 1 ? "cce-card-frame__glow--pulse" : ""}`}
               aria-hidden
             />
             <div className="cce-card-frame__inner">
-              {phaseIndex >= 2 ? (
-                <>
-                  <div
-                    className={`cce-card-placeholder ${phaseIndex >= 2 ? "cce-card-placeholder--sharp" : ""}`}
-                    style={
-                      cardImageUrl
-                        ? {
-                            backgroundImage: `url(${cardImageUrl})`,
-                            backgroundSize: "cover",
-                            backgroundPosition: "center",
-                          }
-                        : undefined
-                    }
-                    aria-hidden
-                  />
-                  {phaseIndex === 2 ? <div className="cce-scan-line" aria-hidden /> : null}
-                  {phaseIndex >= 2 ? (
-                    <>
-                      <span className="cce-tier-edge cce-tier-edge--top" aria-hidden />
-                      <span className="cce-tier-edge cce-tier-edge--right" aria-hidden />
-                      <span className="cce-tier-edge cce-tier-edge--bottom" aria-hidden />
-                      <span className="cce-tier-edge cce-tier-edge--left" aria-hidden />
-                    </>
-                  ) : null}
-                </>
-              ) : null}
+              <div className={`cce-forge-inner-layer cce-forge-scan-layer ${scanLayerClass}`}>
+                <div
+                  className={`cce-card-placeholder ${phaseIndex >= 2 ? "cce-card-placeholder--sharp" : ""}`}
+                  style={
+                    cardImageUrl
+                      ? {
+                          backgroundImage: `url(${cardImageUrl})`,
+                          backgroundSize: "cover",
+                          backgroundPosition: "center",
+                        }
+                      : undefined
+                  }
+                  aria-hidden
+                />
+                {phaseIndex === 2 ? <div className="cce-scan-line" aria-hidden /> : null}
+                <span className="cce-tier-edge cce-tier-edge--top" aria-hidden />
+                <span className="cce-tier-edge cce-tier-edge--right" aria-hidden />
+                <span className="cce-tier-edge cce-tier-edge--bottom" aria-hidden />
+                <span className="cce-tier-edge cce-tier-edge--left" aria-hidden />
+              </div>
 
-              {phaseIndex >= 3 ? (
-                <div className="cce-preview-banner cce-preview-banner--snap">
+              <div className={`cce-forge-inner-layer cce-forge-banner-layer ${bannerLayerClass}`}>
+                <div className={`cce-preview-banner ${phaseIndex >= 3 ? "cce-preview-banner--snap" : ""}`}>
                   <p className="cce-preview-banner__name">{playerName || "Your Player"}</p>
                   {teamName ? <p className="cce-preview-banner__team">{teamName}</p> : null}
                   <span className="cce-preview-banner__pill">{tierConfig.pill}</span>
                 </div>
-              ) : null}
+              </div>
             </div>
           </div>
-        ) : null}
+        </div>
       </div>
       <ExperienceText text={displayText} visible={textVisible} />
     </>
@@ -166,8 +192,10 @@ function ReelCountdown({ num }) {
   );
 }
 
-function ReelExperience({ phaseIndex, playerName, elapsedMs }) {
-  const staticText = REEL_PHASE_TEXT[phaseIndex] || REEL_PHASE_TEXT[1];
+function ReelExperience({ phaseIndex, playerName, elapsedMs, waitingForVideo = false }) {
+  const staticText = waitingForVideo
+    ? "Almost ready..."
+    : REEL_PHASE_TEXT[phaseIndex] || REEL_PHASE_TEXT[1];
   const countdownNum = elapsedMs < 500 ? 3 : elapsedMs < 1000 ? 2 : 1;
 
   return (
@@ -354,7 +382,15 @@ function RevealSection({
       ) : null}
 
       <div className={wrapClass}>
-        {videoUrl ? (
+        {isHighlight && revealCard?.highlight_video_url ? (
+          <CardImage
+            card={revealCard}
+            alt={playerName || "Your highlight card"}
+            showInfoBanner
+            forcePlay
+            variant="detail"
+          />
+        ) : videoUrl ? (
           <video
             src={videoUrl}
             className="cce-reveal-video"
@@ -409,6 +445,9 @@ export default function CardCreationExperience({
   cardImageUrl = "",
   card = null,
   videoUrl = "",
+  highlightCardId = "",
+  token = "",
+  onHighlightVideoReady,
   onRevealComplete,
   showPrimaryAction = false,
   primaryActionLabel = "Add to Collection",
@@ -421,29 +460,99 @@ export default function CardCreationExperience({
   const tierConfig = normalizeExperienceTier(tier);
   const cssVars = tierCssVars(tierConfig);
   const completedRef = useRef(false);
+  const [highlightPollData, setHighlightPollData] = useState(null);
+
+  const handleHighlightUpdate = useCallback(
+    (data) => {
+      if (data?.highlight_video_url) {
+        setHighlightPollData(data);
+        onHighlightVideoReady?.(data);
+      }
+    },
+    [onHighlightVideoReady]
+  );
+
+  const handleHighlightCompleted = useCallback(
+    (data) => {
+      setHighlightPollData(data);
+      onHighlightVideoReady?.(data);
+    },
+    [onHighlightVideoReady]
+  );
+
+  useHighlightStatusPolling({
+    cardId: highlightCardId,
+    token,
+    enabled: active && cardType === "highlight" && Boolean(highlightCardId && token),
+    pollIntervalMs: HIGHLIGHT_CREATION_POLL_INTERVAL_MS,
+    onUpdate: handleHighlightUpdate,
+    onCompleted: handleHighlightCompleted,
+  });
+
+  const highlightVideoUrl =
+    highlightPollData?.highlight_video_url || card?.highlight_video_url || "";
+  const apiGenerationComplete = generationComplete;
+  const highlightMediaReady = Boolean(highlightVideoUrl);
+  const revealReady =
+    cardType === "highlight" ? apiGenerationComplete && highlightMediaReady : apiGenerationComplete;
+  const waitingForHighlightVideo =
+    cardType === "highlight" && apiGenerationComplete && !highlightMediaReady;
 
   const { mode, phaseIndex, elapsedMs } = useCardCreationTiming({
     active,
     cardType,
-    generationComplete,
+    generationComplete: revealReady,
   });
 
   const revealCard = useMemo(() => {
-    if (card) return card;
-    if (!cardImageUrl) return null;
-    return {
-      image_url: cardImageUrl,
-      tier: tierConfig.key,
-      player_name: playerName || "Your Card",
-      team_name: teamName,
-    };
-  }, [card, cardImageUrl, tierConfig.key, playerName, teamName]);
+    const base =
+      card && typeof card === "object"
+        ? { ...card }
+        : cardImageUrl
+          ? {
+              image_url: cardImageUrl,
+              tier: tierConfig.key,
+              player_name: playerName || "Your Card",
+              team_name: teamName,
+            }
+          : null;
+    if (!base) return null;
+    if (cardType === "highlight" && highlightVideoUrl) {
+      return {
+        ...base,
+        is_highlight: true,
+        highlight_video_url: highlightVideoUrl,
+        highlight_status: "completed",
+        highlight_trim_start:
+          highlightPollData?.highlight_trim_start ?? base.highlight_trim_start ?? 0,
+        highlight_trim_end:
+          highlightPollData?.highlight_trim_end ?? base.highlight_trim_end ?? null,
+      };
+    }
+    return base;
+  }, [
+    card,
+    cardImageUrl,
+    cardType,
+    highlightVideoUrl,
+    highlightPollData,
+    tierConfig.key,
+    playerName,
+    teamName,
+  ]);
+
+  const resolvedVideoUrl = videoUrl ? toApiUrl(videoUrl) : "";
 
   useEffect(() => {
     if (!active) {
       completedRef.current = false;
+      setHighlightPollData(null);
       return undefined;
     }
+    return undefined;
+  }, [active, highlightCardId]);
+
+  useEffect(() => {
     if (mode !== "landed" || completedRef.current) return undefined;
     if (showPrimaryAction) return undefined;
 
@@ -464,7 +573,7 @@ export default function CardCreationExperience({
       className={`cce-scene ${fullscreen ? "cce-scene--fullscreen" : ""} ${isReveal ? "cce-scene--reveal" : ""}`}
       style={cssVars}
       aria-live="polite"
-      aria-busy={!generationComplete}
+      aria-busy={!revealReady}
     >
       <div className="cce-bg-gradient" aria-hidden />
       <div className="cce-vignette" aria-hidden />
@@ -482,7 +591,12 @@ export default function CardCreationExperience({
             />
           ) : null}
           {cardType === "highlight" ? (
-            <ReelExperience phaseIndex={phaseIndex} playerName={playerName} elapsedMs={elapsedMs} />
+            <ReelExperience
+              phaseIndex={phaseIndex}
+              playerName={playerName}
+              elapsedMs={elapsedMs}
+              waitingForVideo={waitingForHighlightVideo && elapsedMs >= MIN_DURATION_MS}
+            />
           ) : null}
           {cardType === "animated" ? (
             <AwakeningExperience phaseIndex={phaseIndex} tierConfig={tierConfig} />
@@ -493,7 +607,7 @@ export default function CardCreationExperience({
         <RevealSection
           cardType={cardType}
           revealCard={revealCard}
-          videoUrl={videoUrl}
+          videoUrl={resolvedVideoUrl}
           playerName={playerName}
           revealVariant={revealVariant}
           showPrimaryAction={showPrimaryAction && mode === "landed"}

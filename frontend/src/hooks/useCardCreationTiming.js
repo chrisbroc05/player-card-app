@@ -6,7 +6,7 @@ export const POST_REVEAL_DISPLAY_MS = 2800;
 
 /** Phase start times (ms) per card type */
 export const PHASE_STARTS = {
-  standard: [0, 2000, 6000, 12000],
+  standard: [0, 3000, 7000, 13000],
   highlight: [0, 2000, 7000, 13000],
   animated: [0, 1000, 4000, 10000, 13000],
 };

@@ -59,7 +59,6 @@ from card_pricing import (  # noqa: E402
 )
 from card_history import build_card_history  # noqa: E402
 from card_repo import (  # noqa: E402
-    PRINT_RUN_ALLOWED_QUANTITIES,
     card_to_dict,
     count_cards_for_player,
     create_card_row,
@@ -1228,10 +1227,10 @@ class CardVaultSummary(BaseModel):
 
 
 class CardDuplicateBody(BaseModel):
-    """Request body for expanding a print run (target total: 1, 2, 5, or 10)."""
+    """Request body for expanding a print run (target total: 1–100)."""
 
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
-    quantity: int = Field(..., ge=1, le=10)
+    quantity: int = Field(..., ge=1, le=100)
 
 
 class Card(BaseModel):
@@ -1911,7 +1910,7 @@ def duplicate_cards(
 ):
     """
     Expand the owner's print run for this card's image to `quantity` total copies
-    (allowed totals: 1, 2, 5, 10). Each new copy gets a new FL-YYYY-###### id and slug.
+    (allowed totals: 1–100). Each new copy gets a new FL-YYYY-###### id and slug.
     """
     key = _canonical_card_id(card_id)
     if key is None:
@@ -1923,11 +1922,10 @@ def duplicate_cards(
         raise HTTPException(status_code=403, detail="You do not own this card")
     if (orm.status or "active") != "active":
         raise HTTPException(status_code=400, detail="Only active cards can be duplicated")
-    if body.quantity not in PRINT_RUN_ALLOWED_QUANTITIES:
-        raise HTTPException(
-            status_code=400,
-            detail="Quantity must be one of: 1, 2, 5, 10.",
-        )
+    if not isinstance(body.quantity, int):
+        raise HTTPException(status_code=400, detail="Quantity must be a whole number.")
+    if body.quantity < 1 or body.quantity > 100:
+        raise HTTPException(status_code=400, detail="Quantity must be between 1 and 100.")
     current_run = int(orm.print_run or 1)
     copy_charge = copy_charge_for_quantity(body.quantity, current_run=current_run)
     if copy_charge["total"] > 0:
@@ -1960,7 +1958,12 @@ def duplicate_cards(
         if err == "invalid_quantity":
             raise HTTPException(
                 status_code=400,
-                detail="Quantity must be one of: 1, 2, 5, 10.",
+                detail="Quantity must be between 1 and 100.",
+            ) from exc
+        if err == "invalid_quantity_type":
+            raise HTTPException(
+                status_code=400,
+                detail="Quantity must be a whole number.",
             ) from exc
         raise HTTPException(status_code=500, detail="Could not create copies.") from exc
     return [Card.model_validate(card_to_dict(r, db)) for r in new_rows]
@@ -2287,13 +2290,25 @@ async def upload_image(
         raise HTTPException(status_code=400, detail="Empty file.")
 
     filename = f"{uuid4().hex}{ext}"
-    public_url = save_bytes_to_storage(
-        data,
-        r2_key=f"uploads/{filename}",
-        content_type=content_type,
-        local_dir=UPLOAD_DIR,
-        local_url_prefix="/uploads",
-    )
+    r2_key = f"uploads/{filename}"
+
+    from utils.storage import is_r2_configured, upload_file_to_r2
+
+    if is_r2_configured():
+        public_url = upload_file_to_r2(data, r2_key, content_type)
+        if not public_url:
+            raise HTTPException(
+                status_code=503,
+                detail="Could not upload your photo to storage. Please try again in a moment.",
+            )
+    else:
+        public_url = save_bytes_to_storage(
+            data,
+            r2_key=r2_key,
+            content_type=content_type,
+            local_dir=UPLOAD_DIR,
+            local_url_prefix="/uploads",
+        )
 
     return {
         "filename": filename,

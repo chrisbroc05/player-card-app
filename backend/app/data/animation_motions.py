@@ -14,6 +14,11 @@ SELECTABLE_MOTION_PROMPTS: dict[str, str] = {
         "drives off rubber with explosive leg drive, arm comes through in fluid overhand "
         f"delivery, full follow through. Cinematic slow motion. {_CAMERA_LOCK} Photorealistic."
     ),
+    "throwing": (
+        "Realistic sports photography motion. Baseball player steps into a strong athletic throw, "
+        "planting front foot, rotating hips and shoulders, full arm extension through release "
+        f"with clean follow through. Infield or outfield throw. {_CAMERA_LOCK} Photorealistic."
+    ),
     "hit_homerun": (
         "Realistic sports photography motion. Baseball batter loads weight back, explodes "
         "through contact zone with full hip rotation, powerful follow through with bat finishing "
@@ -121,6 +126,12 @@ ANIMATION_MOTIONS: list[dict[str, str]] = [
         "prompt": SELECTABLE_MOTION_PROMPTS["pitch_windup"],
     },
     {
+        "id": "throwing",
+        "label": "Throwing",
+        "category": "Throwing",
+        "prompt": SELECTABLE_MOTION_PROMPTS["throwing"],
+    },
+    {
         "id": "hit_homerun",
         "label": "Powerful Home Run Swing",
         "category": "Hitting",
@@ -172,6 +183,7 @@ SELECTABLE_MOTION_IDS = frozenset(SELECTABLE_MOTION_PROMPTS.keys())
 
 MOTION_ACTION_CATEGORY: dict[str, str] = {
     "pitch_windup": "pitching",
+    "throwing": "throwing",
     "hit_homerun": "hitting",
     "field_dive": "fielding",
     "catch_framing_throw": "catching",

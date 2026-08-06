@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE_URL, authHeaders } from "../config/api";
 
 export const HIGHLIGHT_POLL_INTERVAL_MS = 5000;
+export const HIGHLIGHT_CREATION_POLL_INTERVAL_MS = 3000;
 export const HIGHLIGHT_MAX_POLL_MS = 600000;
 
 function normalizeHighlightStatus(data) {
@@ -16,13 +17,16 @@ export function useHighlightStatusPolling({
   token,
   enabled = true,
   pollKey = 0,
+  pollIntervalMs = HIGHLIGHT_POLL_INTERVAL_MS,
   onCompleted,
   onFailed,
   onTimeout,
+  onUpdate,
 }) {
   const onCompletedRef = useRef(onCompleted);
   const onFailedRef = useRef(onFailed);
   const onTimeoutRef = useRef(onTimeout);
+  const onUpdateRef = useRef(onUpdate);
   const completionNotifiedRef = useRef(false);
 
   const [status, setStatus] = useState("processing");
@@ -41,6 +45,10 @@ export function useHighlightStatusPolling({
   useEffect(() => {
     onTimeoutRef.current = onTimeout;
   }, [onTimeout]);
+
+  useEffect(() => {
+    onUpdateRef.current = onUpdate;
+  }, [onUpdate]);
 
   const pollOnce = useCallback(async () => {
     if (!cardId || !token) return null;
@@ -97,6 +105,7 @@ export function useHighlightStatusPolling({
 
       const st = normalizeHighlightStatus(data);
       setStatus(st || "processing");
+      onUpdateRef.current?.(data);
 
       if (st === "completed" && data.highlight_video_url) {
         finishCompleted(data);
@@ -109,7 +118,7 @@ export function useHighlightStatusPolling({
     };
 
     runPoll();
-    intervalId = window.setInterval(runPoll, HIGHLIGHT_POLL_INTERVAL_MS);
+    intervalId = window.setInterval(runPoll, pollIntervalMs);
 
     const onVisibility = () => {
       if (document.visibilityState === "visible") {
@@ -123,7 +132,7 @@ export function useHighlightStatusPolling({
       if (intervalId) clearInterval(intervalId);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [enabled, cardId, token, pollKey, pollOnce]);
+  }, [enabled, cardId, token, pollKey, pollOnce, pollIntervalMs]);
 
   return { status, result, timedOut, failed };
 }
