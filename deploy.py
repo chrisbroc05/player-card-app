@@ -39,10 +39,15 @@ Backend on Render should also set:
   DAILY_GENERATION_CAP=50
   MONTHLY_GENERATION_CAP=200
     Generation caps — set high for beta; tighten post-launch based on usage data.
+  R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
+  R2_BUCKET_NAME=prospect-legends-media
+  R2_PUBLIC_URL=https://pub-....r2.dev
+    Cloudflare R2 media storage (S3-compatible). When set, new uploads go to R2 and
+    static /media, /uploads, /animations, /highlights mounts are disabled.
+    Run backend/scripts/migrate_to_r2.py once to move existing disk files to R2.
 
-Backend on Render: card PNGs and uploads live under APP_DATA_DIR (e.g. /var/render/data
-with subdirs cards/ and uploads/). Without a persistent disk, redeploys clear files while
-Postgres still has URLs — add a Render Disk and set APP_DATA_DIR to the mount path.
+Backend on Render: legacy media lived under APP_DATA_DIR (e.g. /var/render/data).
+New media uses R2 when configured; APP_DATA_DIR remains the local-dev fallback.
 """
 
 from __future__ import annotations

@@ -21,7 +21,7 @@ except ValueError:
     pass
 sys.path.insert(0, _app_dir)
 
-from dotenv import load_dotenv
+from utils.storage import is_r2_configured, resolve_source_image_path, save_bytes_to_storage
 from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -31,6 +31,7 @@ from sqlalchemy.orm import Session
 from openai import OpenAI
 from PIL import Image, ImageDraw, ImageFont
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from dotenv import load_dotenv
 
 # Load repo-root .env (e.g. OPENAI_API_KEY).
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -308,7 +309,7 @@ def _tier_animated_card_prompt(
     return _tier_player_portrait_prompt(tier, variant=mapped, special_theme=special_theme)
 
 
-def _resolve_player_and_source_path(player_id: int) -> tuple[dict, Path]:
+def _resolve_player_and_source_path(player_id: int) -> tuple[dict, Path, bool]:
     """Load player row and absolute path to their uploaded image; raise HTTPException if invalid."""
     player_row = next((row for row in _players if row["id"] == player_id), None)
     if player_row is None:
@@ -318,8 +319,8 @@ def _resolve_player_and_source_path(player_id: int) -> tuple[dict, Path]:
     if not image_url:
         raise HTTPException(status_code=400, detail="Player has no image_url")
 
-    source_path = _resolve_source_path_from_image_url(image_url)
-    return player_row, source_path
+    source_path, is_temp = _resolve_source_path_from_image_url(image_url)
+    return player_row, source_path, is_temp
 
 
 def _player_display_name(player_row: dict) -> str:
@@ -347,21 +348,27 @@ def _player_jersey_number(player_row: dict) -> str:
     return str(player_row.get("jersey_number") or player_row.get("player_jersey_number") or "").strip()
 
 
-def _resolve_source_path_from_image_url(image_url: str) -> Path:
-    """Resolve /uploads/... URL to a local file path under UPLOAD_DIR."""
-    image_path_value = urlparse(image_url).path
-    if not image_path_value.startswith("/uploads/"):
-        raise HTTPException(status_code=400, detail="image_url must point to /uploads/")
+def _resolve_source_path_from_image_url(image_url: str) -> tuple[Path, bool]:
+    """Resolve upload URL to local path; second value is True when caller must delete the file."""
+    try:
+        return resolve_source_image_path(image_url, UPLOAD_DIR)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    rel = image_path_value.removeprefix("/uploads/").lstrip("/")
-    if not rel or ".." in rel.split("/"):
-        raise HTTPException(status_code=400, detail="Invalid upload path")
-    source_path = (UPLOAD_DIR / rel).resolve()
-    if not str(source_path).startswith(str(UPLOAD_DIR.resolve())):
-        raise HTTPException(status_code=400, detail="Invalid upload path")
-    if not source_path.exists() or not source_path.is_file():
-        raise HTTPException(status_code=404, detail="Source image not found")
-    return source_path
+
+def _cleanup_temp_source(path: Path, is_temp: bool) -> None:
+    if is_temp:
+        path.unlink(missing_ok=True)
+
+
+def _persist_card_png_bytes(file_bytes: bytes, card_filename: str) -> str:
+    return save_bytes_to_storage(
+        file_bytes,
+        r2_key=f"cards/{card_filename}",
+        content_type="image/png",
+        local_dir=CARD_DIR,
+        local_url_prefix=CARD_MEDIA_URL_PREFIX,
+    )
 
 
 def _player_exists(player_id: int) -> bool:
@@ -987,13 +994,13 @@ def _generate_card_pillow(
     with Image.open(source_path) as image:
         final_rgb = image.convert("RGB")
         card_filename = f"player-{player_id}-{uuid4().hex}.png"
-        card_path = CARD_DIR / card_filename
-        final_rgb.save(card_path, format="PNG")
+        buf = io.BytesIO()
+        final_rgb.save(buf, format="PNG")
+        public_url = _persist_card_png_bytes(buf.getvalue(), card_filename)
 
     return {
         "filename": card_filename,
-        "path": str(card_path),
-        "url": f"{CARD_MEDIA_URL_PREFIX}/{card_filename}",
+        "url": public_url,
         "mode": "pillow",
         "tier": tier.lower(),
         "special_theme": special_theme,
@@ -1019,13 +1026,13 @@ def _generate_highlight_placeholder(
     draw.line([(0, 0), (width, 0)], fill=accent_fill, width=max(2, width // 256))
 
     card_filename = f"highlight-placeholder-{player_id}-{uuid4().hex}.png"
-    card_path = CARD_DIR / card_filename
-    img.convert("RGB").save(card_path, format="PNG")
+    buf = io.BytesIO()
+    img.convert("RGB").save(buf, format="PNG")
+    public_url = _persist_card_png_bytes(buf.getvalue(), card_filename)
 
     return {
         "filename": card_filename,
-        "path": str(card_path),
-        "url": f"{CARD_MEDIA_URL_PREFIX}/{card_filename}",
+        "url": public_url,
         "mode": "highlight-placeholder",
         "tier": tier_norm,
         "special_theme": special_theme,
@@ -1122,13 +1129,14 @@ def _generate_card_openai(
         final_rgb = generated.convert("RGB")
 
     card_filename = f"player-{player_id}-ai-{tier_norm}-{uuid4().hex}.png"
-    card_path = CARD_DIR / card_filename
-    final_rgb.save(card_path, format="PNG")
+    buf = io.BytesIO()
+    final_rgb.save(buf, format="PNG")
+    file_bytes = buf.getvalue()
+    public_url = _persist_card_png_bytes(file_bytes, card_filename)
 
     result = {
         "filename": card_filename,
-        "path": str(card_path),
-        "url": f"{CARD_MEDIA_URL_PREFIX}/{card_filename}",
+        "url": public_url,
         "mode": "ai",
         "tier": tier_norm,
         "generation": generation,
@@ -1139,7 +1147,7 @@ def _generate_card_openai(
         player_id,
         generation,
         result["url"],
-        len(out_bytes),
+        len(file_bytes),
     )
     return result
 
@@ -2111,20 +2119,23 @@ def generate_card_for_order(
             special_theme=order.get("special_theme"),
         )
     else:
-        source_path = _resolve_source_path_from_image_url(order["player_image_url"])
+        source_path, is_temp = _resolve_source_path_from_image_url(order["player_image_url"])
         try:
-            result = _generate_card_openai(
-                player_row, order_id, source_path, tier=card_tier, special_theme=order.get("special_theme")
-            )
-        except Exception as exc:
-            logger.exception(
-                "OpenAI card generation failed for order %s, using pillow fallback: %s",
-                order_id,
-                exc,
-            )
-            result = _generate_card_pillow(
-                player_row, order_id, source_path, tier=card_tier, special_theme=order.get("special_theme")
-            )
+            try:
+                result = _generate_card_openai(
+                    player_row, order_id, source_path, tier=card_tier, special_theme=order.get("special_theme")
+                )
+            except Exception as exc:
+                logger.exception(
+                    "OpenAI card generation failed for order %s, using pillow fallback: %s",
+                    order_id,
+                    exc,
+                )
+                result = _generate_card_pillow(
+                    player_row, order_id, source_path, tier=card_tier, special_theme=order.get("special_theme")
+                )
+        finally:
+            _cleanup_temp_source(source_path, is_temp)
 
     new_card_id = next_collectible_card_id(db)
     owner_id = current_user.id
@@ -2276,13 +2287,17 @@ async def upload_image(
         raise HTTPException(status_code=400, detail="Empty file.")
 
     filename = f"{uuid4().hex}{ext}"
-    dest = UPLOAD_DIR / filename
-    dest.write_bytes(data)
+    public_url = save_bytes_to_storage(
+        data,
+        r2_key=f"uploads/{filename}",
+        content_type=content_type,
+        local_dir=UPLOAD_DIR,
+        local_url_prefix="/uploads",
+    )
 
     return {
         "filename": filename,
-        "path": str(dest),
-        "url": f"/uploads/{filename}",
+        "url": public_url,
     }
 
 
@@ -2321,7 +2336,7 @@ def generate_card(
     else:
         special_theme = None
 
-    player_row, source_path = _resolve_player_and_source_path(player_id)
+    player_row, source_path, is_temp = _resolve_player_and_source_path(player_id)
     _ensure_card_generation_limit(db, player_id, cards_to_generate=1)
 
     from utils.usage import require_generation_capacity
@@ -2344,16 +2359,19 @@ def generate_card(
             detail="Insufficient credits. Please add credits to your account at /credits",
         ) from e
 
-    if use_ai:
-        try:
-            result = _generate_card_openai(player_row, player_id, source_path, tier=tier, special_theme=special_theme)
-        except Exception as exc:
-            # Fallback: keep the app usable if the key is missing, quota fails, or the API errors.
+    try:
+        if use_ai:
+            try:
+                result = _generate_card_openai(player_row, player_id, source_path, tier=tier, special_theme=special_theme)
+            except Exception as exc:
+                # Fallback: keep the app usable if the key is missing, quota fails, or the API errors.
+                result = _generate_card_pillow(player_row, player_id, source_path, tier=tier, special_theme=special_theme)
+                result["mode"] = "pillow_fallback"
+                result["ai_error"] = str(exc)
+        else:
             result = _generate_card_pillow(player_row, player_id, source_path, tier=tier, special_theme=special_theme)
-            result["mode"] = "pillow_fallback"
-            result["ai_error"] = str(exc)
-    else:
-        result = _generate_card_pillow(player_row, player_id, source_path, tier=tier, special_theme=special_theme)
+    finally:
+        _cleanup_temp_source(source_path, is_temp)
 
     card = _store_generated_card(
         db,
@@ -2382,7 +2400,7 @@ def generate_card_set(
     Generate three AI cards for the same player: BASE, RARE, and LEGENDARY (distinct prompt intensity).
     Each result includes its own url; failures are reported per tier without stopping the batch.
     """
-    player_row, source_path = _resolve_player_and_source_path(player_id)
+    player_row, source_path, is_temp = _resolve_player_and_source_path(player_id)
     _ensure_card_generation_limit(db, player_id, cards_to_generate=3)
 
     from utils.usage import require_generation_capacity
@@ -2405,31 +2423,35 @@ def generate_card_set(
             detail="Insufficient credits. Please add credits to your account at /credits",
         ) from e
     cards: list[dict] = []
-    for tier in ("base", "rare", "legendary"):
-        try:
-            result = _generate_card_openai(player_row, player_id, source_path, tier=tier, special_theme=None)
-            card = _store_generated_card(
-                db,
-                player_id,
-                result["url"],
-                _style_from_generated_card(result),
-                gen_tier=str(tier),
-                player_row=player_row,
-                special_theme=None,
-                owner_name="unassigned",
-                owner_id=current_user.id,
-            )
-            result["card_id"] = card["card_id"]
-            result["card_record_id"] = card["id"]
-            result["created_at"] = card["created_at"]
-            cards.append(result)
-        except Exception as exc:
-            cards.append({"tier": tier, "ok": False, "error": str(exc)})
+    try:
+        for tier in ("base", "rare", "legendary"):
+            try:
+                result = _generate_card_openai(player_row, player_id, source_path, tier=tier, special_theme=None)
+                card = _store_generated_card(
+                    db,
+                    player_id,
+                    result["url"],
+                    _style_from_generated_card(result),
+                    gen_tier=str(tier),
+                    player_row=player_row,
+                    special_theme=None,
+                    owner_name="unassigned",
+                    owner_id=current_user.id,
+                )
+                result["card_id"] = card["card_id"]
+                result["card_record_id"] = card["id"]
+                result["created_at"] = card["created_at"]
+                cards.append(result)
+            except Exception as exc:
+                cards.append({"tier": tier, "ok": False, "error": str(exc)})
+    finally:
+        _cleanup_temp_source(source_path, is_temp)
     return {"player_id": player_id, "cards": cards}
 
 
-# Mount after API routes so /upload-image wins over static routing edge cases.
-app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
-app.mount(CARD_MEDIA_URL_PREFIX, StaticFiles(directory=str(CARD_DIR)), name="card_media")
-app.mount("/animations", StaticFiles(directory=str(ANIMATIONS_DIR)), name="animations")
-app.mount("/highlights", StaticFiles(directory=str(HIGHLIGHTS_DIR)), name="highlights")
+# Local disk static serving only when R2 is not configured (development fallback).
+if not is_r2_configured():
+    app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
+    app.mount(CARD_MEDIA_URL_PREFIX, StaticFiles(directory=str(CARD_DIR)), name="card_media")
+    app.mount("/animations", StaticFiles(directory=str(ANIMATIONS_DIR)), name="animations")
+    app.mount("/highlights", StaticFiles(directory=str(HIGHLIGHTS_DIR)), name="highlights")

@@ -5,12 +5,13 @@ from __future__ import annotations
 import logging
 import os
 import re
+import tempfile
 import traceback
 from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
@@ -36,6 +37,7 @@ from email_service import _absolute_image_url, frontend_url, send_highlight_comp
 from marketplace_repo import cancel_pending_marketplace_offers_for_card
 from parent_email_utils import parent_email_for_notify
 from models import Card, MarketplaceOffer, TradeOffer, User, utcnow
+from utils.storage import content_type_for_filename, save_bytes_to_storage
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -385,7 +387,7 @@ async def upload_card_highlight(
     current_user: User = Depends(get_current_user),
 ):
     """Save highlight video immediately — no server-side transcoding."""
-    final_dest: Path | None = None
+    tmp_path: Path | None = None
     charged = False
     price = highlight_card_price()
 
@@ -418,7 +420,6 @@ async def upload_card_highlight(
 
         safe_id = card.card_id.replace("/", "_")
         out_filename = f"{safe_id}{ext}"
-        final_dest = _highlights_dir() / out_filename
 
         if get_balance(db, current_user.id) < price:
             raise HTTPException(
@@ -426,8 +427,16 @@ async def upload_card_highlight(
                 detail="Insufficient credit balance for the highlight upgrade.",
             )
 
-        final_dest.write_bytes(data)
-        source_duration = validate_upload_duration(final_dest)
+        try:
+            with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+                tmp.write(data)
+                tmp_path = Path(tmp.name)
+            source_duration = validate_upload_duration(tmp_path)
+        except ValueError as exc:
+            if tmp_path is not None:
+                tmp_path.unlink(missing_ok=True)
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
         trim_start = max(0.0, float(trim_start_seconds or 0))
         if trim_end_seconds is not None:
             trim_end_raw = float(trim_end_seconds)
@@ -456,9 +465,20 @@ async def upload_card_highlight(
             )
             charged = True
         except InsufficientCreditsError as exc:
+            if tmp_path is not None:
+                tmp_path.unlink(missing_ok=True)
             raise HTTPException(status_code=402, detail=str(exc)) from exc
 
-        public_url = f"/highlights/{out_filename}"
+        upload_content_type = content_type_for_filename(out_filename, file.content_type or "video/mp4")
+        public_url = save_bytes_to_storage(
+            data,
+            r2_key=f"highlights/{out_filename}",
+            content_type=upload_content_type,
+            local_dir=_highlights_dir(),
+            local_url_prefix="/highlights",
+        )
+        if tmp_path is not None:
+            tmp_path.unlink(missing_ok=True)
         now = utcnow()
         card.is_highlight = True
         card.highlight_video_url = public_url
@@ -491,18 +511,18 @@ async def upload_card_highlight(
         return card_to_dict(card, db)
     except HTTPException:
         db.rollback()
-        if final_dest is not None and final_dest.is_file() and not charged:
-            final_dest.unlink(missing_ok=True)
+        if tmp_path is not None and tmp_path.is_file() and not charged:
+            tmp_path.unlink(missing_ok=True)
         raise
     except ValueError as exc:
         db.rollback()
-        if final_dest is not None and final_dest.is_file():
-            final_dest.unlink(missing_ok=True)
+        if tmp_path is not None and tmp_path.is_file():
+            tmp_path.unlink(missing_ok=True)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         db.rollback()
-        if final_dest is not None and final_dest.is_file():
-            final_dest.unlink(missing_ok=True)
+        if tmp_path is not None and tmp_path.is_file():
+            tmp_path.unlink(missing_ok=True)
         logger.error("Highlight upload error for %s: %s", card_id, traceback.format_exc())
         return JSONResponse(
             status_code=500,
@@ -560,6 +580,9 @@ def stream_card_video(
         raise HTTPException(status_code=403, detail="You do not own this card")
     if not card.is_animated:
         raise HTTPException(status_code=404, detail="This card is not animated")
+    video_url = (card.animated_video_url or "").strip()
+    if video_url.startswith("http://") or video_url.startswith("https://"):
+        return RedirectResponse(video_url)
     path = _animation_video_path(card)
     if path is None:
         raise HTTPException(status_code=404, detail="Animation file not found")

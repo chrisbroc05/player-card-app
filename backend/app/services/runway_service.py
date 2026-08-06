@@ -10,6 +10,7 @@ from pathlib import Path
 import httpx
 
 from email_service import _absolute_image_url
+from utils.storage import save_bytes_to_storage
 
 logger = logging.getLogger(__name__)
 
@@ -103,15 +104,16 @@ def _extract_output_url(task_data: dict) -> str:
     raise RuntimeError("Runway task succeeded but output URL is missing")
 
 
-async def _download_video(client: httpx.AsyncClient, video_url: str, dest: Path) -> None:
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    logger.info("Downloading Runway video to %s", dest)
+async def _download_video_bytes(client: httpx.AsyncClient, video_url: str) -> bytes:
+    logger.info("Downloading Runway video from %s", video_url)
     async with client.stream("GET", video_url, follow_redirects=True) as resp:
         resp.raise_for_status()
-        with dest.open("wb") as f:
-            async for chunk in resp.aiter_bytes():
-                f.write(chunk)
-    logger.info("Saved animation video (%s bytes)", dest.stat().st_size if dest.is_file() else 0)
+        chunks: list[bytes] = []
+        async for chunk in resp.aiter_bytes():
+            chunks.append(chunk)
+    data = b"".join(chunks)
+    logger.info("Downloaded animation video (%s bytes)", len(data))
+    return data
 
 
 async def _generate_animation_once(
@@ -128,16 +130,22 @@ async def _generate_animation_once(
         return {"success": False, "video_url": None, "error": "Card image URL is not reachable"}
 
     safe_id = card_id.replace("/", "_")
-    dest = _animations_dir() / f"{safe_id}.mp4"
-    public_path = f"/animations/{safe_id}.mp4"
+    filename = f"{safe_id}.mp4"
 
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(300.0, connect=30.0)) as client:
             task_id = await _start_image_to_video(client, absolute_image, motion_prompt)
             task_data = await _poll_task(client, task_id)
             output_url = _extract_output_url(task_data)
-            await _download_video(client, output_url, dest)
-        return {"success": True, "video_url": public_path, "error": None}
+            video_bytes = await _download_video_bytes(client, output_url)
+        public_url = save_bytes_to_storage(
+            video_bytes,
+            r2_key=f"animations/{filename}",
+            content_type="video/mp4",
+            local_dir=_animations_dir(),
+            local_url_prefix="/animations",
+        )
+        return {"success": True, "video_url": public_url, "error": None}
     except Exception as exc:
         logger.exception("Runway animation failed for card %s: %s", card_id, exc)
         return {"success": False, "video_url": None, "error": str(exc)}

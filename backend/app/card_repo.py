@@ -488,6 +488,10 @@ def _pending_preview_image_available(image_url: str | None) -> bool:
         return False
     if s.startswith("http://") or s.startswith("https://"):
         return True
+    from utils.storage import is_r2_public_url
+
+    if is_r2_public_url(s):
+        return True
     root = _app_data_root()
     filename = s.rsplit("/", 1)[-1]
     if not filename:
