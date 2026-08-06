@@ -5,7 +5,7 @@ import { vaultTierBadge, rarityDisplay } from "../utils/tierStyles";
 import CardImage from "./CardImage";
 import ShareCard from "./ShareCard";
 import QuantitySelector from "./QuantitySelector";
-import { isAnimatedCard } from "../utils/animationCard";
+import { isAnimatedCard, hasAnimatedVideo } from "../utils/animationCard";
 import { isHighlightCard } from "../utils/highlightCard";
 
 export default function PostGenerationPanel({
@@ -39,6 +39,7 @@ export default function PostGenerationPanel({
   const downloadName = detail.card_id ? `future-legends-${detail.card_id}.png` : "future-legends-card.png";
   const showQty = Boolean(showQuantityFlow && isLoggedIn && token);
   const total = Number(detail.print_run) || completedQty || 1;
+  const showAnimated = hasAnimatedVideo(detail) || isAnimatedCard(detail);
 
   async function handleQuantityConfirm(quantity) {
     if (!detail?.card_id || !token) return;
@@ -78,7 +79,11 @@ export default function PostGenerationPanel({
       {!showQty ? (
         <>
           {isLoggedIn ? (
-            <p className="mb-4 text-center text-sm font-medium text-emerald-300/95">Card saved to your collection!</p>
+            <p className="mb-4 text-center text-sm font-medium text-emerald-300/95">
+              {showAnimated
+                ? "Your animated card has been added to your collection!"
+                : "Card saved to your collection!"}
+            </p>
           ) : (
             <p className="mb-4 text-center text-sm text-slate-400">
               <Link
@@ -104,7 +109,7 @@ export default function PostGenerationPanel({
             alt={detail.player_name || "Card"}
             frameClassName="w-full"
             variant="detail"
-            forcePlay={isAnimatedCard(detail) || isHighlightCard(detail)}
+            forcePlay={showAnimated || isHighlightCard(detail)}
           />
         </div>
       </div>

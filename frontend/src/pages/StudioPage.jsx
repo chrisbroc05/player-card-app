@@ -455,6 +455,40 @@ export default function StudioPage() {
   );
   const previewCards = activeOrder?.generated_cards || [];
 
+  const wizardPreviewCard = useMemo(() => {
+    const imageUrl =
+      generatedCardUrl ||
+      selectedPreviewUrl ||
+      uploadedPhotoUrl ||
+      imagePreviewUrl ||
+      "";
+    return {
+      player_name: playerDisplayName,
+      team_name: teamName,
+      position,
+      jersey_number: jerseyNumber,
+      grad_year: gradYear,
+      tier: orderTier || "rookie",
+      theme: specialTheme,
+      special_theme: specialTheme,
+      image_url: imageUrl,
+      edition_number: 1,
+      print_run: 1,
+    };
+  }, [
+    generatedCardUrl,
+    selectedPreviewUrl,
+    uploadedPhotoUrl,
+    imagePreviewUrl,
+    playerDisplayName,
+    teamName,
+    position,
+    jerseyNumber,
+    gradYear,
+    orderTier,
+    specialTheme,
+  ]);
+
   const highlightRevealCardId = useMemo(() => {
     if (!isHighlightCardType) return "";
     return (
@@ -541,6 +575,18 @@ export default function StudioPage() {
     highlightClipDraft?.trimStart,
     highlightClipDraft?.trimEnd,
   ]);
+
+  const animatedModalPreviewCard = useMemo(() => {
+    if (featuredDisplayCard?.image_url) {
+      return {
+        ...featuredDisplayCard,
+        tier: orderTier || featuredDisplayCard.tier || "rookie",
+        theme: specialTheme || featuredDisplayCard.theme,
+        special_theme: specialTheme || featuredDisplayCard.special_theme,
+      };
+    }
+    return wizardPreviewCard;
+  }, [featuredDisplayCard, wizardPreviewCard, orderTier, specialTheme]);
 
   const activePreviewCount = Number(activeOrder?.preview_count ?? 0);
   const activePreviewLimit = Number(activeOrder?.preview_limit ?? 3);
@@ -688,10 +734,18 @@ export default function StudioPage() {
     setCurrentStep(step);
   }
 
-  function handleActionCategorySelect(categoryId) {
+  function selectActionCategory(categoryId) {
     setActionCategory(categoryId);
     setActionStepError("");
-    const motionIds = motionIdsForActionCategory(categoryId);
+  }
+
+  function handleActionCategoryContinue() {
+    if (!actionCategory) {
+      setActionStepError("Please select the action shown in your photo");
+      return;
+    }
+    setActionStepError("");
+    const motionIds = motionIdsForActionCategory(actionCategory);
     if (motionIds.length === 1) {
       setSelectedMotionId(motionIds[0]);
       setMotionStepMode("confirm");
@@ -757,12 +811,7 @@ export default function StudioPage() {
       return;
     }
     if (currentStep === STEP_ACTION) {
-      if (!actionCategory) {
-        setActionStepError("Please select the action shown in your photo");
-        return;
-      }
-      setActionStepError("");
-      handleActionCategorySelect(actionCategory);
+      handleActionCategoryContinue();
       return;
     }
     if (currentStep === STEP_MOTION) {
@@ -1298,6 +1347,7 @@ export default function StudioPage() {
   }
 
   useEffect(() => {
+    if (reviewSubPhase === "approve" && savedCardDetail?.animated_video_url) return;
     const sel = previewCards.find((p) => p.image_url === selectedPreviewUrl);
     if (!sel?.card_id) {
       setSavedCardDetail(null);
@@ -1317,10 +1367,11 @@ export default function StudioPage() {
     return () => {
       cancelled = true;
     };
-  }, [selectedPreviewUrl, previewCards]);
+  }, [selectedPreviewUrl, previewCards, reviewSubPhase, savedCardDetail?.animated_video_url]);
 
   useEffect(() => {
     if (currentStep !== STEP_REVIEW || reviewSubPhase !== "approve" || !activeOrder?.final_card_url) return;
+    if (savedCardDetail?.animated_video_url) return;
     const match = (activeOrder.generated_cards || []).find((g) => g.image_url === activeOrder.final_card_url);
     if (!match?.card_id) return;
     let cancelled = false;
@@ -1675,14 +1726,6 @@ export default function StudioPage() {
       setAnimatedFlowStage(ANIMATED_FLOW_STAGE.ANIMATING);
       console.log("[AnimatedFlow] loading screen state applied", { cardId });
 
-      const res = await fetch(`${API_BASE_URL}/orders/${currentOrderId}/approve-preview`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders(token) },
-        body: JSON.stringify({ image_url: selectedPreviewUrl || generatedCardUrl || null }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(formatApiError(data?.detail, "Failed to start animation."));
-
       const animRes = await fetch(
         `${API_BASE_URL}/cards/${encodeURIComponent(cardId)}/start-studio-animation`,
         {
@@ -1896,13 +1939,36 @@ export default function StudioPage() {
   }
 
   async function handleAnimationComplete(completedData) {
-    if (animationLoadingCardId) {
-      try {
-        await fetchCardDetailById(animationLoadingCardId);
-      } catch {
-        /* keep prior detail */
+    const cardId = animationLoadingCardId;
+    try {
+      if (currentOrderId && cardId) {
+        const res = await fetch(`${API_BASE_URL}/orders/${currentOrderId}/approve-preview`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders(token) },
+          body: JSON.stringify({ image_url: selectedPreviewUrl || generatedCardUrl || null }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(formatApiError(data?.detail, "Could not add card to your collection."));
+        }
       }
+
+      if (cardId) {
+        let detail = completedData?.animated_video_url
+          ? { ...completedData, is_animated: true }
+          : await fetchCardDetailById(cardId);
+        if (detail?.animated_video_url && !detail.is_animated) {
+          detail = { ...detail, is_animated: true };
+        }
+        setSavedCardDetail(detail);
+      }
+    } catch (err) {
+      setError(err.message || "Could not finalize your animated card.");
+      setAnimationLoadingCardId(null);
+      setAnimatedFlowStage(ANIMATED_FLOW_STAGE.IDLE);
+      return completedData;
     }
+
     setAnimationLoadingCardId(null);
     setAnimatedFlowStage(ANIMATED_FLOW_STAGE.IDLE);
     setAnimationFailed(false);
@@ -2037,7 +2103,8 @@ export default function StudioPage() {
               playerName={playerDisplayName}
               teamName={teamName}
               cardImageUrl={selectedPreviewUrl || generatedCardUrl}
-              card={featuredDisplayCard}
+              card={animatedModalPreviewCard}
+              motionName={motionDisplayName}
               onAddToCollection={handleAnimationComplete}
               onFailed={handleAnimationFailed}
               onRetry={handleAnimationRetry}
@@ -2226,7 +2293,8 @@ export default function StudioPage() {
               <div className="grid gap-4">
                 <ActionCategoryStep
                   value={actionCategory}
-                  onSelect={handleActionCategorySelect}
+                  onSelect={selectActionCategory}
+                  onContinue={handleActionCategoryContinue}
                   error={actionStepError}
                   tier={orderTier || "rookie"}
                 />
@@ -3151,7 +3219,7 @@ export default function StudioPage() {
       <AnimatedCardChoiceModal
         open={animatedChoiceModalOpen}
         previewImageUrl={selectedPreviewUrl || generatedCardUrl}
-        previewCard={featuredDisplayCard}
+        previewCard={animatedModalPreviewCard}
         previewAlt={playerDisplayName || "Your card"}
         onAnimate={handleAnimatedChoiceAnimate}
         onSaveStatic={handleAnimatedChoiceSaveStatic}
@@ -3166,7 +3234,7 @@ export default function StudioPage() {
         generationPricing={generationPricing}
         creditBalance={creditBalance}
         previewImageUrl={toApiUrl(selectedPreviewUrl || generatedCardUrl)}
-        previewCard={featuredDisplayCard}
+        previewCard={animatedModalPreviewCard}
         previewAlt={playerDisplayName || "Your card"}
       />
 
@@ -3178,6 +3246,7 @@ export default function StudioPage() {
           setShowAnimatedFlowExplainer(true);
         }}
         busy={addCollectionLoading || Boolean(orderActionKey)}
+        card={wizardPreviewCard}
         previewImageUrl={uploadedPhotoUrl || imagePreviewUrl}
         previewAlt={playerDisplayName || "Your photo"}
         motionName={motionDisplayName}

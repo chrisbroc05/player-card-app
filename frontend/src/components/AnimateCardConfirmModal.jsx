@@ -28,6 +28,13 @@ export default function AnimateCardConfirmModal({
   useScrollModalIntoView(open, dialogRef);
 
   useEffect(() => {
+    if (!open) return;
+    const tier = card?.tier ?? "missing";
+    const theme = card?.theme ?? card?.special_theme ?? "missing";
+    console.log("[AnimateCardConfirmModal] preview card tier/theme", { tier, theme, card });
+  }, [open, card]);
+
+  useEffect(() => {
     if (!open) {
       setConfirmEnabled(false);
       return undefined;
@@ -49,7 +56,7 @@ export default function AnimateCardConfirmModal({
     <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-3 sm:items-center sm:p-4">
       <div
         ref={dialogRef}
-        className="scroll-focus-target max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/10 bg-cardBg p-4 shadow-2xl sm:p-6"
+        className="scroll-focus-target max-h-[90vh] w-full min-w-0 overflow-y-auto rounded-2xl border border-white/10 bg-cardBg p-6 shadow-2xl sm:min-w-[480px] sm:max-w-lg"
         role="dialog"
         aria-labelledby="animate-confirm-title"
         aria-modal="true"
@@ -59,18 +66,20 @@ export default function AnimateCardConfirmModal({
         </h3>
 
         {hasPreview ? (
-          <div className="mx-auto mt-5 max-w-[220px]">
-            <CardImage
-              card={
-                card ||
-                (previewImageUrl
-                  ? { image_url: previewImageUrl, player_name: previewAlt || "Card preview", tier: "rookie" }
-                  : null)
-              }
-              alt={previewAlt}
-              frameClassName="w-full"
-              showInfoBanner
-            />
+          <div className="mx-auto mt-5 flex justify-center" style={{ width: 220, height: 308 }}>
+            <div className="h-full w-full">
+              <CardImage
+                card={
+                  card ||
+                  (previewImageUrl
+                    ? { image_url: previewImageUrl, player_name: previewAlt || "Card preview", tier: "rookie" }
+                    : null)
+                }
+                alt={previewAlt}
+                showInfoBanner
+                variant="detail"
+              />
+            </div>
           </div>
         ) : null}
 

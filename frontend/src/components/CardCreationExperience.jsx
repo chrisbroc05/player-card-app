@@ -249,12 +249,26 @@ function ReelExperience({ phaseIndex, playerName, elapsedMs, waitingForVideo = f
   );
 }
 
-function AwakeningExperience({ phaseIndex, tierConfig }) {
-  const cycleEnabled = phaseIndex === 2;
+function AwakeningExperience({ phaseIndex, tierConfig, waitingForGeneration = false, motionName = "" }) {
+  const cycleEnabled = phaseIndex === 2 && !waitingForGeneration;
   const cycled = useCyclingText(AWAKENING_CYCLE_TEXT.slice(1), 2000, cycleEnabled);
 
-  const staticText =
-    phaseIndex === 0
+  const waitMessages = React.useMemo(
+    () => [
+      "AI is studying your photo...",
+      "Generating cinematic motion...",
+      "Rendering frame by frame...",
+      motionName ? `Applying ${motionName} animation...` : "Applying motion animation...",
+      "Adding finishing touches...",
+      "Almost there...",
+    ],
+    [motionName]
+  );
+  const waitCycled = useCyclingText(waitMessages, 3000, waitingForGeneration);
+
+  const staticText = waitingForGeneration
+    ? waitCycled.text
+    : phaseIndex === 0
       ? ""
       : phaseIndex === 1
         ? AWAKENING_CYCLE_TEXT[0]
@@ -264,20 +278,20 @@ function AwakeningExperience({ phaseIndex, tierConfig }) {
             ? ""
             : AWAKENING_FLIP_TEXT;
 
-  const textVisible = phaseIndex === 2 ? cycled.visible : true;
+  const textVisible = waitingForGeneration ? waitCycled.visible : phaseIndex === 2 ? cycled.visible : true;
 
   return (
     <>
-      {phaseIndex >= 2 ? (
+      {phaseIndex >= 2 || waitingForGeneration ? (
         <div className="cce-energy-bar-wrap" aria-hidden>
-          <div className="cce-energy-bar" />
+          <div className={`cce-energy-bar ${waitingForGeneration ? "cce-energy-bar--pulse" : ""}`} />
         </div>
       ) : null}
 
       <div className="cce-stage">
-        {phaseIndex === 0 ? <div className="cce-heartbeat-ring" aria-hidden /> : null}
+        {phaseIndex === 0 && !waitingForGeneration ? <div className="cce-heartbeat-ring" aria-hidden /> : null}
 
-        {phaseIndex >= 1 && phaseIndex <= 3 ? (
+        {phaseIndex >= 1 && phaseIndex <= 3 && !waitingForGeneration ? (
           <div style={{ position: "relative" }}>
             {Array.from({ length: 8 }, (_, i) => (
               <span
@@ -300,8 +314,31 @@ function AwakeningExperience({ phaseIndex, tierConfig }) {
           </div>
         ) : null}
 
-        {phaseIndex >= 3 ? (
-          <div className={`cce-flip-scene ${phaseIndex >= 4 ? "cce-card-float" : ""}`}>
+        {phaseIndex >= 3 || waitingForGeneration ? (
+          <div
+            className={`cce-flip-scene ${phaseIndex >= 4 || waitingForGeneration ? "cce-card-float" : ""}`}
+          >
+            {waitingForGeneration ? (
+              <div className="cce-orbit-wrap" aria-hidden>
+                {[
+                  { size: 4, delay: 0 },
+                  { size: 6, delay: 0.4 },
+                  { size: 8, delay: 0.8 },
+                  { size: 6, delay: 1.2 },
+                  { size: 4, delay: 1.6 },
+                ].map((dot, i) => (
+                  <span
+                    key={i}
+                    className="cce-orbit-dot"
+                    style={{
+                      "--dot-size": `${dot.size}px`,
+                      "--orbit-delay": `${dot.delay}s`,
+                      "--orbit-duration": `${2.8 + i * 0.3}s`,
+                    }}
+                  />
+                ))}
+              </div>
+            ) : null}
             <div className={`cce-flip-inner ${phaseIndex >= 4 ? "cce-flip-inner--flip" : ""}`}>
               <div className="cce-flip-face">
                 <div className="cce-card-back">
@@ -311,8 +348,8 @@ function AwakeningExperience({ phaseIndex, tierConfig }) {
               <div className="cce-flip-face cce-flip-face--front">
                 <div className="cce-card-frame__inner" style={{ position: "relative", height: "100%" }}>
                   <div
-                    className="cce-card-placeholder"
-                    style={{ filter: "blur(0)", animation: "none", opacity: 0.35 }}
+                    className={`cce-card-placeholder ${waitingForGeneration ? "cce-card-placeholder--wait" : ""}`}
+                    style={{ filter: "blur(0)", animation: "none", opacity: waitingForGeneration ? 0.5 : 0.35 }}
                   />
                 </div>
               </div>
@@ -321,7 +358,16 @@ function AwakeningExperience({ phaseIndex, tierConfig }) {
         ) : null}
       </div>
 
-      {phaseIndex > 0 ? <ExperienceText text={staticText} visible={textVisible} /> : null}
+      {waitingForGeneration ? (
+        <div className="cce-wait-pulse" aria-hidden>
+          <span className="cce-wait-pulse__ring" />
+          <span className="cce-wait-pulse__core" />
+        </div>
+      ) : null}
+
+      {phaseIndex > 0 || waitingForGeneration ? (
+        <ExperienceText text={staticText} visible={textVisible} />
+      ) : null}
     </>
   );
 }
@@ -448,6 +494,7 @@ export default function CardCreationExperience({
   highlightCardId = "",
   token = "",
   onHighlightVideoReady,
+  motionName = "",
   onRevealComplete,
   showPrimaryAction = false,
   primaryActionLabel = "Add to Collection",
@@ -503,6 +550,9 @@ export default function CardCreationExperience({
     cardType,
     generationComplete: revealReady,
   });
+
+  const waitingAfterFlip =
+    cardType === "animated" && !revealReady && mode === "creating" && phaseIndex >= 4;
 
   const revealCard = useMemo(() => {
     const base =
@@ -599,7 +649,12 @@ export default function CardCreationExperience({
             />
           ) : null}
           {cardType === "animated" ? (
-            <AwakeningExperience phaseIndex={phaseIndex} tierConfig={tierConfig} />
+            <AwakeningExperience
+              phaseIndex={phaseIndex}
+              tierConfig={tierConfig}
+              waitingForGeneration={waitingAfterFlip}
+              motionName={motionName}
+            />
           ) : null}
           {hint ? <p className="cce-hint">{hint}</p> : null}
         </>

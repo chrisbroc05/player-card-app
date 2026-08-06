@@ -7,6 +7,11 @@ export function isAnimatedCard(card) {
   return Boolean(animated && url);
 }
 
+export function hasAnimatedVideo(card) {
+  if (!card) return false;
+  return Boolean(card.animated_video_url ?? card.animatedVideoUrl);
+}
+
 export function isAnimationInProgress(card) {
   const st = String(card?.animation_status ?? card?.animationStatus ?? "").toLowerCase();
   return st === "pending" || st === "processing";

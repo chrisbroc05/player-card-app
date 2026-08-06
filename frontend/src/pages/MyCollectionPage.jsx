@@ -121,6 +121,9 @@ export default function MyCollectionPage() {
   const displayRows = useMemo(() => {
     const arr = [...cards];
     arr.sort((a, b) => {
+      const tb = new Date(b.created_at || 0).getTime();
+      const ta = new Date(a.created_at || 0).getTime();
+      if (tb !== ta) return tb - ta;
       const ia = String(a.image_url || "");
       const ib = String(b.image_url || "");
       if (ia !== ib) return ia.localeCompare(ib);

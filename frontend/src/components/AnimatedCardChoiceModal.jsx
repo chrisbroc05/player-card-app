@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import CardImage from "./CardImage";
 import { useScrollModalIntoView } from "../hooks/useScrollIntoViewOnChange";
 
@@ -14,39 +14,46 @@ export default function AnimatedCardChoiceModal({
   const dialogRef = useRef(null);
   useScrollModalIntoView(open, dialogRef);
 
+  useEffect(() => {
+    if (!open) return;
+    const tier = previewCard?.tier ?? "missing";
+    const theme = previewCard?.theme ?? previewCard?.special_theme ?? "missing";
+    console.log("[AnimatedCardChoiceModal] preview card tier/theme", { tier, theme, previewCard });
+  }, [open, previewCard]);
+
   if (!open || !previewImageUrl) return null;
+
+  const displayCard =
+    previewCard ||
+    ({
+      image_url: previewImageUrl,
+      player_name: previewAlt,
+      tier: "rookie",
+    });
 
   return (
     <div className="fixed inset-0 z-[58] flex items-end justify-center bg-black/75 p-3 sm:items-center sm:p-4">
       <div
         ref={dialogRef}
-        className="scroll-focus-target w-full max-w-md overflow-hidden rounded-2xl border border-violet-400/30 bg-cardBg shadow-2xl sm:max-w-lg"
+        className="scroll-focus-target w-full min-w-0 overflow-hidden rounded-2xl border border-violet-400/30 bg-cardBg shadow-2xl sm:min-w-[480px] sm:max-w-lg"
         role="dialog"
         aria-labelledby="animated-choice-title"
         aria-modal="true"
       >
-        <div className="border-b border-white/10 bg-gradient-to-r from-violet-500/15 via-cardBg2 to-neonTeal/10 px-5 py-4 text-center">
+        <div className="border-b border-white/10 bg-gradient-to-r from-violet-500/15 via-cardBg2 to-neonTeal/10 px-6 py-5 text-center">
           <h2 id="animated-choice-title" className="text-lg font-semibold text-white sm:text-xl">
             Your card is ready — want to animate it?
           </h2>
         </div>
 
-        <div className="px-5 py-5">
-          <div className="mx-auto max-w-[220px]">
-            <CardImage
-              card={
-                previewCard || {
-                  image_url: previewImageUrl,
-                  player_name: previewAlt,
-                  tier: "rookie",
-                }
-              }
-              alt={previewAlt}
-              showInfoBanner
-            />
+        <div className="px-6 py-6">
+          <div className="mx-auto flex justify-center" style={{ width: 220, height: 308 }}>
+            <div className="h-full w-full">
+              <CardImage card={displayCard} alt={previewAlt} showInfoBanner variant="detail" />
+            </div>
           </div>
 
-          <div className="mt-6 flex flex-col gap-3">
+          <div className="mt-4 flex flex-col gap-3">
             <button
               type="button"
               disabled={busy}

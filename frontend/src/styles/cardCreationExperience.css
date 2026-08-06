@@ -1050,6 +1050,90 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+.cce-orbit-wrap {
+  position: absolute;
+  inset: -24%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.cce-orbit-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--dot-size, 6px);
+  height: var(--dot-size, 6px);
+  margin: calc(var(--dot-size, 6px) / -2);
+  border-radius: 50%;
+  background: var(--cce-tier, #7c3aed);
+  box-shadow: 0 0 10px var(--cce-tier, #7c3aed), 0 0 20px rgba(var(--cce-tier-rgb, 124, 58, 237), 0.45);
+  animation:
+    cce-orbit-spin var(--orbit-duration, 3s) linear infinite,
+    cce-orbit-pulse 1.6s ease-in-out infinite;
+  animation-delay: var(--orbit-delay, 0s), var(--orbit-delay, 0s);
+  transform-origin: 0 0;
+}
+
+.cce-orbit-dot:nth-child(1) { transform: rotate(0deg) translateX(88px); }
+.cce-orbit-dot:nth-child(2) { transform: rotate(72deg) translateX(96px); }
+.cce-orbit-dot:nth-child(3) { transform: rotate(144deg) translateX(84px); }
+.cce-orbit-dot:nth-child(4) { transform: rotate(216deg) translateX(92px); }
+.cce-orbit-dot:nth-child(5) { transform: rotate(288deg) translateX(80px); }
+
+.cce-card-placeholder--wait {
+  animation: cce-wait-shimmer 2.4s ease-in-out infinite !important;
+}
+
+.cce-energy-bar--pulse {
+  animation: cce-energy-pulse 2s ease-in-out infinite;
+}
+
+.cce-wait-pulse {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.cce-wait-pulse__ring {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--cce-tier, #7c3aed);
+  box-shadow: 0 0 12px var(--cce-tier-muted, rgba(124, 58, 237, 0.65));
+  animation: cce-wait-pulse-ring 1.8s ease-out infinite;
+}
+
+.cce-wait-pulse__core {
+  display: none;
+}
+
+@keyframes cce-orbit-spin {
+  from { transform: rotate(0deg) translateX(88px); }
+  to { transform: rotate(360deg) translateX(88px); }
+}
+
+@keyframes cce-orbit-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+@keyframes cce-wait-shimmer {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.65; }
+}
+
+@keyframes cce-energy-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+@keyframes cce-wait-pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(var(--cce-tier-rgb, 124, 58, 237), 0.5); }
+  70% { box-shadow: 0 0 0 14px rgba(var(--cce-tier-rgb, 124, 58, 237), 0); }
+  100% { box-shadow: 0 0 0 0 rgba(var(--cce-tier-rgb, 124, 58, 237), 0); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .cce-scene *,
   .cce-scene *::before,

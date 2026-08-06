@@ -13,6 +13,7 @@ export default function AnimationLoadingScreen({
   teamName = "",
   cardImageUrl = "",
   card = null,
+  motionName = "",
   onAddToCollection,
   onFailed,
   onRetry,
@@ -154,6 +155,7 @@ export default function AnimationLoadingScreen({
       cardImageUrl={cardImageUrl}
       card={card}
       videoUrl={videoUrl}
+      motionName={motionName}
       showPrimaryAction
       primaryActionLabel={completePrimaryLabel}
       onPrimaryAction={() => onAddToCollection?.(completedData)}
