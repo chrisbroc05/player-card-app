@@ -25,7 +25,7 @@ import PendingCardResumePrompt from "../components/PendingCardResumePrompt";
 import AnimateCardConfirmModal from "../components/AnimateCardConfirmModal";
 import AnimatedCardChoiceModal from "../components/AnimatedCardChoiceModal";
 import AnimatedQuantityModal from "../components/AnimatedQuantityModal";
-import PackOpeningLoader from "../components/PackOpeningLoader";
+import CardCreationExperience from "../components/CardCreationExperience";
 import AnimatedFlowExplainer from "../components/AnimatedFlowExplainer";
 import AnimatedAiDisclaimer from "../components/AnimatedAiDisclaimer";
 import { motionLabel } from "../constants/animationMotions";
@@ -1377,7 +1377,7 @@ export default function StudioPage() {
     } else {
       setAnimatedFlowStage(ANIMATED_FLOW_STAGE.IDLE);
     }
-    setPackOpeningActive(isAnimatedCardType);
+    setPackOpeningActive(true);
     setIsGenerating(true);
     setOrderActionKey(`generate-${orderId}`);
     setMessage("");
@@ -1396,6 +1396,8 @@ export default function StudioPage() {
       if (res.status === 429) {
         const usage = generationUsageFromPayload(data);
         if (usage) setGenerationUsage(usage);
+        setPackOpeningActive(false);
+        setAnimatedFlowStage(ANIMATED_FLOW_STAGE.IDLE);
         return;
       }
       if (!res.ok) throw new Error(formatApiError(data?.detail, "Failed to generate order card."));
@@ -1831,6 +1833,12 @@ export default function StudioPage() {
             <AnimationLoadingScreen
               cardId={animationLoadingCardId}
               token={token}
+              tier={orderTier}
+              theme={specialTheme ? selectedThemeLabel : ""}
+              playerName={playerDisplayName}
+              teamName={teamName}
+              cardImageUrl={selectedPreviewUrl || generatedCardUrl}
+              card={featuredDisplayCard}
               onAddToCollection={handleAnimationComplete}
               onFailed={handleAnimationFailed}
               onRetry={handleAnimationRetry}
@@ -2398,16 +2406,19 @@ export default function StudioPage() {
                   <GenerationCapNotice usage={generationUsage} period={generationCap.period} />
                 ) : null}
                 {packOpeningActive ? (
-                  <PackOpeningLoader
+                  <CardCreationExperience
                     active={packOpeningActive}
+                    cardType={
+                      isHighlightCardType ? "highlight" : isAnimatedCardType ? "animated" : "standard"
+                    }
+                    tier={orderTier}
+                    theme={specialTheme ? selectedThemeLabel : "Default (no theme)"}
+                    playerName={playerDisplayName}
+                    teamName={teamName}
                     generationComplete={!isGenerating && Boolean(generatedCardUrl || selectedPreviewUrl)}
                     cardImageUrl={generatedCardUrl || selectedPreviewUrl}
                     card={featuredDisplayCard}
-                    tier={orderTier}
-                    themeLabel={specialTheme ? selectedThemeLabel : "Default (no theme)"}
-                    isAnimated={isAnimatedCardType}
-                  isHighlight={isHighlightCardType}
-                    onComplete={handlePackOpeningComplete}
+                    onRevealComplete={handlePackOpeningComplete}
                   />
                 ) : null}
                 {isHighlightCardType && highlightUploadState !== "idle" ? (

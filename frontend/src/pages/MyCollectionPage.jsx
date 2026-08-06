@@ -33,6 +33,7 @@ export default function MyCollectionPage() {
   const [animateBusyId, setAnimateBusyId] = useState("");
   const [animationLoadingCardId, setAnimationLoadingCardId] = useState(null);
   const animationLoadingCardIdRef = useRef(null);
+  const animationSourceCardRef = useRef(null);
   const lastAnimateMotionRef = useRef("");
   const [bannerDismissed, setBannerDismissed] = useState({});
   const [generationCapUsage, setGenerationCapUsage] = useState(null);
@@ -198,6 +199,7 @@ export default function MyCollectionPage() {
       setAnimateModalCard(null);
       lastAnimateMotionRef.current = motionId;
       animationLoadingCardIdRef.current = newCardId;
+      animationSourceCardRef.current = card;
       setAnimationLoadingCardId(newCardId);
     } catch (e) {
       setError(e.message || "Could not start animation.");
@@ -209,6 +211,7 @@ export default function MyCollectionPage() {
   const handleAnimationUpgradeComplete = useCallback(async () => {
     await loadCards();
     animationLoadingCardIdRef.current = null;
+    animationSourceCardRef.current = null;
     setAnimationLoadingCardId(null);
     showToast("Your animated card was added to your collection!");
   }, [loadCards]);
@@ -345,6 +348,12 @@ export default function MyCollectionPage() {
             <AnimationLoadingScreen
               cardId={animationLoadingCardId}
               token={token}
+              tier={animationSourceCardRef.current?.tier || "rookie"}
+              theme={animationSourceCardRef.current?.theme || animationSourceCardRef.current?.special_theme || ""}
+              playerName={animationSourceCardRef.current?.player_name || ""}
+              teamName={animationSourceCardRef.current?.team_name || ""}
+              cardImageUrl={animationSourceCardRef.current?.image_url || ""}
+              card={animationSourceCardRef.current}
               onAddToCollection={handleAnimationUpgradeComplete}
               onFailed={handleAnimationUpgradeFailed}
               onRetry={handleAnimationUpgradeRetry}
