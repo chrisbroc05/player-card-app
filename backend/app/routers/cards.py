@@ -31,6 +31,7 @@ from credit_service import (
 )
 from highlight_service import MAX_HIGHLIGHT_UPLOAD_BYTES, validate_trim_range, validate_upload_duration
 from highlight_video_utils import video_extension_for_content_type
+from config.motion_scenarios import list_scenarios_for_motion, motion_has_scenarios
 from data.animation_motions import get_motion_by_id, is_motion_selectable, list_motions_public
 from database import get_db
 from email_service import _absolute_image_url, frontend_url, send_highlight_complete_email
@@ -189,6 +190,14 @@ class StudioAnimateBody(BaseModel):
 def list_animation_motions():
     """Public list of motion options (no internal prompts)."""
     return list_motions_public()
+
+
+@router.get("/animation-scenarios")
+def list_animation_scenarios(motion_id: str = Query(..., min_length=1, max_length=64)):
+    """Public scenario options for a motion (no prompt_context)."""
+    if not motion_has_scenarios(motion_id):
+        return []
+    return list_scenarios_for_motion(motion_id)
 
 
 @router.get("/generation-price")

@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import logging
 
-from card_repo import photo_notes_for_card, player_photo_url_for_card
+from card_repo import (
+    animation_scenario_id_for_card,
+    photo_notes_for_card,
+    player_photo_url_for_card,
+)
 from data.animation_motions import get_motion_prompt
 from database import SessionLocal
 from email_service import (
@@ -36,7 +40,8 @@ async def process_animation(card_id: str, motion_id: str) -> None:
             return
 
         photo_notes = photo_notes_for_card(card)
-        motion_prompt = get_motion_prompt(motion_key, photo_notes)
+        scenario_id = animation_scenario_id_for_card(card)
+        motion_prompt = get_motion_prompt(motion_key, photo_notes, scenario_id)
         if motion_prompt is None:
             logger.error(
                 "process_animation: no Runway prompt for motion_id %s on card %s",
@@ -58,9 +63,22 @@ async def process_animation(card_id: str, motion_id: str) -> None:
         db.commit()
 
         logger.info(
-            "Starting Runway animation for card %s using player photo (notes=%s)",
+            """
+=== RUNWAY PROMPT ===
+Card: %s
+Motion: %s
+Scenario: %s
+User notes: %s
+Final prompt (%d chars):
+%s
+====================
+""",
             card_id,
-            bool(photo_notes),
+            motion_key,
+            scenario_id or "none",
+            photo_notes or "none",
+            len(motion_prompt),
+            motion_prompt,
         )
         result = await generate_animation(source_photo_url, motion_prompt, card_id)
 

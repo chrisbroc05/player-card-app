@@ -87,20 +87,35 @@ _LEGACY_MOTION_PROMPTS: dict[str, str] = {
 }
 
 
-def build_runway_prompt(motion_id: str, photo_notes: str | None = None) -> str | None:
-    """Build the full Runway prompt for a motion, optionally including photo notes."""
+def build_runway_prompt(
+    motion_id: str,
+    scenario_id: str | None = None,
+    photo_notes: str | None = None,
+    tier: str | None = None,
+) -> str | None:
+    """Build the full Runway prompt: scenario context, user notes, motion, technical constraints."""
+    from config.motion_scenarios import GENERIC_SCENARIO_CONTEXT, get_scenario
+
     key = (motion_id or "").strip()
     action_body = MOTION_ACTION_BODIES.get(key) or _LEGACY_MOTION_PROMPTS.get(key)
     if not action_body:
         return None
 
+    scenario = get_scenario(key, scenario_id)
+    scenario_context = scenario["prompt_context"] if scenario else GENERIC_SCENARIO_CONTEXT
+
     notes = (photo_notes or "").strip()
     if notes:
-        focus_clause = f"{notes}. Focus on this specific athlete."
+        user_context = f"Additional context: {notes[:150]}."
     else:
-        focus_clause = "Focus on the main athlete in the foreground."
+        user_context = ""
 
-    return f"{action_body} {focus_clause} {_CAMERA_SUFFIX}"
+    parts = [scenario_context]
+    if user_context:
+        parts.append(user_context)
+    parts.append(action_body)
+    parts.append(_CAMERA_SUFFIX)
+    return " ".join(parts)
 
 
 SELECTABLE_MOTION_PROMPTS: dict[str, str] = {
@@ -189,9 +204,13 @@ def get_motion_by_id(motion_id: str) -> dict[str, str] | None:
     return _MOTION_BY_ID.get((motion_id or "").strip())
 
 
-def get_motion_prompt(motion_id: str, photo_notes: str | None = None) -> str | None:
+def get_motion_prompt(
+    motion_id: str,
+    photo_notes: str | None = None,
+    scenario_id: str | None = None,
+) -> str | None:
     """Return the Runway prompt for a motion id, or None if unknown."""
-    built = build_runway_prompt(motion_id, photo_notes)
+    built = build_runway_prompt(motion_id, scenario_id, photo_notes)
     if built:
         return built
     motion = get_motion_by_id(motion_id)

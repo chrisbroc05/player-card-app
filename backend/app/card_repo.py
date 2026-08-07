@@ -111,6 +111,7 @@ def create_card_row(
     action_category: str | None = None,
     player_photo_url: str | None = None,
     photo_notes: str | None = None,
+    animation_scenario_id: str | None = None,
     commit: bool = True,
 ) -> Card:
     creator = creator_user_id if creator_user_id is not None else owner_id
@@ -140,6 +141,7 @@ def create_card_row(
         action_category=action_category,
         player_photo_url=(player_photo_url or "").strip() or None,
         photo_notes=(photo_notes or "").strip()[:200] or None,
+        animation_scenario_id=(animation_scenario_id or "").strip() or None,
     )
     db.add(row)
     if commit:
@@ -206,6 +208,7 @@ def animation_fields_for_card(card: Card) -> dict:
         "action_category": getattr(card, "action_category", None) or None,
         "player_photo_url": getattr(card, "player_photo_url", None) or None,
         "photo_notes": getattr(card, "photo_notes", None) or None,
+        "animation_scenario_id": getattr(card, "animation_scenario_id", None) or None,
     }
 
 
@@ -226,6 +229,15 @@ def photo_notes_for_card(card: Card) -> str | None:
     draft = _parse_draft_metadata(getattr(card, "draft_metadata", None))
     draft_notes = (draft.get("photo_notes") or "").strip()
     return draft_notes[:200] if draft_notes else None
+
+
+def animation_scenario_id_for_card(card: Card) -> str | None:
+    scenario_id = (getattr(card, "animation_scenario_id", None) or "").strip()
+    if scenario_id:
+        return scenario_id
+    draft = _parse_draft_metadata(getattr(card, "draft_metadata", None))
+    draft_scenario = (draft.get("animation_scenario_id") or "").strip()
+    return draft_scenario or None
 
 
 def highlight_fields_for_card(card: Card) -> dict:
@@ -367,6 +379,9 @@ def create_animated_upgrade_card(
     row.animated_video_url = None
     row.player_photo_url = getattr(source, "player_photo_url", None) or player_photo_url_for_card(source)
     row.photo_notes = getattr(source, "photo_notes", None) or photo_notes_for_card(source)
+    row.animation_scenario_id = (
+        getattr(source, "animation_scenario_id", None) or animation_scenario_id_for_card(source)
+    )
     db.commit()
     db.refresh(row)
     return row
@@ -671,6 +686,8 @@ def _build_pending_session_payload(session_cards: list[Card], session_id: str) -
             draft["player_last_name"] = parts[1] if len(parts) > 1 else "N/A"
     if not draft.get("photo_notes") and getattr(anchor, "photo_notes", None):
         draft["photo_notes"] = anchor.photo_notes or ""
+    if not draft.get("animation_scenario_id") and getattr(anchor, "animation_scenario_id", None):
+        draft["animation_scenario_id"] = anchor.animation_scenario_id or ""
 
     previews = []
     for card in sorted(session_cards, key=_card_created_at):

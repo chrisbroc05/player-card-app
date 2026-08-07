@@ -111,6 +111,7 @@ class Card(Base):
     highlight_thumbnail_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     player_photo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     photo_notes: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    animation_scenario_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     preview_session_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     draft_metadata: Mapped[str | None] = mapped_column(Text, nullable=True)
 

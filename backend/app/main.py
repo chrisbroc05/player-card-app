@@ -454,6 +454,7 @@ def _draft_metadata_from_order(order: dict) -> str:
         "selected_motion_id": order.get("selected_motion_id") or "",
         "action_category": order.get("action_category") or "",
         "photo_notes": (order.get("photo_notes") or "").strip()[:200],
+        "animation_scenario_id": (order.get("animation_scenario_id") or "").strip() or "",
     }
     return json.dumps(payload)
 
@@ -543,6 +544,7 @@ def _store_generated_card(
     draft_metadata: str | None = None,
     player_photo_url: str | None = None,
     photo_notes: str | None = None,
+    animation_scenario_id: str | None = None,
 ) -> dict:
     """Persist generated card to PostgreSQL; returns API-shaped dict."""
     vt = vault_tier or _vault_tier_from_gen_tier(gen_tier)
@@ -574,6 +576,7 @@ def _store_generated_card(
         draft_metadata=draft_metadata,
         player_photo_url=player_photo_url,
         photo_notes=photo_notes,
+        animation_scenario_id=animation_scenario_id,
     )
     return card_to_dict(row, db)
 
@@ -1332,6 +1335,7 @@ class OrderCreate(BaseModel):
     selected_motion_id: str | None = Field(default=None, max_length=64)
     action_category: str | None = Field(default=None, max_length=32)
     photo_notes: str | None = Field(default=None, max_length=200)
+    animation_scenario_id: str | None = Field(default=None, max_length=100)
     add_ons: list[str] = Field(default_factory=list)
     status: OrderStatus = "new_order"
 
@@ -1436,6 +1440,7 @@ class PendingCardDraft(BaseModel):
     selected_motion_id: str = ""
     action_category: str = ""
     photo_notes: str = ""
+    animation_scenario_id: str = ""
 
 
 class PendingCardSession(BaseModel):
@@ -2039,6 +2044,7 @@ def create_order(
         selected_motion_id=body.selected_motion_id,
         action_category=body.action_category,
         photo_notes=(body.photo_notes or "").strip()[:200] or None,
+        animation_scenario_id=(body.animation_scenario_id or "").strip() or None,
         add_ons=body.add_ons,
         status=body.status,
         created_at=datetime.now(timezone.utc).isoformat(),
@@ -2181,6 +2187,7 @@ def generate_card_for_order(
         order["draft_metadata"] = draft_metadata
     player_photo_url = (order.get("player_image_url") or "").strip() or None
     photo_notes = (order.get("photo_notes") or "").strip()[:200] or None
+    animation_scenario_id = (order.get("animation_scenario_id") or "").strip() or None
     vault_rec = _store_generated_card(
         db,
         _player_id_for_order(order),
@@ -2198,6 +2205,7 @@ def generate_card_for_order(
         draft_metadata=draft_metadata,
         player_photo_url=player_photo_url if card_type == "animated" else None,
         photo_notes=photo_notes if card_type == "animated" else None,
+        animation_scenario_id=animation_scenario_id if card_type == "animated" else None,
     )
 
     generated = GeneratedOrderCard(

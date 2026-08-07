@@ -212,6 +212,18 @@ def run_schema_migrations_after_models(engine: Engine) -> None:
                 )
             else:
                 conn.execute(text("ALTER TABLE cards ADD COLUMN photo_notes VARCHAR(200)"))
+        if "animation_scenario_id" not in cols:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN IF NOT EXISTS "
+                        "animation_scenario_id VARCHAR(100)"
+                    )
+                )
+            else:
+                conn.execute(
+                    text("ALTER TABLE cards ADD COLUMN animation_scenario_id VARCHAR(100)")
+                )
         if "action_category" not in cols:
             if dialect == "postgresql":
                 conn.execute(

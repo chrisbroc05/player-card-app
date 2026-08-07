@@ -19,6 +19,7 @@ import HighlightVideoStep from "../components/HighlightVideoStep";
 import HighlightProcessingScreen from "../components/HighlightProcessingScreen";
 import QuantitySelector from "../components/QuantitySelector";
 import ActionCategoryStep from "../components/ActionCategoryStep";
+import ScenarioSelectionStep from "../components/ScenarioSelectionStep";
 import MotionSelectionGrid from "../components/MotionSelectionGrid";
 import AnimationLoadingScreen from "../components/AnimationLoadingScreen";
 import PendingCardResumePrompt from "../components/PendingCardResumePrompt";
@@ -64,9 +65,11 @@ const STEP_CARD_TYPE = 4;
 const STEP_UPLOAD = 5;
 const STEP_ACTION = 6;
 const STEP_MOTION = 7;
-const STEP_HIGHLIGHT_VIDEO = 8;
-const STEP_REVIEW = 9;
-const TOTAL_WIZARD_STEPS = 9;
+const STEP_SCENARIO = 8;
+const STEP_PHOTO_NOTES = 9;
+const STEP_HIGHLIGHT_VIDEO = 10;
+const STEP_REVIEW = 11;
+const TOTAL_WIZARD_STEPS = 11;
 
 const WIZARD_STEP_LABELS = {
   [STEP_DETAILS]: "Player Details",
@@ -76,6 +79,8 @@ const WIZARD_STEP_LABELS = {
   [STEP_UPLOAD]: "Upload",
   [STEP_ACTION]: "Tag Your Action",
   [STEP_MOTION]: "Choose Motion",
+  [STEP_SCENARIO]: "Match Your Photo",
+  [STEP_PHOTO_NOTES]: "Photo Details",
   [STEP_HIGHLIGHT_VIDEO]: "Trim Highlight",
   [STEP_REVIEW]: "Review & Generate",
 };
@@ -97,7 +102,12 @@ const ANIMATED_FLOW_STAGE = {
 };
 
 function isAnimatedOnlyStep(step) {
-  return step === STEP_ACTION || step === STEP_MOTION;
+  return (
+    step === STEP_ACTION ||
+    step === STEP_MOTION ||
+    step === STEP_SCENARIO ||
+    step === STEP_PHOTO_NOTES
+  );
 }
 
 function isHighlightOnlyStep(step) {
@@ -117,7 +127,9 @@ function getNextWizardStep(step, cardType) {
     return STEP_REVIEW;
   }
   if (step === STEP_ACTION) return STEP_MOTION;
-  if (step === STEP_MOTION) return STEP_REVIEW;
+  if (step === STEP_MOTION) return STEP_SCENARIO;
+  if (step === STEP_SCENARIO) return STEP_PHOTO_NOTES;
+  if (step === STEP_PHOTO_NOTES) return STEP_REVIEW;
   if (step === STEP_HIGHLIGHT_VIDEO) return STEP_REVIEW;
   return Math.min(step + 1, STEP_REVIEW);
 }
@@ -127,11 +139,13 @@ function getPrevWizardStep(step, cardType, actionCategory = "") {
   const isHighlight = cardType === "highlight";
   if (step === STEP_REVIEW) {
     if (isHighlight) return STEP_HIGHLIGHT_VIDEO;
-    if (isAnimated) {
-      if (isSingleMotionCategory(actionCategory)) return STEP_ACTION;
-      return STEP_MOTION;
-    }
+    if (isAnimated) return STEP_PHOTO_NOTES;
     return STEP_UPLOAD;
+  }
+  if (step === STEP_PHOTO_NOTES) return STEP_SCENARIO;
+  if (step === STEP_SCENARIO) {
+    if (isSingleMotionCategory(actionCategory)) return STEP_ACTION;
+    return STEP_MOTION;
   }
   if (step === STEP_HIGHLIGHT_VIDEO) return STEP_UPLOAD;
   if (step === STEP_MOTION) return STEP_ACTION;
@@ -343,11 +357,13 @@ export default function StudioPage() {
   const [savedCardDetail, setSavedCardDetail] = useState(null);
   const [cardType, setCardType] = useState("standard");
   const [selectedMotionId, setSelectedMotionId] = useState("");
+  const [selectedScenarioId, setSelectedScenarioId] = useState("");
   const [actionCategory, setActionCategory] = useState("");
   const [photoNotes, setPhotoNotes] = useState("");
   const [motionStepMode, setMotionStepMode] = useState("select");
   const [actionStepError, setActionStepError] = useState("");
   const [motionStepError, setMotionStepError] = useState("");
+  const [scenarioStepError, setScenarioStepError] = useState("");
   const [reviewSubPhase, setReviewSubPhase] = useState("setup");
   const [photoStepError, setPhotoStepError] = useState("");
   const [detailsErrors, setDetailsErrors] = useState({});
@@ -713,6 +729,8 @@ export default function StudioPage() {
         : Boolean(uploadedPhotoUrl) && !photoUploading,
       [STEP_ACTION]: !isAnimatedCardType || Boolean(actionCategory),
       [STEP_MOTION]: !isAnimatedCardType || Boolean(selectedMotionId),
+      [STEP_SCENARIO]: !isAnimatedCardType || Boolean(selectedScenarioId),
+      [STEP_PHOTO_NOTES]: !isAnimatedCardType || true,
       [STEP_HIGHLIGHT_VIDEO]: isHighlightCardType && Boolean(highlightClipDraft?.confirmed),
       [STEP_REVIEW]: true,
     }),
@@ -726,6 +744,7 @@ export default function StudioPage() {
       photoUploading,
       actionCategory,
       selectedMotionId,
+      selectedScenarioId,
       isAnimatedCardType,
       isHighlightCardType,
       highlightClipDraft?.file,
@@ -761,13 +780,29 @@ export default function StudioPage() {
     const motionIds = motionIdsForActionCategory(actionCategory);
     if (motionIds.length === 1) {
       setSelectedMotionId(motionIds[0]);
+      setSelectedScenarioId("");
       setMotionStepMode("confirm");
-      setCurrentStep(STEP_REVIEW);
+      setCurrentStep(STEP_SCENARIO);
     } else {
       setSelectedMotionId("");
+      setSelectedScenarioId("");
       setMotionStepMode("select");
       setCurrentStep(STEP_MOTION);
     }
+  }
+
+  function selectScenario(scenarioId) {
+    setSelectedScenarioId(scenarioId);
+    setScenarioStepError("");
+  }
+
+  function handleScenarioContinue() {
+    if (!selectedScenarioId) {
+      setScenarioStepError("Please select the scenario that best matches your photo");
+      return;
+    }
+    setScenarioStepError("");
+    setCurrentStep(STEP_PHOTO_NOTES);
   }
 
   function clearUploadState() {
@@ -833,6 +868,15 @@ export default function StudioPage() {
         return;
       }
       setMotionStepError("");
+      setSelectedScenarioId("");
+      setCurrentStep(STEP_SCENARIO);
+      return;
+    }
+    if (currentStep === STEP_SCENARIO) {
+      handleScenarioContinue();
+      return;
+    }
+    if (currentStep === STEP_PHOTO_NOTES) {
       setCurrentStep(STEP_REVIEW);
       return;
     }
@@ -1210,6 +1254,7 @@ export default function StudioPage() {
     setCardType(draft.card_type || "standard");
     setSpecialTheme(draft.special_theme || "");
     setSelectedMotionId(draft.selected_motion_id || "");
+    setSelectedScenarioId(draft.animation_scenario_id || "");
     setActionCategory(draft.action_category || "");
     setPhotoNotes(draft.photo_notes || "");
     if (draft.action_category && draft.selected_motion_id) {
@@ -1719,6 +1764,7 @@ export default function StudioPage() {
         selected_motion_id: selectedMotionId || null,
         action_category: actionCategory || null,
         photo_notes: isAnimatedCardType ? photoNotes.trim().slice(0, 200) || null : null,
+        animation_scenario_id: isAnimatedCardType ? selectedScenarioId || null : null,
         add_ons: [],
       }),
     });
@@ -2316,29 +2362,6 @@ export default function StudioPage() {
                       </label>
                     </>
                   )}
-                  {isAnimatedCardType && (uploadedPhotoUrl || imageFile) ? (
-                    <div className="rounded-xl border border-white/10 bg-cardBg2 p-4">
-                      <label htmlFor="photo-notes" className="block text-sm font-medium text-white">
-                        Anything we should know about your photo? (optional)
-                      </label>
-                      <p className="mt-1 text-xs text-slate-400">
-                        If there are multiple people in your photo, tell us who to focus on. Any
-                        other details that might help.
-                      </p>
-                      <textarea
-                        id="photo-notes"
-                        rows={3}
-                        maxLength={200}
-                        value={photoNotes}
-                        onChange={(e) => setPhotoNotes(e.target.value.slice(0, 200))}
-                        placeholder={`e.g. "I'm the player on the left in the red jersey"`}
-                        className="mt-3 w-full resize-none rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-neonBlue/50 focus:outline-none focus:ring-1 focus:ring-neonBlue/40"
-                      />
-                      <p className="mt-1 text-right text-xs text-slate-500">
-                        {photoNotes.length} / 200
-                      </p>
-                    </div>
-                  ) : null}
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
@@ -2369,6 +2392,7 @@ export default function StudioPage() {
                     setCardType(type);
                     if (type === "standard" || type === "highlight") {
                       setSelectedMotionId("");
+                      setSelectedScenarioId("");
                       setActionCategory("");
                       setMotionStepMode("select");
                     }
@@ -2667,6 +2691,7 @@ export default function StudioPage() {
                       value={selectedMotionId}
                       onChange={(id) => {
                         setSelectedMotionId(id);
+                        setSelectedScenarioId("");
                         setMotionStepError("");
                       }}
                       error={motionStepError}
@@ -2689,7 +2714,71 @@ export default function StudioPage() {
                     onClick={tryAdvanceStep}
                     className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
                   >
-                    Continue to Review
+                    Continue to Scenario →
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {currentStep === STEP_SCENARIO && isAnimatedCardType ? (
+              <div className="grid gap-4">
+                <ScenarioSelectionStep
+                  motionId={selectedMotionId}
+                  value={selectedScenarioId}
+                  onSelect={selectScenario}
+                  onContinue={handleScenarioContinue}
+                  error={scenarioStepError}
+                  tier={orderTier || "rookie"}
+                />
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={goBackStep}
+                    className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
+                  >
+                    Back
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {currentStep === STEP_PHOTO_NOTES && isAnimatedCardType ? (
+              <div className="grid gap-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-white">
+                    Anything we should know about your photo?
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-400">
+                    Optional — if there are multiple people in your photo, tell us who to focus on.
+                    Any other details that might help.
+                  </p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-cardBg2 p-4">
+                  <textarea
+                    id="photo-notes"
+                    rows={4}
+                    maxLength={200}
+                    value={photoNotes}
+                    onChange={(e) => setPhotoNotes(e.target.value.slice(0, 200))}
+                    placeholder={`e.g. "I'm the player on the left in the red jersey"`}
+                    className="w-full resize-none rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-neonBlue/50 focus:outline-none focus:ring-1 focus:ring-neonBlue/40"
+                  />
+                  <p className="mt-1 text-right text-xs text-slate-500">{photoNotes.length} / 200</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={goBackStep}
+                    className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={tryAdvanceStep}
+                    className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto"
+                  >
+                    Continue to Review →
                   </button>
                 </div>
               </div>
