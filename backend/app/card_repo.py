@@ -28,6 +28,10 @@ def validate_print_run_quantity(quantity: int) -> None:
 PENDING_CARD_TTL_HOURS = 24
 
 # Same rows surfaced in My Collection and profile "Cards in Collection" KPI.
+import logging
+
+logger = logging.getLogger(__name__)
+
 COLLECTION_STATUSES = ("active", "pending_trade")
 
 # Studio previews and discarded variants never count toward creation KPIs.
@@ -105,6 +109,8 @@ def create_card_row(
     preview_session_id: str | None = None,
     draft_metadata: str | None = None,
     action_category: str | None = None,
+    player_photo_url: str | None = None,
+    photo_notes: str | None = None,
     commit: bool = True,
 ) -> Card:
     creator = creator_user_id if creator_user_id is not None else owner_id
@@ -132,6 +138,8 @@ def create_card_row(
         preview_session_id=preview_session_id,
         draft_metadata=draft_metadata,
         action_category=action_category,
+        player_photo_url=(player_photo_url or "").strip() or None,
+        photo_notes=(photo_notes or "").strip()[:200] or None,
     )
     db.add(row)
     if commit:
@@ -196,7 +204,28 @@ def animation_fields_for_card(card: Card) -> dict:
         "animation_status": getattr(card, "animation_status", None),
         "animation_motion": getattr(card, "animation_motion", None),
         "action_category": getattr(card, "action_category", None) or None,
+        "player_photo_url": getattr(card, "player_photo_url", None) or None,
+        "photo_notes": getattr(card, "photo_notes", None) or None,
     }
+
+
+def player_photo_url_for_card(card: Card) -> str | None:
+    """Original uploaded player photo URL used as Runway promptImage source."""
+    url = (getattr(card, "player_photo_url", None) or "").strip()
+    if url:
+        return url
+    draft = _parse_draft_metadata(getattr(card, "draft_metadata", None))
+    fallback = (draft.get("player_image_url") or draft.get("player_photo_url") or "").strip()
+    return fallback or None
+
+
+def photo_notes_for_card(card: Card) -> str | None:
+    notes = (getattr(card, "photo_notes", None) or "").strip()
+    if notes:
+        return notes[:200]
+    draft = _parse_draft_metadata(getattr(card, "draft_metadata", None))
+    draft_notes = (draft.get("photo_notes") or "").strip()
+    return draft_notes[:200] if draft_notes else None
 
 
 def highlight_fields_for_card(card: Card) -> dict:
@@ -336,6 +365,8 @@ def create_animated_upgrade_card(
     row.animation_requested_at = utcnow()
     row.animation_completed_at = None
     row.animated_video_url = None
+    row.player_photo_url = getattr(source, "player_photo_url", None) or player_photo_url_for_card(source)
+    row.photo_notes = getattr(source, "photo_notes", None) or photo_notes_for_card(source)
     db.commit()
     db.refresh(row)
     return row
@@ -552,7 +583,7 @@ def pending_card_validation_errors(db: Session, card: Card) -> list[str]:
     return errors
 
 
-def discard_preview_cards(db: Session, cards: list[Card]) -> int:
+def discard_preview_cards(db: Session, cards: list[Card], *, owner_id: int | None = None) -> int:
     """Mark preview rows discarded so they never surface as pending again."""
     updated = 0
     for card in cards:
@@ -560,6 +591,8 @@ def discard_preview_cards(db: Session, cards: list[Card]) -> int:
             continue
         card.status = "discarded"
         updated += 1
+        if owner_id is not None:
+            logger.info("Card %s discarded by user %s", card.card_id, owner_id)
     if updated:
         db.commit()
     return updated
@@ -610,6 +643,8 @@ def _build_pending_session_payload(session_cards: list[Card], session_id: str) -
             parts = str(anchor.player_name).split(" ", 1)
             draft["player_first_name"] = parts[0]
             draft["player_last_name"] = parts[1] if len(parts) > 1 else "N/A"
+    if not draft.get("photo_notes") and getattr(anchor, "photo_notes", None):
+        draft["photo_notes"] = anchor.photo_notes or ""
 
     previews = []
     for card in sorted(session_cards, key=_card_created_at):
@@ -626,6 +661,7 @@ def _build_pending_session_payload(session_cards: list[Card], session_id: str) -
                 "team_name": card.team_name,
                 "special_theme": card.special_theme,
                 "rarity": card.rarity,
+                "status": card.status or "preview",
             }
         )
 
@@ -691,6 +727,18 @@ def discard_pending_session(
         return 0
 
     target = preview_session_id.strip()
+    direct = (
+        db.query(Card)
+        .filter(
+            Card.owner_id == owner_id,
+            Card.status == "preview",
+            Card.preview_session_id == target,
+        )
+        .all()
+    )
+    if direct:
+        return discard_preview_cards(db, direct, owner_id=owner_id)
+
     cards = (
         db.query(Card)
         .filter(
@@ -706,7 +754,7 @@ def discard_pending_session(
         )
         if card_session == target:
             to_discard.append(card)
-    return discard_preview_cards(db, to_discard)
+    return discard_preview_cards(db, to_discard, owner_id=owner_id)
 
 
 def pending_session_cards(

@@ -93,7 +93,10 @@ export default function CardTypeStep({
           </span>
           <div className="mb-3">{ICON_ANIMATED}</div>
           <p className="text-base font-semibold text-white">AI Animated Card</p>
-          <p className="mt-1 text-sm text-slate-400">AI brings your photo to life with cinematic sports motion</p>
+          <p className="mt-1 text-sm text-slate-400">
+            AI animates your uploaded player photo inside the card frame — clear, single-subject
+            photos work best.
+          </p>
           <p className="mt-3 text-sm font-medium text-violet-200">{priceLabel(animatedUpgradePrice)}</p>
         </button>
       </div>

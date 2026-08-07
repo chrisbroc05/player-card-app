@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from animation_tasks import process_animation
 from card_pricing import animated_studio_total_price, animated_upgrade_price, generation_price_payload, highlight_card_price, normalize_order_tier
 from auth import get_current_user
-from card_repo import create_animated_upgrade_card, get_card_by_card_id, card_to_dict, highlight_fields_for_card
+from card_repo import create_animated_upgrade_card, get_card_by_card_id, card_to_dict, highlight_fields_for_card, player_photo_url_for_card
 from credit_service import (
     InsufficientCreditsError,
     TX_ANIMATION,
@@ -163,10 +163,11 @@ def _validate_animate_request(
             status_code=400,
             detail="Complete your order and add the card to your collection before animating.",
         )
-    if not (card.image_url or "").strip():
-        raise HTTPException(status_code=400, detail="Card has no image to animate")
-    if _absolute_image_url(card.image_url) is None:
-        raise HTTPException(status_code=400, detail="Card image URL is not valid for animation")
+    if not player_photo_url_for_card(card):
+        raise HTTPException(status_code=400, detail="Card has no player photo to animate")
+    photo_url = player_photo_url_for_card(card)
+    if _absolute_image_url(photo_url) is None:
+        raise HTTPException(status_code=400, detail="Player photo URL is not valid for animation")
 
 
 class AnimateBody(BaseModel):

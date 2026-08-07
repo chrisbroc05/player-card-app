@@ -8,7 +8,8 @@ import {
 } from "../utils/themeOverlayColor";
 import { normalizeHighlightThemeKey } from "../utils/highlightCardStyles";
 
-function HighlightSoundToggle({ muted, onToggle }) {
+function HighlightSoundToggle({ muted, onToggle, position = "left" }) {
+  const positionClass = position === "right" ? "bottom-2 right-2" : "bottom-2 left-2";
   return (
     <button
       type="button"
@@ -19,7 +20,7 @@ function HighlightSoundToggle({ muted, onToggle }) {
       }}
       title={muted ? "Tap to unmute" : "Tap to mute"}
       aria-label={muted ? "Tap to unmute" : "Tap to mute"}
-      className="card-video-area__sound-toggle absolute bottom-2 left-2 z-[8] flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/60 text-sm text-white backdrop-blur-sm transition hover:bg-black/75"
+      className={`card-video-area__sound-toggle absolute ${positionClass} z-[8] flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/60 text-sm text-white backdrop-blur-sm transition hover:bg-black/75`}
     >
       {muted ? (
         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
@@ -60,6 +61,8 @@ function HighlightVideoPlayer({
   showSoundToggle = false,
   soundMuted = true,
   onToggleSound,
+  objectFit = "contain",
+  soundTogglePosition = "left",
 }) {
   const foregroundRef = useRef(null);
 
@@ -82,9 +85,12 @@ function HighlightVideoPlayer({
     ? null
     : getThemeOverlayColor(theme, tier, { opacityScale: tintOpacityScale });
 
+  const foregroundObjectFit = objectFit === "cover" ? "cover" : "contain";
+  const fillModeClass = objectFit === "cover" ? "highlight-video-fill--cover" : "";
+
   return (
     <div
-      className={`card-video-area highlight-video-fill ${wrapperClass}`.trim()}
+      className={`card-video-area highlight-video-fill ${fillModeClass} ${wrapperClass}`.trim()}
       style={{ backgroundColor: tierBackground }}
     >
       <video
@@ -122,6 +128,7 @@ function HighlightVideoPlayer({
         ref={foregroundRef}
         src={videoSrc}
         className="card-video-area__fg highlight-video-fill__fg"
+        style={{ objectFit: foregroundObjectFit, objectPosition: "center" }}
         autoPlay={shouldPlay}
         loop={foregroundLoop}
         muted={muted}
@@ -135,7 +142,11 @@ function HighlightVideoPlayer({
       <ThemeVideoIcon themeKey={themeKey} />
 
       {showSoundToggle && onToggleSound ? (
-        <HighlightSoundToggle muted={soundMuted} onToggle={onToggleSound} />
+        <HighlightSoundToggle
+          muted={soundMuted}
+          onToggle={onToggleSound}
+          position={soundTogglePosition}
+        />
       ) : null}
     </div>
   );

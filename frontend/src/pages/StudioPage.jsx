@@ -51,6 +51,11 @@ import {
 import { scrollAfterPaint } from "../utils/smoothScroll";
 import { cleanupFailedHighlightCard, uploadHighlightClip } from "../utils/uploadHighlightClip";
 import { captureVideoFrameAsFile } from "../utils/highlightVideo";
+import {
+  filterValidPendingPreviews,
+  isPendingSessionDiscarded,
+  markPendingSessionDiscarded,
+} from "../utils/pendingCardSession";
 
 const STEP_DETAILS = 1;
 const STEP_TIER = 2;
@@ -339,6 +344,7 @@ export default function StudioPage() {
   const [cardType, setCardType] = useState("standard");
   const [selectedMotionId, setSelectedMotionId] = useState("");
   const [actionCategory, setActionCategory] = useState("");
+  const [photoNotes, setPhotoNotes] = useState("");
   const [motionStepMode, setMotionStepMode] = useState("select");
   const [actionStepError, setActionStepError] = useState("");
   const [motionStepError, setMotionStepError] = useState("");
@@ -1037,8 +1043,18 @@ export default function StudioPage() {
         setPendingSession(null);
         return null;
       }
-      setPendingSession(session);
-      return session;
+      if (isPendingSessionDiscarded(session.preview_session_id)) {
+        setPendingSession(null);
+        return null;
+      }
+      const validPreviews = filterValidPendingPreviews(session.previews);
+      if (!validPreviews.length) {
+        setPendingSession(null);
+        return null;
+      }
+      const normalizedSession = { ...session, previews: validPreviews };
+      setPendingSession(normalizedSession);
+      return normalizedSession;
     } catch {
       return null;
     }
@@ -1086,7 +1102,12 @@ export default function StudioPage() {
   useEffect(() => {
     if (initializing || !token) return;
     fetchPendingSession().then((session) => {
-      if (session?.previews?.length) setShowPendingPrompt(true);
+      if (
+        session?.previews?.length &&
+        !isPendingSessionDiscarded(session.preview_session_id)
+      ) {
+        setShowPendingPrompt(true);
+      }
     });
   }, [initializing, token, fetchPendingSession]);
 
@@ -1188,6 +1209,7 @@ export default function StudioPage() {
     setSpecialTheme(draft.special_theme || "");
     setSelectedMotionId(draft.selected_motion_id || "");
     setActionCategory(draft.action_category || "");
+    setPhotoNotes(draft.photo_notes || "");
     if (draft.action_category && draft.selected_motion_id) {
       setMotionStepMode(isSingleMotionCategory(draft.action_category) ? "confirm" : "select");
     }
@@ -1265,17 +1287,29 @@ export default function StudioPage() {
     setPendingActionLoading(true);
     setError("");
     try {
-      await fetch(
+      const res = await fetch(
         `${API_BASE_URL}/cards/pending?preview_session_id=${encodeURIComponent(sessionId)}`,
         {
           method: "DELETE",
           headers: { ...authHeaders(token) },
         }
       );
-    } catch {
-      /* dismiss even when discard fails */
-    } finally {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof data?.detail === "string"
+            ? data.detail
+            : "Could not discard unfinished card. Please try again."
+        );
+      }
+      if ((data?.discarded_count ?? 0) === 0) {
+        throw new Error("Could not discard unfinished card. Please try again.");
+      }
+      markPendingSessionDiscarded(sessionId);
       dismissPendingPrompt();
+    } catch (err) {
+      setError(err.message || "Could not discard unfinished card. Please try again.");
+    } finally {
       setPendingActionLoading(false);
     }
   }
@@ -1304,6 +1338,7 @@ export default function StudioPage() {
     setCardType("standard");
     setSelectedMotionId("");
     setActionCategory("");
+    setPhotoNotes("");
     setMotionStepMode("select");
     setReviewSubPhase("setup");
     setPreviewConfigureOpen(false);
@@ -1678,6 +1713,7 @@ export default function StudioPage() {
         special_theme: specialTheme || null,
         selected_motion_id: selectedMotionId || null,
         action_category: actionCategory || null,
+        photo_notes: isAnimatedCardType ? photoNotes.trim().slice(0, 200) || null : null,
         add_ons: [],
       }),
     });
@@ -2173,10 +2209,26 @@ export default function StudioPage() {
               ) : (
                 <div className="grid gap-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-white">Upload your player photo</h3>
-                    <p className="mt-1 text-sm text-slate-400">
-                      Choose a clear photo of your player for the best card result
-                    </p>
+                    <h3 className="text-lg font-semibold text-white">
+                      {isAnimatedCardType
+                        ? "Upload a clear photo of your player"
+                        : "Upload your player photo"}
+                    </h3>
+                    {isAnimatedCardType ? (
+                      <ul className="mt-3 space-y-1.5 text-sm text-slate-400">
+                        <li>✓ Clear photo of just the player works best</li>
+                        <li>✓ The player should be the main subject</li>
+                        <li>✓ Action shots or posed photos both work</li>
+                        <li>
+                          ✓ If multiple people are in the photo, you&apos;ll be able to tell us who
+                          to focus on next
+                        </li>
+                      </ul>
+                    ) : (
+                      <p className="mt-1 text-sm text-slate-400">
+                        Choose a clear photo of your player for the best card result
+                      </p>
+                    )}
                   </div>
                   <input
                     id="studio-photo-upload"
@@ -2252,6 +2304,29 @@ export default function StudioPage() {
                       </label>
                     </>
                   )}
+                  {isAnimatedCardType && (uploadedPhotoUrl || imageFile) ? (
+                    <div className="rounded-xl border border-white/10 bg-cardBg2 p-4">
+                      <label htmlFor="photo-notes" className="block text-sm font-medium text-white">
+                        Anything we should know about your photo? (optional)
+                      </label>
+                      <p className="mt-1 text-xs text-slate-400">
+                        If there are multiple people in your photo, tell us who to focus on. Any
+                        other details that might help.
+                      </p>
+                      <textarea
+                        id="photo-notes"
+                        rows={3}
+                        maxLength={200}
+                        value={photoNotes}
+                        onChange={(e) => setPhotoNotes(e.target.value.slice(0, 200))}
+                        placeholder={`e.g. "I'm the player on the left in the red jersey"`}
+                        className="mt-3 w-full resize-none rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-neonBlue/50 focus:outline-none focus:ring-1 focus:ring-neonBlue/40"
+                      />
+                      <p className="mt-1 text-right text-xs text-slate-500">
+                        {photoNotes.length} / 200
+                      </p>
+                    </div>
+                  ) : null}
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"

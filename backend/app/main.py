@@ -72,6 +72,7 @@ from card_repo import (  # noqa: E402
     list_my_cards_dicts,
     next_collectible_card_id,
     get_pending_session_by_id,
+    pending_session_cards,
 )
 from database import SessionLocal, engine, get_db  # noqa: E402
 from beta_config import get_beta_invite_code  # noqa: E402
@@ -452,6 +453,7 @@ def _draft_metadata_from_order(order: dict) -> str:
         "special_theme": order.get("special_theme"),
         "selected_motion_id": order.get("selected_motion_id") or "",
         "action_category": order.get("action_category") or "",
+        "photo_notes": (order.get("photo_notes") or "").strip()[:200],
     }
     return json.dumps(payload)
 
@@ -539,6 +541,8 @@ def _store_generated_card(
     status: str = "active",
     preview_session_id: str | None = None,
     draft_metadata: str | None = None,
+    player_photo_url: str | None = None,
+    photo_notes: str | None = None,
 ) -> dict:
     """Persist generated card to PostgreSQL; returns API-shaped dict."""
     vt = vault_tier or _vault_tier_from_gen_tier(gen_tier)
@@ -568,6 +572,8 @@ def _store_generated_card(
         status=status,
         preview_session_id=preview_session_id,
         draft_metadata=draft_metadata,
+        player_photo_url=player_photo_url,
+        photo_notes=photo_notes,
     )
     return card_to_dict(row, db)
 
@@ -1325,6 +1331,7 @@ class OrderCreate(BaseModel):
     special_theme: str | None = Field(default=None, max_length=120)
     selected_motion_id: str | None = Field(default=None, max_length=64)
     action_category: str | None = Field(default=None, max_length=32)
+    photo_notes: str | None = Field(default=None, max_length=200)
     add_ons: list[str] = Field(default_factory=list)
     status: OrderStatus = "new_order"
 
@@ -1407,6 +1414,7 @@ class PendingPreviewCard(BaseModel):
     team_name: str = ""
     special_theme: str | None = None
     rarity: str = "base"
+    status: str = "preview"
 
 
 class PendingCardDraft(BaseModel):
@@ -1427,6 +1435,7 @@ class PendingCardDraft(BaseModel):
     special_theme: str | None = None
     selected_motion_id: str = ""
     action_category: str = ""
+    photo_notes: str = ""
 
 
 class PendingCardSession(BaseModel):
@@ -1747,6 +1756,14 @@ def discard_pending_cards(
         owner_id=current_user.id,
         preview_session_id=preview_session_id,
     )
+    if count == 0:
+        remaining = pending_session_cards(
+            db,
+            owner_id=current_user.id,
+            preview_session_id=preview_session_id,
+        )
+        if remaining:
+            raise HTTPException(status_code=409, detail="Could not discard pending preview cards.")
     return {"success": True, "discarded_count": count}
 
 
@@ -2007,6 +2024,7 @@ def create_order(
         special_theme=body.special_theme,
         selected_motion_id=body.selected_motion_id,
         action_category=body.action_category,
+        photo_notes=(body.photo_notes or "").strip()[:200] or None,
         add_ons=body.add_ons,
         status=body.status,
         created_at=datetime.now(timezone.utc).isoformat(),
@@ -2147,6 +2165,8 @@ def generate_card_for_order(
     if not draft_metadata:
         draft_metadata = _draft_metadata_from_order(order)
         order["draft_metadata"] = draft_metadata
+    player_photo_url = (order.get("player_image_url") or "").strip() or None
+    photo_notes = (order.get("photo_notes") or "").strip()[:200] or None
     vault_rec = _store_generated_card(
         db,
         _player_id_for_order(order),
@@ -2162,6 +2182,8 @@ def generate_card_for_order(
         status="preview",
         preview_session_id=preview_session_id,
         draft_metadata=draft_metadata,
+        player_photo_url=player_photo_url if card_type == "animated" else None,
+        photo_notes=photo_notes if card_type == "animated" else None,
     )
 
     generated = GeneratedOrderCard(

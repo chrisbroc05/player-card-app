@@ -2,6 +2,7 @@ import React from "react";
 import CardImage from "./CardImage";
 import { CARD_IMAGE_FRAME_DETAIL } from "../utils/cardImageStyles";
 import { isHighlightCard } from "../utils/highlightCard";
+import { isAnimatedCard } from "../utils/animationCard";
 
 export default function FeaturedCard({ card, imageUrl, tier, loading }) {
   const displayCard =
@@ -34,7 +35,7 @@ export default function FeaturedCard({ card, imageUrl, tier, loading }) {
             frameClassName={CARD_IMAGE_FRAME_DETAIL}
             variant="detail"
             showInfoBanner
-            forcePlay={isHighlightCard(displayCard)}
+            forcePlay={isHighlightCard(displayCard) || isAnimatedCard(displayCard)}
           />
         </div>
       ) : (

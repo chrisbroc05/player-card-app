@@ -256,11 +256,9 @@ export default function MarketplaceCardDetailPage() {
                   frameClassName={CARD_IMAGE_FRAME_DETAIL}
                   variant="detail"
                   forcePlay={
-                    isHighlightCard(displayListing) ||
-                    (isOwner && isAnimatedCard(displayListing))
+                    isHighlightCard(displayListing) || isAnimatedCard(displayListing)
                   }
                   protectMedia={!isOwner && isAnimatedCard(displayListing)}
-                  useOwnerVideoProxy={isOwner && isAnimatedCard(displayListing)}
                   token={token || ""}
                 />
               </CardDetailHero>

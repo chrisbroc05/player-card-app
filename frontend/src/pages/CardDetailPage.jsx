@@ -239,10 +239,9 @@ export default function CardDetailPage() {
                   frameClassName={CARD_IMAGE_FRAME_DETAIL}
                   variant="detail"
                   forcePlay={
-                    isHighlightCard(displayCard) || (isOwner && isAnimatedCard(displayCard))
+                    isHighlightCard(displayCard) || isAnimatedCard(displayCard)
                   }
                   protectMedia={!isOwner && isAnimatedCard(displayCard)}
-                  useOwnerVideoProxy={isOwner && isAnimatedCard(displayCard)}
                   token={token || ""}
                 />
               </CardDetailHero>

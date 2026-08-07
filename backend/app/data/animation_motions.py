@@ -2,120 +2,107 @@
 
 from __future__ import annotations
 
-# Exact Runway prompts for selectable studio motions (do not paraphrase).
-_CAMERA_LOCK = (
-    "Static locked-off camera. No zoom, no push in, no pan, no camera movement. "
-    "Full card remains completely in frame for entire duration."
-)
-
-SELECTABLE_MOTION_PROMPTS: dict[str, str] = {
+# Motion-specific action text (photo-focused; athlete portrait is the Runway input).
+MOTION_ACTION_BODIES: dict[str, str] = {
     "pitch_windup": (
-        "Realistic sports photography motion. Baseball pitcher winds up from set position, "
-        "drives off rubber with explosive leg drive, arm comes through in fluid overhand "
-        f"delivery, full follow through. Cinematic slow motion. {_CAMERA_LOCK} Photorealistic."
+        "The athlete winds up from set position, drives off with explosive leg drive, "
+        "arm comes through in fluid overhand delivery with full follow through."
     ),
     "throwing": (
-        "Realistic sports photography motion. Baseball player steps into a strong athletic throw, "
-        "planting front foot, rotating hips and shoulders, full arm extension through release "
-        f"with clean follow through. Infield or outfield throw. {_CAMERA_LOCK} Photorealistic."
+        "The athlete steps into a strong athletic throw, planting front foot, rotating hips "
+        "and shoulders, full arm extension through release with clean follow through."
     ),
     "hit_homerun": (
-        "Realistic sports photography motion. Baseball batter loads weight back, explodes "
-        "through contact zone with full hip rotation, powerful follow through with bat finishing "
-        f"high over shoulder. Slow motion broadcast style. {_CAMERA_LOCK} Photorealistic."
+        "The athlete loads weight back, explodes through contact zone with full hip rotation, "
+        "powerful follow through with bat finishing high."
     ),
     "field_dive": (
-        "Realistic sports photography motion. Baseball outfielder reads ball off bat, takes "
-        "explosive first step, full extension dive to make catch, slides across grass. "
-        f"Broadcast slow motion. {_CAMERA_LOCK} Photorealistic."
+        "The athlete reads the ball, takes explosive first step, full extension dive to make "
+        "catch, slides across grass."
     ),
     "celebrate_homerun_trot": (
-        "Realistic sports photography motion. Baseball player rounds bases in confident "
-        "measured home run trot, slight smile, helmet tip as they approach home plate. "
-        f"Smooth steady cam follow. {_CAMERA_LOCK} Photorealistic."
+        "The athlete rounds bases in confident measured home run trot, slight smile, helmet tip "
+        "approaching home plate."
     ),
     "celebrate_fist": (
-        "Realistic sports photography motion. Baseball player pumps fist in celebration after "
-        "big play, intense focused emotion, upper body motion only. Slow motion close up. "
-        f"{_CAMERA_LOCK} Photorealistic."
+        "The athlete pumps fist in celebration after big play, intense focused emotion, "
+        "upper body motion."
     ),
     "catch_framing_throw": (
-        "Realistic sports photography motion. Baseball catcher frames pitch in strike zone "
-        "with soft hands, smoothly comes up out of crouch into strong pop throw to second base, "
-        f"full arm extension. Broadcast angle slow motion. {_CAMERA_LOCK} Photorealistic."
+        "The athlete frames pitch with soft hands, smoothly comes up out of crouch into strong "
+        "pop throw, full arm extension."
     ),
     "celebrate_energy": (
-        "Realistic sports photography motion. Baseball player throws both arms up in pure "
-        "celebration after winning moment, jumps slightly, teammates react in background. "
-        f"Broadcast slow motion. {_CAMERA_LOCK} Photorealistic."
+        "The athlete throws both arms up in pure celebration, jumps slightly, pure joy."
     ),
 }
+
+_CAMERA_SUFFIX = (
+    "Realistic sports photography motion. Static locked-off camera. "
+    "No zoom, no push in, no pan. Full subject in frame. Photorealistic."
+)
 
 # Legacy prompts retained for cards created before the motion library trim.
 _LEGACY_MOTION_PROMPTS: dict[str, str] = {
     "pitch_delivery": (
-        "Cinematic sports card animation. The athlete is a youth baseball player "
-        "in full uniform, photographed from the front. The background is stylized "
-        "and dynamic. The player performs the following action with realistic, "
-        "mechanically correct baseball form: a stretch-position pitch delivery: compact leg lift, "
-        "explosive hip rotation, high arm slot, full extension at release, chest over "
-        "knee on follow-through."
+        "The youth baseball athlete performs a stretch-position pitch delivery: compact leg lift, "
+        "explosive hip rotation, high arm slot, full extension at release, chest over knee on "
+        "follow-through."
     ),
     "pitch_strikeout_roar": (
-        "Cinematic sports card animation. The athlete is a youth baseball player "
-        "in full uniform, photographed from the front. The background is stylized "
-        "and dynamic. The player performs the following action with realistic, "
-        "mechanically correct baseball form: a pitcher's strikeout celebration: punches down hard with "
-        "throwing arm, lets out a roar, turns toward the dugout with pure intensity and fire."
+        "The youth baseball athlete performs a pitcher's strikeout celebration: punches down hard "
+        "with throwing arm, lets out a roar, turns toward the dugout with pure intensity and fire."
     ),
     "hit_stance": (
-        "Cinematic sports card animation. The athlete is a youth baseball player "
-        "in full uniform, photographed from the front. The background is stylized "
-        "and dynamic. The player performs the following action with realistic, "
-        "mechanically correct baseball form: a clean contact swing: balanced stance, controlled stride, "
-        "short direct path to contact, solid extension through the ball, balanced finish."
+        "The youth baseball athlete performs a clean contact swing: balanced stance, controlled "
+        "stride, short direct path to contact, solid extension through the ball, balanced finish."
     ),
     "hit_walkup": (
-        "Cinematic sports card animation. The athlete is a youth baseball player "
-        "in full uniform, photographed from the front. The background is stylized "
-        "and dynamic. The player performs the following action with realistic, "
-        "mechanically correct baseball form: a batter approaching the plate with confidence: knocks dirt from "
-        "cleats, taps plate with bat, takes a slow practice swing, locks eyes forward, settles into stance."
+        "The youth baseball athlete approaches the plate with confidence: knocks dirt from cleats, "
+        "taps plate with bat, takes a slow practice swing, locks eyes forward, settles into stance."
     ),
     "hit_bat_flip": (
-        "Cinematic sports card animation. The athlete is a youth baseball player "
-        "in full uniform, photographed from the front. The background is stylized "
-        "and dynamic. The player performs the following action with realistic, "
-        "mechanically correct baseball form: a clean home run bat flip: makes contact, watches the ball for "
-        "a beat, then releases the bat with one hand in a slow controlled flip, begins trot."
+        "The youth baseball athlete performs a clean home run bat flip: makes contact, watches the "
+        "ball for a beat, then releases the bat with one hand in a slow controlled flip, begins trot."
     ),
     "field_dive_celebrate": (
-        "Cinematic sports card animation. The athlete is a youth baseball player "
-        "in full uniform, photographed from the front. The background is stylized "
-        "and dynamic. The player performs the following action with realistic, "
-        "mechanically correct baseball form: a fielder pops up from a diving catch: springs to their feet "
-        "immediately after the slide, ball raised in glove, pumps fist toward the infield, huge energy."
+        "The youth baseball athlete pops up from a diving catch: springs to their feet immediately "
+        "after the slide, ball raised in glove, pumps fist toward the infield, huge energy."
     ),
     "field_sprint": (
-        "Cinematic sports card animation. The athlete is a youth baseball player "
-        "in full uniform, photographed from the front. The background is stylized "
-        "and dynamic. The player performs the following action with realistic, "
-        "mechanically correct baseball form: a quick explosive sprint into fielding position: athletic first "
-        "step, low aggressive angle, glove down to field a ground ball cleanly, plants and squares up to throw."
+        "The youth baseball athlete sprints into fielding position: athletic first step, low "
+        "aggressive angle, glove down to field a ground ball cleanly, plants and squares up to throw."
     ),
     "celebrate_crowd": (
-        "Cinematic sports card animation. The athlete is a youth baseball player "
-        "in full uniform, photographed from the front. The background is stylized "
-        "and dynamic. The player performs the following action with realistic, "
-        "mechanically correct baseball form: a confident celebratory point toward the stands after a home run."
+        "The youth baseball athlete points toward the stands after a home run with confident "
+        "celebratory energy."
     ),
     "celebrate_run": (
-        "Cinematic sports card animation. The athlete is a youth baseball player "
-        "in full uniform, photographed from the front. The background is stylized "
-        "and dynamic. The player performs the following action with realistic, "
-        "mechanically correct baseball form: a full-speed baserunning sprint: powerful arm drive, high knees, "
-        "forward lean, explosive stride, eyes ahead."
+        "The youth baseball athlete runs full speed: powerful arm drive, high knees, forward lean, "
+        "explosive stride, eyes ahead."
     ),
+}
+
+
+def build_runway_prompt(motion_id: str, photo_notes: str | None = None) -> str | None:
+    """Build the full Runway prompt for a motion, optionally including photo notes."""
+    key = (motion_id or "").strip()
+    action_body = MOTION_ACTION_BODIES.get(key) or _LEGACY_MOTION_PROMPTS.get(key)
+    if not action_body:
+        return None
+
+    notes = (photo_notes or "").strip()
+    if notes:
+        focus_clause = f"{notes}. Focus on this specific athlete."
+    else:
+        focus_clause = "Focus on the main athlete in the foreground."
+
+    return f"{action_body} {focus_clause} {_CAMERA_SUFFIX}"
+
+
+SELECTABLE_MOTION_PROMPTS: dict[str, str] = {
+    motion_id: build_runway_prompt(motion_id) or ""
+    for motion_id in MOTION_ACTION_BODIES
 }
 
 ANIMATION_MOTIONS: list[dict[str, str]] = [
@@ -179,7 +166,7 @@ ANIMATION_MOTIONS: list[dict[str, str]] = [
     {"id": "celebrate_run", "label": "Running Full Speed", "category": "Athletic", "prompt": _LEGACY_MOTION_PROMPTS["celebrate_run"]},
 ]
 
-SELECTABLE_MOTION_IDS = frozenset(SELECTABLE_MOTION_PROMPTS.keys())
+SELECTABLE_MOTION_IDS = frozenset(MOTION_ACTION_BODIES.keys())
 
 MOTION_ACTION_CATEGORY: dict[str, str] = {
     "pitch_windup": "pitching",
@@ -199,8 +186,11 @@ def get_motion_by_id(motion_id: str) -> dict[str, str] | None:
     return _MOTION_BY_ID.get((motion_id or "").strip())
 
 
-def get_motion_prompt(motion_id: str) -> str | None:
+def get_motion_prompt(motion_id: str, photo_notes: str | None = None) -> str | None:
     """Return the Runway prompt for a motion id, or None if unknown."""
+    built = build_runway_prompt(motion_id, photo_notes)
+    if built:
+        return built
     motion = get_motion_by_id(motion_id)
     if motion is None:
         return None

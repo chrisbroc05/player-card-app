@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 
+from card_repo import photo_notes_for_card, player_photo_url_for_card
 from data.animation_motions import get_motion_prompt
 from database import SessionLocal
 from email_service import (
@@ -34,7 +35,8 @@ async def process_animation(card_id: str, motion_id: str) -> None:
             db.commit()
             return
 
-        motion_prompt = get_motion_prompt(motion_key)
+        photo_notes = photo_notes_for_card(card)
+        motion_prompt = get_motion_prompt(motion_key, photo_notes)
         if motion_prompt is None:
             logger.error(
                 "process_animation: no Runway prompt for motion_id %s on card %s",
@@ -45,10 +47,22 @@ async def process_animation(card_id: str, motion_id: str) -> None:
             db.commit()
             return
 
+        source_photo_url = player_photo_url_for_card(card)
+        if not source_photo_url:
+            logger.error("process_animation: no player photo URL for card %s", card_id)
+            card.animation_status = "failed"
+            db.commit()
+            return
+
         card.animation_status = "processing"
         db.commit()
 
-        result = await generate_animation(card.image_url, motion_prompt, card_id)
+        logger.info(
+            "Starting Runway animation for card %s using player photo (notes=%s)",
+            card_id,
+            bool(photo_notes),
+        )
+        result = await generate_animation(source_photo_url, motion_prompt, card_id)
 
         owner = db.query(User).filter(User.id == card.owner_id).first()
         player_name = card.player_name or "your card"

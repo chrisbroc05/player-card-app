@@ -1435,6 +1435,11 @@
   object-position: center;
 }
 
+.highlight-video-fill--cover .card-video-area__fg,
+.highlight-video-fill--cover .highlight-video-fill__fg {
+  object-fit: cover;
+}
+
 .card-video-area__theme-icon {
   position: absolute;
   bottom: 8px;
