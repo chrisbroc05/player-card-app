@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE_URL } from "../config/api";
 import { normalizeExperienceTier } from "../utils/cardCreationExperience";
 
@@ -21,7 +21,18 @@ export default function ScenarioSelectionStep({
 }) {
   const [scenarios, setScenarios] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [hasScrolled, setHasScrolled] = useState(false);
+  const [showScrollFade, setShowScrollFade] = useState(false);
+  const listRef = useRef(null);
   const tierConfig = normalizeExperienceTier(tier);
+
+  const updateScrollState = useCallback(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const canScroll = el.scrollHeight > el.clientHeight + 4;
+    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 8;
+    setShowScrollFade(canScroll && !atBottom);
+  }, []);
 
   useEffect(() => {
     if (!motionId) {
@@ -51,7 +62,60 @@ export default function ScenarioSelectionStep({
     };
   }, [motionId]);
 
-  const allOptions = [...scenarios, NONE_OPTION];
+  useEffect(() => {
+    setHasScrolled(false);
+  }, [motionId]);
+
+  useEffect(() => {
+    updateScrollState();
+    const el = listRef.current;
+    if (!el) return undefined;
+
+    const onResize = () => updateScrollState();
+    window.addEventListener("resize", onResize);
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(onResize) : null;
+    observer?.observe(el);
+
+    return () => {
+      window.removeEventListener("resize", onResize);
+      observer?.disconnect();
+    };
+  }, [scenarios, loading, updateScrollState]);
+
+  function handleListScroll(event) {
+    if (event.currentTarget.scrollTop > 8) {
+      setHasScrolled(true);
+    }
+    updateScrollState();
+  }
+
+  function renderScenarioCard(scenario, { stickyNone = false } = {}) {
+    const selected = value === scenario.id;
+    return (
+      <button
+        key={scenario.id}
+        type="button"
+        role="option"
+        aria-selected={selected}
+        onClick={() => onSelect(scenario.id)}
+        className={`scenario-card${selected ? " scenario-card--selected" : ""}${
+          stickyNone ? " scenario-card--none-sticky" : ""
+        }`}
+        style={
+          selected
+            ? {
+                borderColor: tierConfig.color,
+                backgroundColor: `${tierConfig.color}18`,
+                boxShadow: `0 0 0 1px ${tierConfig.color}44`,
+              }
+            : undefined
+        }
+      >
+        <p className="scenario-card__title">{scenario.title}</p>
+        <p className="scenario-card__description">{scenario.description}</p>
+      </button>
+    );
+  }
 
   return (
     <div className="scenario-selection grid gap-5">
@@ -66,32 +130,23 @@ export default function ScenarioSelectionStep({
       {loading ? (
         <p className="text-sm text-slate-400">Loading scenarios…</p>
       ) : (
-        <div className="scenario-selection-list" role="listbox" aria-label="Photo scenarios">
-          {allOptions.map((scenario) => {
-            const selected = value === scenario.id;
-            return (
-              <button
-                key={scenario.id}
-                type="button"
-                role="option"
-                aria-selected={selected}
-                onClick={() => onSelect(scenario.id)}
-                className={`scenario-card${selected ? " scenario-card--selected" : ""}`}
-                style={
-                  selected
-                    ? {
-                        borderColor: tierConfig.color,
-                        backgroundColor: `${tierConfig.color}18`,
-                        boxShadow: `0 0 0 1px ${tierConfig.color}44`,
-                      }
-                    : undefined
-                }
-              >
-                <p className="scenario-card__title">{scenario.title}</p>
-                <p className="scenario-card__description">{scenario.description}</p>
-              </button>
-            );
-          })}
+        <div className="scenario-selection-list-wrap">
+          <div className="scenario-selection-list-scroll">
+            <div
+              ref={listRef}
+              className="scenario-selection-list"
+              role="listbox"
+              aria-label="Photo scenarios"
+              onScroll={handleListScroll}
+            >
+              {scenarios.map((scenario) => renderScenarioCard(scenario))}
+            </div>
+            {showScrollFade ? <div className="scenario-selection-list-fade" aria-hidden /> : null}
+          </div>
+          {renderScenarioCard(NONE_OPTION, { stickyNone: true })}
+          {!hasScrolled && showScrollFade ? (
+            <p className="scenario-selection-scroll-hint">↓ Scroll to see all scenarios</p>
+          ) : null}
         </div>
       )}
 
