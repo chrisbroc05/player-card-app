@@ -1747,23 +1747,37 @@ def get_pending_cards(
 @app.delete("/cards/pending")
 def discard_pending_cards(
     preview_session_id: str = Query(..., min_length=1, max_length=128),
+    card_ids: list[str] = Query(default=[]),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Discard all preview cards in an unfinished session (idempotent)."""
+    logger.info(
+        "Discard called for session %s by user %s (card_ids=%s)",
+        preview_session_id,
+        current_user.id,
+        card_ids or [],
+    )
     count = discard_pending_session(
         db,
         owner_id=current_user.id,
         preview_session_id=preview_session_id,
+        card_ids=card_ids or None,
     )
-    if count == 0:
-        remaining = pending_session_cards(
-            db,
-            owner_id=current_user.id,
-            preview_session_id=preview_session_id,
+    remaining = pending_session_cards(
+        db,
+        owner_id=current_user.id,
+        preview_session_id=preview_session_id,
+    )
+    if remaining:
+        logger.warning(
+            "Discard incomplete for session %s user %s — %s preview row(s) remain after discard_count=%s",
+            preview_session_id,
+            current_user.id,
+            len(remaining),
+            count,
         )
-        if remaining:
-            raise HTTPException(status_code=409, detail="Could not discard pending preview cards.")
+        raise HTTPException(status_code=409, detail="Could not discard pending preview cards.")
     return {"success": True, "discarded_count": count}
 
 

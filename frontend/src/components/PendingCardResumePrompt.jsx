@@ -11,6 +11,7 @@ export default function PendingCardResumePrompt({
   onDiscardConfirm,
   onDiscardCancel,
   onDismiss,
+  discardError = "",
 }) {
   const dialogRef = useRef(null);
   useScrollModalIntoView(Boolean(session), dialogRef);
@@ -25,7 +26,7 @@ export default function PendingCardResumePrompt({
     "your player";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
       <div
         ref={dialogRef}
         className="scroll-focus-target w-full max-w-lg overflow-hidden rounded-2xl border border-neonTeal/35 bg-cardBg shadow-[0_0_60px_rgba(45,212,191,0.15)]"
@@ -85,12 +86,20 @@ export default function PendingCardResumePrompt({
               <p className="mt-1 text-xs text-amber-100/90">
                 This will discard your generated preview. Credits already used will not be refunded.
               </p>
+              {discardError ? (
+                <p className="mt-3 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
+                  {discardError}
+                </p>
+              ) : null}
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={onDiscardConfirm}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDiscardConfirm?.();
+                  }}
                   disabled={loading}
-                  className="inline-flex min-h-[40px] items-center justify-center rounded-xl border border-rose-400/40 bg-rose-500/15 px-4 py-2 text-sm font-medium text-rose-100 disabled:opacity-50"
+                  className="relative z-10 inline-flex min-h-[40px] items-center justify-center rounded-xl border border-rose-400/40 bg-rose-500/15 px-4 py-2 text-sm font-medium text-rose-100 disabled:opacity-50"
                 >
                   {loading ? "Discarding..." : "Yes, discard"}
                 </button>

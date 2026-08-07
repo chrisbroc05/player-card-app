@@ -598,6 +598,32 @@ def discard_preview_cards(db: Session, cards: list[Card], *, owner_id: int | Non
     return updated
 
 
+def discard_preview_cards_by_ids(
+    db: Session,
+    *,
+    owner_id: int,
+    card_ids: list[str],
+) -> int:
+    """Discard preview cards by collectible id (most reliable for studio discard)."""
+    keys: list[str] = []
+    for raw in card_ids:
+        key = _canonical_pending_card_id(raw)
+        if key:
+            keys.append(key)
+    if not keys:
+        return 0
+    cards = (
+        db.query(Card)
+        .filter(
+            Card.owner_id == owner_id,
+            Card.status == "preview",
+            Card.card_id.in_(keys),
+        )
+        .all()
+    )
+    return discard_preview_cards(db, cards, owner_id=owner_id)
+
+
 def validate_and_cleanup_pending_cards(db: Session, owner_id: int) -> list[Card]:
     """Drop invalid or non-resumable preview rows (auto-discard) and return valid cards."""
     cards = list_pending_preview_cards(db, owner_id)
@@ -721,10 +747,15 @@ def discard_pending_session(
     *,
     owner_id: int,
     preview_session_id: str | None = None,
+    card_ids: list[str] | None = None,
 ) -> int:
     """Mark all preview cards in a session as discarded. Returns count updated."""
+    updated = 0
+    if card_ids:
+        updated += discard_preview_cards_by_ids(db, owner_id=owner_id, card_ids=card_ids)
+
     if not preview_session_id:
-        return 0
+        return updated
 
     target = preview_session_id.strip()
     direct = (
@@ -737,7 +768,8 @@ def discard_pending_session(
         .all()
     )
     if direct:
-        return discard_preview_cards(db, direct, owner_id=owner_id)
+        updated += discard_preview_cards(db, direct, owner_id=owner_id)
+        return updated
 
     cards = (
         db.query(Card)
@@ -754,7 +786,8 @@ def discard_pending_session(
         )
         if card_session == target:
             to_discard.append(card)
-    return discard_preview_cards(db, to_discard, owner_id=owner_id)
+    updated += discard_preview_cards(db, to_discard, owner_id=owner_id)
+    return updated
 
 
 def pending_session_cards(

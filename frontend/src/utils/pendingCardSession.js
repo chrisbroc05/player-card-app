@@ -10,6 +10,10 @@ function readDiscardedSessionIds() {
   }
 }
 
+function discardedCardKey(cardId) {
+  return `discarded_card_${cardId || ""}`;
+}
+
 /** Remember a discarded preview session for the browser session. */
 export function markPendingSessionDiscarded(sessionId) {
   if (!sessionId) return;
@@ -19,9 +23,24 @@ export function markPendingSessionDiscarded(sessionId) {
   sessionStorage.setItem("pendingCardDiscarded", "true");
 }
 
+/** Mark individual preview cards as discarded for this browser session. */
+export function markPendingCardsDiscarded(cardIds, sessionId) {
+  if (Array.isArray(cardIds)) {
+    cardIds.filter(Boolean).forEach((cardId) => {
+      sessionStorage.setItem(discardedCardKey(cardId), "true");
+    });
+  }
+  markPendingSessionDiscarded(sessionId);
+}
+
 export function isPendingSessionDiscarded(sessionId) {
   if (!sessionId) return false;
   return readDiscardedSessionIds().includes(sessionId);
+}
+
+export function isPendingCardDiscarded(cardId) {
+  if (!cardId) return false;
+  return sessionStorage.getItem(discardedCardKey(cardId)) === "true";
 }
 
 /** True when any pending card was discarded this browser session. */
@@ -33,6 +52,7 @@ export function wasPendingCardDiscardedThisSession() {
 export function filterValidPendingPreviews(previews) {
   if (!Array.isArray(previews)) return [];
   return previews.filter((preview) => {
+    if (isPendingCardDiscarded(preview?.card_id)) return false;
     const status = String(preview?.status || "preview").toLowerCase();
     return status === "preview" || status === "pending";
   });

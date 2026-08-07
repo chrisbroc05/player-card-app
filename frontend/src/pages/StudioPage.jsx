@@ -54,7 +54,7 @@ import { captureVideoFrameAsFile } from "../utils/highlightVideo";
 import {
   filterValidPendingPreviews,
   isPendingSessionDiscarded,
-  markPendingSessionDiscarded,
+  markPendingCardsDiscarded,
 } from "../utils/pendingCardSession";
 
 const STEP_DETAILS = 1;
@@ -376,6 +376,7 @@ export default function StudioPage() {
   const [showPendingPrompt, setShowPendingPrompt] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [pendingActionLoading, setPendingActionLoading] = useState(false);
+  const [pendingDiscardError, setPendingDiscardError] = useState("");
   const [highlightClipDraft, setHighlightClipDraft] = useState(null);
   const [highlightUploadProgress, setHighlightUploadProgress] = useState(0);
   const [highlightUploadState, setHighlightUploadState] = useState("idle"); // idle | uploading | processing | done | error
@@ -1007,6 +1008,7 @@ export default function StudioPage() {
   const dismissPendingPrompt = useCallback(() => {
     setShowPendingPrompt(false);
     setShowDiscardConfirm(false);
+    setPendingDiscardError("");
     setPendingSession(null);
   }, []);
 
@@ -1284,17 +1286,21 @@ export default function StudioPage() {
   async function handleDiscardPending() {
     if (!pendingSession || !token) return;
     const sessionId = pendingSession.preview_session_id;
+    const cardIds = (pendingSession.previews || []).map((p) => p.card_id).filter(Boolean);
+    const primaryCardId = cardIds[cardIds.length - 1] || sessionId;
+    console.log("Discard button clicked", primaryCardId, { sessionId, cardIds });
     setPendingActionLoading(true);
+    setPendingDiscardError("");
     setError("");
     try {
-      const res = await fetch(
-        `${API_BASE_URL}/cards/pending?preview_session_id=${encodeURIComponent(sessionId)}`,
-        {
-          method: "DELETE",
-          headers: { ...authHeaders(token) },
-        }
-      );
+      const params = new URLSearchParams({ preview_session_id: sessionId });
+      cardIds.forEach((id) => params.append("card_ids", id));
+      const res = await fetch(`${API_BASE_URL}/cards/pending?${params.toString()}`, {
+        method: "DELETE",
+        headers: { ...authHeaders(token) },
+      });
       const data = await res.json().catch(() => ({}));
+      console.log("Discard response:", { ok: res.ok, status: res.status, data });
       if (!res.ok) {
         throw new Error(
           typeof data?.detail === "string"
@@ -1302,13 +1308,12 @@ export default function StudioPage() {
             : "Could not discard unfinished card. Please try again."
         );
       }
-      if ((data?.discarded_count ?? 0) === 0) {
-        throw new Error("Could not discard unfinished card. Please try again.");
-      }
-      markPendingSessionDiscarded(sessionId);
+      markPendingCardsDiscarded(cardIds, sessionId);
       dismissPendingPrompt();
     } catch (err) {
-      setError(err.message || "Could not discard unfinished card. Please try again.");
+      const message = err.message || "Could not discard unfinished card. Please try again.";
+      setPendingDiscardError(message);
+      setError(message);
     } finally {
       setPendingActionLoading(false);
     }
@@ -2112,10 +2117,17 @@ export default function StudioPage() {
           loading={pendingActionLoading}
           showDiscardConfirm={showDiscardConfirm}
           onResume={handleResumePending}
-          onDiscardRequest={() => setShowDiscardConfirm(true)}
+          onDiscardRequest={() => {
+            setPendingDiscardError("");
+            setShowDiscardConfirm(true);
+          }}
           onDiscardConfirm={handleDiscardPending}
-          onDiscardCancel={() => setShowDiscardConfirm(false)}
+          onDiscardCancel={() => {
+            setPendingDiscardError("");
+            setShowDiscardConfirm(false);
+          }}
           onDismiss={dismissPendingPrompt}
+          discardError={pendingDiscardError}
         />
       ) : null}
 
