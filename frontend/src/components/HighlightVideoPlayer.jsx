@@ -139,7 +139,22 @@ function HighlightVideoPlayer({
         {...mediaProtectionProps}
       />
 
-      <ThemeVideoIcon themeKey={themeKey} />
+      {holoTint ? (
+        <div
+          className={`card-video-area__tint card-video-area__tint--holo card-video-area__tint--foreground${
+            tintOpacityScale < 1 ? " card-video-area__tint--subtle" : ""
+          }`}
+          aria-hidden
+        />
+      ) : overlayColor && overlayColor !== "rgba(0, 0, 0, 0)" ? (
+        <div
+          className="card-video-area__tint card-video-area__tint--foreground"
+          style={{ backgroundColor: overlayColor }}
+          aria-hidden
+        />
+      ) : null}
+
+      <ThemeVideoIcon themeKey={themeKey} className="card-video-area__theme-icon--above-tint" />
 
       {showSoundToggle && onToggleSound ? (
         <HighlightSoundToggle

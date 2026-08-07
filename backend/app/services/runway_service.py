@@ -44,7 +44,7 @@ def _runway_headers() -> dict[str, str]:
 # Anti-cartoon guidance is encoded in each motion-specific positive prompt instead.
 RUNWAY_MOTION_NEGATIVE_PROMPT = (
     "cartoon, anime, illustrated, CGI, unrealistic, distorted faces, floating objects, "
-    "physics errors"
+    "physics errors, text on clothing, jersey numbers, name on back, letters on uniform"
 )
 
 

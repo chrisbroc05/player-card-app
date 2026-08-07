@@ -18,6 +18,7 @@ import { useIsMobileViewport } from "../hooks/usePrefersReducedMotion";
 import { normalizeCardForDisplay } from "../utils/cardDetailUtils";
 import CardDisplay from "./CardDisplay";
 import HighlightVideoPlayer from "./HighlightVideoPlayer";
+import ThemedStaticPoster from "./ThemedStaticPoster";
 
 function resolveCardFields(card, props) {
   if (card && typeof card === "object") {
@@ -32,6 +33,7 @@ function resolveCardFields(card, props) {
       highlightStatus: card.highlight_status ?? props.highlightStatus,
       highlightTrimStart: card.highlight_trim_start ?? props.highlightTrimStart,
       highlightTrimEnd: card.highlight_trim_end ?? props.highlightTrimEnd,
+      playerPhotoUrl: card.player_photo_url ?? props.playerPhotoUrl,
     };
   }
   return {
@@ -45,6 +47,7 @@ function resolveCardFields(card, props) {
     highlightStatus: props.highlightStatus,
     highlightTrimStart: props.highlightTrimStart,
     highlightTrimEnd: props.highlightTrimEnd,
+    playerPhotoUrl: props.playerPhotoUrl,
   };
 }
 
@@ -175,6 +178,12 @@ export default function CardImage({
     fields.animatedVideoUrl &&
     !isAnimationInProgress(fields);
 
+  const isAnimatedType = Boolean(
+    cardForTypeChecks?.is_animated ?? fields.isAnimated ?? isAnimatedProp
+  );
+
+  const useThemedAnimatedMedia = isAnimatedType;
+
   const highlightActive =
     !animatedActive &&
     Boolean(highlightSrc) &&
@@ -200,12 +209,21 @@ export default function CardImage({
     const posterSourceUrl =
       highlightActive && fields.highlightThumbnailUrl
         ? fields.highlightThumbnailUrl
-        : fields.imageUrl;
+        : useThemedAnimatedMedia && fields.playerPhotoUrl
+          ? fields.playerPhotoUrl
+          : fields.imageUrl;
     const base = toApiUrl(posterSourceUrl);
     if (!base || !cacheBust) return base;
     const sep = base.includes("?") ? "&" : "?";
     return `${base}${sep}cb=${encodeURIComponent(String(cacheBust))}`;
-  }, [fields.imageUrl, fields.highlightThumbnailUrl, highlightActive, cacheBust]);
+  }, [
+    fields.imageUrl,
+    fields.highlightThumbnailUrl,
+    fields.playerPhotoUrl,
+    highlightActive,
+    useThemedAnimatedMedia,
+    cacheBust,
+  ]);
 
   const publicVideoSrc = useMemo(() => {
     if (animatedActive) return toApiUrl(fields.animatedVideoUrl);
@@ -417,6 +435,35 @@ export default function CardImage({
     mediaProtectionProps,
   ]);
 
+  const themedPosterElement = useMemo(() => {
+    if (!useThemedAnimatedMedia || !imgSrc) return null;
+    return (
+      <ProtectedMediaShell protectMedia={protectMedia}>
+        <ThemedStaticPoster
+          src={imgSrc}
+          theme={cardTheme}
+          tier={cardTier}
+          tintOpacityScale={highlightTintScale}
+          objectFit="cover"
+          wrapperClass={isDetail ? CARD_VIDEO_DETAIL_WRAPPER : ""}
+          alt={alt || "Animated card"}
+          onError={() => setImgFailed(true)}
+          mediaProtectionProps={mediaProtectionProps}
+        />
+      </ProtectedMediaShell>
+    );
+  }, [
+    useThemedAnimatedMedia,
+    imgSrc,
+    cardTheme,
+    cardTier,
+    highlightTintScale,
+    isDetail,
+    alt,
+    protectMedia,
+    mediaProtectionProps,
+  ]);
+
   let mediaInner;
   if (highlightVideoUnavailable) {
     mediaInner = <HighlightVideoUnavailable posterSrc={imgSrc} alt={alt} />;
@@ -429,36 +476,49 @@ export default function CardImage({
   } else if (highlightActive && showHighlightVideoFrame) {
     mediaInner = frameVideoElement;
   } else if (isDetail && showPosterImage) {
-    mediaInner = (
-      <ProtectedMediaShell protectMedia={protectMedia}>
-        <img
-          src={imgSrc}
-          alt={alt || "Card"}
-          className={imgClass}
-          loading="lazy"
-          decoding="async"
-          onError={() => setImgFailed(true)}
-          {...mediaProtectionProps}
-        />
-      </ProtectedMediaShell>
-    );
+    mediaInner =
+      useThemedAnimatedMedia && themedPosterElement ? (
+        themedPosterElement
+      ) : (
+        <ProtectedMediaShell protectMedia={protectMedia}>
+          <img
+            src={imgSrc}
+            alt={alt || "Card"}
+            className={imgClass}
+            loading="lazy"
+            decoding="async"
+            onError={() => setImgFailed(true)}
+            {...mediaProtectionProps}
+          />
+        </ProtectedMediaShell>
+      );
   } else {
     mediaInner = (
       <>
         {showPosterImage ? (
-          <ProtectedMediaShell protectMedia={protectMedia}>
-            <img
-              src={imgSrc}
-              alt={alt || "Card"}
-              className={`${imgClass} transition-opacity duration-200 ${
+          useThemedAnimatedMedia && themedPosterElement ? (
+            <div
+              className={`h-full w-full transition-opacity duration-200 ${
                 showVideoLayer && (animatedActive || highlightActive) ? "opacity-0" : "opacity-100"
               }`}
-              loading="lazy"
-              decoding="async"
-              onError={() => setImgFailed(true)}
-              {...mediaProtectionProps}
-            />
-          </ProtectedMediaShell>
+            >
+              {themedPosterElement}
+            </div>
+          ) : (
+            <ProtectedMediaShell protectMedia={protectMedia}>
+              <img
+                src={imgSrc}
+                alt={alt || "Card"}
+                className={`${imgClass} transition-opacity duration-200 ${
+                  showVideoLayer && (animatedActive || highlightActive) ? "opacity-0" : "opacity-100"
+                }`}
+                loading="lazy"
+                decoding="async"
+                onError={() => setImgFailed(true)}
+                {...mediaProtectionProps}
+              />
+            </ProtectedMediaShell>
+          )
         ) : null}
         {hasVideo && showVideoLayer && (animatedActive ? videoSrc : highlightActive && highlightSrc) ? (
           <div className={CARD_VIDEO_WRAPPER_OVERLAY} aria-hidden={false}>
@@ -502,6 +562,7 @@ export default function CardImage({
       showBadge ||
       highlightActive ||
       animatedActive ||
+      isAnimatedType ||
       isHighlightType(cardForTypeChecks) ||
       Boolean(localVideo);
 

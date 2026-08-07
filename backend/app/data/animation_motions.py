@@ -39,7 +39,10 @@ MOTION_ACTION_BODIES: dict[str, str] = {
 
 _CAMERA_SUFFIX = (
     "Realistic sports photography motion. Static locked-off camera. "
-    "No zoom, no push in, no pan. Full subject in frame. Photorealistic."
+    "No zoom, no push in, no pan, no camera movement. "
+    "No text, numbers, or lettering on jerseys or uniforms. "
+    "Keep all clothing details clean and simple. "
+    "Full subject remains completely in frame for entire duration. Photorealistic."
 )
 
 # Legacy prompts retained for cards created before the motion library trim.

@@ -1440,6 +1440,14 @@
   object-fit: cover;
 }
 
+.card-video-area__tint--foreground {
+  z-index: 3;
+}
+
+.card-video-area__theme-icon--above-tint {
+  z-index: 4;
+}
+
 .card-video-area__theme-icon {
   position: absolute;
   bottom: 8px;
