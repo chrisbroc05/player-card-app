@@ -362,21 +362,26 @@ def animate_card_upgrade(
     upgrade_price = animated_upgrade_price()
     if upgrade_price <= 0:
         upgrade_price = 10.00
+
+    new_card = create_animated_upgrade_card(db, source=source, motion_id=body.motion_id)
+
     try:
         deduct_credits(
             user_id=current_user.id,
             amount=upgrade_price,
-            transaction_type="animation",
+            transaction_type=TX_ANIMATION,
+            reference_id=new_card.card_id,
             note=f"Animated card upgrade - {source.player_name}",
             db=db,
         )
     except InsufficientCreditsError as e:
+        db.rollback()
         raise HTTPException(
             status_code=400,
             detail="Insufficient credits. Please add credits to your account at /credits",
         ) from e
 
-    new_card = create_animated_upgrade_card(db, source=source, motion_id=body.motion_id)
+    db.commit()
 
     background_tasks.add_task(process_animation, new_card.card_id, body.motion_id)
     return {

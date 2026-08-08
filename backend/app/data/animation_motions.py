@@ -1,48 +1,66 @@
-"""Pre-defined motion prompts for Runway image-to-video generation."""
+"""Pre-defined motion prompts for AI video generation (Kling / Pika / Runway)."""
 
 from __future__ import annotations
 
-# Motion-specific action text (photo-focused; athlete portrait is the Runway input).
+# Motion-specific action text — "next 5 seconds" format tuned for Kling 3.0.
 MOTION_ACTION_BODIES: dict[str, str] = {
     "pitch_windup": (
-        "The athlete winds up from set position, drives off with explosive leg drive, "
-        "arm comes through in fluid overhand delivery with full follow through."
+        "Over the next 5 seconds the pitcher completes their delivery — driving off the rubber "
+        "with explosive leg drive, arm coming through in a fluid overhand motion, releasing a "
+        "single baseball at the top of the delivery, following through naturally across the body "
+        "as the back leg swings around for balance. Only one baseball is shown leaving the hand."
     ),
     "throwing": (
-        "The athlete steps into a strong athletic throw, planting front foot, rotating hips "
-        "and shoulders, full arm extension through release with clean follow through."
+        "Over the next 5 seconds the player completes their throw — planting the front foot "
+        "firmly, rotating hips and shoulders through the throw, arm extending fully toward the "
+        "target at release of a single baseball, then following through naturally down and across "
+        "the body as weight transfers to the front foot. Only one baseball leaves the hand."
     ),
     "hit_homerun": (
-        "The athlete loads weight back, explodes through contact zone with full hip rotation, "
-        "powerful follow through with bat finishing high."
+        "Over the next 5 seconds the batter explodes through the hitting zone — hips rotating "
+        "fully, hands driving through the contact zone making contact with a single baseball, "
+        "arms extending completely, bat finishing high over the back shoulder in a full powerful "
+        "follow through as the single baseball travels away. Only one baseball appears in the scene."
     ),
     "field_dive": (
-        "The athlete reads the ball, takes explosive first step, full extension dive to make "
-        "catch, slides across grass."
+        "Over the next 5 seconds the fielder completes the dive — launching fully horizontal "
+        "through the air with glove extended to catch a single incoming baseball, landing on the "
+        "grass and sliding to a stop, coming up to show the caught ball in the glove. Only one "
+        "baseball appears in the scene."
     ),
     "celebrate_homerun_trot": (
-        "The athlete rounds bases in confident measured home run trot, slight smile, helmet tip "
-        "approaching home plate."
+        "Over the next 5 seconds the player continues their home run trot — measured confident "
+        "steps, head up, slight smile, rounding toward the next base with total composure and "
+        "confidence. No baseball shown in this scene."
     ),
     "celebrate_fist": (
-        "The athlete pumps fist in celebration after big play, intense focused emotion, "
-        "upper body motion."
+        "Over the next 5 seconds the player completes their celebration — fist pumping powerfully "
+        "one to two times, intense focused expression, pure competitive emotion, upper body motion "
+        "only. No baseball shown in this scene."
     ),
     "catch_framing_throw": (
-        "The athlete frames pitch with soft hands, smoothly comes up out of crouch into strong "
-        "pop throw, full arm extension."
+        "Over the next 5 seconds the catcher completes the play — framing a single incoming "
+        "baseball with soft hands, smoothly rising from the crouch, arm loading and firing a single "
+        "baseball with a strong throw with full extension and natural follow through. Only one "
+        "baseball appears in the scene at any time."
     ),
     "celebrate_energy": (
-        "The athlete throws both arms up in pure celebration, jumps slightly, pure joy."
+        "Over the next 5 seconds the player erupts in celebration — both arms throwing upward, "
+        "possible slight jump, pure joy and excitement, the natural release of a big moment. "
+        "No baseball shown in this scene."
     ),
 }
 
-_CAMERA_SUFFIX = (
-    "Realistic sports photography motion. Static locked-off camera. "
-    "No zoom, no push in, no pan, no camera movement. "
-    "No text, numbers, or lettering on jerseys or uniforms. "
-    "Keep all clothing details clean and simple. "
-    "Full subject remains completely in frame for entire duration. Photorealistic."
+_KLING_CONSTRAINTS_SUFFIX = (
+    "Animate only the identified athlete. "
+    "Only one baseball may appear in the scene at any time. "
+    "Never show multiple baseballs or duplicate any sports equipment. "
+    "No text, numbers, names, or lettering anywhere on clothing or uniforms. "
+    "Blank jerseys only. No player name on back of jersey. "
+    "No jersey number on front or back. "
+    "Do not add or generate other players, coaches, or people not in the original image. "
+    "Locked off static camera. Absolutely no zoom, push, pull, pan, or camera movement of any kind. "
+    "Photorealistic."
 )
 
 # Legacy prompts retained for cards created before the motion library trim.
@@ -113,8 +131,9 @@ def build_runway_prompt(
     parts = [scenario_context]
     if user_context:
         parts.append(user_context)
+    parts.append("Cinematic slow motion sports video.")
     parts.append(action_body)
-    parts.append(_CAMERA_SUFFIX)
+    parts.append(_KLING_CONSTRAINTS_SUFFIX)
     return " ".join(parts)
 
 

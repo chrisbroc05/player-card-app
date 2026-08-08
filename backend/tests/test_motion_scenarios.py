@@ -20,7 +20,7 @@ class RunwayPromptScenarioTests(unittest.TestCase):
         scenario = get_scenario("throwing", "throwing_follow_through")
         self.assertIn(scenario["prompt_context"], prompt)
         self.assertIn("Additional context: Focus on red jersey.", prompt)
-        self.assertIn("steps into a strong athletic throw", prompt)
+        self.assertIn("Over the next 5 seconds the player completes their throw", prompt)
         self.assertIn("Photorealistic.", prompt)
 
     def test_generic_context_when_no_scenario(self):
@@ -34,15 +34,22 @@ class RunwayPromptScenarioTests(unittest.TestCase):
             scenario_id="throwing_release",
         )
         scenario = get_scenario("throwing", "throwing_release")
-        motion_idx = prompt.index(
-            "The athlete steps into a strong athletic throw"
-        )
+        motion_idx = prompt.index("Over the next 5 seconds the player completes their throw")
         scenario_idx = prompt.index(scenario["prompt_context"])
         notes_idx = prompt.index("Additional context: Player on the left.")
-        camera_idx = prompt.index("Static locked-off camera.")
+        cinematic_idx = prompt.index("Cinematic slow motion sports video.")
+        camera_idx = prompt.index("Locked off static camera.")
         self.assertLess(scenario_idx, notes_idx)
-        self.assertLess(notes_idx, motion_idx)
+        self.assertLess(notes_idx, cinematic_idx)
+        self.assertLess(cinematic_idx, motion_idx)
         self.assertLess(motion_idx, camera_idx)
+
+    def test_kling_constraints_in_prompt(self):
+        prompt = build_runway_prompt("hit_homerun", None, None)
+        self.assertIn("Cinematic slow motion sports video.", prompt)
+        self.assertIn("Only one baseball may appear in the scene at any time.", prompt)
+        self.assertIn("Blank jerseys only.", prompt)
+        self.assertIn("Animate only the identified athlete.", prompt)
 
     def test_all_motions_have_scenario_lists(self):
         expected = {

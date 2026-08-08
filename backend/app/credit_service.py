@@ -5,10 +5,13 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
+import logging
 from sqlalchemy.orm import Session
 
 from database import SessionLocal
 from models import CreditLedger, User, utcnow
+
+logger = logging.getLogger(__name__)
 
 TX_TOP_UP = "top_up"
 TX_GIFT = "gift"
@@ -119,6 +122,54 @@ def highlight_charge_to_refund(db: Session, user_id: int, card_id: str) -> Decim
     if net >= Decimal("0.00"):
         return Decimal("0.00")
     return abs(net)
+
+
+def animation_charge_to_refund(db: Session, user_id: int, card_id: str) -> Decimal:
+    """Return animation fees still owed as a refund for this card (positive amount)."""
+    ref = (card_id or "").strip()
+    if not ref:
+        return Decimal("0.00")
+    rows = (
+        db.query(CreditLedger)
+        .filter(
+            CreditLedger.user_id == user_id,
+            CreditLedger.reference_id == ref,
+            CreditLedger.transaction_type.in_([TX_ANIMATION, TX_REFUND]),
+        )
+        .all()
+    )
+    net = Decimal("0.00")
+    for row in rows:
+        net += _decimal_amount(row.amount)
+    if net >= Decimal("0.00"):
+        return Decimal("0.00")
+    return abs(net)
+
+
+def refund_animation_credits(db: Session, user_id: int, card_id: str) -> Decimal:
+    """
+    Refund outstanding animation charges for a failed card animation.
+    Idempotent: skips when no net animation charge remains for this card_id.
+    """
+    amount = animation_charge_to_refund(db, user_id, card_id)
+    if amount <= Decimal("0.00"):
+        return Decimal("0.00")
+
+    add_credits(
+        user_id=user_id,
+        amount=amount,
+        transaction_type=TX_REFUND,
+        reference_id=card_id,
+        note="Animation failed — automatic refund",
+        db=db,
+    )
+    logger.info(
+        "Refunded $%s to user %s for failed animation on %s",
+        amount,
+        user_id,
+        card_id,
+    )
+    return amount
 
 
 def add_credits(
