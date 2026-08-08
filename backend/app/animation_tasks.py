@@ -18,7 +18,7 @@ from email_service import (
 )
 from parent_email_utils import parent_email_for_notify
 from models import Card, User, utcnow
-from services.runway_service import generate_animation
+from services.video_generation_service import generate_animation
 
 logger = logging.getLogger(__name__)
 
@@ -64,14 +64,14 @@ async def process_animation(card_id: str, motion_id: str) -> None:
 
         logger.info(
             """
-=== RUNWAY PROMPT ===
+=== VIDEO GENERATION PROMPT ===
 Card: %s
 Motion: %s
 Scenario: %s
 User notes: %s
 Final prompt (%d chars):
 %s
-====================
+==============================
 """,
             card_id,
             motion_key,
@@ -90,8 +90,14 @@ Final prompt (%d chars):
             card.animated_video_url = result["video_url"]
             card.animation_status = "completed"
             card.animation_completed_at = utcnow()
+            card.animation_model_used = result.get("model_used")
             db.commit()
-            logger.info("Animation completed for card %s", card_id)
+            logger.info(
+                "Animation completed for card %s (provider=%s model=%s)",
+                card_id,
+                result.get("provider") or "unknown",
+                result.get("model_used") or "unknown",
+            )
             if owner and owner.email:
                 send_animation_complete_email(
                     owner.email,

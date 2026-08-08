@@ -45,6 +45,16 @@ Backend on Render should also set:
     Cloudflare R2 media storage (S3-compatible). When set, new uploads go to R2 and
     static /media, /uploads, /animations, /highlights mounts are disabled.
     Run backend/scripts/migrate_to_r2.py once to move existing disk files to R2.
+  PIKA_API_KEY=
+    Pika API Club key from https://dev.pika.art/keys (server-side only).
+  PIKA_API_BASE_URL=https://api.dev.pika.art
+    Customer API base URL per Pika docs (do not commit the key).
+  PIKA_DEFAULT_MODEL=kling-3.0
+  PIKA_VIDEO_DURATION=5
+  PIKA_VIDEO_RESOLUTION=720p
+    Animated card video settings. Fallback chain: kling-3.0 → pika-2.5 → minimax-h3.
+  RUNWAY_API_KEY=
+    Optional emergency fallback if all Pika models fail.
 
 Backend on Render: legacy media lived under APP_DATA_DIR (e.g. /var/render/data).
 New media uses R2 when configured; APP_DATA_DIR remains the local-dev fallback.

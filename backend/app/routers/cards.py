@@ -1,4 +1,4 @@
-"""Card animation routes (Runway ML)."""
+"""Card animation routes (Pika API Club + Runway ML fallback)."""
 
 from __future__ import annotations
 
@@ -38,6 +38,7 @@ from email_service import _absolute_image_url, frontend_url, send_highlight_comp
 from marketplace_repo import cancel_pending_marketplace_offers_for_card
 from parent_email_utils import parent_email_for_notify
 from models import Card, MarketplaceOffer, TradeOffer, User, utcnow
+from utils.pika_video import fetch_pika_catalog_status, is_pika_configured, model_fallback_chain
 from utils.storage import content_type_for_filename, save_bytes_to_storage
 
 router = APIRouter()
@@ -131,6 +132,7 @@ def _animation_status_payload(card: Card) -> dict:
         "animation_status": status,
         "animated_video_url": video_url,
         "animation_motion": card.animation_motion,
+        "model_used": getattr(card, "animation_model_used", None),
         "animation_requested_at": _iso(card.animation_requested_at),
         "animation_completed_at": _iso(card.animation_completed_at),
         "can_retry": status == "failed",
@@ -198,6 +200,21 @@ def list_animation_scenarios(motion_id: str = Query(..., min_length=1, max_lengt
     if not motion_has_scenarios(motion_id):
         return []
     return list_scenarios_for_motion(motion_id)
+
+
+@router.get("/test-pika")
+async def test_pika_connection():
+    """Verify Pika API configuration and catalog connectivity (no paid generation)."""
+    status = await fetch_pika_catalog_status()
+    return {
+        "configured": status["configured"],
+        "models_available": status["models_available"],
+        "api_base_url": status["api_base_url"],
+        "catalog_reachable": status["catalog_reachable"],
+        "auth_ok": status["auth_ok"],
+        "fallback_chain": model_fallback_chain(),
+        "pika_primary": is_pika_configured(),
+    }
 
 
 @router.get("/generation-price")

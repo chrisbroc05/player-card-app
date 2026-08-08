@@ -38,6 +38,7 @@ class ActivityCardOut(BaseModel):
     player_photo_url: str | None = None
     photo_notes: str | None = None
     animation_scenario_id: str | None = None
+    animation_model_used: str | None = None
 
     is_highlight: bool = False
     highlight_video_url: str | None = None

@@ -209,6 +209,7 @@ def animation_fields_for_card(card: Card) -> dict:
         "player_photo_url": getattr(card, "player_photo_url", None) or None,
         "photo_notes": getattr(card, "photo_notes", None) or None,
         "animation_scenario_id": getattr(card, "animation_scenario_id", None) or None,
+        "animation_model_used": getattr(card, "animation_model_used", None) or None,
     }
 
 
