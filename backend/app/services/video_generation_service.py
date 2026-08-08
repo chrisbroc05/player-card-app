@@ -69,7 +69,7 @@ async def generate_animation(
                 prompt=motion_prompt,
             )
             video_bytes = await _download_video_bytes(pika_result["video_url"])
-            public_url = _save_animation_video(video_bytes, card_id)
+            public_url = await _save_animation_video(video_bytes, card_id)
             model_used = pika_result.get("model_used") or "pika"
             logger.info(
                 "Animation complete for %s using Pika model %s",
