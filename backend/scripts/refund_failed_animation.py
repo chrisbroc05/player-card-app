@@ -6,8 +6,13 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
 APP_DIR = Path(__file__).resolve().parents[1] / "app"
 sys.path.insert(0, str(APP_DIR))
+
+from dotenv import load_dotenv
+
+load_dotenv(REPO_ROOT / ".env")
 
 from credit_service import animation_charge_to_refund, refund_animation_credits
 from database import SessionLocal
