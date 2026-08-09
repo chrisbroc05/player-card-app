@@ -20,7 +20,7 @@ import HighlightProcessingScreen from "../components/HighlightProcessingScreen";
 import QuantitySelector from "../components/QuantitySelector";
 import ActionCategoryStep from "../components/ActionCategoryStep";
 import HandednessStep from "../components/HandednessStep";
-import ScenarioSelectionStep from "../components/ScenarioSelectionStep";
+import ScenarioSelectionStep, { SCENARIO_NONE_ID } from "../components/ScenarioSelectionStep";
 import AnimationLoadingScreen from "../components/AnimationLoadingScreen";
 import PendingCardResumePrompt from "../components/PendingCardResumePrompt";
 import AnimateCardConfirmModal from "../components/AnimateCardConfirmModal";
@@ -30,7 +30,6 @@ import CardCreationExperience from "../components/CardCreationExperience";
 import StartOverConfirmModal, { StartOverButton } from "../components/StartOverConfirmModal";
 import AnimatedFlowExplainer from "../components/AnimatedFlowExplainer";
 import AnimatedAiDisclaimer from "../components/AnimatedAiDisclaimer";
-import { motionLabel } from "../constants/animationMotions";
 import {
   getActionCategory,
   klingMotionForCategory,
@@ -354,6 +353,7 @@ export default function StudioPage() {
   const [cardType, setCardType] = useState("standard");
   const [selectedMotionId, setSelectedMotionId] = useState("");
   const [selectedScenarioId, setSelectedScenarioId] = useState("");
+  const [selectedScenarioTitle, setSelectedScenarioTitle] = useState("");
   const [actionCategory, setActionCategory] = useState("");
   const [throwingHand, setThrowingHand] = useState("");
   const [battingSide, setBattingSide] = useState("");
@@ -691,8 +691,48 @@ export default function StudioPage() {
   const canAffordRegenerate = creditBalance >= additionalPreviewCost;
   const regenerateShortfall = Math.max(0, additionalPreviewCost - creditBalance);
   const firstGenerateShortfall = Math.max(0, firstGenerateDue - creditBalance);
-  const motionDisplayName = isAnimatedCardType && selectedMotionId ? motionLabel(selectedMotionId) : "";
+  const motionDisplayName = useMemo(() => {
+    if (!isAnimatedCardType) return "";
+    if (
+      selectedScenarioTitle &&
+      selectedScenarioId &&
+      selectedScenarioId !== SCENARIO_NONE_ID
+    ) {
+      return selectedScenarioTitle;
+    }
+    return getActionCategory(actionCategory)?.label || "";
+  }, [isAnimatedCardType, selectedScenarioTitle, selectedScenarioId, actionCategory]);
   const inCreationFlow = currentStep >= STEP_DETAILS && currentStep <= STEP_REVIEW;
+
+  useEffect(() => {
+    if (!isAnimatedCardType || !actionCategory || !selectedScenarioId || selectedScenarioTitle) {
+      return undefined;
+    }
+    if (selectedScenarioId === SCENARIO_NONE_ID) {
+      return undefined;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `${API_BASE_URL}/cards/animation-scenarios?category_id=${encodeURIComponent(actionCategory)}`
+        );
+        const data = await res.json().catch(() => []);
+        const match = Array.isArray(data)
+          ? data.find((scenario) => scenario.id === selectedScenarioId)
+          : null;
+        if (!cancelled && match?.title) {
+          setSelectedScenarioTitle(match.title);
+        }
+      } catch {
+        /* ignore — category label fallback remains */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAnimatedCardType, actionCategory, selectedScenarioId, selectedScenarioTitle]);
+
   const animatedChoiceModalOpen =
     animatedFlowStage === ANIMATED_FLOW_STAGE.CHOICE &&
     !animationConfirmed &&
@@ -778,6 +818,7 @@ export default function StudioPage() {
     const motion = klingMotionForCategory(actionCategory);
     setSelectedMotionId(motion || "");
     setSelectedScenarioId("");
+    setSelectedScenarioTitle("");
     setCurrentStep(STEP_SCENARIO);
   }
 
@@ -790,8 +831,9 @@ export default function StudioPage() {
     setCurrentStep(STEP_ACTION);
   }
 
-  function selectScenario(scenarioId) {
+  function selectScenario(scenarioId, scenarioTitle = "") {
     setSelectedScenarioId(scenarioId);
+    setSelectedScenarioTitle(scenarioTitle || "");
     setScenarioStepError("");
   }
 
@@ -1248,6 +1290,7 @@ export default function StudioPage() {
     setSpecialTheme(draft.special_theme || "");
     setSelectedMotionId(draft.selected_motion_id || "");
     setSelectedScenarioId(draft.animation_scenario_id || "");
+    setSelectedScenarioTitle("");
     setActionCategory(draft.action_category || "");
     setThrowingHand(draft.throwing_hand || "");
     setBattingSide(draft.batting_side || "");
@@ -1383,6 +1426,7 @@ export default function StudioPage() {
     setCardType("standard");
     setSelectedMotionId("");
     setSelectedScenarioId("");
+    setSelectedScenarioTitle("");
     setActionCategory("");
     setThrowingHand("");
     setBattingSide("");
@@ -2392,6 +2436,7 @@ export default function StudioPage() {
                     if (type === "standard" || type === "highlight") {
                       setSelectedMotionId("");
                       setSelectedScenarioId("");
+                      setSelectedScenarioTitle("");
                       setActionCategory("");
                       setThrowingHand("");
                       setBattingSide("");

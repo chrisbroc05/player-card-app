@@ -101,7 +101,9 @@ export default function ScenarioSelectionStep({
         type="button"
         role="option"
         aria-selected={selected}
-        onClick={() => onSelect(scenario.id)}
+        onClick={() =>
+          onSelect(scenario.id, scenario.id === SCENARIO_NONE_ID ? "" : scenario.title)
+        }
         className={`scenario-card${selected ? " scenario-card--selected" : ""}${
           stickyNone ? " scenario-card--none-sticky" : ""
         }`}

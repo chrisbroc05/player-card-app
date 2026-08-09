@@ -53,10 +53,10 @@ export default function AnimateCardConfirmModal({
   const hasPreview = Boolean(card || previewImageUrl);
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-3 sm:items-center sm:p-4">
+    <div className="animated-popup-overlay fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-4 sm:items-center sm:p-4">
       <div
         ref={dialogRef}
-        className="scroll-focus-target max-h-[90vh] w-full min-w-0 overflow-y-auto rounded-2xl border border-white/10 bg-cardBg p-6 shadow-2xl sm:min-w-[480px] sm:max-w-lg"
+        className="animated-popup-dialog scroll-focus-target max-h-[90vh] w-full min-w-0 overflow-y-auto rounded-2xl border border-white/10 bg-cardBg shadow-2xl sm:min-w-[500px] sm:max-w-lg"
         role="dialog"
         aria-labelledby="animate-confirm-title"
         aria-modal="true"
@@ -66,25 +66,23 @@ export default function AnimateCardConfirmModal({
         </h3>
 
         {hasPreview ? (
-          <div className="mx-auto mt-5 flex justify-center" style={{ width: 220, height: 308 }}>
-            <div className="h-full w-full">
-              <CardImage
-                card={
-                  card ||
-                  (previewImageUrl
-                    ? { image_url: previewImageUrl, player_name: previewAlt || "Card preview", tier: "rookie" }
-                    : null)
-                }
-                alt={previewAlt}
-                showInfoBanner
-                variant="detail"
-              />
-            </div>
+          <div className="animated-popup-card-wrap mt-5">
+            <CardImage
+              card={
+                card ||
+                (previewImageUrl
+                  ? { image_url: previewImageUrl, player_name: previewAlt || "Card preview", tier: "rookie" }
+                  : null)
+              }
+              alt={previewAlt}
+              showInfoBanner
+              variant="detail"
+            />
           </div>
         ) : null}
 
         {motionName ? (
-          <p className="mt-4 text-center text-sm text-slate-300">
+          <p className="mt-5 text-center text-sm text-slate-300">
             Motion: <span className="font-semibold text-violet-200">{motionName}</span>
           </p>
         ) : null}
@@ -131,7 +129,7 @@ export default function AnimateCardConfirmModal({
 
         {showAiDisclaimer ? <AnimatedAiDisclaimer className="mt-3 px-1" /> : null}
 
-        <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap">
+        <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap">
           <button
             type="button"
             disabled={busy}
