@@ -1,4 +1,4 @@
-"""Photo scenario library for Runway prompt context (animated cards)."""
+"""Photo scenario library for Kling prompt context (animated cards)."""
 
 from __future__ import annotations
 
@@ -9,486 +9,518 @@ class MotionScenario(TypedDict):
     id: str
     title: str
     description: str
-    prompt_context: str
+    prompt: str
 
 
-GENERIC_SCENARIO_CONTEXT = (
-    "The main athlete is the clear subject of the photo."
-)
+class ActionCategory(TypedDict):
+    id: str
+    label: str
+    description: str
+    kling_motion: str
+    scenarios: list[MotionScenario]
 
 
-MOTION_TO_SCENARIO_GROUP: dict[str, str] = {
+GENERIC_SCENARIO_CONTEXT = "The main athlete is the clear subject of the photo."
+
+
+def _s(id: str, title: str, description: str, prompt: str) -> MotionScenario:
+    return {
+        "id": id,
+        "title": title,
+        "description": description,
+        "prompt": prompt,
+    }
+
+
+_PITCHING_SCENARIOS: list[MotionScenario] = [
+    _s(
+        "pitch_windup",
+        "Full wind-up delivery",
+        "Standing tall in full wind-up, both hands together, about to begin delivery",
+        "Cinematic slow motion sports video. The pitcher begins their full wind-up, both hands separating as the leg kicks high, driving off the rubber with explosive force, arm coming through in a fluid overhand delivery, releasing a single baseball, following through naturally as the back leg swings around for balance over the next 5 seconds. Only one baseball shown leaving the hand.",
+    ),
+    _s(
+        "pitch_stretch",
+        "Stretch position delivery",
+        "In the stretch, holding runners, about to deliver to the plate",
+        "Cinematic slow motion sports video. The pitcher comes set in the stretch position, pauses briefly checking the runner, then delivers quickly to the plate with a compact efficient motion, arm driving through powerfully, releasing a single baseball, short follow through over the next 5 seconds. Only one baseball shown leaving the hand.",
+    ),
+    _s(
+        "pitch_leg_kick",
+        "Mid leg kick",
+        "Leg fully raised at peak of kick, arm loading behind the head",
+        "Cinematic slow motion sports video. The pitcher is at peak leg kick, leg coming back down as the stride foot plants, body rotating powerfully, throwing arm whipping through from cocked position to full extension, releasing a single baseball at the top, following through completely over the next 5 seconds. Only one baseball shown.",
+    ),
+    _s(
+        "pitch_release",
+        "Release point",
+        "Arm fully extended at release, ball leaving the fingertips",
+        "Cinematic slow motion sports video. The pitcher completes the release, single baseball leaving the fingertips at full arm extension, wrist snapping through, arm continuing naturally down and across the body in a full follow through, back leg swinging around to balanced fielding position over the next 5 seconds. Only one baseball shown.",
+    ),
+    _s(
+        "pitch_follow_through",
+        "Follow through",
+        "Arm sweeping across body after release, back leg swinging around",
+        "Cinematic slow motion sports video. The pitcher completes their follow through, throwing arm sweeping fully across the body, back leg finishing the rotation and landing in balanced fielding position, body squaring up to home plate ready to field over the next 5 seconds. No baseball shown — already released.",
+    ),
+]
+
+_THROWING_SCENARIOS: list[MotionScenario] = [
+    _s(
+        "throw_catch_ready",
+        "Playing catch, just caught",
+        "Just caught the ball, transferring to throwing hand, setting feet to throw",
+        "Cinematic slow motion sports video. The player transfers the ball from glove to throwing hand, sets their feet with a quick shuffle step, loads the throwing arm back, steps toward the target and fires a strong accurate throw with full arm extension and natural follow through over the next 5 seconds. Only one baseball shown.",
+    ),
+    _s(
+        "throw_catch_mid",
+        "Playing catch, mid throw",
+        "Arm back and loaded, weight shifting forward, about to release",
+        "Cinematic slow motion sports video. The player drives their throwing arm forward from the loaded position, front foot planting firmly, hips and shoulders rotating through the throw, arm reaching full extension at release of a single baseball, following through naturally down across the body over the next 5 seconds. Only one baseball shown.",
+    ),
+    _s(
+        "throw_infield",
+        "Infield throw across the diamond",
+        "Planting and throwing across the infield to a base",
+        "Cinematic slow motion sports video. The infielder plants their front foot, rotates powerfully through the throw, arm whipping through to release a single baseball on a tight line across the diamond, snapping the wrist at release, follow through crossing the body naturally over the next 5 seconds. Only one baseball shown.",
+    ),
+    _s(
+        "throw_outfield",
+        "Outfield throw, arm loaded",
+        "Crow hop position, arm fully back, ready to fire a long throw",
+        "Cinematic slow motion sports video. The outfielder completes their crow hop, plants the front foot, full hip and shoulder rotation driving the arm forward, releasing a single baseball on a high arcing throw toward the infield, arm following through completely, body decelerating naturally over the next 5 seconds. Only one baseball shown.",
+    ),
+    _s(
+        "throw_relay",
+        "Relay throw",
+        "Just received a relay, spinning quickly to redirect and fire",
+        "Cinematic slow motion sports video. The player spins quickly from receiving the relay, planting and firing immediately with a compact powerful throw, single baseball leaving the hand on a straight line, body rotating through to complete the throw with natural follow through over the next 5 seconds. Only one baseball shown.",
+    ),
+]
+
+_FIELDING_GROUND_SCENARIOS: list[MotionScenario] = [
+    _s(
+        "field_ready",
+        "Ready stance, waiting for the pitch",
+        "Athletic pre-pitch fielding stance, knees bent, glove low, weight balanced",
+        "Cinematic slow motion sports video. The infielder explodes out of their ready stance reacting to a ground ball, taking an explosive crossover first step, charging toward a single incoming baseball, glove dropping low to field it cleanly, then setting feet to make the throw over the next 5 seconds. Only one baseball shown.",
+    ),
+    _s(
+        "field_forehand",
+        "Forehand play, ball to glove side",
+        "Moving to the glove side, glove extended out for a forehand play",
+        "Cinematic slow motion sports video. The infielder moves to their glove side, glove sweeping out and down to field a single ground ball on the forehand side, soft hands absorbing the ball, planting quickly and transferring to throwing hand to make the play over the next 5 seconds. Only one baseball shown.",
+    ),
+    _s(
+        "field_backhand",
+        "Backhand play, ball to throwing side",
+        "Moving to the backhand side, glove crossing over for a backhand play",
+        "Cinematic slow motion sports video. The infielder crosses over to the backhand side, glove turning over to field a single ground ball on the backhand, planting the back foot to generate throwing power, transferring quickly and making a strong throw across the body over the next 5 seconds. Only one baseball shown.",
+    ),
+    _s(
+        "field_charge",
+        "Charging a slow roller",
+        "Charging aggressively toward a slow roller, about to barehand or glove it",
+        "Cinematic slow motion sports video. The infielder charges aggressively toward a slowly rolling baseball, glove or bare hand scooping it up in one fluid motion while in stride, planting and firing immediately to the base without stopping, full speed aggressive play over the next 5 seconds. Only one baseball shown.",
+    ),
+    _s(
+        "field_short_hop",
+        "Short hop, ball right at them",
+        "Set and ready, fielding a tough short hop right at their feet",
+        "Cinematic slow motion sports video. The infielder fields a tough short hop, glove positioned perfectly to handle the difficult bounce of a single baseball, soft hands absorbing the impact, cleanly coming up with the ball and transferring quickly to make the throw over the next 5 seconds. Only one baseball shown.",
+    ),
+    _s(
+        "field_double_play",
+        "Double play pivot at second base",
+        "At second base catching the throw, pivoting to fire to first",
+        "Cinematic slow motion sports video. The infielder at second base catches the incoming throw, pivots quickly off the bag to avoid the runner, plants and fires a strong relay throw to first base to complete the double play, full body rotation through the throw over the next 5 seconds. Only one baseball shown.",
+    ),
+]
+
+_FLY_BALL_SCENARIOS: list[MotionScenario] = [
+    _s(
+        "fly_tracking_back",
+        "Tracking ball going back on deep fly",
+        "Turned and running back toward warning track, glove up, tracking deep",
+        "Cinematic slow motion sports video. The outfielder turns and sprints back toward the warning track, glove raised and open, tracking a deep fly ball over their shoulder, making the catch as the ball arrives in the glove over the next 5 seconds. Only one baseball shown.",
+    ),
+    _s(
+        "fly_charging",
+        "Charging in on a sinking liner",
+        "Running hard toward infield, glove low for a sinking line drive",
+        "Cinematic slow motion sports video. The outfielder charges hard toward the infield, glove extended low near the ground, diving or sliding at the last moment to make a shoestring catch on a sinking line drive, coming up showing the ball in the glove over the next 5 seconds. Only one baseball shown.",
+    ),
+    _s(
+        "fly_making_catch",
+        "Making the catch, glove raised",
+        "Glove raised and open, ball arriving, about to make the catch",
+        "Cinematic slow motion sports video. The player makes the catch as a single baseball arrives in the raised glove, squeezing it securely, showing the catch to the umpire, transitioning into position to make a throw if needed over the next 5 seconds. Only one baseball shown.",
+    ),
+    _s(
+        "fly_wall_catch",
+        "Leaping wall catch, robbing a homer",
+        "Jumping at the wall, glove extended above to rob a home run",
+        "Cinematic slow motion sports video. The outfielder leaps at the wall, one foot possibly pushing off the fence, glove extending fully above the top of the barrier to catch a single baseball that would have been a home run, landing and holding up the glove to show the catch over the next 5 seconds. Only one baseball shown.",
+    ),
+    _s(
+        "fly_diving",
+        "Diving catch, fully airborne",
+        "Fully launched horizontal through the air, glove extended making catch",
+        "Cinematic slow motion sports video. The outfielder launches fully horizontal through the air, glove fully extended, catching a single baseball at full extension, landing on the grass and sliding to a stop, coming up immediately to show the ball in the glove over the next 5 seconds. Only one baseball shown.",
+    ),
+]
+
+_OUTFIELD_SCENARIOS: list[MotionScenario] = [
+    _s(
+        "out_ready",
+        "Outfield ready stance",
+        "In outfield ready position, hands on knees, watching the pitch",
+        "Cinematic slow motion sports video. The outfielder explodes out of their ready stance reacting to the crack of the bat, taking an explosive first step in the correct direction, getting a great jump on the ball over the next 5 seconds. No baseball shown yet.",
+    ),
+    _s(
+        "out_ground_ball",
+        "Outfield ground ball, charging",
+        "Charging hard toward an outfield ground ball, glove down",
+        "Cinematic slow motion sports video. The outfielder charges hard toward an outfield ground ball, glove dropping down near the grass, fielding the single baseball cleanly, planting and loading for a strong throw to the infield over the next 5 seconds. Only one baseball shown.",
+    ),
+    _s(
+        "out_crow_hop",
+        "Crow hop, loading to throw",
+        "Mid crow hop, gathering momentum for a long outfield throw",
+        "Cinematic slow motion sports video. The outfielder completes their crow hop, gathering momentum and body position, planting the front foot powerfully, full hip and shoulder rotation driving a strong long throw toward the infield, arm extending fully at release over the next 5 seconds. Only one baseball shown.",
+    ),
+    _s(
+        "out_sprint_back",
+        "Full sprint going back on deep ball",
+        "Turned fully, sprinting back toward warning track at full speed",
+        "Cinematic slow motion sports video. The outfielder runs at full speed toward the warning track, back fully turned, head turning to track the ball over the shoulder, glove raising as they approach the spot where the ball will land over the next 5 seconds. No baseball shown yet.",
+    ),
+    _s(
+        "out_throw_release",
+        "Outfield throw at release point",
+        "Arm fully extended at release of a long outfield throw",
+        "Cinematic slow motion sports video. The outfielder releases a single baseball on a strong throw toward the infield, arm at full extension at the release point, wrist snapping through, arm following through naturally down and across the body, body decelerating after the throw over the next 5 seconds. Only one baseball shown.",
+    ),
+]
+
+_HITTING_SCENARIOS: list[MotionScenario] = [
+    _s(
+        "hit_stance",
+        "Batting stance, ready for the pitch",
+        "In full batting stance, bat up, eyes on pitcher, weight balanced and ready",
+        "Cinematic slow motion sports video. The batter begins their timing mechanism as the pitcher delivers, subtle weight shift and toe tap, hands staying back, loading smoothly into their swing as a single baseball approaches the plate over the next 5 seconds. Only one baseball shown.",
+    ),
+    _s(
+        "hit_loading",
+        "Loading, weight shifted back",
+        "Weight fully shifted to back foot, hands back, coiled and ready to fire",
+        "Cinematic slow motion sports video. The batter completes their load and explodes forward, stride foot landing, hips firing first followed by hands, bat whipping through the hitting zone making contact with a single baseball, arms extending powerfully through contact over the next 5 seconds. Only one baseball shown.",
+    ),
+    _s(
+        "hit_mid_swing",
+        "Mid swing, driving through contact",
+        "Hips fully rotating, hands driving through the hitting zone",
+        "Cinematic slow motion sports video. The batter drives through contact, hips fully rotating, hands extending through the hitting zone, bat making contact with a single baseball, arms fully extending, bat continuing into a high powerful follow through over the next 5 seconds. Only one baseball shown.",
+    ),
+    _s(
+        "hit_contact",
+        "Contact point, bat on ball",
+        "Bat meeting ball out front, hips rotated, arms extending through",
+        "Cinematic slow motion sports video. The batter makes contact with a single baseball, arms fully extending through the hitting zone, hips fully rotated, wrists rolling over naturally, bat continuing up and around into a complete follow through as the baseball travels away over the next 5 seconds. Only one baseball shown.",
+    ),
+    _s(
+        "hit_follow_through",
+        "Full follow through",
+        "Bat fully wrapped around the body, weight transferred, watching the ball",
+        "Cinematic slow motion sports video. The batter completes a full powerful follow through, bat wrapped fully around the body, weight transferred completely to the front foot, head turning to watch the single baseball travel, settling into a balanced finish position over the next 5 seconds. Only one baseball shown traveling away.",
+    ),
+    _s(
+        "hit_bunt",
+        "Bunt stance",
+        "Squared around to bunt, bat flat and extended out in front",
+        "Cinematic slow motion sports video. The batter squares around fully to bunt, bat held flat and extended out in front with soft hands, a single baseball arriving and being deadened off the bat softly toward the infield, the batter beginning to run toward first base over the next 5 seconds. Only one baseball shown.",
+    ),
+]
+
+_CATCHING_SCENARIOS: list[MotionScenario] = [
+    _s(
+        "catch_set",
+        "Set position, giving the target",
+        "In full crouch, mitt extended and open, giving the pitcher a target",
+        "Cinematic slow motion sports video. The catcher holds their set position as the pitcher delivers, mitt steady and open giving a clear target, a single baseball arriving and being received with soft hands, the catcher framing naturally for the umpire over the next 5 seconds. Only one baseball shown.",
+    ),
+    _s(
+        "catch_receiving",
+        "Receiving a pitch",
+        "Catching a pitch, mitt absorbing the ball, body still",
+        "Cinematic slow motion sports video. The catcher receives a single incoming baseball, mitt positioned perfectly, soft hands absorbing the pitch, settling the ball in the mitt and holding the framed position briefly for the umpire over the next 5 seconds. Only one baseball shown.",
+    ),
+    _s(
+        "catch_framing",
+        "Framing a pitch",
+        "Subtly moving the mitt to frame a pitch as a strike",
+        "Cinematic slow motion sports video. The catcher receives a single baseball on the edge of the strike zone, using subtle soft hands to move the mitt slightly inward after catching it, presenting it as a strike for the umpire without over-moving, holding the position steadily over the next 5 seconds. Only one baseball shown.",
+    ),
+    _s(
+        "catch_pop_throw",
+        "Pop throw to second base",
+        "Rising out of crouch, arm loading to fire a throw to second",
+        "Cinematic slow motion sports video. The catcher receives a single baseball, transfers quickly from mitt to throwing hand while rising from the crouch, arm loading and firing a strong accurate throw to second base with full extension and natural follow through over the next 5 seconds. Only one baseball shown.",
+    ),
+    _s(
+        "catch_blocking",
+        "Blocking a ball in the dirt",
+        "Dropped to both knees blocking a wild pitch, body square and low",
+        "Cinematic slow motion sports video. The catcher drops to both knees blocking a single baseball in the dirt, body squaring up as a wall, chin tucked, the ball hitting the chest protector and staying in front, the catcher recovering quickly to locate and control the ball over the next 5 seconds. Only one baseball shown.",
+    ),
+    _s(
+        "catch_bunt",
+        "Fielding a bunt",
+        "Out from behind the plate charging a bunt, about to pick it up",
+        "Cinematic slow motion sports video. The catcher springs out from behind the plate charging a bunt, mask discarding as they run, bare handing or gloving a single baseball, planting and firing a quick strong throw to the base in one continuous fluid motion over the next 5 seconds. Only one baseball shown.",
+    ),
+]
+
+_CELEBRATING_SCENARIOS: list[MotionScenario] = [
+    _s(
+        "cel_single_pump",
+        "Single fist pump, intense",
+        "One controlled fist pump downward, jaw set, pure competitive fire",
+        "Cinematic slow motion sports video. The player delivers one powerful controlled fist pump downward, jaw set and intense, eyes focused, pure competitive fire in the moment, holding the emotion for a beat before composing themselves over the next 5 seconds. No baseball shown.",
+    ),
+    _s(
+        "cel_double_pump",
+        "Double fist pump, both hands",
+        "Both fists pumping simultaneously, maximum emotion and intensity",
+        "Cinematic slow motion sports video. The player pumps both fists downward simultaneously in an explosive double celebration, teeth clenched, maximum emotion and intensity, the raw release of a big competitive moment over the next 5 seconds. No baseball shown.",
+    ),
+    _s(
+        "cel_arms_raised",
+        "Arms raised to the sky",
+        "Both arms raised fully overhead, head back, soaking in the moment",
+        "Cinematic slow motion sports video. The player raises both arms fully overhead reaching toward the sky, head tilting back looking upward, soaking in a significant moment of triumph, holding the pose in pure joy over the next 5 seconds. No baseball shown.",
+    ),
+    _s(
+        "cel_jump_pump",
+        "Jump and fist pump",
+        "Fully airborne jumping while fist pumping, full body celebration",
+        "Cinematic slow motion sports video. The player launches into the air in a celebratory jump, fist pumping powerfully while fully airborne, landing and immediately pumping again, full body expression of pure joy and competitive release over the next 5 seconds. No baseball shown.",
+    ),
+    _s(
+        "cel_running_mob",
+        "Running toward teammates",
+        "Arms wide open running toward teammates rushing in to celebrate",
+        "Cinematic slow motion sports video. The player runs with arms wide open toward teammates rushing in to celebrate, the collision of the group celebration, hugging and mobbing together in a joyful team moment over the next 5 seconds. No baseball shown.",
+    ),
+    _s(
+        "cel_trot",
+        "Home run trot",
+        "Measured confident steps rounding the bases after a home run",
+        "Cinematic slow motion sports video. The player continues their home run trot with measured confident steps, head up, slight smile, rounding toward the next base with total composure and the quiet confidence of knowing the ball is gone over the next 5 seconds. No baseball shown.",
+    ),
+    _s(
+        "cel_pointing",
+        "Pointing to someone in the stands",
+        "After crossing the plate, pointing up to someone specific in the crowd",
+        "Cinematic slow motion sports video. The player points directly up into the stands toward a specific person after crossing the plate, locking eyes with them, sharing a personal meaningful moment of connection after the big play over the next 5 seconds. No baseball shown.",
+    ),
+]
+
+_GENERAL_SCENARIOS: list[MotionScenario] = [
+    _s(
+        "gen_sprint",
+        "Running full sprint",
+        "At full speed running, arms pumping, sprinting across the field",
+        "Cinematic slow motion sports video. The player runs at full athletic speed, arms pumping in rhythm, legs driving powerfully, uniform flowing with the motion, pure athleticism on display over the next 5 seconds. No baseball shown.",
+    ),
+    _s(
+        "gen_stretching",
+        "Stretching or warming up",
+        "In a stretching position, warming up before the game",
+        "Cinematic slow motion sports video. The player moves through their stretching or warm-up routine, fluid athletic movement, preparing their body for the game ahead, relaxed and focused energy over the next 5 seconds. No baseball shown.",
+    ),
+    _s(
+        "gen_dugout",
+        "Dugout celebration or reaction",
+        "In the dugout reacting to a big play, cheering with teammates",
+        "Cinematic slow motion sports video. The player reacts in the dugout to a big play on the field, jumping up, cheering, high-fiving teammates, pure team energy and excitement in the dugout atmosphere over the next 5 seconds. No baseball shown.",
+    ),
+    _s(
+        "gen_handshake",
+        "Post-game handshake line",
+        "Going through the handshake line with the other team after the game",
+        "Cinematic slow motion sports video. The player moves through the post-game handshake line, tapping gloves or shaking hands with opposing players, showing sportsmanship and respect after the game over the next 5 seconds. No baseball shown.",
+    ),
+    _s(
+        "gen_posed",
+        "Posed photo, standing tall",
+        "Standing tall in uniform, posed for a photo, confident and proud",
+        "Cinematic slow motion sports video. The player stands tall and confident in their uniform, subtle natural movement — slight breathing, weight shifting naturally, looking composed and proud, a living portrait of a baseball player over the next 5 seconds. No baseball shown.",
+    ),
+]
+
+
+ACTION_CATEGORIES: dict[str, ActionCategory] = {
+    "pitching": {
+        "id": "pitching",
+        "label": "Pitching",
+        "description": "Delivering a pitch from the mound",
+        "kling_motion": "pitch_windup",
+        "scenarios": _PITCHING_SCENARIOS,
+    },
+    "throwing": {
+        "id": "throwing",
+        "label": "Throwing",
+        "description": "Throwing the ball from any position",
+        "kling_motion": "throwing",
+        "scenarios": _THROWING_SCENARIOS,
+    },
+    "fielding_ground": {
+        "id": "fielding_ground",
+        "label": "Fielding a Ground Ball",
+        "description": "Getting ready for or fielding a ground ball in the infield",
+        "kling_motion": "field_dive",
+        "scenarios": _FIELDING_GROUND_SCENARIOS,
+    },
+    "fly_ball": {
+        "id": "fly_ball",
+        "label": "Catching a Fly Ball",
+        "description": "Tracking or catching a fly ball",
+        "kling_motion": "field_dive",
+        "scenarios": _FLY_BALL_SCENARIOS,
+    },
+    "outfield": {
+        "id": "outfield",
+        "label": "Outfield",
+        "description": "Playing the outfield — fielding, throwing, or tracking",
+        "kling_motion": "throwing",
+        "scenarios": _OUTFIELD_SCENARIOS,
+    },
+    "hitting": {
+        "id": "hitting",
+        "label": "Hitting",
+        "description": "At the plate — batting stance, swing, or follow through",
+        "kling_motion": "hit_homerun",
+        "scenarios": _HITTING_SCENARIOS,
+    },
+    "catching": {
+        "id": "catching",
+        "label": "Catching (Catcher)",
+        "description": "Behind the plate — receiving, framing, blocking, or throwing",
+        "kling_motion": "catch_framing_throw",
+        "scenarios": _CATCHING_SCENARIOS,
+    },
+    "celebrating": {
+        "id": "celebrating",
+        "label": "Celebrating",
+        "description": "Celebrating a big moment — any celebration",
+        "kling_motion": "celebrate_fist",
+        "scenarios": _CELEBRATING_SCENARIOS,
+    },
+    "general": {
+        "id": "general",
+        "label": "General / Practice",
+        "description": "Practice, warmup, dugout, or any other baseball moment",
+        "kling_motion": "celebrate_energy",
+        "scenarios": _GENERAL_SCENARIOS,
+    },
+}
+
+
+LEGACY_MOTION_TO_CATEGORY: dict[str, str] = {
     "pitch_windup": "pitching",
     "throwing": "throwing",
     "hit_homerun": "hitting",
-    "field_dive": "fielding",
+    "field_dive": "fielding_ground",
     "catch_framing_throw": "catching",
-    "celebrate_fist": "pumping_fist",
-    "celebrate_homerun_trot": "home_run_trot",
-    "celebrate_energy": "celebrating",
+    "celebrate_fist": "celebrating",
+    "celebrate_homerun_trot": "celebrating",
+    "celebrate_energy": "general",
 }
 
-SCENARIO_GROUPS: dict[str, list[MotionScenario]] = {
-    "pitching": [
-        {
-            "id": "pitching_windup_set",
-            "title": "Wind-up, hands together",
-            "description": "Standing tall on the rubber, both hands together at chest, weight centered, about to begin the wind-up",
-            "prompt_context": "The athlete is standing tall on the pitcher's rubber in the wind-up position, both hands together at the chest, weight centered, about to begin the full wind-up delivery.",
-        },
-        {
-            "id": "pitching_leg_kick",
-            "title": "Leg kick, arm back",
-            "description": "Leg fully raised at peak of kick, throwing arm pulled back behind the body, loading up",
-            "prompt_context": "The athlete's leg is fully raised at the peak of the leg kick, throwing arm pulled back behind the body and fully loaded, about to drive forward into the delivery.",
-        },
-        {
-            "id": "pitching_stride",
-            "title": "Striding forward, arm cocked",
-            "description": "Front leg striding toward plate, throwing arm fully cocked at 90 degrees",
-            "prompt_context": "The athlete is mid-stride toward home plate, front leg extended forward, throwing arm fully cocked at 90 degrees behind the head, about to fire the pitch.",
-        },
-        {
-            "id": "pitching_release",
-            "title": "Release point",
-            "description": "Arm fully extended at release, ball just leaving the fingertips",
-            "prompt_context": "The athlete is at the exact release point, throwing arm fully extended toward home plate, ball just leaving the fingertips at the top of the delivery.",
-        },
-        {
-            "id": "pitching_follow_through",
-            "title": "Follow through, arm across body",
-            "description": "Throwing arm sweeping across body after release, back leg coming around",
-            "prompt_context": "The athlete has just released the pitch and is in the follow through, throwing arm sweeping naturally across the body, back leg swinging around for balance.",
-        },
-        {
-            "id": "pitching_stretch",
-            "title": "Stretch position, looking in",
-            "description": "Standing in the stretch, glove up, looking toward home for the sign",
-            "prompt_context": "The athlete is standing in the stretch position on the rubber, glove held up, looking in toward home plate for the catcher's sign.",
-        },
-        {
-            "id": "pitching_set",
-            "title": "Set position, holding runners",
-            "description": "Holding the set position, looking toward first before delivering",
-            "prompt_context": "The athlete is holding the set position on the rubber, pausing with both hands together, checking the runner before delivering to the plate.",
-        },
-        {
-            "id": "pitching_pickoff",
-            "title": "Pickoff move to first",
-            "description": "Pivoting off the rubber, arm coming forward in a snap throw to first base",
-            "prompt_context": "The athlete is executing a pickoff move, pivoting quickly off the rubber and firing a snap throw toward first base.",
-        },
-    ],
-    "throwing": [
-        {
-            "id": "throwing_fielded_loading",
-            "title": "Just fielded, about to throw",
-            "description": "Just picked up the ball, feet setting up, ball in throwing hand at waist",
-            "prompt_context": "The athlete has just fielded the ball and is setting their feet to throw, ball in the throwing hand at waist level, body turning toward the target.",
-        },
-        {
-            "id": "throwing_arm_back",
-            "title": "Loading up, arm fully back",
-            "description": "Weight shifted to back foot, throwing arm fully extended behind body",
-            "prompt_context": "The athlete has their weight shifted to the back foot, throwing arm fully extended behind the body, glove arm pointing toward the target, fully loaded to throw.",
-        },
-        {
-            "id": "throwing_mid_throw",
-            "title": "Mid-throw, arm coming forward",
-            "description": "Body rotating, throwing arm driving forward, front foot planted",
-            "prompt_context": "The athlete is mid-throw, body fully rotating, throwing arm driving forward powerfully, front foot planted, generating maximum velocity toward the target.",
-        },
-        {
-            "id": "throwing_release",
-            "title": "Release point, arm extended",
-            "description": "Arm fully extended at release, ball leaving the hand",
-            "prompt_context": "The athlete is at the exact release point of the throw, arm fully extended toward the target, ball leaving the fingertips, body square to the throwing direction.",
-        },
-        {
-            "id": "throwing_follow_through",
-            "title": "Follow through, ball already gone",
-            "description": "Ball already released, arm naturally following down across the body",
-            "prompt_context": "The athlete has already released the ball and is in the natural follow through, throwing arm sweeping down and across the body, weight transferring to the front foot.",
-        },
-        {
-            "id": "throwing_short_hop",
-            "title": "Short hop recovery throw",
-            "description": "Low to the ground after fielding a short hop, coming up to throw",
-            "prompt_context": "The athlete is low to the ground having just fielded a short hop, quickly coming up from a bent position to make a fast throw to the target.",
-        },
-        {
-            "id": "throwing_one_knee",
-            "title": "Throwing from one knee",
-            "description": "Down on one knee from a diving stop, making the throw",
-            "prompt_context": "The athlete is down on one knee after a diving stop, throwing arm fully extended making a strong throw to the base from that low position.",
-        },
-        {
-            "id": "throwing_crow_hop",
-            "title": "Crow hop, outfield throw",
-            "description": "Mid crow-hop in the outfield, gathering momentum for a long throw",
-            "prompt_context": "The athlete is mid crow-hop in the outfield, one foot off the ground as they gather momentum and body positioning for a long powerful throw to the infield.",
-        },
-        {
-            "id": "throwing_relay",
-            "title": "Relay throw, spinning",
-            "description": "Catching a relay and spinning quickly to fire the next throw",
-            "prompt_context": "The athlete is executing a relay throw, having just caught the incoming throw and spinning their body quickly to redirect and fire to the next base.",
-        },
-        {
-            "id": "throwing_barehand",
-            "title": "Barehand charge throw",
-            "description": "Charging a slow roller, barehanding the ball, throwing in one motion",
-            "prompt_context": "The athlete is charging aggressively toward a slow roller, barehanding the ball in stride and throwing to first base in one continuous fluid motion without stopping.",
-        },
-    ],
-    "hitting": [
-        {
-            "id": "hitting_stance",
-            "title": "Pre-pitch stance",
-            "description": "In batting stance, bat up, eyes on pitcher, weight balanced",
-            "prompt_context": "The athlete is standing in their batting stance in the batter's box, bat held up and back, eyes locked on the pitcher, weight balanced and ready.",
-        },
-        {
-            "id": "hitting_loading",
-            "title": "Loading, weight shifted back",
-            "description": "Weight fully shifted to back foot, hands back, coiled and ready",
-            "prompt_context": "The athlete has fully loaded their swing, weight shifted back to the rear foot, hands back, bat cocked, body coiled and ready to explode through the ball.",
-        },
-        {
-            "id": "hitting_toe_tap",
-            "title": "Toe tap timing move",
-            "description": "Front foot doing a slight toe tap, timing the pitch",
-            "prompt_context": "The athlete is using their timing mechanism, front foot doing a subtle toe tap as the pitcher delivers, keeping their rhythm and timing in sync with the pitch.",
-        },
-        {
-            "id": "hitting_stride",
-            "title": "Striding, hands back",
-            "description": "Front foot striding toward pitcher, hands staying back",
-            "prompt_context": "The athlete is mid-stride, front foot stepping toward the pitcher while keeping the hands back and the bat cocked, maintaining separation before exploding into the swing.",
-        },
-        {
-            "id": "hitting_contact",
-            "title": "Contact point, bat on ball",
-            "description": "Bat meeting ball out front, hips fully rotated",
-            "prompt_context": "The athlete is at the exact moment of contact, bat meeting the ball out in front of home plate, hips fully rotated, arms fully extended through the hitting zone.",
-        },
-        {
-            "id": "hitting_follow_one_hand",
-            "title": "Follow through, one hand off",
-            "description": "One hand released from bat in the follow through",
-            "prompt_context": "The athlete is in the follow through of the swing, top hand naturally releasing from the bat as the bottom hand extends fully, watching the ball travel after making contact.",
-        },
-        {
-            "id": "hitting_full_follow",
-            "title": "Full follow through, two hands",
-            "description": "Bat fully wrapped around the body, complete swing",
-            "prompt_context": "The athlete has completed a full two-handed follow through, the bat fully wrapped around the body behind them, weight fully transferred to the front foot, watching the ball.",
-        },
-        {
-            "id": "hitting_check_swing",
-            "title": "Check swing, holding back",
-            "description": "Mid-swing, holding back, bat stopped partway",
-            "prompt_context": "The athlete began their swing but is checking it, bat stopped partway through the swing zone, body holding back and not committing fully.",
-        },
-        {
-            "id": "hitting_bunt",
-            "title": "Bunt stance",
-            "description": "Squared around to bunt, bat flat and out front",
-            "prompt_context": "The athlete has squared around into the bunting stance, bat held flat and extended out in front of the plate, soft hands ready to deaden the ball.",
-        },
-        {
-            "id": "hitting_walkoff",
-            "title": "Walk-off bat drop moment",
-            "description": "Knowing the ball is gone, beginning to drop the bat",
-            "prompt_context": "The athlete has just made contact on what they know is a home run, beginning the dramatic bat drop as they watch the ball leave the park, pure confidence in the moment.",
-        },
-    ],
-    "fielding": [
-        {
-            "id": "fielding_ready",
-            "title": "Ready position, pre-pitch",
-            "description": "Athletic stance, knees bent, glove low, weight on balls of feet",
-            "prompt_context": "The athlete is in their athletic pre-pitch ready position, knees bent, glove held low and out in front, weight balanced on the balls of the feet, ready to react in any direction.",
-        },
-        {
-            "id": "fielding_first_step",
-            "title": "First explosive step, reacting",
-            "description": "Just reacted to the ball, taking the first crossover step",
-            "prompt_context": "The athlete has just picked up the ball off the bat and is taking their explosive first crossover step in reaction, body already moving toward where the ball is going.",
-        },
-        {
-            "id": "fielding_backhand",
-            "title": "Ranging to the backhand side",
-            "description": "Moving to the backhand side, glove extended out",
-            "prompt_context": "The athlete is ranging hard to their backhand side, body fully turned and running, glove extended out in front making a backhand play on a ball to their throwing arm side.",
-        },
-        {
-            "id": "fielding_glove_side",
-            "title": "Ranging to the glove side",
-            "description": "Moving to the glove side, reaching out for the ball",
-            "prompt_context": "The athlete is ranging to their glove side, body moving laterally with the glove reaching out to make a forehand play on a ball to their non-throwing arm side.",
-        },
-        {
-            "id": "fielding_dive_airborne",
-            "title": "Full dive, body airborne",
-            "description": "Fully launched in the air, body horizontal, glove extended",
-            "prompt_context": "The athlete is fully airborne in a dive, body horizontal to the ground, glove fully extended making or about to make a diving catch, completely laid out.",
-        },
-        {
-            "id": "fielding_dive_landing",
-            "title": "Just landed after diving",
-            "description": "Just hit the ground after a dive, ball in glove, sliding",
-            "prompt_context": "The athlete has just completed a dive and is sliding on the grass or dirt, ball secured in the glove after the diving catch, body still low to the ground.",
-        },
-        {
-            "id": "fielding_wall_jump",
-            "title": "Jumping at the wall, robbing",
-            "description": "Leaping up at the wall, glove extended above to rob a homer",
-            "prompt_context": "The athlete is leaping up at the outfield wall or fence, one foot possibly on the wall, glove fully extended above the top of the barrier to rob what would have been a home run.",
-        },
-        {
-            "id": "fielding_going_back",
-            "title": "Going back on a deep flyball",
-            "description": "Turned and running back, glove up, tracking a deep ball",
-            "prompt_context": "The athlete has turned their back and is running toward the warning track or fence, glove raised, tracking a deep flyball over their shoulder while running at full speed.",
-        },
-        {
-            "id": "fielding_charging",
-            "title": "Charging in on a sinking liner",
-            "description": "Charging hard toward infield, glove down for a sinking liner",
-            "prompt_context": "The athlete is charging aggressively toward the infield, running at full speed with the glove held low near the ground trying to make a shoestring catch on a sinking line drive.",
-        },
-        {
-            "id": "fielding_double_play",
-            "title": "Double play pivot at second",
-            "description": "Catching throw at second, pivoting off the bag, firing to first",
-            "prompt_context": "The athlete is at second base executing a double play pivot, catching the incoming throw, pivoting off the base to avoid the runner, and firing the relay throw to first base.",
-        },
-    ],
-    "catching": [
-        {
-            "id": "catching_set",
-            "title": "Set position, giving target",
-            "description": "In full crouch, mitt extended and open, giving the pitcher a target",
-            "prompt_context": "The athlete is in their full catching crouch behind home plate, mitt extended and open, giving the pitcher a clear target to throw to.",
-        },
-        {
-            "id": "catching_receiving",
-            "title": "Receiving a pitch",
-            "description": "In the middle of receiving a pitch, mitt absorbing the ball",
-            "prompt_context": "The athlete is in the process of receiving a pitch, mitt positioned to catch the ball, body still and controlled behind the plate.",
-        },
-        {
-            "id": "catching_framing_low",
-            "title": "Framing a low pitch",
-            "description": "Receiving a pitch at the bottom of the zone, subtly framing up",
-            "prompt_context": "The athlete is receiving a pitch at the bottom of the strike zone, using soft hands to subtly move the mitt upward to frame the pitch as a strike for the umpire.",
-        },
-        {
-            "id": "catching_framing_outside",
-            "title": "Framing an outside corner pitch",
-            "description": "Catching a pitch on the outside corner, turning mitt inward",
-            "prompt_context": "The athlete is receiving a pitch on the outside corner of the plate, mitt positioned wide and turning inward to frame the pitch as a strike.",
-        },
-        {
-            "id": "catching_pop_throw_rising",
-            "title": "Coming up for a pop throw",
-            "description": "Rising out of the crouch, throwing arm coming up to fire",
-            "prompt_context": "The athlete is rising quickly out of the catching crouch, transferring the ball from mitt to throwing hand, arm coming up and loading to make a throw to second base.",
-        },
-        {
-            "id": "catching_pop_throw_release",
-            "title": "Full pop throw, arm extended",
-            "description": "Fully upright, throwing arm fully extended on the throw",
-            "prompt_context": "The athlete is fully upright and has made the pop throw, throwing arm fully extended toward second base at the release point, body square and powerful.",
-        },
-        {
-            "id": "catching_blocking",
-            "title": "Blocking a ball in the dirt",
-            "description": "Dropped to both knees blocking a wild pitch, chin down",
-            "prompt_context": "The athlete has dropped to both knees to block a ball in the dirt, body square and low, chin tucked down to the chest, using their body as a wall to keep the ball in front.",
-        },
-        {
-            "id": "catching_bunt_field",
-            "title": "Fielding a bunt",
-            "description": "Out from behind the plate, charging a bunt, about to throw",
-            "prompt_context": "The athlete has come out from behind home plate charging a bunt, mask discarded, picking up the ball and loading to make a quick throw to the base.",
-        },
-    ],
-    "celebrating": [
-        {
-            "id": "celebrating_first_fist_pump",
-            "title": "First raw fist pump",
-            "description": "Immediate reaction, single fist pump down, intense expression",
-            "prompt_context": "The athlete is having their immediate raw celebratory reaction, a single powerful fist pump downward, jaw set and intense, pure competitive emotion in the moment.",
-        },
-        {
-            "id": "celebrating_double_fist",
-            "title": "Double fist pump, both hands",
-            "description": "Both fists pumping down simultaneously, teeth clenched",
-            "prompt_context": "The athlete is pumping both fists downward simultaneously in an explosive double celebration, teeth clenched, eyes intense, maximum competitive emotion.",
-        },
-        {
-            "id": "celebrating_arms_raised",
-            "title": "Arms raised, looking up",
-            "description": "Both arms fully overhead, looking up to the sky",
-            "prompt_context": "The athlete has both arms raised fully overhead reaching toward the sky, head tilted back looking upward, soaking in a significant moment of triumph.",
-        },
-        {
-            "id": "celebrating_jump_pump",
-            "title": "Jump and fist pump",
-            "description": "Jumping off the ground while fist pumping, full body",
-            "prompt_context": "The athlete is fully airborne, feet off the ground in a celebratory jump, fist pumping powerfully while in the air, full body expression of joy.",
-        },
-        {
-            "id": "celebrating_pointing_dugout",
-            "title": "Pointing to the dugout",
-            "description": "Pointing toward teammates in the dugout after a big play",
-            "prompt_context": "The athlete is pointing directly toward their teammates in the dugout, sharing the moment, acknowledging the team after making a significant play.",
-        },
-        {
-            "id": "celebrating_screaming_sky",
-            "title": "Screaming toward the sky",
-            "description": "Head tilted back, mouth open in a yell, arms wide",
-            "prompt_context": "The athlete has their head tilted fully back, mouth open in a raw scream of pure excitement and release, arms spread wide, every emotion pouring out.",
-        },
-        {
-            "id": "celebrating_slow_trot",
-            "title": "Slow home run trot, head down",
-            "description": "Walking slowly from the plate, head down, letting it sink in",
-            "prompt_context": "The athlete is taking slow deliberate steps away from home plate, head slightly down, letting the magnitude of the home run moment sink in before beginning the full trot around the bases.",
-        },
-        {
-            "id": "celebrating_helmet_tip",
-            "title": "Helmet tip during trot",
-            "description": "Rounding a base, tipping the helmet to the crowd",
-            "prompt_context": "The athlete is mid home run trot rounding one of the bases, reaching up to tip or touch the brim of their helmet in acknowledgment to the crowd.",
-        },
-        {
-            "id": "celebrating_mob_arms_wide",
-            "title": "Running toward teammate mob",
-            "description": "Running toward rushing teammates, arms wide open",
-            "prompt_context": "The athlete is running toward a group of teammates who are rushing in to celebrate, arms spread wide open ready to embrace the celebration mob.",
-        },
-        {
-            "id": "celebrating_pointing_stands",
-            "title": "Pointing to someone in the stands",
-            "description": "After crossing the plate, pointing up to someone specific",
-            "prompt_context": "The athlete has just crossed home plate and is looking up into the stands, pointing directly at a specific person — a parent, family member, or someone meaningful to them in that moment.",
-        },
-    ],
-    "pumping_fist": [
-        {
-            "id": "fist_subtle_single",
-            "title": "Single subtle fist pump",
-            "description": "One controlled fist pump down, understated but intense",
-            "prompt_context": "The athlete is performing a single controlled fist pump downward, understated and composed but clearly intense, eyes focused, the quiet confidence of a competitor.",
-        },
-        {
-            "id": "fist_aggressive_double",
-            "title": "Aggressive rapid double pump",
-            "description": "Two rapid aggressive fist pumps, jaw clenched",
-            "prompt_context": "The athlete is executing two rapid aggressive fist pumps in quick succession, jaw fully clenched, pure competitive fire and intensity in the motion.",
-        },
-        {
-            "id": "fist_slow_deliberate",
-            "title": "Slow deliberate powerful pump",
-            "description": "One slow powerful fist pump, savoring the moment",
-            "prompt_context": "The athlete is making one slow and deliberately powerful fist pump, savoring the moment fully, total composure and confidence in the controlled celebration.",
-        },
-        {
-            "id": "fist_running",
-            "title": "Fist pump while running",
-            "description": "Pumping fist while jogging or running, mid-stride",
-            "prompt_context": "The athlete is pumping their fist while in motion, jogging or running mid-stride, the celebration happening while still moving on the field.",
-        },
-        {
-            "id": "fist_toward_dugout",
-            "title": "Fist pump toward the dugout",
-            "description": "Fist pump directed toward teammates in the dugout",
-            "prompt_context": "The athlete is directing their fist pump toward the dugout, body turned toward their teammates, sharing the emotional moment with the bench.",
-        },
-        {
-            "id": "fist_strikeout_spin",
-            "title": "Strikeout spin and pump",
-            "description": "Spinning and pumping fist after striking out a key batter",
-            "prompt_context": "The athlete is spinning their body in a full rotation while simultaneously pumping the fist, the natural motion of a pitcher after getting a huge strikeout.",
-        },
-    ],
-    "home_run_trot": [
-        {
-            "id": "trot_first_steps",
-            "title": "Just left the box, first steps",
-            "description": "Taking first slow confident steps out of the box, watching the ball",
-            "prompt_context": "The athlete has just made contact and is taking their first slow confident steps out of the batter's box, head turning to watch the ball travel, the home run trot just beginning.",
-        },
-        {
-            "id": "trot_rounding_first",
-            "title": "Rounding first base",
-            "description": "Making the wide turn around first base, settling into trot",
-            "prompt_context": "The athlete is making the wide arcing turn around first base, settling into their home run trot pace, body relaxed and confident.",
-        },
-        {
-            "id": "trot_between_bases",
-            "title": "Mid-trot between bases",
-            "description": "Fully locked into the trot, between bases",
-            "prompt_context": "The athlete is fully locked into their home run trot between bases, pace measured and deliberate, fully present in the moment of the home run.",
-        },
-        {
-            "id": "trot_rounding_third",
-            "title": "Rounding third, home in sight",
-            "description": "Making the turn at third, home plate in sight ahead",
-            "prompt_context": "The athlete is making the final turn around third base, home plate now clearly in sight straight ahead, the end of the home run trot moments away.",
-        },
-        {
-            "id": "trot_approaching_home",
-            "title": "Approaching home plate",
-            "description": "Last few steps toward home, teammates starting to gather",
-            "prompt_context": "The athlete is in the final few steps of the home run trot approaching home plate, teammates beginning to gather and rush in from the dugout to celebrate.",
-        },
-        {
-            "id": "trot_crossing_home",
-            "title": "Crossing home plate",
-            "description": "The exact moment of crossing home plate, hands slapping",
-            "prompt_context": "The athlete is at the exact moment of crossing home plate to complete the home run, slapping hands with waiting teammates, the celebration fully beginning.",
-        },
-    ],
-}
-
+# Backward-compatible motion-id keyed scenario lists (legacy API / tests).
 MOTION_SCENARIOS: dict[str, list[MotionScenario]] = {
-    "pitch_windup": SCENARIO_GROUPS["pitching"],
-    "throwing": SCENARIO_GROUPS["throwing"],
-    "hit_homerun": SCENARIO_GROUPS["hitting"],
-    "field_dive": SCENARIO_GROUPS["fielding"],
-    "catch_framing_throw": SCENARIO_GROUPS["catching"],
-    "celebrate_fist": SCENARIO_GROUPS["pumping_fist"],
-    "celebrate_homerun_trot": SCENARIO_GROUPS["home_run_trot"],
-    "celebrate_energy": SCENARIO_GROUPS["celebrating"],
+    motion_id: ACTION_CATEGORIES[category_id]["scenarios"]
+    for motion_id, category_id in LEGACY_MOTION_TO_CATEGORY.items()
+}
+
+_SCENARIO_BY_CATEGORY: dict[str, dict[str, MotionScenario]] = {
+    category_id: {scenario["id"]: scenario for scenario in category["scenarios"]}
+    for category_id, category in ACTION_CATEGORIES.items()
 }
 
 _SCENARIO_BY_MOTION: dict[str, dict[str, MotionScenario]] = {
-    motion_id: {s['id']: s for s in scenarios}
-    for motion_id, scenarios in MOTION_SCENARIOS.items()
+    motion_id: _SCENARIO_BY_CATEGORY[category_id]
+    for motion_id, category_id in LEGACY_MOTION_TO_CATEGORY.items()
 }
 
 
-def get_scenario(motion_id: str, scenario_id: str | None) -> MotionScenario | None:
-    """Return scenario for a motion, or None for generic / unknown ids."""
-    key = (scenario_id or "").strip()
-    if not key or key == "none":
-        return None
-    motion_key = (motion_id or "").strip()
-    return _SCENARIO_BY_MOTION.get(motion_key, {}).get(key)
-
-
-def list_scenarios_for_motion(motion_id: str) -> list[dict[str, str]]:
-    """Public scenario list for API (no prompt_context)."""
-    motion_key = (motion_id or "").strip()
+def list_action_categories() -> list[dict[str, str]]:
+    """Public category list for API (no scenario prompts)."""
     return [
-        {"id": s["id"], "title": s["title"], "description": s["description"]}
-        for s in MOTION_SCENARIOS.get(motion_key, [])
+        {
+            "id": category["id"],
+            "label": category["label"],
+            "description": category["description"],
+            "kling_motion": category["kling_motion"],
+        }
+        for category in ACTION_CATEGORIES.values()
     ]
 
 
+def get_action_category(category_id: str) -> ActionCategory | None:
+    return ACTION_CATEGORIES.get((category_id or "").strip())
+
+
+def kling_motion_for_category(category_id: str) -> str | None:
+    category = get_action_category(category_id)
+    return category["kling_motion"] if category else None
+
+
+def list_scenarios_for_category(category_id: str) -> list[dict[str, str]]:
+    """Public scenario list for a category (no prompts)."""
+    category = get_action_category(category_id)
+    if not category:
+        return []
+    return [
+        {"id": s["id"], "title": s["title"], "description": s["description"]}
+        for s in category["scenarios"]
+    ]
+
+
+def get_scenario_by_category(
+    category_id: str,
+    scenario_id: str | None,
+) -> MotionScenario | None:
+    """Return full scenario for a category, or None for generic / unknown ids."""
+    key = (scenario_id or "").strip()
+    if not key or key == "none":
+        return None
+    cat_key = (category_id or "").strip()
+    return _SCENARIO_BY_CATEGORY.get(cat_key, {}).get(key)
+
+
+def category_has_scenarios(category_id: str) -> bool:
+    category = get_action_category(category_id)
+    return bool(category and category["scenarios"])
+
+
+def get_scenario(motion_id: str, scenario_id: str | None) -> MotionScenario | None:
+    """Legacy wrapper: resolve category from motion id, then look up scenario."""
+    category_id = LEGACY_MOTION_TO_CATEGORY.get((motion_id or "").strip())
+    if not category_id:
+        return None
+    return get_scenario_by_category(category_id, scenario_id)
+
+
+def list_scenarios_for_motion(motion_id: str) -> list[dict[str, str]]:
+    """Legacy wrapper: scenarios for a motion id via category mapping."""
+    category_id = LEGACY_MOTION_TO_CATEGORY.get((motion_id or "").strip())
+    if not category_id:
+        return []
+    return list_scenarios_for_category(category_id)
+
+
 def motion_has_scenarios(motion_id: str) -> bool:
-    return bool(MOTION_SCENARIOS.get((motion_id or "").strip()))
+    """Legacy wrapper: whether a motion id has scenarios."""
+    return (motion_id or "").strip() in LEGACY_MOTION_TO_CATEGORY

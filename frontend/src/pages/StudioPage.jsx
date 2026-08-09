@@ -19,8 +19,8 @@ import HighlightVideoStep from "../components/HighlightVideoStep";
 import HighlightProcessingScreen from "../components/HighlightProcessingScreen";
 import QuantitySelector from "../components/QuantitySelector";
 import ActionCategoryStep from "../components/ActionCategoryStep";
+import HandednessStep from "../components/HandednessStep";
 import ScenarioSelectionStep from "../components/ScenarioSelectionStep";
-import MotionSelectionGrid from "../components/MotionSelectionGrid";
 import AnimationLoadingScreen from "../components/AnimationLoadingScreen";
 import PendingCardResumePrompt from "../components/PendingCardResumePrompt";
 import AnimateCardConfirmModal from "../components/AnimateCardConfirmModal";
@@ -33,8 +33,7 @@ import AnimatedAiDisclaimer from "../components/AnimatedAiDisclaimer";
 import { motionLabel } from "../constants/animationMotions";
 import {
   getActionCategory,
-  isSingleMotionCategory,
-  motionIdsForActionCategory,
+  klingMotionForCategory,
 } from "../constants/actionCategories";
 import { API_BASE_URL, authHeaders, toApiUrl } from "../config/api";
 import { useAuth } from "../context/AuthContext";
@@ -63,8 +62,8 @@ const STEP_TIER = 2;
 const STEP_THEME = 3;
 const STEP_CARD_TYPE = 4;
 const STEP_UPLOAD = 5;
-const STEP_ACTION = 6;
-const STEP_MOTION = 7;
+const STEP_HANDEDNESS = 6;
+const STEP_ACTION = 7;
 const STEP_SCENARIO = 8;
 const STEP_PHOTO_NOTES = 9;
 const STEP_HIGHLIGHT_VIDEO = 10;
@@ -77,8 +76,8 @@ const WIZARD_STEP_LABELS = {
   [STEP_THEME]: "Choose Theme",
   [STEP_CARD_TYPE]: "Choose Card Type",
   [STEP_UPLOAD]: "Upload",
+  [STEP_HANDEDNESS]: "Player Handedness",
   [STEP_ACTION]: "Tag Your Action",
-  [STEP_MOTION]: "Choose Motion",
   [STEP_SCENARIO]: "Match Your Photo",
   [STEP_PHOTO_NOTES]: "Photo Details",
   [STEP_HIGHLIGHT_VIDEO]: "Trim Highlight",
@@ -103,8 +102,8 @@ const ANIMATED_FLOW_STAGE = {
 
 function isAnimatedOnlyStep(step) {
   return (
+    step === STEP_HANDEDNESS ||
     step === STEP_ACTION ||
-    step === STEP_MOTION ||
     step === STEP_SCENARIO ||
     step === STEP_PHOTO_NOTES
   );
@@ -122,19 +121,19 @@ function getNextWizardStep(step, cardType) {
   if (step === STEP_THEME) return STEP_CARD_TYPE;
   if (step === STEP_CARD_TYPE) return STEP_UPLOAD;
   if (step === STEP_UPLOAD) {
-    if (isAnimated) return STEP_ACTION;
+    if (isAnimated) return STEP_HANDEDNESS;
     if (isHighlight) return STEP_HIGHLIGHT_VIDEO;
     return STEP_REVIEW;
   }
-  if (step === STEP_ACTION) return STEP_MOTION;
-  if (step === STEP_MOTION) return STEP_SCENARIO;
+  if (step === STEP_HANDEDNESS) return STEP_ACTION;
+  if (step === STEP_ACTION) return STEP_SCENARIO;
   if (step === STEP_SCENARIO) return STEP_PHOTO_NOTES;
   if (step === STEP_PHOTO_NOTES) return STEP_REVIEW;
   if (step === STEP_HIGHLIGHT_VIDEO) return STEP_REVIEW;
   return Math.min(step + 1, STEP_REVIEW);
 }
 
-function getPrevWizardStep(step, cardType, actionCategory = "") {
+function getPrevWizardStep(step, cardType) {
   const isAnimated = cardType === "animated";
   const isHighlight = cardType === "highlight";
   if (step === STEP_REVIEW) {
@@ -143,13 +142,10 @@ function getPrevWizardStep(step, cardType, actionCategory = "") {
     return STEP_UPLOAD;
   }
   if (step === STEP_PHOTO_NOTES) return STEP_SCENARIO;
-  if (step === STEP_SCENARIO) {
-    if (isSingleMotionCategory(actionCategory)) return STEP_ACTION;
-    return STEP_MOTION;
-  }
+  if (step === STEP_SCENARIO) return STEP_ACTION;
+  if (step === STEP_ACTION) return STEP_HANDEDNESS;
+  if (step === STEP_HANDEDNESS) return STEP_UPLOAD;
   if (step === STEP_HIGHLIGHT_VIDEO) return STEP_UPLOAD;
-  if (step === STEP_MOTION) return STEP_ACTION;
-  if (step === STEP_ACTION) return STEP_UPLOAD;
   if (step === STEP_UPLOAD) return STEP_CARD_TYPE;
   if (step === STEP_CARD_TYPE) return STEP_THEME;
   if (step === STEP_THEME) return STEP_TIER;
@@ -359,10 +355,10 @@ export default function StudioPage() {
   const [selectedMotionId, setSelectedMotionId] = useState("");
   const [selectedScenarioId, setSelectedScenarioId] = useState("");
   const [actionCategory, setActionCategory] = useState("");
+  const [throwingHand, setThrowingHand] = useState("");
+  const [battingSide, setBattingSide] = useState("");
   const [photoNotes, setPhotoNotes] = useState("");
-  const [motionStepMode, setMotionStepMode] = useState("select");
   const [actionStepError, setActionStepError] = useState("");
-  const [motionStepError, setMotionStepError] = useState("");
   const [scenarioStepError, setScenarioStepError] = useState("");
   const [reviewSubPhase, setReviewSubPhase] = useState("setup");
   const [photoStepError, setPhotoStepError] = useState("");
@@ -727,8 +723,9 @@ export default function StudioPage() {
       [STEP_UPLOAD]: isHighlightCardType
         ? Boolean(highlightClipDraft?.file)
         : Boolean(uploadedPhotoUrl) && !photoUploading,
+      [STEP_HANDEDNESS]:
+        !isAnimatedCardType || (Boolean(throwingHand) && Boolean(battingSide)),
       [STEP_ACTION]: !isAnimatedCardType || Boolean(actionCategory),
-      [STEP_MOTION]: !isAnimatedCardType || Boolean(selectedMotionId),
       [STEP_SCENARIO]: !isAnimatedCardType || Boolean(selectedScenarioId),
       [STEP_PHOTO_NOTES]: !isAnimatedCardType || true,
       [STEP_HIGHLIGHT_VIDEO]: isHighlightCardType && Boolean(highlightClipDraft?.confirmed),
@@ -743,7 +740,8 @@ export default function StudioPage() {
       uploadedPhotoUrl,
       photoUploading,
       actionCategory,
-      selectedMotionId,
+      throwingHand,
+      battingSide,
       selectedScenarioId,
       isAnimatedCardType,
       isHighlightCardType,
@@ -777,18 +775,19 @@ export default function StudioPage() {
       return;
     }
     setActionStepError("");
-    const motionIds = motionIdsForActionCategory(actionCategory);
-    if (motionIds.length === 1) {
-      setSelectedMotionId(motionIds[0]);
-      setSelectedScenarioId("");
-      setMotionStepMode("confirm");
-      setCurrentStep(STEP_SCENARIO);
-    } else {
-      setSelectedMotionId("");
-      setSelectedScenarioId("");
-      setMotionStepMode("select");
-      setCurrentStep(STEP_MOTION);
+    const motion = klingMotionForCategory(actionCategory);
+    setSelectedMotionId(motion || "");
+    setSelectedScenarioId("");
+    setCurrentStep(STEP_SCENARIO);
+  }
+
+  function handleHandednessContinue() {
+    if (!throwingHand || !battingSide) {
+      setPhotoStepError("Please answer both handedness questions to continue");
+      return;
     }
+    setPhotoStepError("");
+    setCurrentStep(STEP_ACTION);
   }
 
   function selectScenario(scenarioId) {
@@ -858,18 +857,12 @@ export default function StudioPage() {
       setCurrentStep(getNextWizardStep(STEP_UPLOAD, cardType));
       return;
     }
-    if (currentStep === STEP_ACTION) {
-      handleActionCategoryContinue();
+    if (currentStep === STEP_HANDEDNESS) {
+      handleHandednessContinue();
       return;
     }
-    if (currentStep === STEP_MOTION) {
-      if (!selectedMotionId) {
-        setMotionStepError("Please select a motion for your animated card");
-        return;
-      }
-      setMotionStepError("");
-      setSelectedScenarioId("");
-      setCurrentStep(STEP_SCENARIO);
+    if (currentStep === STEP_ACTION) {
+      handleActionCategoryContinue();
       return;
     }
     if (currentStep === STEP_SCENARIO) {
@@ -883,7 +876,7 @@ export default function StudioPage() {
   }
 
   function goBackStep() {
-    setCurrentStep(getPrevWizardStep(currentStep, cardType, actionCategory));
+    setCurrentStep(getPrevWizardStep(currentStep, cardType));
   }
 
   useEffect(() => {
@@ -1256,9 +1249,11 @@ export default function StudioPage() {
     setSelectedMotionId(draft.selected_motion_id || "");
     setSelectedScenarioId(draft.animation_scenario_id || "");
     setActionCategory(draft.action_category || "");
+    setThrowingHand(draft.throwing_hand || "");
+    setBattingSide(draft.batting_side || "");
     setPhotoNotes(draft.photo_notes || "");
-    if (draft.action_category && draft.selected_motion_id) {
-      setMotionStepMode(isSingleMotionCategory(draft.action_category) ? "confirm" : "select");
+    if (draft.action_category) {
+      setSelectedMotionId(draft.selected_motion_id || klingMotionForCategory(draft.action_category) || "");
     }
   }
 
@@ -1387,9 +1382,11 @@ export default function StudioPage() {
     setSpecialTheme("");
     setCardType("standard");
     setSelectedMotionId("");
+    setSelectedScenarioId("");
     setActionCategory("");
+    setThrowingHand("");
+    setBattingSide("");
     setPhotoNotes("");
-    setMotionStepMode("select");
     setReviewSubPhase("setup");
     setPreviewConfigureOpen(false);
     setPackOpeningActive(false);
@@ -1412,7 +1409,7 @@ export default function StudioPage() {
     setAnimationConfirmed(false);
     setPhotoStepError("");
     setActionStepError("");
-    setMotionStepError("");
+    setScenarioStepError("");
     setDetailsErrors({});
     setDetailsShowErrors(false);
     setTierStepError("");
@@ -1761,8 +1758,10 @@ export default function StudioPage() {
         tier: orderTier,
         card_type: cardType,
         special_theme: specialTheme || null,
-        selected_motion_id: selectedMotionId || null,
+        selected_motion_id: selectedMotionId || klingMotionForCategory(actionCategory) || null,
         action_category: actionCategory || null,
+        throwing_hand: isAnimatedCardType ? throwingHand || null : null,
+        batting_side: isAnimatedCardType ? battingSide || null : null,
         photo_notes: isAnimatedCardType ? photoNotes.trim().slice(0, 200) || null : null,
         animation_scenario_id: isAnimatedCardType ? selectedScenarioId || null : null,
         add_ons: [],
@@ -2394,7 +2393,8 @@ export default function StudioPage() {
                       setSelectedMotionId("");
                       setSelectedScenarioId("");
                       setActionCategory("");
-                      setMotionStepMode("select");
+                      setThrowingHand("");
+                      setBattingSide("");
                     }
                   }}
                   highlightCardPrice={generationPricing?.highlight_card_price ?? highlightCardPrice}
@@ -2415,6 +2415,35 @@ export default function StudioPage() {
                     className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
                   >
                     Continue to Upload
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {currentStep === STEP_HANDEDNESS && isAnimatedCardType ? (
+              <div className="grid gap-4">
+                <HandednessStep
+                  throwingHand={throwingHand}
+                  battingSide={battingSide}
+                  onThrowingHandChange={(id) => {
+                    setThrowingHand(id);
+                    setPhotoStepError("");
+                  }}
+                  onBattingSideChange={(id) => {
+                    setBattingSide(id);
+                    setPhotoStepError("");
+                  }}
+                  onContinue={handleHandednessContinue}
+                  error={photoStepError}
+                  tier={orderTier || "rookie"}
+                />
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={goBackStep}
+                    className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
+                  >
+                    Back
                   </button>
                 </div>
               </div>
@@ -2651,78 +2680,10 @@ export default function StudioPage() {
               </div>
             ) : null}
 
-            {currentStep === STEP_MOTION && isAnimatedCardType ? (
-              <div className="grid gap-4">
-                {motionStepMode === "confirm" ? (
-                  <>
-                    <div>
-                      <h3 className="text-lg font-semibold text-white">Your Animation</h3>
-                      <p className="mt-1 text-sm text-slate-400">
-                        Based on your {getActionCategory(actionCategory)?.label || "selected"} photo
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-violet-400/40 bg-violet-500/10 px-5 py-6 text-center">
-                      <p className="text-sm text-violet-200/90">Your animation:</p>
-                      <p className="mt-2 text-xl font-semibold text-white">
-                        {motionLabel(selectedMotionId)}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMotionStepMode("select");
-                          setSelectedMotionId("");
-                          setCurrentStep(STEP_ACTION);
-                        }}
-                        className="mt-4 text-sm text-violet-200 underline-offset-2 hover:text-violet-100 hover:underline"
-                      >
-                        Change
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div>
-                      <h3 className="text-lg font-semibold text-white">Choose Your Celebration</h3>
-                      <p className="mt-1 text-sm text-slate-400">
-                        Pick the motion that best matches your photo
-                      </p>
-                    </div>
-                    <MotionSelectionGrid
-                      value={selectedMotionId}
-                      onChange={(id) => {
-                        setSelectedMotionId(id);
-                        setSelectedScenarioId("");
-                        setMotionStepError("");
-                      }}
-                      error={motionStepError}
-                      motionIds={motionIdsForActionCategory(actionCategory)}
-                    />
-                  </>
-                )}
-                <AnimatedAiDisclaimer className="mt-1" />
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={goBackStep}
-                    className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
-                  >
-                    Back
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!canAdvanceFromStep}
-                    onClick={tryAdvanceStep}
-                    className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
-                  >
-                    Continue to Scenario →
-                  </button>
-                </div>
-              </div>
-            ) : null}
-
             {currentStep === STEP_SCENARIO && isAnimatedCardType ? (
               <div className="grid gap-4">
                 <ScenarioSelectionStep
+                  categoryId={actionCategory}
                   motionId={selectedMotionId}
                   value={selectedScenarioId}
                   onSelect={selectScenario}

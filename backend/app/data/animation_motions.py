@@ -110,31 +110,82 @@ def build_runway_prompt(
     scenario_id: str | None = None,
     photo_notes: str | None = None,
     tier: str | None = None,
+    action_category: str | None = None,
+    throwing_hand: str | None = None,
+    batting_side: str | None = None,
 ) -> str | None:
-    """Build the full Runway prompt: scenario context, user notes, motion, technical constraints."""
-    from config.motion_scenarios import GENERIC_SCENARIO_CONTEXT, get_scenario
+    """Build the full Kling prompt: scenario, handedness, notes, universal constraints."""
+    from config.motion_scenarios import (
+        GENERIC_SCENARIO_CONTEXT,
+        get_scenario,
+        get_scenario_by_category,
+        kling_motion_for_category,
+    )
+    from config.prompt_constraints import UNIVERSAL_KLING_CONSTRAINTS, handedness_for_category
 
     key = (motion_id or "").strip()
-    action_body = MOTION_ACTION_BODIES.get(key) or _LEGACY_MOTION_PROMPTS.get(key)
-    if not action_body:
-        return None
+    category = (action_category or "").strip().lower() or None
 
-    scenario = get_scenario(key, scenario_id)
-    scenario_context = scenario["prompt_context"] if scenario else GENERIC_SCENARIO_CONTEXT
+    scenario = None
+    if category:
+        scenario = get_scenario_by_category(category, scenario_id)
+    if scenario is None:
+        scenario = get_scenario(key, scenario_id)
+
+    if scenario and scenario.get("prompt"):
+        scenario_text = scenario["prompt"]
+    else:
+        action_body = MOTION_ACTION_BODIES.get(key) or _LEGACY_MOTION_PROMPTS.get(key)
+        if not action_body:
+            return None
+        scenario_text = f"Cinematic slow motion sports video. {action_body}"
+
+    handedness = handedness_for_category(
+        category,
+        throwing_hand=throwing_hand,
+        batting_side=batting_side,
+    )
 
     notes = (photo_notes or "").strip()
-    if notes:
-        user_context = f"Additional context: {notes[:150]}."
-    else:
-        user_context = ""
+    user_context = f"Additional context: {notes[:150]}." if notes else ""
 
-    parts = [scenario_context]
+    parts = [scenario_text, handedness]
     if user_context:
         parts.append(user_context)
-    parts.append("Cinematic slow motion sports video.")
-    parts.append(action_body)
-    parts.append(_KLING_CONSTRAINTS_SUFFIX)
+    parts.append(UNIVERSAL_KLING_CONSTRAINTS)
     return " ".join(parts)
+
+
+def kling_motion_for_action_category(action_category: str | None) -> str | None:
+    from config.motion_scenarios import kling_motion_for_category
+
+    return kling_motion_for_category((action_category or "").strip())
+
+
+def get_motion_prompt(
+    motion_id: str,
+    photo_notes: str | None = None,
+    scenario_id: str | None = None,
+    action_category: str | None = None,
+    throwing_hand: str | None = None,
+    batting_side: str | None = None,
+) -> str | None:
+    """Return the Kling prompt for a motion id, or None if unknown."""
+    built = build_runway_prompt(
+        motion_id,
+        scenario_id,
+        photo_notes,
+        action_category=action_category,
+        throwing_hand=throwing_hand,
+        batting_side=batting_side,
+    )
+    if built:
+        return built
+    motion = get_motion_by_id(motion_id)
+    if motion is None:
+        return None
+    prompt = (motion.get("prompt") or "").strip()
+    return prompt or None
 
 
 SELECTABLE_MOTION_PROMPTS: dict[str, str] = {
@@ -209,10 +260,10 @@ MOTION_ACTION_CATEGORY: dict[str, str] = {
     "pitch_windup": "pitching",
     "throwing": "throwing",
     "hit_homerun": "hitting",
-    "field_dive": "fielding",
+    "field_dive": "fielding_ground",
     "catch_framing_throw": "catching",
     "celebrate_fist": "celebrating",
-    "celebrate_energy": "celebrating",
+    "celebrate_energy": "general",
     "celebrate_homerun_trot": "celebrating",
 }
 
@@ -221,22 +272,6 @@ _MOTION_BY_ID: dict[str, dict[str, str]] = {m["id"]: m for m in ANIMATION_MOTION
 
 def get_motion_by_id(motion_id: str) -> dict[str, str] | None:
     return _MOTION_BY_ID.get((motion_id or "").strip())
-
-
-def get_motion_prompt(
-    motion_id: str,
-    photo_notes: str | None = None,
-    scenario_id: str | None = None,
-) -> str | None:
-    """Return the Runway prompt for a motion id, or None if unknown."""
-    built = build_runway_prompt(motion_id, scenario_id, photo_notes)
-    if built:
-        return built
-    motion = get_motion_by_id(motion_id)
-    if motion is None:
-        return None
-    prompt = (motion.get("prompt") or "").strip()
-    return prompt or None
 
 
 def is_motion_selectable(motion_id: str) -> bool:

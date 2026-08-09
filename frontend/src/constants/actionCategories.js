@@ -4,38 +4,56 @@ export const ACTION_CATEGORIES = [
   {
     id: "pitching",
     label: "Pitching",
-    description: "Full wind-up or stretch delivery from the mound",
-    motionIds: ["pitch_windup"],
+    description: "Delivering a pitch from the mound",
+    klingMotion: "pitch_windup",
   },
   {
     id: "throwing",
     label: "Throwing",
-    description: "Field throw from any position — infield or outfield",
-    motionIds: ["throwing"],
+    description: "Throwing the ball from any position",
+    klingMotion: "throwing",
+  },
+  {
+    id: "fielding_ground",
+    label: "Fielding a Ground Ball",
+    description: "Getting ready for or fielding a ground ball in the infield",
+    klingMotion: "field_dive",
+  },
+  {
+    id: "fly_ball",
+    label: "Catching a Fly Ball",
+    description: "Tracking or catching a fly ball",
+    klingMotion: "field_dive",
+  },
+  {
+    id: "outfield",
+    label: "Outfield",
+    description: "Playing the outfield — fielding, throwing, or tracking",
+    klingMotion: "throwing",
   },
   {
     id: "hitting",
     label: "Hitting",
-    description: "Batting stance, swing, or follow through",
-    motionIds: ["hit_homerun"],
-  },
-  {
-    id: "fielding",
-    label: "Fielding",
-    description: "Diving, ranging, or making a play in the field",
-    motionIds: ["field_dive"],
+    description: "At the plate — batting stance, swing, or follow through",
+    klingMotion: "hit_homerun",
   },
   {
     id: "catching",
-    label: "Catching",
-    description: "Behind the plate — receiving, framing, or throwing",
-    motionIds: ["catch_framing_throw"],
+    label: "Catching (Catcher)",
+    description: "Behind the plate — receiving, framing, blocking, or throwing",
+    klingMotion: "catch_framing_throw",
   },
   {
     id: "celebrating",
     label: "Celebrating",
-    description: "Fist pump, trot, arms up — any celebration moment",
-    motionIds: ["celebrate_fist", "celebrate_energy", "celebrate_homerun_trot"],
+    description: "Celebrating a big moment — any celebration",
+    klingMotion: "celebrate_fist",
+  },
+  {
+    id: "general",
+    label: "General / Practice",
+    description: "Practice, warmup, dugout, or any other baseball moment",
+    klingMotion: "celebrate_energy",
   },
 ];
 
@@ -43,10 +61,17 @@ export function getActionCategory(id) {
   return ACTION_CATEGORIES.find((c) => c.id === id) || null;
 }
 
-export function motionIdsForActionCategory(categoryId) {
-  return getActionCategory(categoryId)?.motionIds || [];
+export function klingMotionForCategory(categoryId) {
+  return getActionCategory(categoryId)?.klingMotion || null;
 }
 
+/** @deprecated All categories map to a single Kling motion — motion step is skipped. */
+export function motionIdsForActionCategory(categoryId) {
+  const motion = klingMotionForCategory(categoryId);
+  return motion ? [motion] : [];
+}
+
+/** @deprecated Every category is single-motion now. */
 export function isSingleMotionCategory(categoryId) {
-  return motionIdsForActionCategory(categoryId).length === 1;
+  return Boolean(getActionCategory(categoryId));
 }

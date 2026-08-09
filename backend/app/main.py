@@ -453,6 +453,8 @@ def _draft_metadata_from_order(order: dict) -> str:
         "special_theme": order.get("special_theme"),
         "selected_motion_id": order.get("selected_motion_id") or "",
         "action_category": order.get("action_category") or "",
+        "throwing_hand": order.get("throwing_hand") or "",
+        "batting_side": order.get("batting_side") or "",
         "photo_notes": (order.get("photo_notes") or "").strip()[:200],
         "animation_scenario_id": (order.get("animation_scenario_id") or "").strip() or "",
     }
@@ -545,6 +547,9 @@ def _store_generated_card(
     player_photo_url: str | None = None,
     photo_notes: str | None = None,
     animation_scenario_id: str | None = None,
+    action_category: str | None = None,
+    throwing_hand: str | None = None,
+    batting_side: str | None = None,
 ) -> dict:
     """Persist generated card to PostgreSQL; returns API-shaped dict."""
     vt = vault_tier or _vault_tier_from_gen_tier(gen_tier)
@@ -577,6 +582,9 @@ def _store_generated_card(
         player_photo_url=player_photo_url,
         photo_notes=photo_notes,
         animation_scenario_id=animation_scenario_id,
+        action_category=action_category,
+        throwing_hand=throwing_hand,
+        batting_side=batting_side,
     )
     return card_to_dict(row, db)
 
@@ -1227,6 +1235,8 @@ class CardVaultSummary(BaseModel):
     animation_status: str | None = Field(default=None)
     animation_motion: str | None = Field(default=None)
     action_category: str | None = Field(default=None)
+    throwing_hand: str | None = Field(default=None)
+    batting_side: str | None = Field(default=None)
     player_photo_url: str | None = Field(default=None)
     photo_notes: str | None = Field(default=None)
     animation_scenario_id: str | None = Field(default=None)
@@ -1277,6 +1287,8 @@ class Card(BaseModel):
     animation_status: str | None = Field(default=None)
     animation_motion: str | None = Field(default=None)
     action_category: str | None = Field(default=None)
+    throwing_hand: str | None = Field(default=None)
+    batting_side: str | None = Field(default=None)
     player_photo_url: str | None = Field(default=None)
     photo_notes: str | None = Field(default=None)
     animation_scenario_id: str | None = Field(default=None)
@@ -1342,6 +1354,8 @@ class OrderCreate(BaseModel):
     special_theme: str | None = Field(default=None, max_length=120)
     selected_motion_id: str | None = Field(default=None, max_length=64)
     action_category: str | None = Field(default=None, max_length=32)
+    throwing_hand: str | None = Field(default=None, max_length=10)
+    batting_side: str | None = Field(default=None, max_length=15)
     photo_notes: str | None = Field(default=None, max_length=200)
     animation_scenario_id: str | None = Field(default=None, max_length=100)
     add_ons: list[str] = Field(default_factory=list)
@@ -1447,6 +1461,8 @@ class PendingCardDraft(BaseModel):
     special_theme: str | None = None
     selected_motion_id: str = ""
     action_category: str = ""
+    throwing_hand: str = ""
+    batting_side: str = ""
     photo_notes: str = ""
     animation_scenario_id: str = ""
 
@@ -2051,6 +2067,8 @@ def create_order(
         special_theme=body.special_theme,
         selected_motion_id=body.selected_motion_id,
         action_category=body.action_category,
+        throwing_hand=(body.throwing_hand or "").strip().lower() or None,
+        batting_side=(body.batting_side or "").strip().lower() or None,
         photo_notes=(body.photo_notes or "").strip()[:200] or None,
         animation_scenario_id=(body.animation_scenario_id or "").strip() or None,
         add_ons=body.add_ons,
@@ -2196,6 +2214,9 @@ def generate_card_for_order(
     player_photo_url = (order.get("player_image_url") or "").strip() or None
     photo_notes = (order.get("photo_notes") or "").strip()[:200] or None
     animation_scenario_id = (order.get("animation_scenario_id") or "").strip() or None
+    action_category = (order.get("action_category") or "").strip() or None
+    throwing_hand = (order.get("throwing_hand") or "").strip().lower() or None
+    batting_side = (order.get("batting_side") or "").strip().lower() or None
     vault_rec = _store_generated_card(
         db,
         _player_id_for_order(order),
@@ -2214,6 +2235,9 @@ def generate_card_for_order(
         player_photo_url=player_photo_url if card_type == "animated" else None,
         photo_notes=photo_notes if card_type == "animated" else None,
         animation_scenario_id=animation_scenario_id if card_type == "animated" else None,
+        action_category=action_category if card_type == "animated" else None,
+        throwing_hand=throwing_hand if card_type == "animated" else None,
+        batting_side=batting_side if card_type == "animated" else None,
     )
 
     generated = GeneratedOrderCard(

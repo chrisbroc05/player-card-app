@@ -5,9 +5,12 @@ from __future__ import annotations
 import logging
 
 from card_repo import (
+    action_category_for_card,
     animation_scenario_id_for_card,
+    batting_side_for_card,
     photo_notes_for_card,
     player_photo_url_for_card,
+    throwing_hand_for_card,
 )
 from credit_service import refund_animation_credits
 from data.animation_motions import get_motion_prompt
@@ -68,7 +71,17 @@ async def process_animation(card_id: str, motion_id: str) -> None:
 
         photo_notes = photo_notes_for_card(card)
         scenario_id = animation_scenario_id_for_card(card)
-        motion_prompt = get_motion_prompt(motion_key, photo_notes, scenario_id)
+        category = action_category_for_card(card)
+        throwing_hand = throwing_hand_for_card(card)
+        batting_side = batting_side_for_card(card)
+        motion_prompt = get_motion_prompt(
+            motion_key,
+            photo_notes,
+            scenario_id,
+            action_category=category,
+            throwing_hand=throwing_hand,
+            batting_side=batting_side,
+        )
         if motion_prompt is None:
             raise RuntimeError(f"No video prompt for motion_id {motion_key} on card {card_id}")
 
@@ -79,24 +92,14 @@ async def process_animation(card_id: str, motion_id: str) -> None:
         card.animation_status = "processing"
         db.commit()
 
-        logger.info(
-            """
-=== VIDEO GENERATION PROMPT ===
-Card: %s
-Motion: %s
-Scenario: %s
-User notes: %s
-Final prompt (%d chars):
-%s
-==============================
-""",
-            card_id,
-            motion_key,
-            scenario_id or "none",
-            photo_notes or "none",
-            len(motion_prompt),
-            motion_prompt,
-        )
+        logger.info("=== KLING PROMPT ===")
+        logger.info("Category: %s", category or "none")
+        logger.info("Scenario: %s", scenario_id or "none")
+        logger.info("Throwing hand: %s", throwing_hand or "none")
+        logger.info("Batting side: %s", batting_side or "none")
+        logger.info("Motion: %s", motion_key)
+        logger.info("Prompt: %s", motion_prompt)
+        logger.info("===================")
 
         result = await generate_animation(source_photo_url, motion_prompt, card_id)
         if not result.get("success") or not result.get("video_url"):

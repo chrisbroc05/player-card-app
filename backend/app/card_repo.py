@@ -109,6 +109,8 @@ def create_card_row(
     preview_session_id: str | None = None,
     draft_metadata: str | None = None,
     action_category: str | None = None,
+    throwing_hand: str | None = None,
+    batting_side: str | None = None,
     player_photo_url: str | None = None,
     photo_notes: str | None = None,
     animation_scenario_id: str | None = None,
@@ -139,6 +141,8 @@ def create_card_row(
         preview_session_id=preview_session_id,
         draft_metadata=draft_metadata,
         action_category=action_category,
+        throwing_hand=(throwing_hand or "").strip().lower() or None,
+        batting_side=(batting_side or "").strip().lower() or None,
         player_photo_url=(player_photo_url or "").strip() or None,
         photo_notes=(photo_notes or "").strip()[:200] or None,
         animation_scenario_id=(animation_scenario_id or "").strip() or None,
@@ -206,6 +210,8 @@ def animation_fields_for_card(card: Card) -> dict:
         "animation_status": getattr(card, "animation_status", None),
         "animation_motion": getattr(card, "animation_motion", None),
         "action_category": getattr(card, "action_category", None) or None,
+        "throwing_hand": getattr(card, "throwing_hand", None) or None,
+        "batting_side": getattr(card, "batting_side", None) or None,
         "player_photo_url": getattr(card, "player_photo_url", None) or None,
         "photo_notes": getattr(card, "photo_notes", None) or None,
         "animation_scenario_id": getattr(card, "animation_scenario_id", None) or None,
@@ -239,6 +245,32 @@ def animation_scenario_id_for_card(card: Card) -> str | None:
     draft = _parse_draft_metadata(getattr(card, "draft_metadata", None))
     draft_scenario = (draft.get("animation_scenario_id") or "").strip()
     return draft_scenario or None
+
+
+def throwing_hand_for_card(card: Card) -> str | None:
+    hand = (getattr(card, "throwing_hand", None) or "").strip().lower()
+    if hand in ("left", "right"):
+        return hand
+    draft = _parse_draft_metadata(getattr(card, "draft_metadata", None))
+    draft_hand = (draft.get("throwing_hand") or "").strip().lower()
+    return draft_hand if draft_hand in ("left", "right") else None
+
+
+def batting_side_for_card(card: Card) -> str | None:
+    side = (getattr(card, "batting_side", None) or "").strip().lower()
+    if side in ("left", "right", "switch"):
+        return side
+    draft = _parse_draft_metadata(getattr(card, "draft_metadata", None))
+    draft_side = (draft.get("batting_side") or "").strip().lower()
+    return draft_side if draft_side in ("left", "right", "switch") else None
+
+
+def action_category_for_card(card: Card) -> str | None:
+    cat = (getattr(card, "action_category", None) or "").strip()
+    if cat:
+        return cat
+    draft = _parse_draft_metadata(getattr(card, "draft_metadata", None))
+    return (draft.get("action_category") or "").strip() or None
 
 
 def highlight_fields_for_card(card: Card) -> dict:
@@ -383,6 +415,8 @@ def create_animated_upgrade_card(
     row.animation_scenario_id = (
         getattr(source, "animation_scenario_id", None) or animation_scenario_id_for_card(source)
     )
+    row.throwing_hand = throwing_hand_for_card(source)
+    row.batting_side = batting_side_for_card(source)
     db.commit()
     db.refresh(row)
     return row

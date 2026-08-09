@@ -11,6 +11,7 @@ const NONE_OPTION = {
 };
 
 export default function ScenarioSelectionStep({
+  categoryId,
   motionId,
   value,
   onSelect,
@@ -26,6 +27,8 @@ export default function ScenarioSelectionStep({
   const listRef = useRef(null);
   const tierConfig = normalizeExperienceTier(tier);
 
+  const fetchKey = categoryId || motionId;
+
   const updateScrollState = useCallback(() => {
     const el = listRef.current;
     if (!el) return;
@@ -35,7 +38,7 @@ export default function ScenarioSelectionStep({
   }, []);
 
   useEffect(() => {
-    if (!motionId) {
+    if (!fetchKey) {
       setScenarios([]);
       setLoading(false);
       return undefined;
@@ -45,9 +48,10 @@ export default function ScenarioSelectionStep({
     (async () => {
       setLoading(true);
       try {
-        const res = await fetch(
-          `${API_BASE_URL}/cards/animation-scenarios?motion_id=${encodeURIComponent(motionId)}`
-        );
+        const query = categoryId
+          ? `category_id=${encodeURIComponent(categoryId)}`
+          : `motion_id=${encodeURIComponent(motionId)}`;
+        const res = await fetch(`${API_BASE_URL}/cards/animation-scenarios?${query}`);
         const data = await res.json().catch(() => []);
         if (!cancelled) setScenarios(Array.isArray(data) ? data : []);
       } catch {
@@ -60,11 +64,11 @@ export default function ScenarioSelectionStep({
     return () => {
       cancelled = true;
     };
-  }, [motionId]);
+  }, [fetchKey, categoryId, motionId]);
 
   useEffect(() => {
     setHasScrolled(false);
-  }, [motionId]);
+  }, [fetchKey]);
 
   useEffect(() => {
     updateScrollState();

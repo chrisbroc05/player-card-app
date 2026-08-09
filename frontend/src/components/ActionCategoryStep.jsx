@@ -22,7 +22,7 @@ export default function ActionCategoryStep({
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="action-category-grid">
         {ACTION_CATEGORIES.map((cat) => {
           const selected = value === cat.id;
           return (
@@ -30,7 +30,7 @@ export default function ActionCategoryStep({
               key={cat.id}
               type="button"
               onClick={() => onSelect(cat.id)}
-              className="action-category-btn relative flex min-h-[140px] flex-col items-center justify-center rounded-2xl border px-4 py-5 text-center transition will-change-transform hover:scale-[1.02]"
+              className="action-category-card"
               style={{
                 borderColor: selected ? tierConfig.color : "rgba(255, 255, 255, 0.12)",
                 backgroundColor: selected ? `${tierConfig.color}18` : "rgba(15, 15, 20, 0.85)",
@@ -38,22 +38,14 @@ export default function ActionCategoryStep({
                 fontFamily: tierConfig.font,
               }}
             >
-              {selected ? (
-                <span
-                  className="absolute right-2.5 top-2.5 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-slate-950"
-                  style={{ backgroundColor: tierConfig.color }}
-                >
-                  ✓
-                </span>
-              ) : null}
               <p
-                className="text-lg font-bold leading-tight"
+                className="action-category-card__name"
                 style={{ color: selected ? "#f8fafc" : "#e2e8f0" }}
               >
                 {cat.label}
               </p>
               {cat.description ? (
-                <p className="mt-2 text-xs leading-snug text-slate-400">{cat.description}</p>
+                <p className="action-category-card__desc">{cat.description}</p>
               ) : null}
             </button>
           );
@@ -67,9 +59,7 @@ export default function ActionCategoryStep({
           onClick={onContinue}
           className="inline-flex min-h-[52px] w-full items-center justify-center rounded-xl bg-neonBlue px-6 text-base font-semibold text-slate-950 transition hover:brightness-110 disabled:opacity-50"
         >
-          {selectedCategory
-            ? `Continue with ${selectedCategory.label} →`
-            : "Next →"}
+          {selectedCategory ? `Continue with ${selectedCategory.label} →` : "Next →"}
         </button>
       ) : null}
 

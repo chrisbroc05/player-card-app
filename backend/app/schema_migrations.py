@@ -245,6 +245,24 @@ def run_schema_migrations_after_models(engine: Engine) -> None:
                 )
             else:
                 conn.execute(text("ALTER TABLE cards ADD COLUMN action_category VARCHAR(32)"))
+        if "throwing_hand" not in cols:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN IF NOT EXISTS throwing_hand VARCHAR(10)"
+                    )
+                )
+            else:
+                conn.execute(text("ALTER TABLE cards ADD COLUMN throwing_hand VARCHAR(10)"))
+        if "batting_side" not in cols:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN IF NOT EXISTS batting_side VARCHAR(15)"
+                    )
+                )
+            else:
+                conn.execute(text("ALTER TABLE cards ADD COLUMN batting_side VARCHAR(15)"))
         if "is_highlight" not in cols:
             if dialect == "postgresql":
                 conn.execute(

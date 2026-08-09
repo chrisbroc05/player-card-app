@@ -31,8 +31,15 @@ from credit_service import (
 )
 from highlight_service import MAX_HIGHLIGHT_UPLOAD_BYTES, validate_trim_range, validate_upload_duration
 from highlight_video_utils import video_extension_for_content_type
-from config.motion_scenarios import list_scenarios_for_motion, motion_has_scenarios
-from data.animation_motions import get_motion_by_id, is_motion_selectable, list_motions_public
+from config.motion_scenarios import (
+    category_has_scenarios,
+    kling_motion_for_category,
+    list_action_categories,
+    list_scenarios_for_category,
+    list_scenarios_for_motion,
+    motion_has_scenarios,
+)
+from data.animation_motions import get_motion_by_id, is_motion_selectable, kling_motion_for_action_category, list_motions_public
 from database import get_db
 from email_service import _absolute_image_url, frontend_url, send_highlight_complete_email
 from marketplace_repo import cancel_pending_marketplace_offers_for_card
@@ -194,12 +201,29 @@ def list_animation_motions():
     return list_motions_public()
 
 
+@router.get("/animation-categories")
+def list_animation_categories():
+    """Public list of action categories for the animated card wizard."""
+    return list_action_categories()
+
+
 @router.get("/animation-scenarios")
-def list_animation_scenarios(motion_id: str = Query(..., min_length=1, max_length=64)):
-    """Public scenario options for a motion (no prompt_context)."""
-    if not motion_has_scenarios(motion_id):
+def list_animation_scenarios(
+    category_id: str | None = Query(default=None, alias="category_id"),
+    motion_id: str | None = Query(default=None, min_length=1, max_length=64),
+):
+    """Public scenario options for a category or legacy motion id."""
+    cat = (category_id or "").strip()
+    if cat:
+        if not category_has_scenarios(cat):
+            return []
+        return list_scenarios_for_category(cat)
+    mid = (motion_id or "").strip()
+    if not mid:
         return []
-    return list_scenarios_for_motion(motion_id)
+    if not motion_has_scenarios(mid):
+        return []
+    return list_scenarios_for_motion(mid)
 
 
 @router.get("/test-pika")

@@ -100,6 +100,8 @@ class Card(Base):
     animation_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
     animation_motion: Mapped[str | None] = mapped_column(String(64), nullable=True)
     action_category: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    throwing_hand: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    batting_side: Mapped[str | None] = mapped_column(String(15), nullable=True)
     animation_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     animation_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_highlight: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
