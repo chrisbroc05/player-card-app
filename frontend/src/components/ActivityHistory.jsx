@@ -1,5 +1,5 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import CardImage from "./CardImage";
 import { API_BASE_URL, authHeaders } from "../config/api";
 import {
@@ -332,6 +332,7 @@ export function ProfileActivityCompactList({ items, loading }) {
 }
 
 export function RecentActivitySection({ token, limit = 5 }) {
+  const location = useLocation();
   const [items, setItems] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
 
@@ -360,7 +361,7 @@ export function RecentActivitySection({ token, limit = 5 }) {
     return () => {
       cancelled = true;
     };
-  }, [token, limit]);
+  }, [token, limit, location.key]);
 
   return (
     <section className="mt-8 rounded-2xl border border-white/10 bg-cardBg p-6">

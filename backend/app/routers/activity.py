@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from activity_history import ACTIVITY_TYPES, list_user_activity_history
@@ -81,6 +81,7 @@ class ActivityHistoryResponse(BaseModel):
 
 @router.get("/history", response_model=ActivityHistoryResponse)
 def get_activity_history(
+    response: Response,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     activity_type: str | None = Query(default=None, alias="type"),
@@ -88,6 +89,7 @@ def get_activity_history(
     user: User = Depends(get_current_user),
 ):
     """Unified completed activity for the authenticated user, newest first."""
+    response.headers["Cache-Control"] = "no-store"
     if activity_type:
         normalized = activity_type.strip().lower()
         allowed = ACTIVITY_TYPES | {"trades"}

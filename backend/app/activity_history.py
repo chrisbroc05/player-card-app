@@ -7,10 +7,10 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session, joinedload
 
-from card_pricing import animated_upgrade_price, highlight_card_price
+from card_pricing import animated_upgrade_price, highlight_card_price, tier_generation_price
 from card_repo import (
-    ANIMATED_UPGRADE_STYLE_PREFIX,
     animation_fields_for_card,
+    cards_created_by_user_filter,
     highlight_fields_for_card,
 )
 from marketplace_repo import float_from_decimal
@@ -27,6 +27,7 @@ ACTIVITY_TYPES = frozenset(
         "marketplace_bought",
         "animated_upgrade",
         "highlight_upgrade",
+        "card_created",
     }
 )
 
@@ -222,10 +223,9 @@ def gather_user_activity_items(db: Session, user_id: int) -> list[dict]:
     animated_rows = (
         db.query(Card)
         .filter(
-            Card.creator_user_id == user_id,
+            cards_created_by_user_filter(user_id),
             Card.is_animated.is_(True),
             Card.animation_status == "completed",
-            Card.style.like(f"{ANIMATED_UPGRADE_STYLE_PREFIX}%"),
         )
         .all()
     )
@@ -247,7 +247,7 @@ def gather_user_activity_items(db: Session, user_id: int) -> list[dict]:
     highlight_rows = (
         db.query(Card)
         .filter(
-            Card.creator_user_id == user_id,
+            cards_created_by_user_filter(user_id),
             Card.is_highlight.is_(True),
             Card.highlight_status == "completed",
         )
@@ -265,6 +265,29 @@ def gather_user_activity_items(db: Session, user_id: int) -> list[dict]:
                 card=card,
                 counterparty=None,
                 amount=highlight_price,
+            )
+        )
+
+    standard_rows = (
+        db.query(Card)
+        .filter(
+            cards_created_by_user_filter(user_id),
+            Card.is_animated.is_(False),
+            Card.is_highlight.is_(False),
+        )
+        .all()
+    )
+    for card in standard_rows:
+        when = card.created_at
+        items.append(
+            _build_item(
+                item_id=f"card_created-{card.id}",
+                activity_type="card_created",
+                completed_at=when,
+                created_at=card.created_at,
+                card=card,
+                counterparty=None,
+                amount=tier_generation_price(card.tier),
             )
         )
 

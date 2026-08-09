@@ -346,7 +346,7 @@ export default function MyCollectionPage() {
         {animationLoadingCardId ? (
           <section
             ref={animationFocusRef}
-            className="scroll-focus-target animate-fadeUp rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6"
+            className="scroll-focus-target overflow-hidden rounded-2xl border-0 bg-transparent p-0 shadow-none"
           >
             <AnimationLoadingScreen
               cardId={animationLoadingCardId}

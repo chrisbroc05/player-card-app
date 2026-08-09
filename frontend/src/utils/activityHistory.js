@@ -55,11 +55,24 @@ export const ACTIVITY_META = {
     badgeClass: "border-[#D85A30]/40 bg-[#D85A30]/15 text-orange-100",
     iconWrapClass: "border-[#D85A30]/35 bg-[#D85A30]/15 text-orange-100",
   },
+  card_created: {
+    emoji: "🃏",
+    label: "Card Created",
+    shortLabel: "Created",
+    badgeClass: "border-teal-400/40 bg-teal-500/15 text-teal-100",
+    iconWrapClass: "border-teal-400/35 bg-teal-500/15 text-teal-100",
+  },
 };
 
 export function activityMeta(item, tier) {
   const base = ACTIVITY_META[item?.activity_type] || ACTIVITY_META.trade_sent;
-  if (item?.activity_type !== "animated_upgrade" && item?.activity_type !== "highlight_upgrade") return base;
+  if (
+    item?.activity_type !== "animated_upgrade"
+    && item?.activity_type !== "highlight_upgrade"
+    && item?.activity_type !== "card_created"
+  ) {
+    return base;
+  }
   const badge = vaultTierBadge(tier);
   return {
     ...base,
@@ -109,11 +122,17 @@ const ACTIVITY_ROW_STYLES = {
     badgeStyle: { backgroundColor: "#D85A30", color: "#ffffff" },
     labelColor: "#fdba74",
   },
+  card_created: {
+    label: "CARD CREATED",
+    glyph: "★",
+    badgeStyle: { backgroundColor: "#0d9488", color: "#ffffff" },
+    labelColor: "#5eead4",
+  },
 };
 
 export function activityRowStyle(item) {
   const base = ACTIVITY_ROW_STYLES[item?.activity_type] || ACTIVITY_ROW_STYLES.trade_sent;
-  if (item?.activity_type !== "animated_upgrade") return base;
+  if (item?.activity_type !== "animated_upgrade" && item?.activity_type !== "card_created") return base;
   const accent = vaultTierBadge(item?.card?.tier).accent;
   return { ...base, badgeStyle: { backgroundColor: accent, color: "#ffffff" } };
 }
@@ -155,6 +174,9 @@ export function counterpartyLine(item) {
   const type = item?.activity_type;
   if (type === "animated_upgrade" || type === "highlight_upgrade") {
     return "Upgraded by you";
+  }
+  if (type === "card_created") {
+    return "Created by you";
   }
   const name = item?.counterparty?.display_name;
   if (!name) return null;
@@ -219,6 +241,10 @@ export function activityAmountDisplay(item) {
 
   if (type === "highlight_upgrade") {
     return { text: `−${formatMoney(Math.abs(raw))}`, tone: "danger", subtext: "Highlight", small: true };
+  }
+
+  if (type === "card_created") {
+    return { text: `−${formatMoney(Math.abs(raw))}`, tone: "danger", subtext: "Card creation", small: true };
   }
 
   return { text: formatMoney(Math.abs(raw)), tone: "muted" };

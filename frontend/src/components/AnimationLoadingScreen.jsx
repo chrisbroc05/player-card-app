@@ -85,12 +85,8 @@ export default function AnimationLoadingScreen({
   }
 
   const shareButton = (
-    <button
-      type="button"
-      onClick={handleShare}
-      className="cce-reveal-btn cce-reveal-btn--secondary"
-    >
-      {shareCopied ? "Link copied!" : "Share"}
+    <button type="button" onClick={handleShare} className="acr-btn acr-btn--secondary">
+      {shareCopied ? "Link copied!" : "Share Card"}
     </button>
   );
 

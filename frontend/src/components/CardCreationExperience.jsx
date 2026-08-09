@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import AnimatedCardReveal from "./AnimatedCardReveal";
 import CardImage from "./CardImage";
 import { toApiUrl } from "../config/api";
 import {
@@ -616,11 +617,14 @@ export default function CardCreationExperience({
   if (!active) return null;
 
   const isReveal = mode === "reveal" || mode === "landed";
+  const isAnimatedReveal = cardType === "animated" && isReveal;
   const revealVariant = cardType === "highlight" ? "rise" : "bounce";
+  const showAnimatedActions =
+    showPrimaryAction && (cardType === "animated" ? mode === "reveal" || mode === "landed" : mode === "landed");
 
   return (
     <div
-      className={`cce-scene ${fullscreen ? "cce-scene--fullscreen" : ""} ${isReveal ? "cce-scene--reveal" : ""}`}
+      className={`cce-scene ${fullscreen ? "cce-scene--fullscreen" : ""} ${isAnimatedReveal ? "cce-scene--animated-reveal" : ""} ${isReveal && !isAnimatedReveal ? "cce-scene--reveal" : ""}`}
       style={cssVars}
       aria-live="polite"
       aria-busy={!revealReady}
@@ -658,6 +662,20 @@ export default function CardCreationExperience({
           ) : null}
           {hint ? <p className="cce-hint">{hint}</p> : null}
         </>
+      ) : isAnimatedReveal ? (
+        <AnimatedCardReveal
+          videoUrl={resolvedVideoUrl}
+          playerName={playerName}
+          tierConfig={tierConfig}
+          theme={theme}
+          showPrimaryAction={showAnimatedActions}
+          primaryActionLabel={primaryActionLabel}
+          onPrimaryAction={() => {
+            onPrimaryAction?.();
+            onRevealComplete?.();
+          }}
+          secondaryAction={secondaryAction}
+        />
       ) : (
         <RevealSection
           cardType={cardType}

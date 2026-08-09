@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Link, Navigate, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useSearchParams } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import CardImage from "../components/CardImage";
@@ -93,6 +93,7 @@ function CardPlaceholder({ icon, message, linkTo, linkLabel }) {
 }
 
 function ProfileRecentActivity({ token }) {
+  const location = useLocation();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -121,7 +122,7 @@ function ProfileRecentActivity({ token }) {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, location.key]);
 
   return (
     <section>
