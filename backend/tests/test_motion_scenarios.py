@@ -90,11 +90,11 @@ class RunwayPromptScenarioTests(unittest.TestCase):
         self.assertIn("Only one baseball may appear in any scene at any time", prompt)
         self.assertIn("Blank jerseys only.", prompt)
         self.assertIn("Animate only the identified athlete.", prompt)
-        self.assertIn("must also have no people", prompt)
+        self.assertIn("figures not clearly visible in the original photo", prompt)
 
-    def test_fielding_ground_has_six_scenarios(self):
+    def test_fielding_ground_has_eleven_scenarios(self):
         scenarios = list_scenarios_for_category("fielding_ground")
-        self.assertEqual(len(scenarios), 6)
+        self.assertEqual(len(scenarios), 11)
 
     def test_hitting_has_six_scenarios(self):
         scenarios = list_scenarios_for_category("hitting")

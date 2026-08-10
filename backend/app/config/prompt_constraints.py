@@ -21,15 +21,14 @@ THROWING_HAND_CATEGORIES = frozenset(
 BATTING_SIDE_CATEGORIES = frozenset({"hitting"})
 
 UNIVERSAL_KLING_CONSTRAINTS = (
-    "Only one baseball may appear in any scene at any time — never show multiple baseballs "
-    "or duplicate any sports equipment. "
+    "Only one baseball may appear in any scene at any time. "
+    "Never show multiple baseballs or duplicate any sports equipment. "
     "No text, numbers, names, or lettering anywhere on clothing or uniforms. "
     "Blank jerseys only. No player name on back of jersey. "
     "No jersey number on front or back. "
     "The background must remain static and faithful to the original image. "
     "Do not add, generate, or animate any other people, players, coaches, umpires, "
-    "or figures of any kind that are not clearly visible in the original photo. "
-    "If the original background has no people in it, the animated background must also have no people. "
+    "or figures not clearly visible in the original photo. "
     "Animate only the identified athlete. "
     "Locked off static camera. Absolutely no zoom, push, pull, pan, or camera movement of any kind. "
     "Photorealistic."
