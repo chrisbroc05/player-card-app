@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from "react";
 import CardImage from "./CardImage";
 import { useScrollModalIntoView } from "../hooks/useScrollIntoViewOnChange";
+import { themeDisplayLabel } from "../utils/cardBannerStyles";
+import { normalizeHighlightThemeKey } from "../utils/highlightCardStyles";
 
 export default function AnimatedCardChoiceModal({
   open,
@@ -31,6 +33,11 @@ export default function AnimatedCardChoiceModal({
       tier: "rookie",
     });
 
+  const themeRaw = previewCard?.theme ?? previewCard?.special_theme ?? "";
+  const themeKey = normalizeHighlightThemeKey(themeRaw);
+  const themeLabel = themeDisplayLabel(themeRaw);
+  const showThemeDisclaimer = themeKey !== "default" && Boolean(themeLabel);
+
   return (
     <div className="animated-popup-overlay fixed inset-0 z-[58] flex items-end justify-center bg-black/75 p-4 sm:items-center sm:p-4">
       <div
@@ -47,6 +54,18 @@ export default function AnimatedCardChoiceModal({
         <div className="animated-popup-card-wrap mt-5">
           <CardImage card={displayCard} alt={previewAlt} showInfoBanner variant="detail" />
         </div>
+
+        {showThemeDisclaimer ? (
+          <div className="animated-theme-disclaimer mt-4" role="note">
+            <span className="animated-theme-disclaimer__icon" aria-hidden>
+              ℹ️
+            </span>
+            <p className="animated-theme-disclaimer__text">
+              Note: Your {themeLabel} theme styling appears on the card frame and banner. The animation shows your
+              player photo in motion — the theme is applied as a visual overlay when viewing the card.
+            </p>
+          </div>
+        ) : null}
 
         <div className="mt-4 flex flex-col gap-3">
           <button

@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE_URL, authHeaders } from "../config/api";
 import { normalizeAnimationStatus } from "../utils/animationCard";
+import { ANIMATION_EMAIL_FALLBACK_MS } from "../utils/animationWaitMessaging";
 
 export const ANIMATION_POLL_INTERVAL_MS = 5000;
-export const ANIMATION_MAX_POLL_MS = 600000;
+export { ANIMATION_EMAIL_FALLBACK_MS as ANIMATION_MAX_POLL_MS };
 
 /**
- * Poll GET /cards/{id}/animation-status until completed, failed, or timeout.
+ * Poll GET /cards/{id}/animation-status until completed or failed.
+ * Sets timedOut after ANIMATION_EMAIL_FALLBACK_MS (8 min) but keeps polling.
  * Survives tab visibility changes and keeps callbacks stable via refs.
  */
 export function useAnimationStatusPolling({
@@ -91,11 +93,9 @@ export function useAnimationStatusPolling({
     const runPoll = async () => {
       if (cancelled || completionNotifiedRef.current) return;
 
-      if (Date.now() - startAt > ANIMATION_MAX_POLL_MS) {
+      if (Date.now() - startAt > ANIMATION_EMAIL_FALLBACK_MS) {
         setTimedOut(true);
-        if (intervalId) clearInterval(intervalId);
         onTimeoutRef.current?.();
-        return;
       }
 
       const data = await pollOnce();

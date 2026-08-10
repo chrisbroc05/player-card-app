@@ -11,6 +11,7 @@ import {
   HIGHLIGHT_CREATION_POLL_INTERVAL_MS,
   useHighlightStatusPolling,
 } from "../hooks/useHighlightStatusPolling";
+import { buildAnimationCyclingMessages } from "../utils/animationWaitMessaging";
 import {
   AWAKENING_CYCLE_TEXT,
   AWAKENING_FLIP_TEXT,
@@ -255,14 +256,7 @@ function AwakeningExperience({ phaseIndex, tierConfig, waitingForGeneration = fa
   const cycled = useCyclingText(AWAKENING_CYCLE_TEXT.slice(1), 2000, cycleEnabled);
 
   const waitMessages = React.useMemo(
-    () => [
-      "AI is studying your photo...",
-      "Generating cinematic motion...",
-      "Rendering frame by frame...",
-      motionName ? `Applying ${motionName} animation...` : "Applying motion animation...",
-      "Adding finishing touches...",
-      "Almost there...",
-    ],
+    () => buildAnimationCyclingMessages(motionName),
     [motionName]
   );
   const waitCycled = useCyclingText(waitMessages, 3000, waitingForGeneration);
@@ -504,6 +498,7 @@ export default function CardCreationExperience({
   revealTitle = "",
   fullscreen = false,
   hint = "This usually takes 30–60 seconds. Please keep this page open.",
+  extraWaitHint = "",
 }) {
   const tierConfig = normalizeExperienceTier(tier);
   const cssVars = tierCssVars(tierConfig);
@@ -661,6 +656,9 @@ export default function CardCreationExperience({
             />
           ) : null}
           {hint ? <p className="cce-hint">{hint}</p> : null}
+          {extraWaitHint && cardType === "animated" && !revealReady ? (
+            <p className="cce-hint cce-hint--extra">{extraWaitHint}</p>
+          ) : null}
         </>
       ) : isAnimatedReveal ? (
         <AnimatedCardReveal

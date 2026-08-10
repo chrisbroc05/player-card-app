@@ -144,6 +144,7 @@ export default function ScenarioSelectionStep({
               role="listbox"
               aria-label="Photo scenarios"
               onScroll={handleListScroll}
+              style={{ "--scenario-scroll-accent": tierConfig.color }}
             >
               {scenarios.map((scenario) => renderScenarioCard(scenario))}
             </div>

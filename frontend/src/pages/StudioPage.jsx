@@ -30,6 +30,8 @@ import CardCreationExperience from "../components/CardCreationExperience";
 import StartOverConfirmModal, { StartOverButton } from "../components/StartOverConfirmModal";
 import AnimatedFlowExplainer from "../components/AnimatedFlowExplainer";
 import AnimatedAiDisclaimer from "../components/AnimatedAiDisclaimer";
+import PlayerDetailsStep from "../components/PlayerDetailsStep";
+import PhotoNotesStep from "../components/PhotoNotesStep";
 import {
   getActionCategory,
   klingMotionForCategory,
@@ -48,6 +50,7 @@ import {
   generationUsageFromPayload,
 } from "../utils/generationUsage";
 import { scrollAfterPaint } from "../utils/smoothScroll";
+import { playerNameFromForm, validatePlayerDetails } from "../utils/playerDetails";
 import { cleanupFailedHighlightCard, uploadHighlightClip } from "../utils/uploadHighlightClip";
 import { captureVideoFrameAsFile } from "../utils/highlightVideo";
 import {
@@ -196,41 +199,6 @@ const TIER_UI = {
       "border-amber-300/35 bg-gradient-to-r from-zinc-700/40 via-amber-500/20 to-yellow-400/20",
   },
 };
-
-function playerNameFromForm(firstName, lastName, displayName) {
-  return (displayName.trim() || `${firstName.trim()} ${lastName.trim()}`.trim());
-}
-
-function isValidGradYear(value) {
-  const n = Number(value);
-  return Number.isInteger(n) && n >= 1950 && n <= 2100;
-}
-
-function validatePlayerDetails(firstName, lastName, displayName, teamName, position, jerseyNumber, gradYear) {
-  const errors = {};
-  const playerName = playerNameFromForm(firstName, lastName, displayName);
-  if (playerName.length < 2) {
-    errors.playerName = "Player name is required (minimum 2 characters)";
-  }
-  if (!teamName.trim()) errors.teamName = "Team name is required";
-  if (!position.trim()) errors.position = "Position is required";
-  if (!jerseyNumber.trim()) {
-    errors.jerseyNumber = "Jersey number is required";
-  } else if (!/^\d+$/.test(jerseyNumber.trim())) {
-    errors.jerseyNumber = "Jersey number must be a number";
-  }
-  if (!String(gradYear || "").trim()) {
-    errors.gradYear = "Grad year is required";
-  } else if (!isValidGradYear(gradYear)) {
-    errors.gradYear = "Enter a valid graduation year";
-  }
-  return { valid: Object.keys(errors).length === 0, errors };
-}
-
-
-function fieldErrorClass(hasError) {
-  return hasError ? "border-rose-500/60 ring-1 ring-rose-500/30" : "border-white/15";
-}
 
 function WizardProgress({ currentStep, isAnimated, isHighlight, cardType, onGoToStep }) {
   const progressPct = Math.round((currentStep / TOTAL_WIZARD_STEPS) * 100);
@@ -858,12 +826,67 @@ export default function StudioPage() {
     setHighlightUploadError("");
   }
 
+  function applyPlayerDetailsFields(values) {
+    setFirstName(values.firstName || "");
+    setLastName(values.lastName || "");
+    setDisplayName(values.displayName || "");
+    setJerseyNumber(values.jerseyNumber || "");
+    setPosition(values.position || "");
+    setGradYear(values.gradYear || "");
+    setTeamName(values.teamName || "");
+  }
+
+  function handleDetailsFieldBlur(field, value) {
+    switch (field) {
+      case "firstName":
+        setFirstName(value);
+        break;
+      case "lastName":
+        setLastName(value);
+        break;
+      case "displayName":
+        setDisplayName(value);
+        break;
+      case "jerseyNumber":
+        setJerseyNumber(value);
+        break;
+      case "position":
+        setPosition(value);
+        break;
+      case "gradYear":
+        setGradYear(value);
+        break;
+      case "teamName":
+        setTeamName(value);
+        break;
+      default:
+        break;
+    }
+  }
+
+  function handleDetailsContinue(values) {
+    applyPlayerDetailsFields(values);
+    const validation = validatePlayerDetails(
+      values.firstName,
+      values.lastName,
+      values.displayName,
+      values.teamName,
+      values.position,
+      values.jerseyNumber,
+      values.gradYear
+    );
+    if (!validation.valid) {
+      setDetailsShowErrors(true);
+      setDetailsErrors(validation.errors);
+      return;
+    }
+    setDetailsShowErrors(false);
+    setDetailsErrors({});
+    setCurrentStep(STEP_TIER);
+  }
+
   function tryAdvanceStep() {
     if (currentStep === STEP_DETAILS) {
-      setDetailsShowErrors(true);
-      setDetailsErrors(detailsValidation.errors);
-      if (!detailsValidation.valid) return;
-      setCurrentStep(STEP_TIER);
       return;
     }
     if (currentStep === STEP_TIER) {
@@ -912,7 +935,6 @@ export default function StudioPage() {
       return;
     }
     if (currentStep === STEP_PHOTO_NOTES) {
-      setCurrentStep(STEP_REVIEW);
       return;
     }
   }
@@ -958,6 +980,9 @@ export default function StudioPage() {
   useEffect(() => {
     if (prevStepRef.current === currentStep) return;
     prevStepRef.current = currentStep;
+    if (currentStep >= STEP_DETAILS && currentStep <= STEP_REVIEW) {
+      return;
+    }
     scrollAfterPaint(wizardPanelRef.current);
   }, [currentStep]);
 
@@ -1567,12 +1592,13 @@ export default function StudioPage() {
   }
 
   useEffect(() => {
-    if (initializing) return;
+    if (initializing || !token) return;
+    if (inCreationFlow) return;
     fetchMyCards().catch((err) => {
       setError(err.message || "Could not load data.");
     });
     fetchOrders();
-  }, [token, initializing]);
+  }, [token, initializing, inCreationFlow]);
 
   async function createPlayerFromCurrentForm() {
     let imageUrl = uploadedPhotoUrl;
@@ -2271,7 +2297,7 @@ export default function StudioPage() {
         ) : (
         <section
           ref={wizardPanelRef}
-          className="scroll-focus-target animate-fadeUp rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6"
+          className="scroll-focus-target rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6"
         >
             <WizardProgress
               currentStep={currentStep}
@@ -2516,99 +2542,22 @@ export default function StudioPage() {
             ) : null}
 
             {currentStep === STEP_DETAILS ? (
-              <div className="grid gap-4">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <input
-                      className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 ${fieldErrorClass(detailsShowErrors && detailsErrors.playerName)}`}
-                      placeholder="First Name *"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <input
-                      className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 ${fieldErrorClass(detailsShowErrors && detailsErrors.playerName)}`}
-                      placeholder="Last Name *"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                    />
-                    {detailsShowErrors && detailsErrors.playerName ? (
-                      <p className="mt-1 text-xs text-rose-300">{detailsErrors.playerName}</p>
-                    ) : null}
-                  </div>
-                  <div className="sm:col-span-2">
-                    <input
-                      className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 ${fieldErrorClass(detailsShowErrors && detailsErrors.playerName)}`}
-                      placeholder="Display Name (optional — used as player name if set)"
-                      value={displayName}
-                      onChange={(e) => setDisplayName(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <input
-                      className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 ${fieldErrorClass(detailsShowErrors && detailsErrors.jerseyNumber)}`}
-                      placeholder="Jersey Number *"
-                      value={jerseyNumber}
-                      onChange={(e) => setJerseyNumber(e.target.value)}
-                    />
-                    {detailsShowErrors && detailsErrors.jerseyNumber ? (
-                      <p className="mt-1 text-xs text-rose-300">{detailsErrors.jerseyNumber}</p>
-                    ) : null}
-                  </div>
-                  <div>
-                    <input
-                      className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 ${fieldErrorClass(detailsShowErrors && detailsErrors.position)}`}
-                      placeholder="Position *"
-                      value={position}
-                      onChange={(e) => setPosition(e.target.value)}
-                    />
-                    {detailsShowErrors && detailsErrors.position ? (
-                      <p className="mt-1 text-xs text-rose-300">{detailsErrors.position}</p>
-                    ) : null}
-                  </div>
-                  <div>
-                    <input
-                      type="number"
-                      className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 ${fieldErrorClass(detailsShowErrors && detailsErrors.gradYear)}`}
-                      placeholder="Grad Year *"
-                      value={gradYear}
-                      onChange={(e) => setGradYear(e.target.value)}
-                    />
-                    {detailsShowErrors && detailsErrors.gradYear ? (
-                      <p className="mt-1 text-xs text-rose-300">{detailsErrors.gradYear}</p>
-                    ) : null}
-                  </div>
-                  <div>
-                    <input
-                      className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 ${fieldErrorClass(detailsShowErrors && detailsErrors.teamName)}`}
-                      placeholder="Team Name *"
-                      value={teamName}
-                      onChange={(e) => setTeamName(e.target.value)}
-                    />
-                    {detailsShowErrors && detailsErrors.teamName ? (
-                      <p className="mt-1 text-xs text-rose-300">{detailsErrors.teamName}</p>
-                    ) : null}
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={goBackStep}
-                    className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
-                  >
-                    Back
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!canAdvanceFromStep}
-                    onClick={tryAdvanceStep}
-                    className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
-                  >
-                    Continue to Tier Selection
-                  </button>
-                </div>
-              </div>
+              <PlayerDetailsStep
+                values={{
+                  firstName,
+                  lastName,
+                  displayName,
+                  jerseyNumber,
+                  position,
+                  gradYear,
+                  teamName,
+                }}
+                onFieldBlur={handleDetailsFieldBlur}
+                onContinue={handleDetailsContinue}
+                onBack={goBackStep}
+                showErrors={detailsShowErrors}
+                errors={detailsErrors}
+              />
             ) : null}
 
             {currentStep === STEP_HIGHLIGHT_VIDEO && isHighlightCardType ? (
@@ -2749,45 +2698,12 @@ export default function StudioPage() {
             ) : null}
 
             {currentStep === STEP_PHOTO_NOTES && isAnimatedCardType ? (
-              <div className="grid gap-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-white">
-                    Anything we should know about your photo?
-                  </h3>
-                  <p className="mt-1 text-sm text-slate-400">
-                    Optional — if there are multiple people in your photo, tell us who to focus on.
-                    Any other details that might help.
-                  </p>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-cardBg2 p-4">
-                  <textarea
-                    id="photo-notes"
-                    rows={4}
-                    maxLength={200}
-                    value={photoNotes}
-                    onChange={(e) => setPhotoNotes(e.target.value.slice(0, 200))}
-                    placeholder={`e.g. "I'm the player on the left in the red jersey"`}
-                    className="w-full resize-none rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-neonBlue/50 focus:outline-none focus:ring-1 focus:ring-neonBlue/40"
-                  />
-                  <p className="mt-1 text-right text-xs text-slate-500">{photoNotes.length} / 200</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={goBackStep}
-                    className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
-                  >
-                    Back
-                  </button>
-                  <button
-                    type="button"
-                    onClick={tryAdvanceStep}
-                    className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto"
-                  >
-                    Continue to Review →
-                  </button>
-                </div>
-              </div>
+              <PhotoNotesStep
+                value={photoNotes}
+                onChange={setPhotoNotes}
+                onContinue={() => setCurrentStep(STEP_REVIEW)}
+                onBack={goBackStep}
+              />
             ) : null}
 
             {currentStep === STEP_REVIEW && reviewSubPhase === "setup" ? (
@@ -3366,7 +3282,7 @@ export default function StudioPage() {
           card={featuredDisplayCard}
           loading={isGenerating && !packOpeningActive}
         />
-        {user ? <CardGallery cards={cards} /> : null}
+        {user && !inCreationFlow ? <CardGallery cards={cards} /> : null}
       </main>
 
       <StartOverConfirmModal
