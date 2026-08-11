@@ -58,6 +58,7 @@ from card_pricing import (  # noqa: E402
     tier_generation_price,
 )
 from card_history import build_card_history  # noqa: E402
+from card_cleanup import run_deleted_cards_cleanup_pass
 from card_repo import (  # noqa: E402
     card_to_dict,
     count_cards_for_player,
@@ -185,6 +186,7 @@ async def lifespan(_app: FastAPI):
     run_schema_migrations_after_models(engine)
     _startup_validate_admin_account()
     run_marketplace_expiration_pass()
+    run_deleted_cards_cleanup_pass()
     start_marketplace_scheduler()
     print(f"[startup] UPLOAD_DIR={UPLOAD_DIR} CARD_DIR={CARD_DIR} (writable={os.access(CARD_DIR, os.W_OK)})")
     print("FRONTEND_URL:", os.environ.get("FRONTEND_URL"), flush=True)
@@ -1884,6 +1886,8 @@ def get_card_share_meta(card_id: str, db: Session = Depends(get_db)):
     orm = get_card_by_card_id(db, key)
     if orm is None:
         raise HTTPException(status_code=404, detail="Card not found")
+    if (orm.status or "active") == "deleted":
+        raise HTTPException(status_code=404, detail="Card not found")
     d = card_to_dict(orm, db)
     slug = d.get("shareable_slug") or d.get("card_id")
     base = _frontend_base_url()
@@ -1919,6 +1923,8 @@ def get_card(
         raise HTTPException(status_code=404, detail="Card not found")
     orm = get_card_by_card_id(db, key)
     if orm is None:
+        raise HTTPException(status_code=404, detail="Card not found")
+    if (orm.status or "active") == "deleted":
         raise HTTPException(status_code=404, detail="Card not found")
     data = card_to_dict(orm, db)
     is_owner = current_user is not None and orm.owner_id == current_user.id

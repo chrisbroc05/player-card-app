@@ -13,6 +13,7 @@ import AnimationProgressBanner from "../components/AnimationProgressBanner";
 import GenerationCapNotice from "../components/GenerationCapNotice";
 import CollectionToast from "../components/CollectionToast";
 import DeleteCardModal from "../components/DeleteCardModal";
+import PermanentDeleteCardModal from "../components/PermanentDeleteCardModal";
 import { authFetch, formatApiError } from "../utils/authFetch";
 import { canAnimateCard, isAnimatedCard, isAnimationInProgress } from "../utils/animationCard";
 import { cardMediaFrameClass, cardPlaysVideoOnHover } from "../utils/highlightCard";
@@ -39,6 +40,11 @@ export default function MyCollectionPage() {
   const [generationCapUsage, setGenerationCapUsage] = useState(null);
   const [deleteModalCard, setDeleteModalCard] = useState(null);
   const [deleteBusyId, setDeleteBusyId] = useState("");
+  const [deletedCards, setDeletedCards] = useState([]);
+  const [deletedExpanded, setDeletedExpanded] = useState(false);
+  const [permanentDeleteModalCard, setPermanentDeleteModalCard] = useState(null);
+  const [recoverBusyId, setRecoverBusyId] = useState("");
+  const [permanentDeleteBusyId, setPermanentDeleteBusyId] = useState("");
   const [toast, setToast] = useState({ message: "", variant: "success" });
   const [listSuccessOpen, setListSuccessOpen] = useState(false);
   const animationFocusRef = useRef(null);
@@ -54,6 +60,13 @@ export default function MyCollectionPage() {
       if (!res.ok) throw new Error("Could not load your collection.");
       const data = await res.json();
       setCards(Array.isArray(data) ? data : []);
+      const deletedRes = await authFetch(token, "/cards/recently-deleted");
+      if (deletedRes.res.ok) {
+        const deletedData = await deletedRes.res.json().catch(() => []);
+        setDeletedCards(Array.isArray(deletedData) ? deletedData : []);
+      } else {
+        setDeletedCards([]);
+      }
       const listRes = await authFetch(token, "/marketplace/my-listings");
       if (listRes.res.ok) {
         const listings = await listRes.res.json().catch(() => []);
@@ -261,9 +274,16 @@ export default function MyCollectionPage() {
 
   function canDeleteCard(card) {
     if (!user?.id || card.owner_id !== user.id) return false;
-    if ((card.status || "active") === "pending_trade") return false;
-    if (listingByCardId[card.card_id]) return false;
+    if ((card.status || "active") === "deleted") return false;
     return true;
+  }
+
+  function deletedCardTiming(deletedAt) {
+    if (!deletedAt) return { daysAgo: 0, daysRemaining: 30 };
+    const deletedMs = new Date(deletedAt).getTime();
+    if (Number.isNaN(deletedMs)) return { daysAgo: 0, daysRemaining: 30 };
+    const daysAgo = Math.max(0, Math.floor((Date.now() - deletedMs) / 86400000));
+    return { daysAgo, daysRemaining: Math.max(0, 30 - daysAgo) };
   }
 
   async function confirmDeleteCard() {
@@ -279,7 +299,7 @@ export default function MyCollectionPage() {
       );
       if (unauthorized) throw new Error("Session expired.");
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not delete card."));
+      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not move card to trash."));
       setCards((prev) => prev.filter((c) => c.card_id !== card.card_id));
       setListingByCardId((prev) => {
         const next = { ...prev };
@@ -287,13 +307,65 @@ export default function MyCollectionPage() {
         return next;
       });
       setDeleteModalCard(null);
-      showToast("Card deleted successfully");
+      showToast("Card moved to Recently Deleted");
+      await loadCards();
       refreshNavBadges?.();
     } catch (e) {
       setDeleteModalCard(null);
-      showToast(e.message || "Could not delete card.", "error");
+      showToast(e.message || "Could not move card to trash.", "error");
     } finally {
       setDeleteBusyId("");
+    }
+  }
+
+  async function recoverDeletedCard(card) {
+    if (!token || !card?.card_id) return;
+    setRecoverBusyId(card.card_id);
+    try {
+      const { res, unauthorized } = await authFetch(
+        token,
+        `/cards/${encodeURIComponent(card.card_id)}/recover`,
+        { method: "POST" }
+      );
+      if (unauthorized) throw new Error("Session expired.");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(formatApiError(data?.detail, "Could not recover card."));
+      }
+      setDeletedCards((prev) => prev.filter((c) => c.card_id !== card.card_id));
+      setCards((prev) => [data, ...prev.filter((c) => c.card_id !== data.card_id)]);
+      showToast("Card recovered and added back to your collection!");
+      refreshNavBadges?.();
+    } catch (e) {
+      showToast(e.message || "Could not recover card.", "error");
+    } finally {
+      setRecoverBusyId("");
+    }
+  }
+
+  async function confirmPermanentDelete() {
+    const card = permanentDeleteModalCard;
+    if (!token || !card?.card_id) return;
+    setPermanentDeleteBusyId(card.card_id);
+    try {
+      const { res, unauthorized } = await authFetch(
+        token,
+        `/cards/${encodeURIComponent(card.card_id)}/delete-permanently`,
+        { method: "POST" }
+      );
+      if (unauthorized) throw new Error("Session expired.");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(formatApiError(data?.detail, "Could not permanently delete card."));
+      }
+      setDeletedCards((prev) => prev.filter((c) => c.card_id !== card.card_id));
+      setPermanentDeleteModalCard(null);
+      showToast("Card permanently deleted");
+    } catch (e) {
+      setPermanentDeleteModalCard(null);
+      showToast(e.message || "Could not permanently delete card.", "error");
+    } finally {
+      setPermanentDeleteBusyId("");
     }
   }
 
@@ -467,6 +539,81 @@ export default function MyCollectionPage() {
             })}
           </div>
         )}
+
+        {deletedCards.length > 0 ? (
+          <section className="mt-12 border-t border-white/10 pt-8">
+            <button
+              type="button"
+              onClick={() => setDeletedExpanded((v) => !v)}
+              className="flex w-full items-center justify-between gap-3 rounded-xl border border-white/10 bg-cardBg2 px-4 py-3 text-left transition hover:border-white/20"
+              aria-expanded={deletedExpanded}
+            >
+              <span className="text-sm font-semibold text-slate-200">
+                Recently Deleted ({deletedCards.length} card{deletedCards.length === 1 ? "" : "s"})
+              </span>
+              <span className="text-slate-400" aria-hidden>
+                {deletedExpanded ? "▾" : "▸"}
+              </span>
+            </button>
+
+            {deletedExpanded ? (
+              <div className="mt-5 grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {deletedCards.map((card) => {
+                  const badge = vaultTierBadge(card.tier);
+                  const { daysAgo, daysRemaining } = deletedCardTiming(card.deleted_at);
+                  const expired = daysRemaining <= 0;
+                  return (
+                    <article
+                      key={card.card_id}
+                      className={`rounded-2xl border border-white/10 bg-cardBg p-3 shadow-lg ${badge.glow}`}
+                    >
+                      <div className="relative min-h-[280px] sm:min-h-[320px]">
+                        <div className="h-full grayscale opacity-60">
+                          <CardImage
+                            card={card}
+                            alt={card.player_name}
+                            cacheBust={card.deleted_at || card.created_at}
+                            frameClassName={`${cardMediaFrameClass(card)} w-full`}
+                            showInfoBanner
+                          />
+                        </div>
+                        <span className="absolute left-2 top-2 z-10 rounded-md border border-rose-500/50 bg-rose-600/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                          Deleted
+                        </span>
+                      </div>
+                      <div className="mt-3 space-y-2 px-1 text-center text-xs text-slate-400">
+                        <p>
+                          Deleted {daysAgo === 0 ? "today" : `${daysAgo} day${daysAgo === 1 ? "" : "s"} ago`}
+                        </p>
+                        <p>
+                          {expired
+                            ? "Recovery period has expired for this card"
+                            : `Recoverable for ${daysRemaining} more day${daysRemaining === 1 ? "" : "s"}`}
+                        </p>
+                        <button
+                          type="button"
+                          disabled={expired || recoverBusyId === card.card_id}
+                          onClick={() => recoverDeletedCard(card)}
+                          className="inline-flex min-h-[40px] w-full items-center justify-center rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {recoverBusyId === card.card_id ? "Recovering…" : "Recover"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={permanentDeleteBusyId === card.card_id}
+                          onClick={() => setPermanentDeleteModalCard(card)}
+                          className="inline-flex w-full items-center justify-center py-1.5 text-xs font-medium text-rose-400/90 transition hover:text-rose-300 disabled:opacity-50"
+                        >
+                          Delete Forever
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
       </main>
 
       <AnimateCardModal
@@ -485,6 +632,14 @@ export default function MyCollectionPage() {
         busy={Boolean(deleteBusyId)}
         onClose={() => setDeleteModalCard(null)}
         onConfirm={confirmDeleteCard}
+      />
+
+      <PermanentDeleteCardModal
+        card={permanentDeleteModalCard}
+        open={Boolean(permanentDeleteModalCard)}
+        busy={Boolean(permanentDeleteBusyId)}
+        onClose={() => setPermanentDeleteModalCard(null)}
+        onConfirm={confirmPermanentDelete}
       />
 
       <ListedSuccessModal

@@ -168,7 +168,9 @@ export default function AdminDashboard() {
   const [cardTierFilter, setCardTierFilter] = useState("all");
   const [cardAnimatedOnly, setCardAnimatedOnly] = useState(false);
   const [cardHighlightOnly, setCardHighlightOnly] = useState(false);
+  const [cardDeletedOnly, setCardDeletedOnly] = useState(false);
   const [cardSearch, setCardSearch] = useState("");
+  const [adminDeleteBusyId, setAdminDeleteBusyId] = useState("");
 
   const clearAdminAndRedirect = useCallback(() => {
     localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
@@ -617,13 +619,14 @@ export default function AdminDashboard() {
       }
       if (cardAnimatedOnly && !c.is_animated) return false;
       if (cardHighlightOnly && !c.is_highlight) return false;
+      if (cardDeletedOnly && (c.status || "active") !== "deleted") return false;
       if (!q) return true;
       return (
         (c.player_name || "").toLowerCase().includes(q) ||
         (c.card_id || "").toLowerCase().includes(q)
       );
     });
-  }, [cards, cardSearch, cardTierFilter, cardAnimatedOnly, cardHighlightOnly]);
+  }, [cards, cardSearch, cardTierFilter, cardAnimatedOnly, cardHighlightOnly, cardDeletedOnly]);
 
   const filteredTrades = useMemo(() => {
     if (tradeStatusFilter === "all") return trades;
@@ -640,6 +643,25 @@ export default function AdminDashboard() {
   function logoutAdmin() {
     localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
     navigate("/login", { replace: true });
+  }
+
+  async function adminPermanentDeleteCard(cardId) {
+    if (!cardId || !window.confirm(`Permanently delete ${cardId}? This cannot be undone.`)) return;
+    setAdminDeleteBusyId(cardId);
+    try {
+      const res = await adminFetch(`/admin/cards/${encodeURIComponent(cardId)}/delete-permanently`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(formatApiError(data?.detail, "Permanent delete failed."));
+      }
+      setCards((prev) => prev.filter((c) => c.card_id !== cardId));
+    } catch (e) {
+      setErrors((prev) => ({ ...prev, cards: e.message || "Permanent delete failed." }));
+    } finally {
+      setAdminDeleteBusyId("");
+    }
   }
 
   const kpi = (label, value, sub) => (
@@ -1162,7 +1184,7 @@ export default function AdminDashboard() {
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <p className="text-sm text-slate-400">
                 Total cards: <span className="font-semibold text-white">{cards.length}</span>
-                {cardSearch.trim() || cardTierFilter !== "all" || cardAnimatedOnly || cardHighlightOnly ? (
+                {cardSearch.trim() || cardTierFilter !== "all" || cardAnimatedOnly || cardHighlightOnly || cardDeletedOnly ? (
                   <>
                     {" "}
                     · Shown: <span className="font-semibold text-white">{filteredCards.length}</span>
@@ -1198,6 +1220,15 @@ export default function AdminDashboard() {
                   />
                   Highlight only
                 </label>
+                <label className="flex min-h-[42px] cursor-pointer items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 text-sm text-rose-100">
+                  <input
+                    type="checkbox"
+                    checked={cardDeletedOnly}
+                    onChange={(e) => setCardDeletedOnly(e.target.checked)}
+                    className="rounded border-white/20"
+                  />
+                  Deleted only
+                </label>
                 <input
                   placeholder="Player or card ID…"
                   value={cardSearch}
@@ -1211,7 +1242,7 @@ export default function AdminDashboard() {
               <table className="w-full min-w-[960px] text-left text-sm">
                 <thead className="border-b border-white/10 bg-cardBg2 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
-                    {["Card ID", "Player", "Team", "Tier", "Theme", "Rarity", "Ed.", "Print", "Animated", "Highlight", "Owner", "Status", "Created"].map(
+                    {["Card ID", "Player", "Team", "Tier", "Theme", "Rarity", "Ed.", "Print", "Animated", "Highlight", "Owner", "Status", "Created", "Actions"].map(
                       (h) => (
                         <th key={h} className="p-3 font-medium">
                           {h}
@@ -1223,7 +1254,7 @@ export default function AdminDashboard() {
                 <tbody>
                   {filteredCards.length === 0 ? (
                     <tr>
-                      <td colSpan={13} className="p-6 text-center text-slate-500">
+                      <td colSpan={14} className="p-6 text-center text-slate-500">
                         No cards match.
                       </td>
                     </tr>
@@ -1260,8 +1291,40 @@ export default function AdminDashboard() {
                           <span className="block">{c.owner_display_name}</span>
                           <span className="text-xs text-slate-500">{c.owner_email}</span>
                         </td>
-                        <td className="p-3 text-slate-400">{c.status}</td>
+                        <td className="p-3 text-slate-400">
+                          {(c.status || "active") === "deleted" ? (
+                            <div className="space-y-1">
+                              <span className="inline-flex rounded-full border border-rose-500/40 bg-rose-500/15 px-2 py-0.5 text-[11px] font-semibold uppercase text-rose-100">
+                                Deleted
+                              </span>
+                              {c.deleted_at ? (
+                                <span className="block text-[11px] text-slate-500">
+                                  {c.deleted_at.slice(0, 10)}
+                                  {typeof c.days_remaining === "number"
+                                    ? ` · ${c.days_remaining}d left`
+                                    : ""}
+                                </span>
+                              ) : null}
+                            </div>
+                          ) : (
+                            c.status
+                          )}
+                        </td>
                         <td className="p-3 text-slate-500">{c.created_at?.slice(0, 10) || "—"}</td>
+                        <td className="p-3">
+                          {(c.status || "active") === "deleted" ? (
+                            <button
+                              type="button"
+                              disabled={adminDeleteBusyId === c.card_id}
+                              onClick={() => adminPermanentDeleteCard(c.card_id)}
+                              className="rounded-lg border border-rose-500/40 px-2 py-1 text-[11px] font-medium text-rose-200 hover:bg-rose-500/10 disabled:opacity-50"
+                            >
+                              {adminDeleteBusyId === c.card_id ? "…" : "Delete forever"}
+                            </button>
+                          ) : (
+                            <span className="text-slate-600">—</span>
+                          )}
+                        </td>
                       </tr>
                     ))
                   )}

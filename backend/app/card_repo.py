@@ -33,9 +33,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 COLLECTION_STATUSES = ("active", "pending_trade")
+DELETED_STATUS = "deleted"
 
-# Studio previews and discarded variants never count toward creation KPIs.
-EXCLUDED_CREATOR_STATUSES = ("preview", "discarded")
+# Studio previews, discarded variants, and soft-deleted cards never count toward creation KPIs.
+EXCLUDED_CREATOR_STATUSES = ("preview", "discarded", DELETED_STATUS)
 
 
 def owned_collection_filter(owner_id: int):
@@ -46,6 +47,25 @@ def owned_collection_filter(owner_id: int):
         Card.owner_id == owner_id,
         Card.status.in_(COLLECTION_STATUSES),
     )
+
+
+def deleted_collection_filter(owner_id: int):
+    """Soft-deleted cards recoverable by the owner."""
+    from sqlalchemy import and_
+
+    return and_(
+        Card.owner_id == owner_id,
+        Card.status == DELETED_STATUS,
+        Card.deleted_at.isnot(None),
+        Card.permanently_deleted.is_(False),
+    )
+
+
+def active_card_filter():
+    """Exclude soft-deleted cards from public/active queries."""
+    from sqlalchemy import or_
+
+    return or_(Card.status.is_(None), Card.status != DELETED_STATUS)
 
 
 def cards_created_by_user_filter(user_id: int):
@@ -194,6 +214,13 @@ def card_to_dict(card: Card, db: Session | None = None) -> dict:
         "trade_offered_to": getattr(card, "trade_offered_to", None),
         "pending_trade_offer_id": None,
     }
+    deleted_at = getattr(card, "deleted_at", None)
+    if deleted_at is not None:
+        if deleted_at.tzinfo is None:
+            deleted_at = deleted_at.replace(tzinfo=timezone.utc)
+        d["deleted_at"] = deleted_at.isoformat()
+    else:
+        d["deleted_at"] = None
     if db is not None and st == "pending_trade":
         from trade_repo import pending_offer_id_for_card
 
@@ -299,6 +326,21 @@ def list_my_cards_dicts(db: Session, owner_id: int) -> list[dict]:
         db.query(Card)
         .filter(owned_collection_filter(owner_id))
         .order_by(Card.created_at.desc())
+        .all()
+    )
+    return [card_to_dict(r, db) for r in rows]
+
+
+def list_recently_deleted_dicts(db: Session, owner_id: int) -> list[dict]:
+    """Soft-deleted cards still within the recovery window."""
+    cutoff = utcnow() - timedelta(days=30)
+    rows = (
+        db.query(Card)
+        .filter(
+            deleted_collection_filter(owner_id),
+            Card.deleted_at >= cutoff,
+        )
+        .order_by(Card.deleted_at.desc())
         .all()
     )
     return [card_to_dict(r, db) for r in rows]
@@ -434,7 +476,7 @@ def list_print_family_for_owner_image(db: Session, owner_id: int, image_url: str
 def list_cards_by_image_url_dicts(db: Session, image_url: str) -> list[dict]:
     rows = (
         db.query(Card)
-        .filter(Card.image_url == image_url)
+        .filter(Card.image_url == image_url, active_card_filter())
         .order_by(Card.edition_number.asc(), Card.id.asc())
         .all()
     )
@@ -500,7 +542,7 @@ def expand_print_run_for_owner_image(
 def list_cards_for_player_dicts(db: Session, player_id: int) -> list[dict]:
     rows = (
         db.query(Card)
-        .filter(Card.player_id == player_id)
+        .filter(Card.player_id == player_id, active_card_filter())
         .order_by(Card.created_at.desc())
         .all()
     )

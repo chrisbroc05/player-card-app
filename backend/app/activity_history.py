@@ -132,6 +132,8 @@ def gather_user_activity_items(db: Session, user_id: int) -> list[dict]:
         card = offer.card
         if card is None:
             continue
+        if (card.status or "active") == "deleted":
+            continue
         when = offer.updated_at or offer.created_at
         if offer.sender_id == user_id:
             items.append(
@@ -180,6 +182,8 @@ def gather_user_activity_items(db: Session, user_id: int) -> list[dict]:
     for offer in marketplace_rows:
         card = offer.card
         if card is None:
+            continue
+        if (card.status or "active") == "deleted":
             continue
         when = offer.updated_at or offer.created_at
         is_cash = (offer.offer_type or OFFER_TYPE_CASH).strip().lower() == OFFER_TYPE_CASH

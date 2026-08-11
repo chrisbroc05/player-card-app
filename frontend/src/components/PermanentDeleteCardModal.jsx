@@ -1,23 +1,22 @@
 import React from "react";
 
-export default function DeleteCardModal({ card, open, busy, onClose, onConfirm }) {
+export default function PermanentDeleteCardModal({ card, open, busy, onClose, onConfirm }) {
   if (!open || !card) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 sm:items-center sm:p-4">
       <div
-        className="w-full max-w-md rounded-2xl border border-white/10 bg-cardBg p-5 shadow-2xl sm:p-6"
+        className="w-full max-w-md rounded-2xl border border-rose-500/25 bg-cardBg p-5 shadow-2xl sm:p-6"
         role="dialog"
-        aria-labelledby="delete-card-modal-title"
+        aria-labelledby="permanent-delete-card-title"
         aria-modal="true"
       >
-        <h3 id="delete-card-modal-title" className="text-lg font-semibold text-white">
-          Move this card to Recently Deleted?
+        <h3 id="permanent-delete-card-title" className="text-lg font-semibold text-white">
+          Delete forever?
         </h3>
         <p className="mt-3 text-sm leading-relaxed text-slate-300">
-          <span className="font-medium text-white">{card.player_name}</span> ({card.card_id}) will be
-          hidden from your collection. You&apos;ll have <strong className="font-semibold text-white">30 days</strong>{" "}
-          to recover it before it&apos;s permanently deleted.
+          Are you sure? This cannot be undone. Your card and all associated files will be permanently
+          deleted.
         </p>
         <div className="mt-6 flex flex-wrap gap-2">
           <button
@@ -34,7 +33,7 @@ export default function DeleteCardModal({ card, open, busy, onClose, onConfirm }
             onClick={onConfirm}
             className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-xl bg-rose-600 px-4 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:opacity-50"
           >
-            {busy ? "Moving…" : "Move to Trash"}
+            {busy ? "Deleting…" : "Yes, Delete Forever"}
           </button>
         </div>
       </div>

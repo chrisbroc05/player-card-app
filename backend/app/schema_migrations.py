@@ -327,6 +327,31 @@ def run_schema_migrations_after_models(engine: Engine) -> None:
             else:
                 conn.execute(text("ALTER TABLE cards ADD COLUMN highlight_thumbnail_url VARCHAR(512)"))
 
+        if "deleted_at" not in cols:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN IF NOT EXISTS deleted_at "
+                        "TIMESTAMP WITH TIME ZONE"
+                    )
+                )
+            else:
+                conn.execute(text("ALTER TABLE cards ADD COLUMN deleted_at DATETIME"))
+        if "permanently_deleted" not in cols:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN IF NOT EXISTS permanently_deleted BOOLEAN "
+                        "NOT NULL DEFAULT FALSE"
+                    )
+                )
+            else:
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN permanently_deleted BOOLEAN NOT NULL DEFAULT 0"
+                    )
+                )
+
         if "marketplace_offers" in insp.get_table_names():
             mcols = {c["name"] for c in insp.get_columns("marketplace_offers")}
             if "offer_type" not in mcols:

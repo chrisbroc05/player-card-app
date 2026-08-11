@@ -24,6 +24,8 @@ from sqlalchemy.orm import Session, aliased
 from auth import ALGORITHM, SECRET_KEY
 from beta_config import beta_mode_active, get_beta_invite_code, set_beta_invite_code
 from credit_service import InsufficientCreditsError, TX_ANIMATION, TX_HIGHLIGHT, TX_WITHDRAWAL, deduct_credits
+from card_cleanup import permanently_delete_card
+from card_repo import get_card_by_card_id
 from database import get_db
 from marketplace_repo import float_from_decimal, listing_active_filter
 from models import Card, CreditLedger, MarketplaceOffer, TradeOffer, User, utcnow
@@ -1116,7 +1118,15 @@ def admin_cards(
         .all()
     )
     out = []
+    now = utcnow()
     for card, od, oe in rows:
+        deleted_at = getattr(card, "deleted_at", None)
+        days_remaining: int | None = None
+        if (card.status or "active") == "deleted" and deleted_at is not None:
+            da = deleted_at if deleted_at.tzinfo else deleted_at.replace(tzinfo=timezone.utc)
+            n = now if now.tzinfo else now.replace(tzinfo=timezone.utc)
+            elapsed = (n - da).days
+            days_remaining = max(0, 30 - elapsed)
         out.append(
             {
                 "card_id": card.card_id,
@@ -1134,9 +1144,26 @@ def admin_cards(
                 "is_animated": bool(card.is_animated),
                 "is_highlight": bool(card.is_highlight),
                 "highlight_status": card.highlight_status,
+                "deleted_at": _iso(deleted_at),
+                "days_remaining": days_remaining,
             }
         )
     return out
+
+
+@router.post("/cards/{card_id}/delete-permanently")
+def admin_delete_card_permanently(
+    card_id: str,
+    db: Session = Depends(get_db),
+    _admin: dict[str, Any] = Depends(require_admin),
+):
+    """Admin moderation — permanently delete any card (including soft-deleted)."""
+    card = get_card_by_card_id(db, card_id)
+    if card is None:
+        raise HTTPException(status_code=404, detail="Card not found")
+    deleted_id = permanently_delete_card(db, card)
+    db.commit()
+    return {"success": True, "card_id": deleted_id, "message": "Card permanently deleted"}
 
 
 @router.get("/trades")

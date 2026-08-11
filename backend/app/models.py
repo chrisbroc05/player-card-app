@@ -117,6 +117,8 @@ class Card(Base):
     animation_model_used: Mapped[str | None] = mapped_column(String(50), nullable=True)
     preview_session_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     draft_metadata: Mapped[str | None] = mapped_column(Text, nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    permanently_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     owner: Mapped["User | None"] = relationship(
         "User",

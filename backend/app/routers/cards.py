@@ -7,6 +7,7 @@ import os
 import re
 import tempfile
 import traceback
+from datetime import timedelta
 from pathlib import Path
 from uuid import uuid4
 
@@ -18,7 +19,20 @@ from sqlalchemy.orm import Session
 from animation_tasks import process_animation
 from card_pricing import animated_studio_total_price, animated_upgrade_price, generation_price_payload, highlight_card_price, normalize_order_tier
 from auth import get_current_user
-from card_repo import create_animated_upgrade_card, get_card_by_card_id, card_to_dict, highlight_fields_for_card, player_photo_url_for_card
+from card_cleanup import (
+    RECOVERY_DAYS,
+    permanently_delete_card,
+    soft_delete_owned_card,
+)
+from card_repo import (
+    create_animated_upgrade_card,
+    get_card_by_card_id,
+    card_to_dict,
+    highlight_fields_for_card,
+    list_recently_deleted_dicts,
+    player_photo_url_for_card,
+    DELETED_STATUS,
+)
 from credit_service import (
     InsufficientCreditsError,
     TX_ANIMATION,
@@ -103,14 +117,8 @@ def _is_failed_highlight_card(card: Card) -> bool:
 
 
 def _delete_owned_card(db: Session, card: Card) -> str:
-    deleted_id = card.card_id
-    cancel_pending_marketplace_offers_for_card(db, card.card_id)
-    db.query(MarketplaceOffer).filter(MarketplaceOffer.card_id == card.card_id).delete(
-        synchronize_session=False
-    )
-    db.query(TradeOffer).filter(TradeOffer.card_id == card.id).delete(synchronize_session=False)
-    db.delete(card)
-    return deleted_id
+    """Hard delete — used only for failed highlight cleanup."""
+    return permanently_delete_card(db, card)
 
 
 def _animation_video_path(card: Card) -> Path | None:
@@ -659,16 +667,18 @@ def stream_card_video(
 def _validate_delete_request(card: Card, current_user: User) -> None:
     if card.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="You do not own this card")
-    if (card.status or "active") == "pending_trade":
-        raise HTTPException(
-            status_code=400,
-            detail="This card cannot be deleted while a trade is in progress. Cancel the trade first.",
-        )
-    if card.listed_on_marketplace:
-        raise HTTPException(
-            status_code=400,
-            detail="Remove this card from Free Agency Marketplace before deleting it.",
-        )
+    if (card.status or "active") == DELETED_STATUS:
+        raise HTTPException(status_code=400, detail="Card is already in Recently Deleted")
+
+
+@router.get("/recently-deleted")
+def list_recently_deleted(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Soft-deleted cards still within the 30-day recovery window."""
+    rows = list_recently_deleted_dicts(db, current_user.id)
+    return rows
 
 
 @router.delete("/{card_id}")
@@ -677,10 +687,71 @@ def delete_card(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Permanently delete a card owned by the authenticated user."""
+    """Soft delete — card moves to Recently Deleted for 30 days."""
     card = _resolve_card(db, card_id)
     _validate_delete_request(card, current_user)
 
-    deleted_id = _delete_owned_card(db, card)
+    deleted_at, recoverable_until = soft_delete_owned_card(db, card)
     db.commit()
-    return {"success": True, "card_id": deleted_id}
+    return {
+        "success": True,
+        "card_id": card.card_id,
+        "message": "Card moved to Recently Deleted",
+        "recoverable_until": recoverable_until.isoformat(),
+        "deleted_at": deleted_at.isoformat(),
+    }
+
+
+@router.post("/{card_id}/recover")
+def recover_card(
+    card_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Restore a soft-deleted card to the active collection."""
+    from datetime import timezone
+
+    card = _resolve_card(db, card_id)
+    if card.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not own this card")
+    if (card.status or "active") != DELETED_STATUS:
+        raise HTTPException(status_code=400, detail="Card is not in Recently Deleted")
+    if card.deleted_at is None:
+        raise HTTPException(status_code=400, detail="Card cannot be recovered")
+
+    deleted_at = card.deleted_at
+    if deleted_at.tzinfo is None:
+        deleted_at = deleted_at.replace(tzinfo=timezone.utc)
+    now = utcnow()
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    if now > deleted_at + timedelta(days=RECOVERY_DAYS):
+        raise HTTPException(status_code=400, detail="Recovery period has expired")
+
+    card.status = "active"
+    card.deleted_at = None
+    card.permanently_deleted = False
+    db.commit()
+    db.refresh(card)
+    return card_to_dict(card, db)
+
+
+@router.post("/{card_id}/delete-permanently")
+def delete_card_permanently(
+    card_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Permanently delete a soft-deleted card and its R2 media."""
+    card = _resolve_card(db, card_id)
+    if card.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not own this card")
+    if (card.status or "active") != DELETED_STATUS:
+        raise HTTPException(
+            status_code=400,
+            detail="Only cards in Recently Deleted can be permanently deleted",
+        )
+
+    deleted_id = permanently_delete_card(db, card)
+    db.commit()
+    return {"success": True, "card_id": deleted_id, "message": "Card permanently deleted"}
