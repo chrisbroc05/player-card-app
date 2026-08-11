@@ -197,9 +197,6 @@ export default function ProfilePage() {
   const mp = profile?.marketplace_stats;
   const biggestSale = mp?.highest_sale ?? null;
   const rarestCard = profile?.rarest_card ?? null;
-  const hasCompletedSales = (mp?.total_earned ?? 0) > 0;
-  const stripeConnected =
-    profile?.stripe_onboarding_complete === true && profile?.stripe_payouts_enabled === true;
   const rarity = rarestCard
     ? rarityEditionDisplay(rarestCard.edition_number, rarestCard.print_run)
     : null;
@@ -251,11 +248,9 @@ export default function ProfilePage() {
                 <span className="profile-page__balance">
                   Balance: {formatMoney(profile?.credit_balance ?? 0)}
                 </span>
-                {stripeConnected ? (
-                  <a href="#payout-settings" className="profile-page__payout-link">
-                    Payout settings
-                  </a>
-                ) : null}
+                <a href="#payout-settings" className="profile-page__payout-link">
+                  Payout settings
+                </a>
               </div>
             </section>
 
@@ -352,15 +347,11 @@ export default function ProfilePage() {
             </section>
 
             {/* Section 5 — Payout Settings */}
-            {hasCompletedSales ? (
-              <>
-                <hr className="profile-page__divider" />
-                <section id="payout-settings">
-                  <h2 className="profile-page__section-title">Payout Settings</h2>
-                  <PayoutSettings token={token} profile={profile} loading={loading} />
-                </section>
-              </>
-            ) : null}
+            <hr className="profile-page__divider" />
+            <section id="payout-settings">
+              <h2 className="profile-page__section-title">Payout Settings</h2>
+              <PayoutSettings token={token} profile={profile} loading={loading} />
+            </section>
           </div>
         )}
       </main>
@@ -526,7 +517,7 @@ function PayoutSettings({ token, profile, loading }) {
           onClick={openDashboard}
           className="min-h-[44px] rounded-xl border border-teal-500/40 bg-teal-500/10 px-4 text-sm font-semibold text-neonTeal disabled:opacity-50"
         >
-          {busy ? "Opening…" : "Manage Payout Settings"}
+          {busy ? "Opening…" : "Manage Payouts"}
         </button>
         {error ? <p className="text-sm text-rose-300">{error}</p> : null}
       </div>
@@ -558,7 +549,7 @@ function PayoutSettings({ token, profile, loading }) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-400">
-        Connect your bank account to withdraw earnings from card sales.
+        Connect your bank account to receive payments when you sell cards.
       </p>
       <button
         type="button"
