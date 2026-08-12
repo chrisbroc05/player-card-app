@@ -19,6 +19,7 @@ import { isCardOwner } from "../utils/cardOwnership";
 import AnimatedBadge from "../components/AnimatedBadge";
 import HighlightBadge from "../components/HighlightBadge";
 import CardHistoryTimeline from "../components/CardHistoryTimeline";
+import { themeDisplayLabel } from "../utils/cardBannerStyles";
 import { vaultTierBadge, rarityDisplay } from "../utils/tierStyles";
 import { CARD_IMAGE_FRAME_DETAIL } from "../utils/cardImageStyles";
 import {
@@ -704,6 +705,8 @@ function BuyAtAskingConfirmModal({
   const shortfall = Math.max(0, askingPrice - balance);
   const insufficient = hasBalance && shortfall > 0;
   const balanceAfter = hasBalance ? Math.max(0, balance - askingPrice) : null;
+  const tierBadge = vaultTierBadge(listing.tier);
+  const themeLabel = themeDisplayLabel(listing.theme || listing.special_theme);
 
   return (
     <MarketplaceModalShell
@@ -712,48 +715,53 @@ function BuyAtAskingConfirmModal({
       ariaLabelledBy="buy-confirm-title"
       onBackdropClick={onCancel}
     >
-      <MarketplaceModalContent>
-        <h3 id="buy-confirm-title" className="text-xl font-semibold text-white">
+      <MarketplaceModalContent className="marketplace-buy-sheet">
+        <h3 id="buy-confirm-title" className="marketplace-buy-sheet__title text-xl font-semibold text-white">
           Confirm Purchase
         </h3>
-        <p className="mt-2 text-[13px] text-slate-400">Review purchase details before completing payment.</p>
 
-        <div className="mt-4 rounded-xl border border-white/10 bg-cardBg2 p-3 sm:mt-6 sm:p-4">
-          <MarketplaceModalCardSection card={listing}>
-            <MarketplaceModalCardDetails
-              listing={listing}
-              extra={
-                <>
-                  <p className="text-[13px] text-slate-400">
-                    Seller:{" "}
-                    <span className="font-medium text-white break-words">
-                      {listing.owner_display_name || "Unknown Seller"}
-                    </span>
-                  </p>
-                  <p className="text-[13px] leading-relaxed text-slate-200">
-                    You are buying this card for{" "}
-                    <span className="font-semibold text-neonTeal">{formatMoney(askingPrice)}</span>
-                  </p>
-                  <p className="text-[13px] text-slate-400">
-                    Your balance:{" "}
-                    <span className="font-semibold text-white">
-                      {hasBalance ? formatMoney(balance) : "—"}
-                    </span>
-                  </p>
-                  <p className="text-[13px] text-slate-400">
-                    Balance after:{" "}
-                    <span className="font-semibold text-white">
-                      {balanceAfter != null ? formatMoney(balanceAfter) : "—"}
-                    </span>
-                  </p>
-                </>
-              }
+        <div className="marketplace-buy-sheet__hero">
+          <div className="marketplace-buy-sheet__image-wrap">
+            <CardImage
+              card={listing}
+              alt={listing.player_name}
+              frameClassName="marketplace-buy-sheet__image"
+              showInfoBanner
+              playOnHover
             />
-          </MarketplaceModalCardSection>
+          </div>
+
+          <div className="marketplace-buy-sheet__details">
+            <p className="marketplace-buy-sheet__name">{listing.player_name || "Card"}</p>
+            <div className="marketplace-buy-sheet__badges">
+              <span
+                className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${tierBadge.pill}`}
+              >
+                {tierBadge.label}
+              </span>
+              {themeLabel ? (
+                <span className="marketplace-buy-sheet__theme">{themeLabel}</span>
+              ) : null}
+            </div>
+            <p className="marketplace-buy-sheet__price">{formatMoney(askingPrice)}</p>
+            <p className="marketplace-buy-sheet__balance">
+              Your balance:{" "}
+              <span className="font-semibold text-white">{hasBalance ? formatMoney(balance) : "—"}</span>
+            </p>
+            <p className="marketplace-buy-sheet__balance">
+              Balance after:{" "}
+              <span className="font-semibold text-white">
+                {balanceAfter != null ? formatMoney(balanceAfter) : "—"}
+              </span>
+            </p>
+            <p className="marketplace-buy-sheet__seller">
+              Seller: {listing.owner_display_name || "Unknown Seller"}
+            </p>
+          </div>
         </div>
 
         {!insufficient ? (
-          <div className="mt-4">
+          <div className="marketplace-buy-sheet__message">
             <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
               Add a message to the seller (optional)
             </label>
@@ -781,25 +789,25 @@ function BuyAtAskingConfirmModal({
         ) : null}
       </MarketplaceModalContent>
 
-      <MarketplaceModalActions>
-        <button
-          type="button"
-          disabled={submitting}
-          onClick={onCancel}
-          className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg border border-white/20 px-4 text-sm text-slate-300 disabled:opacity-50"
-        >
-          Cancel
-        </button>
+      <MarketplaceModalActions className="marketplace-buy-sheet__actions marketplace-modal-actions--stacked">
         {!insufficient ? (
           <button
             type="button"
             disabled={submitting}
             onClick={onConfirm}
-            className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+            className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
           >
             {submitting ? "Purchasing…" : "Confirm Purchase"}
           </button>
         ) : null}
+        <button
+          type="button"
+          disabled={submitting}
+          onClick={onCancel}
+          className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg border border-white/20 px-4 text-sm text-slate-300 disabled:opacity-50"
+        >
+          Cancel
+        </button>
       </MarketplaceModalActions>
     </MarketplaceModalShell>
   );
