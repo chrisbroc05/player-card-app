@@ -129,6 +129,23 @@ export function listedAgeLabel(iso) {
   }
 }
 
+export function sentAgeLabel(iso) {
+  if (!iso) return "";
+  try {
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "Sent just now";
+    if (mins < 60) return `Sent ${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `Sent ${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days === 1) return "Sent 1 day ago";
+    return `Sent ${days} days ago`;
+  } catch {
+    return "";
+  }
+}
+
 export function compareOfferToAsking(offerAmount, askingPrice) {
   const o = Number(offerAmount);
   const a = Number(askingPrice);

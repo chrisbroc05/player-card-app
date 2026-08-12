@@ -14,7 +14,7 @@ import {
   isHighlightInProgress,
   isHighlightType,
 } from "../utils/highlightCard";
-import { useIsMobileViewport } from "../hooks/usePrefersReducedMotion";
+import { usePrefersHover } from "../hooks/usePrefersReducedMotion";
 import { normalizeCardForDisplay } from "../utils/cardDetailUtils";
 import CardDisplay from "./CardDisplay";
 import HighlightVideoPlayer from "./HighlightVideoPlayer";
@@ -134,16 +134,20 @@ export default function CardImage({
   protectMedia = false,
   useOwnerVideoProxy = false,
   token = "",
+  onMediaReady,
 }) {
   const [imgFailed, setImgFailed] = useState(false);
   const [videoFailed, setVideoFailed] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [mobileActive, setMobileActive] = useState(false);
+  const [viewportActive, setViewportActive] = useState(false);
   const [ownerVideoBlobUrl, setOwnerVideoBlobUrl] = useState(null);
   const [highlightMuted, setHighlightMuted] = useState(true);
   const [animatedMuted, setAnimatedMuted] = useState(true);
   const videoRef = useRef(null);
-  const isMobile = useIsMobileViewport();
+  const mediaContainerRef = useRef(null);
+  const mediaReadyFiredRef = useRef(false);
+  const canHover = usePrefersHover();
   const isDetail = variant === "detail";
   const isGridBrowse = variant === "grid" && playOnHover;
   const cardIdForApi = card?.card_id || card?.cardId || "";
@@ -283,7 +287,43 @@ export default function CardImage({
   const handleToggleHighlightSound = useCallback(() => setHighlightMuted((m) => !m), []);
   const handleToggleAnimatedSound = useCallback(() => setAnimatedMuted((m) => !m), []);
 
-  const browseActive = isGridBrowse && (isMobile ? mobileActive : hovered);
+  const notifyMediaReady = useCallback(() => {
+    if (mediaReadyFiredRef.current) return;
+    mediaReadyFiredRef.current = true;
+    onMediaReady?.();
+  }, [onMediaReady]);
+
+  useEffect(() => {
+    mediaReadyFiredRef.current = false;
+  }, [imgSrc, videoSrc, highlightSrc, onMediaReady]);
+
+  const handleImageLoad = useCallback(() => {
+    notifyMediaReady();
+  }, [notifyMediaReady]);
+
+  const useViewportAutoplay = isGridBrowse && !canHover && hasVideo;
+  const browseActive =
+    isGridBrowse && (canHover ? hovered : useViewportAutoplay ? viewportActive : mobileActive);
+
+  useEffect(() => {
+    if (!useViewportAutoplay) {
+      setViewportActive(false);
+      return undefined;
+    }
+    const el = mediaContainerRef.current;
+    if (!el) return undefined;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          setViewportActive(entry.isIntersecting);
+        });
+      },
+      { threshold: 0.5 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [useViewportAutoplay, videoReady, highlightActive, animatedActive]);
 
   const shouldPlayVideo =
     videoReady &&
@@ -300,6 +340,12 @@ export default function CardImage({
           : forcePlay || (!playOnHover && !isGridBrowse));
 
   const highlightPlaying = highlightActive && shouldPlayVideo;
+
+  useEffect(() => {
+    if (onMediaReady && shouldPlayVideo && videoReady) {
+      notifyMediaReady();
+    }
+  }, [onMediaReady, shouldPlayVideo, videoReady, notifyMediaReady]);
 
   useEffect(() => {
     const el = videoRef.current;
@@ -360,7 +406,7 @@ export default function CardImage({
     (showInfoBanner === true || syntheticCard.player_name || syntheticCard.playerName);
 
   const handleMobileToggle = (event) => {
-    if (!isGridBrowse || !isMobile) return;
+    if (!isGridBrowse || canHover || useViewportAutoplay) return;
     event.preventDefault();
     event.stopPropagation();
     setMobileActive((prev) => !prev);
@@ -488,6 +534,7 @@ export default function CardImage({
             loading="lazy"
             decoding="async"
             onError={() => setImgFailed(true)}
+            onLoad={handleImageLoad}
             {...mediaProtectionProps}
           />
         </ProtectedMediaShell>
@@ -515,6 +562,7 @@ export default function CardImage({
                 loading="lazy"
                 decoding="async"
                 onError={() => setImgFailed(true)}
+                onLoad={handleImageLoad}
                 {...mediaProtectionProps}
               />
             </ProtectedMediaShell>
@@ -531,16 +579,17 @@ export default function CardImage({
 
   const mediaSlot = (
     <div
+      ref={mediaContainerRef}
       className="relative h-full w-full"
-      onMouseEnter={isGridBrowse && !isMobile ? () => setHovered(true) : undefined}
+      onMouseEnter={isGridBrowse && canHover ? () => setHovered(true) : undefined}
       onMouseLeave={
-        isGridBrowse && !isMobile
+        isGridBrowse && canHover
           ? () => {
               setHovered(false);
             }
           : undefined
       }
-      onClick={handleMobileToggle}
+      onClick={isGridBrowse && !canHover && !useViewportAutoplay ? handleMobileToggle : undefined}
     >
       {mediaInner}
     </div>

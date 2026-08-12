@@ -1130,3 +1130,59 @@ def send_animation_failed_email(
         _send_resend_html(owner_email, subject, html, 0, f"animation_failed_{card_id}", parent_email=parent_email)
     except Exception as e:
         logger.error("Animation failed email failed for card %s: %s", card_id, e)
+
+
+def _numbered_steps(steps: list[str]) -> str:
+    rows = []
+    for i, step in enumerate(steps, start=1):
+        esc = html_module.escape(step)
+        rows.append(
+            f'<tr><td style="padding:0 0 10px 0;font-size:15px;color:#dddddd;line-height:1.5;">'
+            f'<span style="color:#ffd700;font-weight:700;margin-right:8px;">{i}.</span>{esc}</td></tr>'
+        )
+    inner = (
+        '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" '
+        'style="background-color:#161616;border:1px solid #2a2a2a;border-radius:8px;margin:0 0 28px 0;">'
+        f'<tr><td style="padding:18px 20px;">'
+        f'<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">'
+        f'{"".join(rows)}'
+        "</table></td></tr></table>"
+    )
+    return _content_row(inner)
+
+
+def send_welcome_email(
+    user_email: str,
+    display_name: str,
+    *,
+    parent_email: str | None = None,
+) -> None:
+    """Send welcome email to a newly registered user (and parent copy if provided)."""
+    try:
+        name = (display_name or "Legend").strip() or "Legend"
+        studio_url = f"{frontend_url()}/studio"
+        parts = [
+            _heading(f"Welcome {name}!"),
+            _subtext_plain("Your account is ready. Here's how to get started:"),
+            _numbered_steps(
+                [
+                    "Load credits to your account",
+                    "Create your first card in the Studio",
+                    "Share, trade, and sell on the marketplace",
+                ]
+            ),
+            _cta_button(studio_url, "Create Your First Card"),
+            _divider(),
+            _subtext_plain(
+                "Share your experience with friends using invite code: FUTURELEGENDS2026"
+            ),
+            _muted_center(
+                "You're receiving this because you created a Future Legends account. "
+                "To stop account emails, contact support."
+            ),
+        ]
+        html = _email_shell("".join(parts))
+        subject = "Welcome to Future Legends! 🎉"
+        _send_resend_html(user_email, subject, html, 0, "welcome", parent_email=parent_email)
+    except Exception as e:
+        logger.error("Welcome email failed for %s: %s", user_email, e)

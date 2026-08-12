@@ -381,11 +381,39 @@ function RevealSection({
 }) {
   const isHighlight = cardType === "highlight";
   const isAnimated = cardType === "animated";
+  const [mediaReady, setMediaReady] = React.useState(false);
+
+  React.useEffect(() => {
+    setMediaReady(false);
+  }, [revealCard, videoUrl, cardType]);
+
+  React.useEffect(() => {
+    if (isHighlight && revealCard?.highlight_video_url) return undefined;
+    if (videoUrl) return undefined;
+    const imageUrl = revealCard?.image_url ? toApiUrl(revealCard.image_url) : "";
+    if (!imageUrl) {
+      setMediaReady(true);
+      return undefined;
+    }
+    const img = new Image();
+    img.onload = () => setMediaReady(true);
+    img.onerror = () => setMediaReady(true);
+    img.src = imageUrl;
+    return undefined;
+  }, [isHighlight, revealCard, videoUrl]);
 
   const wrapClass =
     revealVariant === "rise"
       ? "cce-reveal-card-wrap cce-reveal-card-wrap--rise"
       : "cce-reveal-card-wrap cce-reveal-card-wrap--bounce";
+
+  const readyTitle =
+    revealTitle ||
+    (isAnimated
+      ? AWAKENING_FLIP_TEXT
+      : isHighlight
+        ? "Lights. Camera. Card."
+        : "Your card is ready!");
 
   return (
     <>
@@ -430,6 +458,7 @@ function RevealSection({
             showInfoBanner
             forcePlay
             variant="detail"
+            onMediaReady={() => setMediaReady(true)}
           />
         ) : videoUrl ? (
           <video
@@ -440,26 +469,35 @@ function RevealSection({
             loop
             playsInline
             aria-label={playerName || "Your card video"}
+            onLoadedData={() => setMediaReady(true)}
+            onError={() => setMediaReady(true)}
           />
         ) : revealCard ? (
-          <CardImage card={revealCard} alt={playerName || "Your generated card"} showInfoBanner />
+          <CardImage
+            card={revealCard}
+            alt={playerName || "Your generated card"}
+            showInfoBanner
+            onMediaReady={() => setMediaReady(true)}
+          />
         ) : null}
       </div>
 
       <div className="cce-reveal-copy">
-        <p className="cce-reveal-title">
-          {revealTitle ||
-            (isAnimated
-              ? AWAKENING_FLIP_TEXT
-              : isHighlight
-                ? "Lights. Camera. Card."
-                : "Your card is ready!")}
-        </p>
-        {isHighlight ? <span className="cce-reveal-badge">HIGHLIGHT</span> : null}
-        {isAnimated ? <span className="cce-reveal-badge cce-reveal-badge--animated">ANIMATED</span> : null}
+        {!mediaReady ? (
+          <div className="cce-reveal-loading">
+            <div className="cce-reveal-loading__spinner" aria-hidden />
+            <p className="cce-reveal-title">Almost ready...</p>
+          </div>
+        ) : (
+          <>
+            <p className="cce-reveal-title">{readyTitle}</p>
+            {isHighlight ? <span className="cce-reveal-badge">HIGHLIGHT</span> : null}
+            {isAnimated ? <span className="cce-reveal-badge cce-reveal-badge--animated">ANIMATED</span> : null}
+          </>
+        )}
       </div>
 
-      {showPrimaryAction ? (
+      {showPrimaryAction && mediaReady ? (
         <div className="cce-reveal-actions">
           <button type="button" className="cce-reveal-btn cce-reveal-btn--primary" onClick={onPrimaryAction}>
             {primaryActionLabel || "Add to Collection"}

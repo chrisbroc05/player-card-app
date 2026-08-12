@@ -85,6 +85,7 @@ from marketplace_scheduler import (
 )  # noqa: E402
 from marketplace_repo import float_from_decimal  # noqa: E402
 from parent_email_utils import normalize_optional_parent_email  # noqa: E402
+from email_service import send_welcome_email  # noqa: E402
 from schema_migrations import run_schema_migrations_after_models  # noqa: E402
 from trade_routes import router as trade_router  # noqa: E402
 from routers.activity import router as activity_router  # noqa: E402
@@ -1640,6 +1641,7 @@ def auth_register(body: RegisterBody, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
+    send_welcome_email(user.email, user.display_name, parent_email=user.parent_email)
     token = create_access_token({"sub": user.email})
     return AuthTokenResponse(access_token=token, user=_user_public(user))
 

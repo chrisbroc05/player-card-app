@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import MarketplaceSubNav from "../components/MarketplaceSubNav";
@@ -107,6 +107,15 @@ export default function MarketplaceMyListingsPage() {
     if (!token || initializing) return;
     load();
   }, [token, initializing, load]);
+
+  const location = useLocation();
+  useEffect(() => {
+    const reviewFromNav = location.state?.reviewCardId;
+    if (reviewFromNav) {
+      setReviewCardId(String(reviewFromNav));
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state?.reviewCardId]);
 
   async function offerAction(offerId, action) {
     if (!token) return;
@@ -553,11 +562,18 @@ function OfferReviewModal({
   if (!open || !listing) return null;
 
   return (
-    <div className="fixed inset-0 z-[72] flex items-center justify-center bg-black/70 px-3 py-4 sm:px-4">
-      <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl border border-white/10 bg-cardBg p-4 shadow-2xl shadow-black/50 sm:p-6">
+    <MarketplaceModalShell
+      open={open}
+      zIndex={72}
+      ariaLabelledBy="review-offers-title"
+      onBackdropClick={onClose}
+    >
+      <MarketplaceModalContent className="offer-review-modal">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-xl font-semibold text-white">Review Offers</h2>
+            <h2 id="review-offers-title" className="text-xl font-semibold text-white">
+              Review Offers
+            </h2>
             <p className="mt-1 text-sm text-slate-400">Incoming offers for {listing.player_name}</p>
           </div>
           <button
@@ -569,17 +585,18 @@ function OfferReviewModal({
           </button>
         </div>
 
-        <div className="mt-4 flex flex-col gap-4 rounded-xl border border-white/10 bg-cardBg2 p-3 sm:flex-row sm:items-center">
-          <div className="w-24 shrink-0 overflow-hidden rounded-lg border border-white/10">
+        <div className="offer-review-listing mt-4">
+          <div className="offer-review-listing__card">
             <CardImage
               card={listing}
               alt={listing.player_name}
               frameClassName="w-full"
               infoBannerVariant="compact"
               showInfoBanner
+              playOnHover
             />
           </div>
-          <div className="min-w-0">
+          <div className="offer-review-listing__details">
             <p className="text-base font-semibold text-white">{listing.player_name}</p>
             <p className="text-sm text-slate-400">{listing.team_name}</p>
             <p className="mt-1 font-mono text-xs text-neonTeal/80">{listing.card_id}</p>
@@ -740,8 +757,8 @@ function OfferReviewModal({
             );
           })}
         </ul>
-      </div>
-    </div>
+      </MarketplaceModalContent>
+    </MarketplaceModalShell>
   );
 }
 

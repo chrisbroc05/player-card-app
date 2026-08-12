@@ -47,6 +47,7 @@ export default function MyCollectionPage() {
   const [permanentDeleteBusyId, setPermanentDeleteBusyId] = useState("");
   const [toast, setToast] = useState({ message: "", variant: "success" });
   const [listSuccessOpen, setListSuccessOpen] = useState(false);
+  const [pendingOffersByCardId, setPendingOffersByCardId] = useState({});
   const animationFocusRef = useRef(null);
 
   const loadCards = useCallback(async () => {
@@ -77,6 +78,19 @@ export default function MyCollectionPage() {
           }
         }
         setListingByCardId(map);
+      }
+      const incRes = await authFetch(token, "/marketplace/incoming-offers");
+      if (incRes.res.ok) {
+        const incoming = await incRes.res.json().catch(() => []);
+        const offerMap = {};
+        if (Array.isArray(incoming)) {
+          for (const row of incoming) {
+            if (row.card_id) offerMap[row.card_id] = (offerMap[row.card_id] || 0) + 1;
+          }
+        }
+        setPendingOffersByCardId(offerMap);
+      } else {
+        setPendingOffersByCardId({});
       }
     } catch (e) {
       setError(e.message || "Failed to fetch.");
@@ -457,6 +471,7 @@ export default function MyCollectionPage() {
               const pending = (card.status || "active") === "pending_trade";
               const showDelete = canDeleteCard(card);
               const videoCard = cardPlaysVideoOnHover(card);
+              const pendingOfferCount = pendingOffersByCardId[card.card_id] || 0;
               return (
                 <article
                   key={card.card_id}
@@ -473,11 +488,26 @@ export default function MyCollectionPage() {
                       playOnHover
                       showInfoBanner
                     />
-                    {stackCount ? (
-                      <span className="absolute left-2 top-2 z-10 rounded-md border border-white/15 bg-black/70 px-2 py-0.5 text-[11px] font-semibold text-slate-200 backdrop-blur-sm">
-                        x{stackCount}
-                      </span>
-                    ) : null}
+                    <div className="absolute left-2 top-2 z-10 flex flex-col items-start gap-1">
+                      {stackCount ? (
+                        <span className="rounded-md border border-white/15 bg-black/70 px-2 py-0.5 text-[11px] font-semibold text-slate-200 backdrop-blur-sm">
+                          x{stackCount}
+                        </span>
+                      ) : null}
+                      {pendingOfferCount > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate("/marketplace/my-listings", {
+                              state: { reviewCardId: card.card_id },
+                            })
+                          }
+                          className="rounded-full border border-amber-400/50 bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold text-amber-100 backdrop-blur-sm"
+                        >
+                          {pendingOfferCount} offer{pendingOfferCount === 1 ? "" : "s"}
+                        </button>
+                      ) : null}
+                    </div>
                     <div className="absolute right-2 top-2 z-10">
                       <CardSharePopover card={card} />
                     </div>

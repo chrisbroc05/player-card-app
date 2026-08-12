@@ -14,8 +14,10 @@ import {
   offerExpiresLineClass,
   offerStatusStyle,
   compareOfferToAsking,
+  sentAgeLabel,
 } from "../utils/marketplace";
-import { CARD_IMAGE_FRAME_XS } from "../utils/cardImageStyles";
+import { getCardBannerStyles } from "../utils/cardBannerStyles";
+import { vaultTierBadge } from "../utils/tierStyles";
 
 const STATUS_TABS = [
   { id: "all", label: "All" },
@@ -236,7 +238,7 @@ export default function MarketplaceMyOffersPage() {
             ) : null}
           </div>
         ) : (
-          <ul className="space-y-4">
+          <ul className="my-offers-list">
             {filteredOffers.map((offer) => {
               const statusClass = offerStatusStyle(offer.status);
               const isTrade = (offer.offer_type || "cash") === "card_trade";
@@ -247,9 +249,11 @@ export default function MarketplaceMyOffersPage() {
               const pending = statusKey === "pending";
               const counterPending = pending && offer.counter_status === "pending";
               const note = footerNote(offer);
+              const tierBadge = vaultTierBadge(offer.tier);
+              const banner = getCardBannerStyles(offer.tier, offer.theme || offer.special_theme);
 
               return (
-                <li key={offer.offer_id} className="rounded-2xl border border-white/10 bg-cardBg p-4">
+                <li key={offer.offer_id} className="my-offers-card">
                   {counterPending ? (
                     <div className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/15 px-4 py-3">
                       {isTrade ? (
@@ -266,12 +270,12 @@ export default function MarketplaceMyOffersPage() {
                           <p className="mt-1 text-xs text-amber-200/90">Accept or decline to continue.</p>
                         </>
                       )}
-                      <div className="mt-3 flex flex-wrap gap-2">
+                      <div className="my-offers-card__actions mt-3">
                         <button
                           type="button"
                           disabled={actionKey === `cacc-${offer.offer_id}`}
                           onClick={() => counterDecision(offer.offer_id, "accept")}
-                          className="min-h-[40px] rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+                          className="my-offers-card__btn my-offers-card__btn--primary"
                         >
                           {actionKey === `cacc-${offer.offer_id}`
                             ? "Accepting…"
@@ -283,7 +287,7 @@ export default function MarketplaceMyOffersPage() {
                           type="button"
                           disabled={actionKey === `cdec-${offer.offer_id}`}
                           onClick={() => counterDecision(offer.offer_id, "decline")}
-                          className="min-h-[40px] rounded-lg border border-white/20 px-4 text-sm text-slate-300 disabled:opacity-50"
+                          className="my-offers-card__btn my-offers-card__btn--secondary"
                         >
                           {actionKey === `cdec-${offer.offer_id}` ? "Declining…" : "Decline Counter"}
                         </button>
@@ -291,60 +295,61 @@ export default function MarketplaceMyOffersPage() {
                     </div>
                   ) : null}
 
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                    <Link
-                      to={`/marketplace/my-offers/${offer.offer_id}`}
-                      className="block w-full max-w-[120px] shrink-0 self-center sm:self-start"
-                    >
-                      <CardImage card={offer} alt={offer.player_name} frameClassName={CARD_IMAGE_FRAME_XS} />
-                    </Link>
-                    <div className="min-w-0 flex-1">
-                      <Link
-                        to={`/marketplace/my-offers/${offer.offer_id}`}
-                        className="block transition hover:opacity-90"
-                      >
-                        <p className="text-base font-medium text-white break-words">{offer.player_name}</p>
-                        <p className="font-mono text-[13px] text-slate-500 break-all">{offer.card_id}</p>
+                  <Link
+                    to={`/marketplace/my-offers/${offer.offer_id}`}
+                    className="my-offers-card__thumb-link"
+                  >
+                    <CardImage card={offer} alt={offer.player_name} frameClassName="w-full" playOnHover showInfoBanner />
+                  </Link>
+
+                  <div className="my-offers-card__body">
+                    <Link to={`/marketplace/my-offers/${offer.offer_id}`} className="my-offers-card__details-link">
+                      <p className="my-offers-card__name">{offer.player_name}</p>
+                      <div className="my-offers-card__pills">
+                        <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${tierBadge.pill}`}>
+                          {tierBadge.label}
+                        </span>
+                        {banner.themeLabel ? (
+                          <span className="my-offers-card__theme">{banner.themeLabel}</span>
+                        ) : null}
+                      </div>
                       {isTrade ? (
                         <>
-                          <p className="mt-1 text-sm font-semibold text-amber-200">Card Trade Offer</p>
-                          <TradeCardsThumbRow cards={offeredCards} className="mt-2" />
+                          <p className="my-offers-card__amount my-offers-card__amount--trade">Trade offer</p>
+                          <TradeCardsThumbRow cards={offeredCards} className="mt-2 justify-center" />
                         </>
                       ) : (
                         <>
-                          <p className="mt-1 text-lg font-semibold text-neonTeal">{formatMoney(offer.offer_amount)}</p>
+                          <p className="my-offers-card__amount">Offered: {formatMoney(offer.offer_amount)}</p>
                           {offer.asking_price != null && offer.asking_price > 0 ? (
-                            <p className="text-[13px] text-slate-500">
+                            <p className="my-offers-card__meta">
                               Asking {formatMoney(offer.asking_price)}
                               {compare ? ` · ${compare}` : ""}
                             </p>
                           ) : null}
                         </>
                       )}
-                      <span
-                        className={
-                          "mt-2 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold capitalize " + statusClass
-                        }
-                      >
-                        {statusBadgeLabel(offer.status)}
-                      </span>
+                      <span className={`my-offers-card__status ${statusClass}`}>{statusBadgeLabel(offer.status)}</span>
+                      <p className="my-offers-card__sent">{sentAgeLabel(offer.created_at)}</p>
                       {pending && !counterPending && offer.days_remaining != null && offer.expires_at ? (
-                        <p className={`mt-2 text-xs ${offerExpiresLineClass(offer.days_remaining)}`}>
+                        <p className={`my-offers-card__meta ${offerExpiresLineClass(offer.days_remaining)}`}>
                           {offerExpiresLabel(offer.days_remaining)}
                         </p>
                       ) : null}
-                      {note ? <p className="mt-1 text-[13px] text-slate-500">{note}</p> : null}
-                      </Link>
-                    </div>
+                      {note ? <p className="my-offers-card__meta">{note}</p> : null}
+                    </Link>
+
                     {pending && !counterPending ? (
-                      <button
-                        type="button"
-                        disabled={actionKey === `cancel-${offer.offer_id}`}
-                        onClick={() => cancelOffer(offer.offer_id)}
-                        className="min-h-[40px] shrink-0 self-start rounded-lg border border-white/20 px-4 text-sm text-slate-300 disabled:opacity-50"
-                      >
-                        {actionKey === `cancel-${offer.offer_id}` ? "Cancelling…" : "Cancel offer"}
-                      </button>
+                      <div className="my-offers-card__actions">
+                        <button
+                          type="button"
+                          disabled={actionKey === `cancel-${offer.offer_id}`}
+                          onClick={() => cancelOffer(offer.offer_id)}
+                          className="my-offers-card__btn my-offers-card__btn--secondary"
+                        >
+                          {actionKey === `cancel-${offer.offer_id}` ? "Cancelling…" : "Cancel offer"}
+                        </button>
+                      </div>
                     ) : null}
                   </div>
                 </li>

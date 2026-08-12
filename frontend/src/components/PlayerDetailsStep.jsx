@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { validatePlayerDetails } from "../utils/playerDetails";
+import { validatePlayerDetails, POSITION_OPTIONS } from "../utils/playerDetails";
 
 function fieldErrorClass(hasError) {
   return hasError ? "border-rose-500/60" : "border-white/15";
@@ -77,13 +77,19 @@ export default function PlayerDetailsStep({
           ) : null}
         </div>
         <div>
-          <input
-            className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 ${fieldErrorClass(showErrors && errors.position)}`}
-            placeholder="Position *"
+          <select
+            className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 text-slate-100 ${fieldErrorClass(showErrors && errors.position)}`}
             value={local.position}
             onChange={(e) => updateLocal("position", e.target.value)}
             onBlur={() => blurField("position")}
-          />
+          >
+            <option value="">Select Position</option>
+            {POSITION_OPTIONS.map(({ value, label }) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
           {showErrors && errors.position ? (
             <p className="mt-1 text-xs text-rose-300">{errors.position}</p>
           ) : null}
