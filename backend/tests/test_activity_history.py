@@ -14,8 +14,10 @@ sys.path.insert(0, str(APP_DIR))
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
 from activity_history import gather_user_activity_items, list_user_activity_history  # noqa: E402
+from card_pricing import tier_generation_price  # noqa: E402
+from credit_service import TX_GENERATION  # noqa: E402
 from database import Base, SessionLocal, engine  # noqa: E402
-from models import Card, User, utcnow  # noqa: E402
+from models import Card, CreditLedger, User, utcnow  # noqa: E402
 
 
 class ActivityHistoryTests(unittest.TestCase):
@@ -53,6 +55,7 @@ class ActivityHistoryTests(unittest.TestCase):
         highlight_uploaded_at: datetime | None = None,
         created_at: datetime | None = None,
         status: str = "active",
+        preview_session_id: str | None = None,
     ) -> Card:
         row = Card(
             card_id=card_id,
@@ -79,6 +82,7 @@ class ActivityHistoryTests(unittest.TestCase):
             highlight_status=highlight_status,
             highlight_uploaded_at=highlight_uploaded_at,
             created_at=created_at or utcnow(),
+            preview_session_id=preview_session_id,
         )
         self.db.add(row)
         self.db.commit()
@@ -159,6 +163,52 @@ class ActivityHistoryTests(unittest.TestCase):
         animated = [i for i in items if i["activity_type"] == "animated_upgrade"]
         self.assertEqual(len(animated), 1)
         self.assertEqual(animated[0]["card"]["card_id"], "FL-2026-000105")
+
+    def test_free_card_creation_shows_zero_amount(self) -> None:
+        self._add_card(card_id="FL-2026-000106")
+
+        items = gather_user_activity_items(self.db, self.user.id)
+        created = [i for i in items if i["activity_type"] == "card_created"]
+        self.assertEqual(len(created), 1)
+        self.assertEqual(created[0]["amount"], 0.0)
+
+    def test_paid_card_creation_uses_ledger_amount(self) -> None:
+        card = self._add_card(card_id="FL-2026-000107")
+        self.db.add(
+            CreditLedger(
+                user_id=self.user.id,
+                amount=-2.00,
+                balance_after=98.00,
+                transaction_type=TX_GENERATION,
+                reference_id=card.card_id,
+                note="Card preview",
+            )
+        )
+        self.db.commit()
+
+        items = gather_user_activity_items(self.db, self.user.id)
+        created = [i for i in items if i["activity_type"] == "card_created"]
+        self.assertEqual(len(created), 1)
+        self.assertEqual(created[0]["amount"], 2.0)
+
+    def test_paid_preview_in_session_uses_tier_price_without_ledger(self) -> None:
+        now = datetime.now(timezone.utc)
+        session_id = "preview-session-1"
+        self._add_card(
+            card_id="FL-2026-000108",
+            preview_session_id=session_id,
+            created_at=now - timedelta(minutes=5),
+        )
+        self._add_card(
+            card_id="FL-2026-000109",
+            preview_session_id=session_id,
+            created_at=now,
+        )
+
+        items = gather_user_activity_items(self.db, self.user.id)
+        created = {i["card"]["card_id"]: i for i in items if i["activity_type"] == "card_created"}
+        self.assertEqual(created["FL-2026-000108"]["amount"], 0.0)
+        self.assertEqual(created["FL-2026-000109"]["amount"], tier_generation_price("rookie"))
 
 
 if __name__ == "__main__":

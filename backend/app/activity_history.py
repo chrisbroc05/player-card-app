@@ -7,15 +7,21 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session, joinedload
 
-from card_pricing import animated_upgrade_price, highlight_card_price, tier_generation_price
+from card_pricing import tier_generation_price
 from card_repo import (
     animation_fields_for_card,
     cards_created_by_user_filter,
     highlight_fields_for_card,
 )
+from credit_service import (
+    TX_ANIMATION,
+    TX_CARD_PURCHASE,
+    TX_GENERATION,
+    TX_HIGHLIGHT,
+)
 from marketplace_repo import float_from_decimal
 from marketplace_trade_repo import OFFER_TYPE_CASH
-from models import Card, MarketplaceOffer, TradeOffer, User
+from models import Card, CreditLedger, MarketplaceOffer, TradeOffer, User
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +89,100 @@ def _counterparty(display_name: str | None, user_id: int | None = None) -> dict 
     return {"display_name": name, "user_id": user_id}
 
 
+CARD_CREATION_TX_TYPES = (TX_CARD_PURCHASE, TX_GENERATION)
+UPGRADE_TX_TYPES = {
+    "animated_upgrade": (TX_ANIMATION,),
+    "highlight_upgrade": (TX_HIGHLIGHT,),
+}
+
+
+def _ledger_charge_amounts(
+    db: Session,
+    user_id: int,
+    transaction_types: tuple[str, ...],
+) -> dict[str, float]:
+    """Sum negative ledger debits keyed by reference_id (positive dollar amounts)."""
+    rows = (
+        db.query(CreditLedger)
+        .filter(
+            CreditLedger.user_id == user_id,
+            CreditLedger.transaction_type.in_(transaction_types),
+            CreditLedger.amount < 0,
+        )
+        .all()
+    )
+    totals: dict[str, float] = {}
+    for row in rows:
+        ref = (row.reference_id or "").strip()
+        if not ref:
+            continue
+        totals[ref] = totals.get(ref, 0.0) + abs(float(row.amount))
+    return totals
+
+
+def _preview_session_indexes(db: Session, user_id: int) -> dict[str, int]:
+    """Map card_id -> 0-based creation order within its preview session."""
+    rows = (
+        db.query(Card)
+        .filter(
+            Card.owner_id == user_id,
+            Card.preview_session_id.isnot(None),
+        )
+        .order_by(Card.created_at.asc(), Card.id.asc())
+        .all()
+    )
+    by_session: dict[str, list[str]] = {}
+    for card in rows:
+        session_id = (card.preview_session_id or "").strip()
+        if not session_id:
+            continue
+        by_session.setdefault(session_id, []).append(card.card_id or "")
+
+    indexes: dict[str, int] = {}
+    for card_ids in by_session.values():
+        for index, card_id in enumerate(card_ids):
+            if card_id:
+                indexes[card_id] = index
+    return indexes
+
+
+def _card_creation_charge(
+    card: Card,
+    *,
+    ledger_by_ref: dict[str, float],
+    preview_indexes: dict[str, int],
+) -> float:
+    """
+    Actual charge for a created card, or 0 when no credits were deducted (free preview).
+    """
+    card_ref = (card.card_id or "").strip()
+    if card_ref and card_ref in ledger_by_ref:
+        return ledger_by_ref[card_ref]
+
+    session_id = (card.preview_session_id or "").strip()
+    if session_id and card_ref:
+        if preview_indexes.get(card_ref, 0) > 0:
+            return tier_generation_price(card.tier)
+        return 0.0
+
+    return 0.0
+
+
+def _upgrade_charge(
+    card: Card,
+    *,
+    activity_type: str,
+    ledger_by_ref: dict[str, float],
+) -> float:
+    tx_types = UPGRADE_TX_TYPES.get(activity_type, ())
+    if not tx_types:
+        return 0.0
+    card_ref = (card.card_id or "").strip()
+    if card_ref and card_ref in ledger_by_ref:
+        return ledger_by_ref[card_ref]
+    return 0.0
+
+
 def _build_item(
     *,
     item_id: str,
@@ -114,6 +214,13 @@ def _build_item(
 def gather_user_activity_items(db: Session, user_id: int) -> list[dict]:
     """Collect all completed activity rows for a user (unsorted)."""
     items: list[dict] = []
+    card_creation_ledger = _ledger_charge_amounts(db, user_id, CARD_CREATION_TX_TYPES)
+    upgrade_ledger = _ledger_charge_amounts(
+        db,
+        user_id,
+        UPGRADE_TX_TYPES["animated_upgrade"] + UPGRADE_TX_TYPES["highlight_upgrade"],
+    )
+    preview_indexes = _preview_session_indexes(db, user_id)
 
     trade_rows = (
         db.query(TradeOffer)
@@ -233,7 +340,6 @@ def gather_user_activity_items(db: Session, user_id: int) -> list[dict]:
         )
         .all()
     )
-    animated_price = animated_upgrade_price()
     for card in animated_rows:
         when = card.animation_completed_at or card.created_at
         items.append(
@@ -244,7 +350,11 @@ def gather_user_activity_items(db: Session, user_id: int) -> list[dict]:
                 created_at=card.created_at,
                 card=card,
                 counterparty=None,
-                amount=animated_price,
+                amount=_upgrade_charge(
+                    card,
+                    activity_type="animated_upgrade",
+                    ledger_by_ref=upgrade_ledger,
+                ),
             )
         )
 
@@ -257,7 +367,6 @@ def gather_user_activity_items(db: Session, user_id: int) -> list[dict]:
         )
         .all()
     )
-    highlight_price = highlight_card_price()
     for card in highlight_rows:
         when = card.highlight_uploaded_at or card.created_at
         items.append(
@@ -268,7 +377,11 @@ def gather_user_activity_items(db: Session, user_id: int) -> list[dict]:
                 created_at=card.created_at,
                 card=card,
                 counterparty=None,
-                amount=highlight_price,
+                amount=_upgrade_charge(
+                    card,
+                    activity_type="highlight_upgrade",
+                    ledger_by_ref=upgrade_ledger,
+                ),
             )
         )
 
@@ -291,7 +404,11 @@ def gather_user_activity_items(db: Session, user_id: int) -> list[dict]:
                 created_at=card.created_at,
                 card=card,
                 counterparty=None,
-                amount=tier_generation_price(card.tier),
+                amount=_card_creation_charge(
+                    card,
+                    ledger_by_ref=card_creation_ledger,
+                    preview_indexes=preview_indexes,
+                ),
             )
         )
 

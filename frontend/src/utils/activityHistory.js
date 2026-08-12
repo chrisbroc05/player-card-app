@@ -216,6 +216,30 @@ export function activityAmountDisplay(item) {
   }
 
   const raw = Number(item?.amount);
+
+  if (
+    type === "card_created"
+    || type === "animated_upgrade"
+    || type === "highlight_upgrade"
+  ) {
+    if (!Number.isFinite(raw) || raw === 0) {
+      const subtext =
+        type === "card_created"
+          ? "Free preview"
+          : type === "animated_upgrade"
+            ? "Animation"
+            : "Highlight";
+      return { text: "Free", tone: "success", subtext, small: true };
+    }
+    const subtext =
+      type === "card_created"
+        ? "Card creation"
+        : type === "animated_upgrade"
+          ? "Animation"
+          : "Highlight";
+    return { text: `−${formatMoney(Math.abs(raw))}`, tone: "danger", subtext, small: true };
+  }
+
   if (!Number.isFinite(raw)) return { text: "—", tone: "muted" };
 
   if (type === "marketplace_sold") {
@@ -233,18 +257,6 @@ export function activityAmountDisplay(item) {
 
   if (type === "marketplace_bought") {
     return { text: `−${formatMoney(Math.abs(raw))}`, tone: "danger" };
-  }
-
-  if (type === "animated_upgrade") {
-    return { text: `−${formatMoney(Math.abs(raw))}`, tone: "danger", subtext: "Animation", small: true };
-  }
-
-  if (type === "highlight_upgrade") {
-    return { text: `−${formatMoney(Math.abs(raw))}`, tone: "danger", subtext: "Highlight", small: true };
-  }
-
-  if (type === "card_created") {
-    return { text: `−${formatMoney(Math.abs(raw))}`, tone: "danger", subtext: "Card creation", small: true };
   }
 
   return { text: formatMoney(Math.abs(raw)), tone: "muted" };
@@ -270,9 +282,23 @@ export function amountDisplay(item) {
   if (item?.activity_type === "marketplace_sold") {
     return marketplaceSoldAmountDisplay(item);
   }
-  if (item?.amount == null || Number.isNaN(Number(item.amount))) return null;
-  const n = Number(item.amount);
-  const formatted = formatMoney(Math.abs(n));
+
+  const type = item?.activity_type;
+  const raw = Number(item?.amount);
+
+  if (
+    type === "card_created"
+    || type === "animated_upgrade"
+    || type === "highlight_upgrade"
+  ) {
+    if (!Number.isFinite(raw) || raw === 0) {
+      return { text: "Free", className: "text-emerald-300" };
+    }
+    return { text: `-${formatMoney(Math.abs(raw))}`, className: "text-rose-300" };
+  }
+
+  if (item?.amount == null || Number.isNaN(raw)) return null;
+  const formatted = formatMoney(Math.abs(raw));
   if (item.activity_type === "marketplace_bought") {
     return { text: `-${formatted}`, className: "text-rose-300" };
   }
