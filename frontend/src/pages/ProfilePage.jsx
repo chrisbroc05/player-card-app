@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Navigate, useLocation, useSearchParams } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
@@ -171,6 +171,10 @@ export default function ProfilePage() {
       setLoading(false);
     }
   }, [token]);
+
+  const updateProfileFields = useCallback((fields) => {
+    setProfile((prev) => (prev ? { ...prev, ...fields } : prev));
+  }, []);
 
   useEffect(() => {
     if (!token || initializing) return;
@@ -350,7 +354,12 @@ export default function ProfilePage() {
             <hr className="profile-page__divider" />
             <section id="payout-settings">
               <h2 className="profile-page__section-title">Payout Settings</h2>
-              <PayoutSettings token={token} profile={profile} loading={loading} />
+              <PayoutSettings
+                token={token}
+                profile={profile}
+                loading={loading}
+                onProfileUpdate={updateProfileFields}
+              />
             </section>
           </div>
         )}
@@ -429,9 +438,11 @@ function ParentEmailSettings({ token, profile, onSaved }) {
   );
 }
 
-function PayoutSettings({ token, profile, loading }) {
+function PayoutSettings({ token, profile, loading, onProfileUpdate }) {
   const [busy, setBusy] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const autoRefreshed = useRef(false);
 
   const connected =
     profile?.stripe_onboarding_complete === true && profile?.stripe_payouts_enabled === true;
@@ -439,6 +450,52 @@ function PayoutSettings({ token, profile, loading }) {
     !connected &&
     profile?.stripe_account_status === "pending" &&
     profile?.stripe_onboarding_complete !== true;
+
+  const refreshStatus = useCallback(async () => {
+    const authToken = (token || localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) || "").trim();
+    if (!authToken) {
+      setError("Not signed in. Please log in again.");
+      return;
+    }
+    setRefreshing(true);
+    setError("");
+    try {
+      const res = await fetch(`${API_BASE_URL}/connect/refresh-status`, {
+        method: "POST",
+        headers: { ...authHeaders(authToken) },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 503) {
+        throw new Error(formatApiError(data?.detail, "Payments not yet enabled"));
+      }
+      if (!res.ok) {
+        throw new Error(formatApiError(data?.detail, "Could not refresh payout status."));
+      }
+      onProfileUpdate?.({
+        stripe_account_status: data.stripe_account_status,
+        stripe_onboarding_complete: data.stripe_onboarding_complete,
+        stripe_payouts_enabled: data.stripe_payouts_enabled,
+      });
+    } catch (err) {
+      setError(err?.message || "Refresh failed.");
+    } finally {
+      setRefreshing(false);
+    }
+  }, [token, onProfileUpdate]);
+
+  useEffect(() => {
+    if (loading) {
+      autoRefreshed.current = false;
+    }
+  }, [loading]);
+
+  useEffect(() => {
+    if (loading || !profile || autoRefreshed.current) return;
+    if (profile.stripe_account_status === "pending") {
+      autoRefreshed.current = true;
+      refreshStatus();
+    }
+  }, [loading, profile, refreshStatus]);
 
   async function startOnboarding() {
     const authToken = (token || localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) || "").trim();
@@ -527,9 +584,19 @@ function PayoutSettings({ token, profile, loading }) {
   if (pending) {
     return (
       <div className="space-y-4">
-        <span className="inline-flex rounded-full border border-amber-500/40 bg-amber-500/15 px-3 py-1 text-xs font-semibold text-amber-200">
-          Verification Pending
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex rounded-full border border-amber-500/40 bg-amber-500/15 px-3 py-1 text-xs font-semibold text-amber-200">
+            Verification Pending
+          </span>
+          <button
+            type="button"
+            disabled={busy || refreshing}
+            onClick={refreshStatus}
+            className="min-h-[32px] rounded-lg border border-white/15 bg-white/5 px-3 text-xs font-medium text-slate-300 disabled:opacity-50"
+          >
+            {refreshing ? "Refreshing…" : "↻ Refresh Status"}
+          </button>
+        </div>
         <p className="text-sm text-slate-400">
           Stripe is reviewing your account. This usually takes 1-2 business days.
         </p>

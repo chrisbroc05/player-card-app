@@ -12,7 +12,12 @@ from auth import get_current_user
 from database import get_db
 from models import User
 from payments_config import require_payments_enabled
-from stripe_connect import create_dashboard_link, create_onboarding_link, ensure_connect_account
+from stripe_connect import (
+    create_dashboard_link,
+    create_onboarding_link,
+    ensure_connect_account,
+    sync_connect_account_status,
+)
 
 router = APIRouter()
 
@@ -33,6 +38,15 @@ class ConnectUrlResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     url: str
+
+
+class ConnectStatusResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    stripe_account_status: str | None = None
+    stripe_onboarding_complete: bool = False
+    stripe_payouts_enabled: bool = False
+    charges_enabled: bool = False
 
 
 @router.post("/create-account", response_model=ConnectAccountResponse)
@@ -65,6 +79,19 @@ def connect_onboarding_link(
         print("CONNECT ONBOARDING ERROR:", str(e), flush=True)
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/refresh-status", response_model=ConnectStatusResponse)
+def connect_refresh_status(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Fetch current Stripe Connect account status and update the user record."""
+    require_payments_enabled()
+    if not user.stripe_account_id:
+        raise HTTPException(status_code=400, detail="No Stripe Connect account")
+    status = sync_connect_account_status(db, user)
+    return ConnectStatusResponse(**status)
 
 
 @router.post("/dashboard-link", response_model=ConnectUrlResponse)

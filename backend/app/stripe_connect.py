@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 import os
 
 import stripe
 from sqlalchemy.orm import Session
 
 from models import User
+
+logger = logging.getLogger(__name__)
 
 STATUS_PENDING = "pending"
 STATUS_ACTIVE = "active"
@@ -73,6 +76,46 @@ def create_onboarding_link(db: Session, user: User) -> str:
     if not url:
         raise RuntimeError("Stripe did not return an onboarding URL")
     return url
+
+
+def connect_status_payload(user: User, *, charges_enabled: bool = False) -> dict[str, bool | str | None]:
+    return {
+        "stripe_account_status": user.stripe_account_status,
+        "stripe_onboarding_complete": bool(user.stripe_onboarding_complete),
+        "stripe_payouts_enabled": bool(user.stripe_payouts_enabled),
+        "charges_enabled": charges_enabled,
+    }
+
+
+def sync_connect_account_status(db: Session, user: User) -> dict[str, bool | str | None]:
+    """Fetch live Stripe Connect status and persist on user."""
+    if not user.stripe_account_id:
+        return connect_status_payload(user)
+
+    charges_enabled = False
+    try:
+        _configure_stripe()
+        account = stripe.Account.retrieve(user.stripe_account_id)
+        payouts_enabled = bool(getattr(account, "payouts_enabled", False))
+        charges_enabled = bool(getattr(account, "charges_enabled", False))
+        details_submitted = bool(getattr(account, "details_submitted", False))
+
+        user.stripe_payouts_enabled = payouts_enabled
+        user.stripe_account_status = STATUS_ACTIVE if payouts_enabled else STATUS_PENDING
+        user.stripe_onboarding_complete = (
+            details_submitted or payouts_enabled or charges_enabled
+        )
+        db.commit()
+        db.refresh(user)
+    except Exception as exc:
+        logger.warning(
+            "Failed to sync Stripe Connect status for user %s: %s",
+            user.id,
+            exc,
+        )
+        db.rollback()
+
+    return connect_status_payload(user, charges_enabled=charges_enabled)
 
 
 def create_dashboard_link(user: User) -> str:

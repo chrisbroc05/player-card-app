@@ -15,6 +15,7 @@ from models import Card, MarketplaceOffer, User
 from parent_email_utils import normalize_optional_parent_email
 from profile_stats import compute_profile_kpis
 from marketplace_repo import float_from_decimal
+from stripe_connect import sync_connect_account_status
 
 router = APIRouter()
 
@@ -179,6 +180,9 @@ def get_profile(
     user: User = Depends(get_current_user),
 ):
     """Aggregate stats for the authenticated user (own cards / trades only)."""
+    if user.stripe_account_id:
+        sync_connect_account_status(db, user)
+
     kpis = compute_profile_kpis(db, user)
 
     rarest_out: RarestCardOut | None = None
