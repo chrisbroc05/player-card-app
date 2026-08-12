@@ -505,13 +505,15 @@ function PayoutSettings({ token, profile, loading, onProfileUpdate }) {
     }
     setError("");
     setBusy(true);
+    let redirecting = false;
     try {
       const response = await fetch(`${API_BASE_URL}/connect/onboarding-link`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${authToken}`,
+          ...authHeaders(authToken),
           "Content-Type": "application/json",
         },
+        cache: "no-store",
       });
       const data = await response.json().catch(() => ({}));
       if (response.status === 503) {
@@ -521,14 +523,15 @@ function PayoutSettings({ token, profile, loading, onProfileUpdate }) {
         throw new Error(formatApiError(data?.detail, "Could not start bank connection."));
       }
       if (data.url) {
-        window.location.href = data.url;
+        redirecting = true;
+        window.location.assign(data.url);
         return;
       }
       setError("No onboarding URL returned.");
     } catch (err) {
       setError(err?.message || "Request failed");
     } finally {
-      setBusy(false);
+      if (!redirecting) setBusy(false);
     }
   }
 

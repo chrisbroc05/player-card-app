@@ -59,18 +59,22 @@ def ensure_connect_account(db: Session, user: User) -> str:
 
 
 def create_onboarding_link(db: Session, user: User) -> str:
-    """Ensure Connect account exists and return Stripe Account Link URL."""
+    """Ensure Connect account exists and return a fresh Stripe Account Link URL."""
     stripe_account_id = ensure_connect_account(db, user)
     _configure_stripe()
     frontend = (os.environ.get("FRONTEND_URL") or "").strip().rstrip("/")
     if not frontend:
         raise RuntimeError("FRONTEND_URL is not configured")
+
+    account = stripe.Account.retrieve(stripe_account_id)
+    details_submitted = bool(getattr(account, "details_submitted", False))
+    link_type = "account_update" if details_submitted else "account_onboarding"
+
     link = stripe.AccountLink.create(
         account=stripe_account_id,
-        refresh_url=f"{frontend}/profile?connect=refresh",
-        return_url=f"{frontend}/profile?connect=complete",
-        type="account_onboarding",
-        collection_options={"fields": "eventually_due"},
+        refresh_url=f"{frontend}/profile",
+        return_url=f"{frontend}/profile",
+        type=link_type,
     )
     url = link.url
     if not url:

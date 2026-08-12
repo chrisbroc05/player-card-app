@@ -3,24 +3,72 @@ import CardImage from "./CardImage";
 import { CARD_IMAGE_FRAME_MODAL } from "../utils/cardImageStyles";
 import { rarityDisplay, vaultTierBadge } from "../utils/tierStyles";
 
+/** @deprecated Use MarketplaceModalShell */
 export const MARKETPLACE_MODAL_OVERLAY_CLASS =
-  "fixed inset-0 flex items-center justify-center bg-black/70 p-4";
+  "marketplace-modal-overlay";
 
+/** @deprecated Use MarketplaceModalShell */
 export function marketplaceModalPanelClass(borderClass = "border-white/10") {
-  return `w-full min-w-0 max-w-lg rounded-2xl border ${borderClass} bg-cardBg p-6 shadow-2xl shadow-black/50 sm:min-w-[420px]`;
+  return `marketplace-modal-panel border ${borderClass} bg-cardBg shadow-2xl shadow-black/50 sm:min-w-[420px] sm:max-w-lg sm:rounded-2xl sm:p-6`;
+}
+
+export function MarketplaceModalShell({
+  open,
+  zIndex = 70,
+  borderClass = "border-white/10",
+  ariaLabelledBy,
+  children,
+  onBackdropClick,
+}) {
+  if (!open) return null;
+
+  return (
+    <div
+      className="marketplace-modal-overlay"
+      style={{ zIndex }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onBackdropClick?.();
+      }}
+    >
+      <div
+        className={`marketplace-modal-panel border ${borderClass} bg-cardBg shadow-2xl shadow-black/50`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={ariaLabelledBy}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="marketplace-modal-handle" aria-hidden="true" />
+        {children}
+      </div>
+    </div>
+  );
+}
+
+export function MarketplaceModalContent({ children, className = "" }) {
+  return <div className={`marketplace-modal-content ${className}`.trim()}>{children}</div>;
+}
+
+export function MarketplaceModalActions({ children, className = "" }) {
+  return <div className={`marketplace-modal-actions ${className}`.trim()}>{children}</div>;
+}
+
+export function MarketplaceModalSuccessIcon() {
+  return (
+    <div className="marketplace-modal-success-icon" aria-hidden="true">
+      ✓
+    </div>
+  );
 }
 
 export function MarketplaceModalCardSection({ card, children, centered = false }) {
-  const alignment = centered
-    ? "items-center text-center sm:items-start sm:text-left"
-    : "items-center sm:items-start";
+  const centeredClass = centered ? "marketplace-modal-card-section--centered" : "";
 
   return (
-    <div className={`flex flex-col gap-6 ${alignment} sm:flex-row sm:gap-6`}>
-      <div className="mx-auto w-full min-w-[200px] max-w-[240px] shrink-0 sm:mx-0">
+    <div className={`marketplace-modal-card-section ${centeredClass}`.trim()}>
+      <div className="marketplace-modal-card-section__image">
         <CardImage card={card} alt={card?.player_name} frameClassName={CARD_IMAGE_FRAME_MODAL} />
       </div>
-      <div className="w-full min-w-0 flex-1 space-y-3">{children}</div>
+      <div className="marketplace-modal-card-section__details">{children}</div>
     </div>
   );
 }

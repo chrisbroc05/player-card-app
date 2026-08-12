@@ -22,10 +22,12 @@ import CardHistoryTimeline from "../components/CardHistoryTimeline";
 import { vaultTierBadge, rarityDisplay } from "../utils/tierStyles";
 import { CARD_IMAGE_FRAME_DETAIL } from "../utils/cardImageStyles";
 import {
-  MARKETPLACE_MODAL_OVERLAY_CLASS,
+  MarketplaceModalActions,
   MarketplaceModalCardDetails,
   MarketplaceModalCardSection,
-  marketplaceModalPanelClass,
+  MarketplaceModalContent,
+  MarketplaceModalShell,
+  MarketplaceModalSuccessIcon,
 } from "../components/MarketplaceModalLayout";
 
 export default function MarketplaceCardDetailPage() {
@@ -115,6 +117,7 @@ export default function MarketplaceCardDetailPage() {
 
     const isTrade = offerMode === "card_trade";
     let body;
+    let cashOfferAmount = null;
 
     if (isTrade) {
       if (tradeCardIds.length < 1) {
@@ -128,12 +131,12 @@ export default function MarketplaceCardDetailPage() {
         message: message.trim() || null,
       };
     } else {
-      const n = Number(forcedCashAmount ?? offerAmount);
-      if (!Number.isFinite(n) || n < 0.01) {
+      cashOfferAmount = Number(forcedCashAmount ?? offerAmount);
+      if (!Number.isFinite(cashOfferAmount) || cashOfferAmount < 0.01) {
         setOfferError("Offer amount must be at least $0.01");
         return false;
       }
-      if (buyerBalance != null && n > buyerBalance) {
+      if (buyerBalance != null && cashOfferAmount > buyerBalance) {
         setOfferError("Insufficient credits — Add credits to your account");
         return false;
       }
@@ -141,7 +144,7 @@ export default function MarketplaceCardDetailPage() {
       body = {
         card_id: listing.card_id,
         offer_type: "cash",
-        offer_amount: n,
+        offer_amount: cashOfferAmount,
         message: messageText.trim() || null,
       };
     }
@@ -176,7 +179,7 @@ export default function MarketplaceCardDetailPage() {
       } else if (isTrade) {
         setOfferSuccess("Trade offer submitted! The seller will be notified by email.");
       } else {
-        setSubmittedOfferAmount(n);
+        setSubmittedOfferAmount(cashOfferAmount);
         setOfferConfirmOpen(false);
         setOfferSuccessOpen(true);
       }
@@ -201,7 +204,7 @@ export default function MarketplaceCardDetailPage() {
     if (!listing) return;
     const ok = await handleSubmitOffer(null, Number(listing.asking_price), buyMessage, true);
     if (!ok) {
-      setBuyConfirmOpen(true);
+      setBuyConfirmOpen(false);
     }
   }
 
@@ -224,7 +227,7 @@ export default function MarketplaceCardDetailPage() {
   async function handleConfirmCashOffer() {
     const ok = await handleSubmitOffer(null, Number(offerAmount), message);
     if (!ok) {
-      setOfferConfirmOpen(true);
+      setOfferConfirmOpen(false);
     }
   }
 
@@ -559,18 +562,18 @@ function CashOfferConfirmModal({
   const difference = Math.max(0, askingPrice - amount);
 
   return (
-    <div className={`${MARKETPLACE_MODAL_OVERLAY_CLASS} z-[70]`}>
-      <div
-        className={marketplaceModalPanelClass()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="offer-confirm-title"
-      >
+    <MarketplaceModalShell
+      open={open}
+      zIndex={70}
+      ariaLabelledBy="offer-confirm-title"
+      onBackdropClick={onCancel}
+    >
+      <MarketplaceModalContent>
         <h3 id="offer-confirm-title" className="text-xl font-semibold text-white">
           Confirm Offer
         </h3>
 
-        <div className="mt-6 rounded-xl border border-white/10 bg-cardBg2 p-4">
+        <div className="mt-4 rounded-xl border border-white/10 bg-cardBg2 p-3 sm:mt-6 sm:p-4">
           <MarketplaceModalCardSection card={listing}>
             <MarketplaceModalCardDetails
               listing={listing}
@@ -601,40 +604,38 @@ function CashOfferConfirmModal({
 
         {insufficient ? (
           <div className="mt-4 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-3 text-sm text-amber-100">
-            <p>
-              {creditTopUpShortfallMessage(shortfall)}
-            </p>
+            <p>{creditTopUpShortfallMessage(shortfall)}</p>
             <Link
               to="/credits"
-              className="mt-3 inline-flex min-h-[42px] w-full items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950"
+              className="mt-3 inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950"
             >
               Add Credits
             </Link>
           </div>
         ) : null}
+      </MarketplaceModalContent>
 
-        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row">
+      <MarketplaceModalActions>
+        <button
+          type="button"
+          disabled={submitting}
+          onClick={onCancel}
+          className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg border border-white/20 px-4 text-sm text-slate-300 disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        {!insufficient ? (
           <button
             type="button"
             disabled={submitting}
-            onClick={onCancel}
-            className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg border border-white/20 px-4 text-sm text-slate-300 disabled:opacity-50"
+            onClick={onConfirm}
+            className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
           >
-            Cancel
+            {submitting ? "Submitting…" : "Submit Offer"}
           </button>
-          {!insufficient ? (
-            <button
-              type="button"
-              disabled={submitting}
-              onClick={onConfirm}
-              className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
-            >
-              {submitting ? "Submitting…" : "Submit Offer"}
-            </button>
-          ) : null}
-        </div>
-      </div>
-    </div>
+        ) : null}
+      </MarketplaceModalActions>
+    </MarketplaceModalShell>
   );
 }
 
@@ -647,43 +648,41 @@ function CashOfferSuccessModal({
   if (!open || offerAmount == null) return null;
 
   return (
-    <div className={`${MARKETPLACE_MODAL_OVERLAY_CLASS} z-[71]`}>
-      <div
-        className={marketplaceModalPanelClass("border-emerald-500/30")}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="offer-success-title"
-      >
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-emerald-400/50 bg-emerald-500/15 text-2xl text-emerald-300">
-          ✓
-        </div>
-        <h3 id="offer-success-title" className="mt-4 text-center text-2xl font-semibold text-white">
+    <MarketplaceModalShell
+      open={open}
+      zIndex={71}
+      borderClass="border-emerald-500/30"
+      ariaLabelledBy="offer-success-title"
+      onBackdropClick={onBackToMarketplace}
+    >
+      <MarketplaceModalContent>
+        <MarketplaceModalSuccessIcon />
+        <h3 id="offer-success-title" className="mt-4 text-center text-xl font-semibold text-white sm:text-2xl">
           Offer Submitted!
         </h3>
         <p className="mt-3 text-center text-sm leading-relaxed text-slate-300">
           Your offer of <span className="font-semibold text-neonTeal">{formatMoney(offerAmount)}</span> has been sent
-          to the seller.
+          to the seller. You&apos;ll be notified when they respond.
         </p>
-        <p className="mt-2 text-center text-sm text-slate-400">You&apos;ll be notified when they respond.</p>
+      </MarketplaceModalContent>
 
-        <div className="mt-6 space-y-2">
-          <button
-            type="button"
-            onClick={onViewMyOffers}
-            className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950"
-          >
-            View My Offers
-          </button>
-          <button
-            type="button"
-            onClick={onBackToMarketplace}
-            className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg border border-white/20 bg-cardBg2 px-4 text-sm font-medium text-slate-100"
-          >
-            Back to Marketplace
-          </button>
-        </div>
-      </div>
-    </div>
+      <MarketplaceModalActions className="marketplace-modal-actions--stacked">
+        <button
+          type="button"
+          onClick={onViewMyOffers}
+          className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950"
+        >
+          View My Offers
+        </button>
+        <button
+          type="button"
+          onClick={onBackToMarketplace}
+          className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg border border-white/20 bg-cardBg2 px-4 text-sm font-medium text-slate-100"
+        >
+          Back to Marketplace
+        </button>
+      </MarketplaceModalActions>
+    </MarketplaceModalShell>
   );
 }
 
@@ -707,19 +706,19 @@ function BuyAtAskingConfirmModal({
   const balanceAfter = hasBalance ? Math.max(0, balance - askingPrice) : null;
 
   return (
-    <div className={`${MARKETPLACE_MODAL_OVERLAY_CLASS} z-[70]`}>
-      <div
-        className={marketplaceModalPanelClass()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="buy-confirm-title"
-      >
+    <MarketplaceModalShell
+      open={open}
+      zIndex={70}
+      ariaLabelledBy="buy-confirm-title"
+      onBackdropClick={onCancel}
+    >
+      <MarketplaceModalContent>
         <h3 id="buy-confirm-title" className="text-xl font-semibold text-white">
           Confirm Purchase
         </h3>
         <p className="mt-2 text-[13px] text-slate-400">Review purchase details before completing payment.</p>
 
-        <div className="mt-6 rounded-xl border border-white/10 bg-cardBg2 p-4">
+        <div className="mt-4 rounded-xl border border-white/10 bg-cardBg2 p-3 sm:mt-6 sm:p-4">
           <MarketplaceModalCardSection card={listing}>
             <MarketplaceModalCardDetails
               listing={listing}
@@ -753,55 +752,55 @@ function BuyAtAskingConfirmModal({
           </MarketplaceModalCardSection>
         </div>
 
-        <div className="mt-4">
-          <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
-            Add a message to the seller (optional)
-          </label>
-          <textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            rows={3}
-            maxLength={2000}
-            placeholder="Great card! Looking forward to adding it to my collection."
-            className="mt-1 w-full rounded-lg border border-white/15 bg-cardBg2 px-3 py-2 text-sm text-slate-100"
-          />
-        </div>
+        {!insufficient ? (
+          <div className="mt-4">
+            <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Add a message to the seller (optional)
+            </label>
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              rows={2}
+              maxLength={2000}
+              placeholder="Great card! Looking forward to adding it to my collection."
+              className="mt-1 w-full rounded-lg border border-white/15 bg-cardBg2 px-3 py-2 text-sm text-slate-100"
+            />
+          </div>
+        ) : null}
 
         {insufficient ? (
           <div className="mt-4 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-3 text-sm text-amber-100">
-            <p>
-              {creditTopUpShortfallMessage(shortfall)}
-            </p>
+            <p>{creditTopUpShortfallMessage(shortfall)}</p>
             <Link
               to="/credits"
-              className="mt-3 inline-flex min-h-[42px] w-full items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950"
+              className="mt-3 inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950"
             >
               Add Credits
             </Link>
           </div>
         ) : null}
+      </MarketplaceModalContent>
 
-        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row">
+      <MarketplaceModalActions>
+        <button
+          type="button"
+          disabled={submitting}
+          onClick={onCancel}
+          className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg border border-white/20 px-4 text-sm text-slate-300 disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        {!insufficient ? (
           <button
             type="button"
             disabled={submitting}
-            onClick={onCancel}
-            className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg border border-white/20 px-4 text-sm text-slate-300 disabled:opacity-50"
+            onClick={onConfirm}
+            className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
           >
-            Cancel
+            {submitting ? "Purchasing…" : "Confirm Purchase"}
           </button>
-          {!insufficient ? (
-            <button
-              type="button"
-              disabled={submitting}
-              onClick={onConfirm}
-              className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
-            >
-              {submitting ? "Purchasing…" : "Confirm Purchase"}
-            </button>
-          ) : null}
-        </div>
-      </div>
-    </div>
+        ) : null}
+      </MarketplaceModalActions>
+    </MarketplaceModalShell>
   );
 }

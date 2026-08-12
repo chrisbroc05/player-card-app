@@ -22,10 +22,12 @@ import { normalizeTierKey } from "../utils/cardTemplate";
 import { formatEditionShort, vaultTierBadge } from "../utils/tierStyles";
 import { CARD_IMAGE_FRAME_LISTING_ROW } from "../utils/cardImageStyles";
 import {
-  MARKETPLACE_MODAL_OVERLAY_CLASS,
+  MarketplaceModalActions,
   MarketplaceModalCardDetails,
   MarketplaceModalCardSection,
-  marketplaceModalPanelClass,
+  MarketplaceModalContent,
+  MarketplaceModalShell,
+  MarketplaceModalSuccessIcon,
 } from "../components/MarketplaceModalLayout";
 
 function formatLongDate(iso) {
@@ -751,9 +753,16 @@ function AcceptOfferConfirmModal({ open, payload, actionBusy, onBack, onConfirm 
   const fee = computeRoyaltyPreview(gross);
   const net = Math.max(0, Math.round((gross - fee) * 100) / 100);
   return (
-    <div className="fixed inset-0 z-[73] flex items-center justify-center bg-black/70 px-3 py-4 sm:px-4">
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-cardBg p-5 shadow-2xl sm:p-6">
-        <h3 className="text-xl font-semibold text-white">Accept this offer?</h3>
+    <MarketplaceModalShell
+      open={open}
+      zIndex={73}
+      ariaLabelledBy="accept-offer-confirm-title"
+      onBackdropClick={onBack}
+    >
+      <MarketplaceModalContent>
+        <h3 id="accept-offer-confirm-title" className="text-xl font-semibold text-white">
+          Accept this offer?
+        </h3>
         <div className="mt-3 space-y-2 rounded-lg border border-white/10 bg-cardBg2 p-3 text-sm">
           <p className="text-slate-300">
             Buyer: <span className="font-semibold text-white">{offer.buyer_display_name}</span>
@@ -776,59 +785,66 @@ function AcceptOfferConfirmModal({ open, payload, actionBusy, onBack, onConfirm 
             </>
           )}
         </div>
-        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row">
-          <button
-            type="button"
-            disabled={actionBusy}
-            onClick={onBack}
-            className="inline-flex min-h-[42px] flex-1 items-center justify-center rounded-lg border border-white/20 px-4 text-sm text-slate-300"
-          >
-            Go Back
-          </button>
-          <button
-            type="button"
-            disabled={actionBusy}
-            onClick={onConfirm}
-            className="inline-flex min-h-[42px] flex-1 items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
-          >
-            {actionBusy ? "Accepting…" : "Yes, Accept"}
-          </button>
-        </div>
-      </div>
-    </div>
+      </MarketplaceModalContent>
+      <MarketplaceModalActions>
+        <button
+          type="button"
+          disabled={actionBusy}
+          onClick={onBack}
+          className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg border border-white/20 px-4 text-sm text-slate-300"
+        >
+          Go Back
+        </button>
+        <button
+          type="button"
+          disabled={actionBusy}
+          onClick={onConfirm}
+          className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+        >
+          {actionBusy ? "Accepting…" : "Yes, Accept"}
+        </button>
+      </MarketplaceModalActions>
+    </MarketplaceModalShell>
   );
 }
 
 function DeclineOfferConfirmModal({ open, payload, actionBusy, onCancel, onConfirm }) {
   if (!open || !payload?.offer) return null;
   return (
-    <div className="fixed inset-0 z-[73] flex items-center justify-center bg-black/70 px-3 py-4 sm:px-4">
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-cardBg p-5 shadow-2xl sm:p-6">
-        <h3 className="text-xl font-semibold text-white">Decline this offer?</h3>
+    <MarketplaceModalShell
+      open={open}
+      zIndex={73}
+      ariaLabelledBy="decline-offer-confirm-title"
+      onBackdropClick={onCancel}
+    >
+      <MarketplaceModalContent>
+        <h3 id="decline-offer-confirm-title" className="text-xl font-semibold text-white">
+          Decline this offer?
+        </h3>
         <p className="mt-3 text-sm text-slate-300">
           Are you sure you want to decline this offer from{" "}
           <span className="font-semibold text-white">{payload.offer.buyer_display_name}</span>?
         </p>
-        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row">
-          <button
-            type="button"
-            disabled={actionBusy}
-            onClick={onCancel}
-            className="inline-flex min-h-[42px] flex-1 items-center justify-center rounded-lg border border-white/20 px-4 text-sm text-slate-300"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            disabled={actionBusy}
-            onClick={onConfirm}
-            className="inline-flex min-h-[42px] flex-1 items-center justify-center rounded-lg border border-rose-500/40 bg-rose-500/15 px-4 text-sm font-semibold text-rose-200 disabled:opacity-50"
-          >
-            {actionBusy ? "Declining…" : "Yes, Decline"}
-          </button>
-        </div>
-      </div>
-    </div>
+      </MarketplaceModalContent>
+      <MarketplaceModalActions>
+        <button
+          type="button"
+          disabled={actionBusy}
+          onClick={onCancel}
+          className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg border border-white/20 px-4 text-sm text-slate-300"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          disabled={actionBusy}
+          onClick={onConfirm}
+          className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg border border-rose-500/40 bg-rose-500/15 px-4 text-sm font-semibold text-rose-200 disabled:opacity-50"
+        >
+          {actionBusy ? "Declining…" : "Yes, Decline"}
+        </button>
+      </MarketplaceModalActions>
+    </MarketplaceModalShell>
   );
 }
 
@@ -836,44 +852,44 @@ function AcceptOfferSuccessModal({ open, payload, onGoProfile, onBackListings })
   if (!open || !payload) return null;
   const { listing, isTrade, net, newBalance } = payload;
   return (
-    <div className={`${MARKETPLACE_MODAL_OVERLAY_CLASS} z-[74]`}>
-      <div className={marketplaceModalPanelClass("border-emerald-500/30")}>
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-emerald-400/50 bg-emerald-500/15 text-2xl text-emerald-300">
-          ✓
-        </div>
-        <h3 className="mt-4 text-center text-2xl font-semibold text-white">Offer Accepted!</h3>
-        <p className="mt-2 text-center text-[13px] text-slate-300 sm:text-left">
+    <MarketplaceModalShell open={open} zIndex={74} borderClass="border-emerald-500/30" ariaLabelledBy="accept-offer-success-title">
+      <MarketplaceModalContent>
+        <MarketplaceModalSuccessIcon />
+        <h3 id="accept-offer-success-title" className="mt-4 text-center text-xl font-semibold text-white sm:text-2xl">
+          Offer Accepted!
+        </h3>
+        <p className="mt-2 text-center text-[13px] text-slate-300">
           {isTrade ? "Card added to your collection" : `You received ${formatMoney(net)}`}
         </p>
         {newBalance != null ? (
-          <p className="mt-1 text-center text-[13px] text-neonTeal sm:text-left">
+          <p className="mt-1 text-center text-[13px] text-neonTeal">
             Current credit balance: {formatMoney(newBalance)}
           </p>
         ) : null}
 
-        <div className="mt-6 rounded-xl border border-white/10 bg-cardBg2 p-4">
+        <div className="mt-4 rounded-xl border border-white/10 bg-cardBg2 p-3 sm:mt-6 sm:p-4">
           <MarketplaceModalCardSection card={listing} centered>
             <MarketplaceModalCardDetails listing={listing} />
           </MarketplaceModalCardSection>
         </div>
+      </MarketplaceModalContent>
 
-        <div className="mt-6 space-y-2">
-          <button
-            type="button"
-            onClick={onGoProfile}
-            className="inline-flex min-h-[42px] w-full items-center justify-center rounded-lg border border-white/20 bg-cardBg2 px-4 text-sm text-slate-100"
-          >
-            Go to My Profile
-          </button>
-          <button
-            type="button"
-            onClick={onBackListings}
-            className="inline-flex min-h-[42px] w-full items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950"
-          >
-            Back to My Listings
-          </button>
-        </div>
-      </div>
-    </div>
+      <MarketplaceModalActions className="marketplace-modal-actions--stacked">
+        <button
+          type="button"
+          onClick={onBackListings}
+          className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950"
+        >
+          Back to My Listings
+        </button>
+        <button
+          type="button"
+          onClick={onGoProfile}
+          className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg border border-white/20 bg-cardBg2 px-4 text-sm text-slate-100"
+        >
+          Go to My Profile
+        </button>
+      </MarketplaceModalActions>
+    </MarketplaceModalShell>
   );
 }
