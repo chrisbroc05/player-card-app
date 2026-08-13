@@ -2,7 +2,9 @@ import React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { formatMoney } from "../utils/marketplace";
-import BrandLogo from "./BrandLogo";
+
+/** Set to false to hide the logo mark and show text-only branding on all screen sizes. */
+const SHOW_LOGO_MARK = true;
 
 export default function AppHeader() {
   const location = useLocation();
@@ -26,11 +28,25 @@ export default function AppHeader() {
     return `app-nav-link px-3 py-2 text-xs font-medium sm:text-sm ${active ? "app-nav-link--active" : ""}`;
   }
 
+  const brandClass = SHOW_LOGO_MARK ? "app-header-brand app-header-brand--show-mark" : "app-header-brand";
+
   return (
     <header className="app-header backdrop-blur">
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
-        <Link to="/" className="transition hover:opacity-90" aria-label="Prospect Legends home">
-          <BrandLogo />
+        <Link to="/" className={brandClass} aria-label="Prospect Legends home">
+          {SHOW_LOGO_MARK ? (
+            <img
+              src="/prospect-legends-logo.png"
+              alt=""
+              aria-hidden
+              className="app-header-brand__mark"
+              height={36}
+            />
+          ) : null}
+          <span className="app-header-brand__text">
+            <span className="app-header-brand__title">Prospect Legends</span>
+            <span className="app-header-brand__tagline">Digital Collectible Cards</span>
+          </span>
         </Link>
         <nav className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
           <Link to="/" className={navClass(onStudio)}>

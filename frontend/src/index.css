@@ -252,6 +252,75 @@
     border-bottom: 1px solid rgba(201, 168, 76, 0.2);
   }
 
+  .app-header-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    transition: opacity 0.15s ease;
+  }
+
+  .app-header-brand:hover {
+    opacity: 0.92;
+  }
+
+  .app-header-brand__mark {
+    height: 36px;
+    width: auto;
+    object-fit: contain;
+    flex-shrink: 0;
+    display: none;
+  }
+
+  @media (min-width: 640px) {
+    .app-header-brand--show-mark .app-header-brand__mark {
+      display: block;
+    }
+  }
+
+  .app-header-brand__text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+
+  .app-header-brand__title {
+    font-family: "Barlow Condensed", sans-serif;
+    font-weight: 800;
+    font-size: 16px;
+    line-height: 1.1;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, #c9a84c, #e8c56a, #a8832a);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  .app-header-brand__tagline {
+    font-family: "Barlow Condensed", sans-serif;
+    font-weight: 700;
+    font-size: 9px;
+    line-height: 1.2;
+    letter-spacing: 2px;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+  }
+
+  @media (min-width: 640px) {
+    .app-header-brand__title {
+      font-size: 20px;
+      letter-spacing: 2px;
+    }
+
+    .app-header-brand__tagline {
+      font-size: 10px;
+      letter-spacing: 3px;
+    }
+  }
+
   .app-nav-link {
     color: var(--color-text-secondary);
     border-radius: 8px;
