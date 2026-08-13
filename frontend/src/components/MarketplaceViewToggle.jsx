@@ -56,7 +56,7 @@ function ToggleButton({ active, label, onClick, children }) {
       title={label}
       className={`inline-flex min-h-[40px] min-w-[44px] flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition sm:min-w-[120px] ${
         active
-          ? "bg-neonTeal/20 text-neonTeal shadow-sm"
+          ? "bg-gold-subtle text-brand-gold shadow-sm"
           : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
       }`}
     >

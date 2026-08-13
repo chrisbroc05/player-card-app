@@ -55,7 +55,7 @@ export default function ExpandableCardView({
       <div
         role="button"
         tabIndex={0}
-        className={`cursor-zoom-in outline-none focus-visible:ring-2 focus-visible:ring-neonBlue/60 ${className}`}
+        className={`cursor-zoom-in outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-gold-bright/60] ${className}`}
         onClick={openModal}
         onKeyDown={onKeyDown}
         aria-label="View card full size"

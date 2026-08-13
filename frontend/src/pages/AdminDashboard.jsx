@@ -51,14 +51,14 @@ const LEDGER_TYPE_OPTIONS = [
 function txBadgeClass(type) {
   const t = (type || "").toLowerCase();
   const map = {
-    top_up: "border-emerald-500/40 bg-emerald-500/15 text-emerald-200",
-    card_sale: "border-blue-500/40 bg-blue-500/15 text-blue-200",
+    top_up: "bg-success-subtle text-success",
+    card_sale: "border-[var(--color-border-gold)] bg-gold-subtle text-brand-gold",
     card_purchase: "border-orange-500/40 bg-orange-500/15 text-orange-200",
     withdrawal: "border-rose-500/40 bg-rose-500/15 text-rose-200",
     generation: "border-purple-500/40 bg-purple-500/15 text-purple-200",
     animation: "border-purple-500/40 bg-purple-500/15 text-purple-200",
     royalty: "border-slate-500/40 bg-slate-500/15 text-slate-300",
-    gift: "border-teal-500/40 bg-teal-500/15 text-teal-200",
+    gift: "border-[var(--color-border-gold)] bg-gold-subtle text-brand-gold",
   };
   return map[t] || "border-white/15 bg-white/5 text-slate-300";
 }
@@ -99,8 +99,8 @@ function formatDateTime(value) {
 
 function tierBadgeClass(tier) {
   const t = (tier || "").toLowerCase().replace("-", "_");
-  if (t === "rookie") return "border-emerald-500/40 bg-emerald-500/15 text-emerald-100";
-  if (t === "allstar" || t === "all_star") return "border-cyan-500/40 bg-cyan-500/15 text-cyan-100";
+  if (t === "rookie") return "bg-success-subtle text-success";
+  if (t === "allstar" || t === "all_star") return "border-[var(--color-allstar)]/40 bg-[rgba(26,106,181,0.15)] text-slate-200";
   if (t === "legends") return "border-amber-500/40 bg-amber-500/15 text-amber-100";
   return "border-white/20 bg-white/5 text-slate-200";
 }
@@ -560,7 +560,7 @@ export default function AdminDashboard() {
   function payoutStatusClass(status) {
     const value = (status || "").toLowerCase();
     if (value === "paid") {
-      return "border-emerald-500/40 bg-emerald-500/15 text-emerald-200";
+      return "bg-success-subtle text-success";
     }
     if (value === "failed") {
       return "border-rose-500/40 bg-rose-500/15 text-rose-200";
@@ -768,7 +768,7 @@ export default function AdminDashboard() {
           </p>
           <p className="mt-2 text-xs text-slate-400">
             Beta mode:{" "}
-            <span className={betaActive ? "text-neonTeal" : "text-slate-500"}>
+            <span className={betaActive ? "text-brand-gold" : "text-slate-500"}>
               {betaActive ? "Active" : "Inactive"}
             </span>
             <span className="mt-1 block text-[11px] text-slate-500">
@@ -805,7 +805,7 @@ export default function AdminDashboard() {
       </div>
       {inviteMsg ? (
         <p
-          className={`mt-3 text-sm ${inviteMsg.includes("fail") || inviteMsg.includes("Failed") ? "text-rose-300" : "text-neonTeal"}`}
+          className={`mt-3 text-sm ${inviteMsg.includes("fail") || inviteMsg.includes("Failed") ? "text-rose-300" : "text-brand-gold"}`}
         >
           {inviteMsg}
         </p>
@@ -883,7 +883,7 @@ export default function AdminDashboard() {
                 ) : null}
                 {fin ? (
                   <div>
-                    <h3 className="mb-3 text-sm font-semibold text-emerald-200/90">Financial Overview</h3>
+                    <h3 className="mb-3 text-sm font-semibold text-success/90">Financial Overview</h3>
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                       {kpi("Total Platform Volume", formatMoney(fin.total_volume))}
                       {kpi("Total Royalties Earned", formatMoney(fin.total_royalties))}
@@ -895,14 +895,14 @@ export default function AdminDashboard() {
                       {kpi("Animation Revenue", formatMoney(fin.total_animation_revenue || 0))}
                       {kpi("Highlight Revenue", formatMoney(fin.total_highlight_revenue || 0))}
                     </div>
-                    <div className="mt-3 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-xs text-cyan-100">
+                    <div className="mt-3 rounded-lg border bg-gold-subtle px-3 py-2 text-xs text-brand-gold">
                       <p>
                         Stripe balance ({String(fin.stripe_balance_currency || "usd").toUpperCase()}):{" "}
                         <span className="font-semibold">{formatMoney(fin.stripe_balance_total || 0)}</span>{" "}
                         (available {formatMoney(fin.stripe_balance_available || 0)} + pending{" "}
                         {formatMoney(fin.stripe_balance_pending || 0)})
                       </p>
-                      <p className="mt-1 text-cyan-100/80">
+                      <p className="mt-1 text-brand-gold/80">
                         {fin.stripe_balance_ok
                           ? "Use this Stripe total alongside royalty metrics to spot retention discrepancies."
                           : `Stripe balance unavailable${fin?.stripe_error ? `: ${fin.stripe_error}` : " (check STRIPE_SECRET_KEY on backend)."}`}
@@ -913,7 +913,7 @@ export default function AdminDashboard() {
                 {stats.marketplace_stats ? (
                   <>
                     <div>
-                      <h3 className="mb-3 text-sm font-semibold text-teal-200/90">Free Agency Marketplace</h3>
+                      <h3 className="mb-3 text-sm font-semibold text-brand-gold/90">Free Agency Marketplace</h3>
                       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                         {kpi("Listed cards", stats.marketplace_stats.total_listed)}
                         {kpi("Total offers", stats.marketplace_stats.total_offers)}
@@ -971,8 +971,8 @@ export default function AdminDashboard() {
                       <p className="text-xs uppercase text-orange-200/90">Rookie</p>
                       <p className="text-2xl font-semibold text-white">{stats.cards_by_tier?.rookie ?? 0}</p>
                     </div>
-                    <div className="rounded-xl border border-cyan-400/25 bg-cyan-500/10 p-4">
-                      <p className="text-xs uppercase text-cyan-100/90">All-Star</p>
+                    <div className="rounded-xl border bg-gold-subtle p-4">
+                      <p className="text-xs uppercase text-brand-gold/90">All-Star</p>
                       <p className="text-2xl font-semibold text-white">{stats.cards_by_tier?.all_star ?? 0}</p>
                     </div>
                     <div className="rounded-xl border border-amber-400/25 bg-amber-500/10 p-4">
@@ -1070,7 +1070,7 @@ export default function AdminDashboard() {
                         <tbody>
                           {(stats.recent_cards || []).map((c) => (
                             <tr key={c.card_id} className="border-b border-white/5">
-                              <td className="py-2 pr-2 font-mono text-neonTeal/90">{c.card_id}</td>
+                              <td className="py-2 pr-2 font-mono text-brand-gold/90">{c.card_id}</td>
                               <td className="py-2 pr-2 text-slate-200">{c.player_name}</td>
                               <td className="py-2 pr-2 text-slate-400">{c.tier}</td>
                               <td className="py-2 pr-2 text-slate-400">{c.theme}</td>
@@ -1129,7 +1129,7 @@ export default function AdminDashboard() {
                       ["created_at", "Member since"],
                     ].map(([key, label]) => (
                       <th key={key} className="p-3">
-                        <button type="button" className="font-medium hover:text-neonBlue" onClick={() => toggleUserSort(key)}>
+                        <button type="button" className="font-medium hover:text-brand-gold-bright" onClick={() => toggleUserSort(key)}>
                           {label}
                           {userSort.key === key ? (userSort.dir === "asc" ? " ↑" : " ↓") : ""}
                         </button>
@@ -1159,7 +1159,7 @@ export default function AdminDashboard() {
                         <td className="p-3 text-slate-500">{u.created_at?.slice(0, 10) || "—"}</td>
                         <td className="p-3">
                           {u.stripe_payouts_enabled ? (
-                            <span className="font-medium text-emerald-300">Yes</span>
+                            <span className="font-medium text-success">Yes</span>
                           ) : (
                             <span className="text-slate-500">No</span>
                           )}
@@ -1260,7 +1260,7 @@ export default function AdminDashboard() {
                   ) : (
                     filteredCards.map((c) => (
                       <tr key={c.card_id} className="border-b border-white/5 hover:bg-white/[0.02]">
-                        <td className="p-3 font-mono text-xs text-neonTeal/90">{c.card_id}</td>
+                        <td className="p-3 font-mono text-xs text-brand-gold/90">{c.card_id}</td>
                         <td className="p-3 text-slate-100">{c.player_name}</td>
                         <td className="p-3 text-slate-400">{c.team_name}</td>
                         <td className="p-3 text-slate-400">{c.tier}</td>
@@ -1386,7 +1386,7 @@ export default function AdminDashboard() {
                       <tr key={t.id} className="border-b border-white/5 hover:bg-white/[0.02]">
                         <td className="p-3 text-slate-200">{t.id}</td>
                         <td className="p-3">
-                          <span className="font-mono text-xs text-neonTeal/90">{t.card_id}</span>
+                          <span className="font-mono text-xs text-brand-gold/90">{t.card_id}</span>
                           <span className="mt-0.5 block text-xs text-slate-500">{t.player_name}</span>
                         </td>
                         <td className="p-3 text-slate-300">
@@ -1468,7 +1468,7 @@ export default function AdminDashboard() {
                     filteredMarketplaceOffers.map((o) => (
                       <tr key={o.offer_id} className="border-b border-white/5 hover:bg-white/[0.02]">
                         <td className="p-3 text-slate-200">{o.offer_id}</td>
-                        <td className="p-3 font-mono text-xs text-neonTeal/90">{o.card_id}</td>
+                        <td className="p-3 font-mono text-xs text-brand-gold/90">{o.card_id}</td>
                         <td className="p-3 text-slate-300">{o.player_name}</td>
                         <td className="p-3 text-slate-300">
                           <span className="block">{o.buyer_display_name}</span>
@@ -1541,7 +1541,7 @@ export default function AdminDashboard() {
               <h3 className="text-sm font-semibold text-white">Withdraw</h3>
               <p className="mt-1 text-sm text-slate-400">
                 Available to withdraw:{" "}
-                <span className="font-semibold text-emerald-300">{formatMoney(withdrawableBalance)}</span>
+                <span className="font-semibold text-success">{formatMoney(withdrawableBalance)}</span>
               </p>
               <div className="mt-4">
                 <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
@@ -1570,7 +1570,7 @@ export default function AdminDashboard() {
                   type="button"
                   disabled={!withdrawButtonEnabled}
                   onClick={() => setWithdrawConfirmOpen(true)}
-                  className="min-h-[48px] rounded-lg bg-emerald-500 px-5 text-sm font-semibold text-slate-950 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="min-h-[48px] rounded-lg btn-primary px-5 text-sm font-semibold text-slate-950 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {withdrawButtonLabel}
                 </button>
@@ -1646,7 +1646,7 @@ export default function AdminDashboard() {
               </div>
               <p className="mt-3 text-sm text-slate-400">
                 {earningsTotalCount} rows · Filter total:{" "}
-                <span className="font-semibold text-emerald-300">{formatMoney(earningsFilteredTotal)}</span>
+                <span className="font-semibold text-success">{formatMoney(earningsFilteredTotal)}</span>
               </p>
               {errors.earningsTable ? (
                 <p className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
@@ -1688,7 +1688,7 @@ export default function AdminDashboard() {
                           <td className="p-3 text-xs text-slate-400">{formatDateTime(row.date)}</td>
                           <td className="p-3">
                             <p className="text-slate-200">{row.player_name || "—"}</p>
-                            <p className="font-mono text-xs text-neonTeal/90">{row.card_id}</p>
+                            <p className="font-mono text-xs text-brand-gold/90">{row.card_id}</p>
                             <span
                               className={`mt-1 inline-block rounded-full border px-2 py-0.5 text-[11px] ${tierBadgeClass(row.tier)}`}
                             >
@@ -1698,7 +1698,7 @@ export default function AdminDashboard() {
                           <td className="p-3 text-slate-300">{row.seller_display_name || "—"}</td>
                           <td className="p-3 text-slate-300">{row.buyer_display_name || "—"}</td>
                           <td className="p-3 tabular-nums text-slate-200">{formatMoney(row.sale_amount || 0)}</td>
-                          <td className="p-3 tabular-nums font-semibold text-emerald-300">
+                          <td className="p-3 tabular-nums font-semibold text-success">
                             {formatMoney(row.royalty_amount || 0)}
                           </td>
                           <td className="p-3 tabular-nums text-amber-200">{formatMoney(row.running_total || 0)}</td>
@@ -1767,7 +1767,7 @@ export default function AdminDashboard() {
                                     href={row.stripe_payout_url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-xs font-medium text-neonTeal hover:underline"
+                                    className="text-xs font-medium text-brand-gold hover:underline"
                                   >
                                     View in Stripe →
                                   </a>
@@ -1800,7 +1800,7 @@ export default function AdminDashboard() {
             <section className="rounded-xl border border-white/10 bg-cardBg p-4">
               <h3 className="text-sm font-semibold text-white">Monthly Earnings (Last 12 Months)</h3>
               <p className="mt-1 text-sm text-slate-400">
-                Year total: <span className="font-semibold text-emerald-300">{formatMoney(monthlyEarningsYearTotal)}</span>
+                Year total: <span className="font-semibold text-success">{formatMoney(monthlyEarningsYearTotal)}</span>
               </p>
               {errors.earningsChart ? (
                 <p className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
@@ -1894,7 +1894,7 @@ export default function AdminDashboard() {
                               </span>
                             </td>
                             <td
-                              className={`p-3 tabular-nums font-semibold ${positive ? "text-emerald-300" : "text-rose-300"}`}
+                              className={`p-3 tabular-nums font-semibold ${positive ? "text-success" : "text-rose-300"}`}
                             >
                               {positive ? "+" : ""}
                               {formatMoney(amt)}
@@ -1917,7 +1917,7 @@ export default function AdminDashboard() {
 
             <section>
               <h2 className="text-lg font-semibold text-white">Royalties</h2>
-              <p className="mt-3 text-2xl font-bold tabular-nums text-neonTeal">
+              <p className="mt-3 text-2xl font-bold tabular-nums text-brand-gold">
                 Total Royalties Earned: {formatMoney(royaltiesSum)}
               </p>
               {fin ? (
@@ -1965,7 +1965,7 @@ export default function AdminDashboard() {
                         <tr key={row.offer_id} className="border-b border-white/5 hover:bg-white/[0.02]">
                           <td className="p-3">
                             <span className="block text-slate-200">{row.player_name}</span>
-                            <span className="font-mono text-xs text-neonTeal/90">{row.card_id}</span>
+                            <span className="font-mono text-xs text-brand-gold/90">{row.card_id}</span>
                           </td>
                           <td className="p-3 text-slate-300">{row.seller_display_name}</td>
                           <td className="p-3 text-slate-300">{row.buyer_display_name}</td>
@@ -1995,7 +1995,7 @@ export default function AdminDashboard() {
               <h3 className="text-lg font-semibold text-white">Withdraw to Bank</h3>
               <p className="mt-2 text-sm text-slate-300">
                 You are about to withdraw{" "}
-                <span className="font-semibold text-emerald-300">
+                <span className="font-semibold text-success">
                   {formatMoney(confirmWithdrawAmount)}
                 </span>{" "}
                 to your connected bank account.
@@ -2019,7 +2019,7 @@ export default function AdminDashboard() {
                   type="button"
                   onClick={handleWithdrawConfirm}
                   disabled={withdrawBusy || !withdrawButtonEnabled}
-                  className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-50"
+                  className="rounded-lg btn-primary px-4 py-2 text-sm font-semibold text-slate-950 hover:brightness-110 disabled:opacity-50"
                 >
                   {confirmWithdrawLabel}
                 </button>
@@ -2030,13 +2030,13 @@ export default function AdminDashboard() {
 
         {withdrawSuccessOpen && withdrawSuccessData ? (
           <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4">
-            <div className="w-full max-w-md rounded-xl border border-emerald-500/30 bg-cardBg p-5">
+            <div className="w-full max-w-md rounded-xl border border-[var(--color-success)]/30 bg-cardBg p-5">
               <h3 className="text-lg font-semibold text-white">
                 Withdrawal of {formatMoney(withdrawSuccessData.amount)} initiated!
               </h3>
               <p className="mt-2 text-sm text-slate-300">
                 Stripe Payout ID:{" "}
-                <span className="font-mono text-emerald-300">{withdrawSuccessData.payoutId || "—"}</span>
+                <span className="font-mono text-success">{withdrawSuccessData.payoutId || "—"}</span>
                 {" — "}use this to track in your Stripe dashboard under Payouts.
               </p>
               {withdrawSuccessData.stripePayoutUrl ? (
@@ -2044,7 +2044,7 @@ export default function AdminDashboard() {
                   href={withdrawSuccessData.stripePayoutUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-2 inline-block text-sm font-medium text-neonTeal hover:underline"
+                  className="mt-2 inline-block text-sm font-medium text-brand-gold hover:underline"
                 >
                   View in Stripe →
                 </a>
@@ -2057,7 +2057,7 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => setWithdrawSuccessOpen(false)}
-                  className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-emerald-400"
+                  className="rounded-lg btn-primary px-4 py-2 text-sm font-semibold text-slate-950 hover:brightness-110"
                 >
                   Done
                 </button>

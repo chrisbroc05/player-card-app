@@ -236,13 +236,13 @@ export default function MarketplaceCardDetailPage() {
     <div className="min-h-screen overflow-x-hidden bg-appBg text-slate-100">
       <AppHeader />
       <main className="mx-auto w-full max-w-4xl px-6 py-8">
-        <Link to="/marketplace" className="text-sm text-neonTeal hover:text-teal-200">
+        <Link to="/marketplace" className="text-sm text-brand-gold hover:text-brand-gold">
           &larr; Back to Free Agency Marketplace
         </Link>
 
         {loading ? (
           <div className="mt-12 flex justify-center">
-            <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/15 border-t-neonTeal" />
+            <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/15 border-t-[var(--color-gold-primary)]" />
           </div>
         ) : error ? (
           <div className="mt-8 rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-6 text-sm text-rose-100">{error}</div>
@@ -269,7 +269,7 @@ export default function MarketplaceCardDetailPage() {
             </ErrorBoundary>
             <div className="space-y-4">
               <div>
-              <p className="font-mono text-sm text-neonTeal/90">{displayListing?.card_id}</p>
+              <p className="font-mono text-sm text-brand-gold/90">{displayListing?.card_id}</p>
               {displayListing?.animation_motion ? (
                 <p className="mt-2 text-sm text-slate-500">
                   Motion: {safeMotionLabel(displayListing.animation_motion)}
@@ -282,7 +282,7 @@ export default function MarketplaceCardDetailPage() {
                 {isAnimatedCard(displayListing) ? <AnimatedBadge /> : null}
                 {isHighlightCard(displayListing) ? <HighlightBadge /> : null}
               </div>
-              <p className="mt-3 text-3xl font-bold text-neonTeal">{formatMoney(listing.asking_price)}</p>
+              <p className="mt-3 text-3xl font-bold text-brand-gold">{formatMoney(listing.asking_price)}</p>
               {listing.days_remaining != null && listing.listing_expires_at ? (
                 <p className={`mt-1 text-sm ${listingExpiresSubtextClass(listing.days_remaining)}`}>
                   {listing.days_remaining <= 0
@@ -398,7 +398,7 @@ function OfferPanel({
     return (
       <p className="rounded-xl border border-white/10 bg-cardBg2 px-4 py-3 text-sm text-slate-400">
         This is your listing. Manage offers from{" "}
-        <Link to="/marketplace/my-listings" className="text-neonTeal underline">
+        <Link to="/marketplace/my-listings" className="text-brand-gold underline">
           My Listings
         </Link>
         .
@@ -424,11 +424,11 @@ function OfferPanel({
   }
 
   return (
-    <form onSubmit={handleFormSubmit} className="rounded-xl border border-teal-500/25 bg-teal-500/5 p-4 space-y-3">
+    <form onSubmit={handleFormSubmit} className="rounded-xl border bg-gold-subtle p-4 space-y-3">
       <h2 className="text-lg font-semibold text-white">Make an offer</h2>
       {!user ? (
         <p className="text-sm text-slate-400">
-          <button type="button" onClick={onLogin} className="font-medium text-neonTeal underline">
+          <button type="button" onClick={onLogin} className="font-medium text-brand-gold underline">
             Sign in
           </button>{" "}
           to submit an offer.
@@ -437,7 +437,7 @@ function OfferPanel({
         <>
           {buyerBalance != null ? (
             <p className="rounded-lg border border-white/10 bg-cardBg2 px-3 py-2 text-sm text-slate-300">
-              Your balance: <span className="font-semibold text-neonTeal">{formatMoney(buyerBalance)}</span>
+              Your balance: <span className="font-semibold text-brand-gold">{formatMoney(buyerBalance)}</span>
             </p>
           ) : null}
 
@@ -446,7 +446,7 @@ function OfferPanel({
               type="button"
               onClick={() => setOfferMode("cash")}
               className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition ${
-                !isTrade ? "bg-teal-500/25 text-neonTeal" : "text-slate-400 hover:text-white"
+                !isTrade ? "bg-[rgba(201,168,76,0.15)] text-brand-gold" : "text-slate-400 hover:text-white"
               }`}
             >
               Cash Offer
@@ -455,7 +455,7 @@ function OfferPanel({
               type="button"
               onClick={() => setOfferMode("card_trade")}
               className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition ${
-                isTrade ? "bg-teal-500/25 text-neonTeal" : "text-slate-400 hover:text-white"
+                isTrade ? "bg-[rgba(201,168,76,0.15)] text-brand-gold" : "text-slate-400 hover:text-white"
               }`}
             >
               Card Trade
@@ -475,7 +475,7 @@ function OfferPanel({
                 type="button"
                 disabled={submitting || insufficientAtAsking}
                 onClick={onBuyAtAsking}
-                className="mb-3 min-h-[44px] w-full rounded-xl border border-teal-500/40 bg-teal-500/10 px-4 text-sm font-semibold text-neonTeal disabled:opacity-50"
+                className="mb-3 min-h-[44px] w-full rounded-xl border btn-secondary px-4 text-sm font-semibold disabled:opacity-50"
               >
                 Buy at Asking Price ({formatMoney(listing.asking_price)})
               </button>
@@ -495,7 +495,7 @@ function OfferPanel({
               {insufficientAtAsking ? (
                 <p className="mt-2 text-xs text-amber-200">
                   {creditTopUpShortfallMessage(askingShortfall)}{" "}
-                  <Link to="/credits" className="text-neonTeal underline">
+                  <Link to="/credits" className="text-brand-gold underline">
                     Add credits
                   </Link>
                 </p>
@@ -505,7 +505,7 @@ function OfferPanel({
               Number(offerAmount || 0) > buyerBalance ? (
                 <p className="mt-2 text-xs text-amber-200">
                   {creditTopUpShortfallMessage(offerShortfall)}{" "}
-                  <Link to="/credits" className="text-neonTeal underline">
+                  <Link to="/credits" className="text-brand-gold underline">
                     Add credits
                   </Link>
                 </p>
@@ -530,14 +530,14 @@ function OfferPanel({
               (isTrade && !canSubmitTrade) ||
               (!isTrade && buyerBalance != null && Number(offerAmount || 0) > buyerBalance)
             }
-            className="min-h-[48px] w-full rounded-xl bg-neonTeal font-semibold text-slate-950 disabled:opacity-50"
+            className="min-h-[48px] w-full rounded-xl btn-primary font-semibold text-slate-950 disabled:opacity-50"
           >
             {submitting ? "Submitting…" : isTrade ? "Submit Trade Offer" : cashButtonLabel}
           </button>
         </>
       )}
       {offerError ? <p className="text-sm text-rose-300">{offerError}</p> : null}
-      {offerSuccess ? <p className="text-sm text-emerald-300">{offerSuccess}</p> : null}
+      {offerSuccess ? <p className="text-sm text-success">{offerSuccess}</p> : null}
     </form>
   );
 }
@@ -582,7 +582,7 @@ function CashOfferConfirmModal({
                 <>
                   <p className="text-[13px] leading-relaxed text-slate-200">
                     You are offering{" "}
-                    <span className="font-semibold text-neonTeal">{formatMoney(amount)}</span> for this card
+                    <span className="font-semibold text-brand-gold">{formatMoney(amount)}</span> for this card
                   </p>
                   {belowAsking ? (
                     <p className="text-[13px] text-slate-400">
@@ -608,7 +608,7 @@ function CashOfferConfirmModal({
             <p>{creditTopUpShortfallMessage(shortfall)}</p>
             <Link
               to="/credits"
-              className="mt-3 inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950"
+              className="mt-3 inline-flex min-h-[44px] w-full items-center justify-center rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950"
             >
               Add Credits
             </Link>
@@ -630,7 +630,7 @@ function CashOfferConfirmModal({
             type="button"
             disabled={submitting}
             onClick={onConfirm}
-            className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+            className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
           >
             {submitting ? "Submitting…" : "Submit Offer"}
           </button>
@@ -652,7 +652,7 @@ function CashOfferSuccessModal({
     <MarketplaceModalShell
       open={open}
       zIndex={71}
-      borderClass="border-emerald-500/30"
+      borderClass="border-[var(--color-success)]/30"
       ariaLabelledBy="offer-success-title"
       onBackdropClick={onBackToMarketplace}
     >
@@ -662,7 +662,7 @@ function CashOfferSuccessModal({
           Offer Submitted!
         </h3>
         <p className="mt-3 text-center text-sm leading-relaxed text-slate-300">
-          Your offer of <span className="font-semibold text-neonTeal">{formatMoney(offerAmount)}</span> has been sent
+          Your offer of <span className="font-semibold text-brand-gold">{formatMoney(offerAmount)}</span> has been sent
           to the seller. You&apos;ll be notified when they respond.
         </p>
       </MarketplaceModalContent>
@@ -671,7 +671,7 @@ function CashOfferSuccessModal({
         <button
           type="button"
           onClick={onViewMyOffers}
-          className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950"
+          className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950"
         >
           View My Offers
         </button>
@@ -781,7 +781,7 @@ function BuyAtAskingConfirmModal({
             <p>{creditTopUpShortfallMessage(shortfall)}</p>
             <Link
               to="/credits"
-              className="mt-3 inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950"
+              className="mt-3 inline-flex min-h-[44px] w-full items-center justify-center rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950"
             >
               Add Credits
             </Link>
@@ -795,7 +795,7 @@ function BuyAtAskingConfirmModal({
             type="button"
             disabled={submitting}
             onClick={onConfirm}
-            className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+            className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
           >
             {submitting ? "Purchasing…" : "Confirm Purchase"}
           </button>

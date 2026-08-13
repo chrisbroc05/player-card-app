@@ -94,7 +94,7 @@ export function MarketplaceModalCardDetails({ listing, extra = null }) {
         </div>
       ) : null}
       {listing?.card_id ? (
-        <p className="font-mono text-[13px] leading-relaxed text-neonTeal/90 break-all">
+        <p className="font-mono text-[13px] leading-relaxed text-brand-gold/90 break-all">
           {listing.card_id}
         </p>
       ) : null}

@@ -16,10 +16,10 @@ export default function GenerationCapNotice({ usage, period, className = "" }) {
       <p>{message}</p>
       {isMonthly ? (
         <div className="mt-3 flex flex-wrap gap-3 text-sm font-medium">
-          <Link to="/my-collection" className="text-neonTeal underline underline-offset-2">
+          <Link to="/my-collection" className="text-brand-gold underline underline-offset-2">
             My Collection
           </Link>
-          <Link to="/marketplace" className="text-neonTeal underline underline-offset-2">
+          <Link to="/marketplace" className="text-brand-gold underline underline-offset-2">
             Marketplace
           </Link>
         </div>

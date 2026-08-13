@@ -165,7 +165,7 @@ export default function HighlightVideoStep({
         <div>
           <h3 className="text-lg font-semibold text-white">Trim your highlight</h3>
           <p className="mt-1 text-sm text-slate-400">Pick up to 10 seconds for your card.</p>
-          <p className="mt-2 text-sm text-teal-200">Highlight upgrade: {formatMoney(highlightCardPrice)}</p>
+          <p className="mt-2 text-sm text-brand-gold">Highlight upgrade: {formatMoney(highlightCardPrice)}</p>
         </div>
         <HighlightVideoTrimmer
           objectUrl={pendingClip.objectUrl}
@@ -193,7 +193,7 @@ export default function HighlightVideoStep({
             : "Upload or record your best moment, then trim to 10 seconds. Your clip plays on the card instead of AI animation."}
         </p>
         {!isUploadOnly ? (
-          <p className="mt-2 text-sm text-teal-200">Highlight upgrade: {formatMoney(highlightCardPrice)}</p>
+          <p className="mt-2 text-sm text-brand-gold">Highlight upgrade: {formatMoney(highlightCardPrice)}</p>
         ) : null}
       </div>
 
@@ -202,8 +202,8 @@ export default function HighlightVideoStep({
       ) : null}
 
       {phase === PHASE.PROCESSING ? (
-        <div className="rounded-2xl border border-teal-500/35 bg-teal-500/10 px-5 py-8 text-center">
-          <p className="text-sm font-medium text-teal-100">Processing your clip...</p>
+        <div className="rounded-2xl border bg-gold-subtle px-5 py-8 text-center">
+          <p className="text-sm font-medium text-brand-gold">Processing your clip...</p>
         </div>
       ) : null}
 
@@ -213,7 +213,7 @@ export default function HighlightVideoStep({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="flex min-h-[120px] flex-col items-center justify-center gap-2 rounded-2xl border border-white/15 bg-cardBg2 px-4 py-6 text-center transition hover:border-teal-400/40 hover:bg-teal-500/5"
+              className="flex min-h-[120px] flex-col items-center justify-center gap-2 rounded-2xl border border-white/15 bg-cardBg2 px-4 py-6 text-center transition hover:border-[var(--color-border-gold)] hover:bg-[rgba(201,168,76,0.08)]"
             >
               <span className="text-2xl">📁</span>
               <span className="text-sm font-semibold text-white">

@@ -208,7 +208,7 @@ export default function MarketplaceMyOffersPage() {
               type="button"
               onClick={() => setStatusFilter(tab.id)}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-                statusFilter === tab.id ? "bg-teal-500/20 text-neonTeal" : "text-slate-400 hover:bg-white/5 hover:text-white"
+                statusFilter === tab.id ? "marketplace-tab marketplace-tab--active" : "marketplace-tab"
               }`}
             >
               {tab.label}
@@ -222,7 +222,7 @@ export default function MarketplaceMyOffersPage() {
 
         {initializing || loading ? (
           <div className="flex min-h-[200px] items-center justify-center">
-            <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/15 border-t-neonTeal" />
+            <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/15 border-t-[var(--color-gold-primary)]" />
           </div>
         ) : filteredOffers.length === 0 ? (
           <div className="flex min-h-[200px] flex-col items-center justify-center rounded-2xl border border-dashed border-white/15 bg-cardBg/50 px-6 py-12 text-center">
@@ -231,7 +231,7 @@ export default function MarketplaceMyOffersPage() {
             {statusFilter === "all" ? (
               <Link
                 to="/marketplace"
-                className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-neonTeal px-5 text-sm font-semibold text-slate-950"
+                className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-xl btn-primary px-5 text-sm font-semibold text-slate-950"
               >
                 Browse listings
               </Link>

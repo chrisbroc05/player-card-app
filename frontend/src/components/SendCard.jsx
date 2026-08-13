@@ -127,7 +127,7 @@ export default function SendCard({ card, onSent, onCancelTrade }) {
           />
         </label>
         {error ? <p className="mt-3 text-sm text-rose-300">{error}</p> : null}
-        {success ? <p className="mt-3 text-sm text-emerald-300/95">{success}</p> : null}
+        {success ? <p className="mt-3 text-sm text-success/95">{success}</p> : null}
         <button
           type="submit"
           disabled={loading}

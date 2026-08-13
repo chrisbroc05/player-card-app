@@ -21,9 +21,9 @@ function chipClass(status) {
   switch (status) {
     case "delivered":
     case "completed":
-      return "bg-emerald-400/15 text-emerald-200 border-emerald-300/30";
+      return "bg-success-subtle text-success border-[var(--color-success)]/30";
     case "ready_for_delivery":
-      return "bg-cyan-400/15 text-cyan-200 border-cyan-300/30";
+      return "bg-gold-subtle text-brand-gold border-[var(--color-border-gold)]";
     case "in_design":
       return "bg-violet-400/15 text-violet-200 border-violet-300/30";
     case "awaiting_review":
@@ -84,7 +84,7 @@ export default function OrdersDashboard({
                         href={toApiUrl(order.final_card_url)}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-neonBlue hover:underline"
+                        className="text-brand-gold-bright hover:underline"
                       >
                         View selected
                       </a>
@@ -102,7 +102,7 @@ export default function OrdersDashboard({
                         [order.id]: e.target.value,
                       }))
                     }
-                    className="min-h-[42px] rounded-lg border border-white/15 bg-cardBg px-2 py-2 text-xs text-slate-100 outline-none focus:border-neonBlue"
+                    className="min-h-[42px] rounded-lg border border-white/15 bg-cardBg px-2 py-2 text-xs text-slate-100 outline-none focus:border-[var(--color-gold-bright]"
                   >
                     {STATUS_OPTIONS.map((status) => (
                       <option key={status} value={status}>
@@ -114,14 +114,14 @@ export default function OrdersDashboard({
                     <button
                       onClick={() => onUpdateStatus(order.id)}
                       disabled={Boolean(activeActionKey)}
-                      className="min-h-[42px] rounded-lg border border-neonBlue/40 bg-neonBlue/15 px-2.5 py-2 text-xs font-medium text-neonBlue disabled:opacity-50"
+                      className="min-h-[42px] rounded-lg border border-[var(--color-border-gold)] bg-gold-subtle px-2.5 py-2 text-xs font-medium text-brand-gold-bright disabled:opacity-50"
                     >
                       {activeActionKey === `status-${order.id}` ? "Saving..." : "Update"}
                     </button>
                     <button
                       onClick={() => onDeliver(order.id)}
                       disabled={Boolean(activeActionKey)}
-                      className="min-h-[42px] rounded-lg border border-emerald-300/40 bg-emerald-400/15 px-2.5 py-2 text-xs font-medium text-emerald-200 disabled:opacity-50"
+                      className="min-h-[42px] rounded-lg border bg-success-subtle px-2.5 py-2 text-xs font-medium text-success disabled:opacity-50"
                     >
                       {activeActionKey === `deliver-${order.id}` ? "Delivering..." : "Deliver"}
                     </button>
@@ -162,7 +162,7 @@ export default function OrdersDashboard({
                         href={toApiUrl(order.final_card_url)}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-neonBlue hover:underline"
+                        className="text-brand-gold-bright hover:underline"
                       >
                         View selected
                       </a>
@@ -181,7 +181,7 @@ export default function OrdersDashboard({
                             [order.id]: e.target.value,
                           }))
                         }
-                        className="min-h-[40px] rounded-lg border border-white/15 bg-cardBg px-2 py-1.5 text-xs text-slate-100 outline-none focus:border-neonBlue"
+                        className="min-h-[40px] rounded-lg border border-white/15 bg-cardBg px-2 py-1.5 text-xs text-slate-100 outline-none focus:border-[var(--color-gold-bright]"
                       >
                         {STATUS_OPTIONS.map((status) => (
                           <option key={status} value={status}>
@@ -193,7 +193,7 @@ export default function OrdersDashboard({
                       <button
                         onClick={() => onUpdateStatus(order.id)}
                         disabled={Boolean(activeActionKey)}
-                        className="min-h-[40px] rounded-lg border border-neonBlue/40 bg-neonBlue/15 px-2.5 py-1.5 text-xs font-medium text-neonBlue disabled:opacity-50"
+                        className="min-h-[40px] rounded-lg border border-[var(--color-border-gold)] bg-gold-subtle px-2.5 py-1.5 text-xs font-medium text-brand-gold-bright disabled:opacity-50"
                       >
                         {activeActionKey === `status-${order.id}` ? "Saving..." : "Update"}
                       </button>
@@ -201,7 +201,7 @@ export default function OrdersDashboard({
                       <button
                         onClick={() => onDeliver(order.id)}
                         disabled={Boolean(activeActionKey)}
-                        className="min-h-[40px] rounded-lg border border-emerald-300/40 bg-emerald-400/15 px-2.5 py-1.5 text-xs font-medium text-emerald-200 disabled:opacity-50"
+                        className="min-h-[40px] rounded-lg border bg-success-subtle px-2.5 py-1.5 text-xs font-medium text-success disabled:opacity-50"
                       >
                         {activeActionKey === `deliver-${order.id}` ? "Delivering..." : "Deliver"}
                       </button>

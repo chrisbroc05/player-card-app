@@ -45,14 +45,14 @@ export default function CardInfoBanner({ card, variant = "default", className = 
     meta.tier === "legends"
       ? "border-amber-400/40"
       : meta.tier === "allstar"
-        ? "border-cyan-400/40"
+        ? "border-[var(--color-allstar)]/40"
         : "border-orange-500/35";
 
   const tierGradient =
     meta.tier === "legends"
       ? "from-amber-500/12 via-cardBg2 to-cardBg"
       : meta.tier === "allstar"
-        ? "from-cyan-500/12 via-cardBg2 to-cardBg"
+        ? "from-[rgba(26,106,181,0.12)] via-cardBg2 to-cardBg"
         : "from-orange-500/10 via-cardBg2 to-cardBg";
 
   return (

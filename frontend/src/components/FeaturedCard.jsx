@@ -24,7 +24,7 @@ export default function FeaturedCard({ card, imageUrl, tier, loading }) {
 
       {loading ? (
         <div className="flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-white/10 bg-cardBg2 sm:min-h-[280px]">
-          <div className="h-7 w-7 animate-spin rounded-full border-2 border-white/20 border-t-neonBlue" />
+          <div className="h-7 w-7 animate-spin rounded-full border-2 border-white/20 border-t-[var(--color-gold-primary)]" />
           <p className="mt-3 text-sm text-slate-300">Generating your card...</p>
         </div>
       ) : displayCard ? (

@@ -17,7 +17,7 @@ export default function AnimationFailedScreen({ cardId }) {
       <div className="mt-8 flex flex-wrap justify-center gap-3">
         <Link
           to={cardPath}
-          className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-neonTeal px-5 text-sm font-semibold text-slate-950"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-xl btn-primary px-5 text-sm font-semibold text-slate-950"
         >
           View My Card
         </Link>

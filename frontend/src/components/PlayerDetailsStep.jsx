@@ -131,7 +131,7 @@ export default function PlayerDetailsStep({
         <button
           type="button"
           onClick={handleContinue}
-          className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto"
+          className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl btn-primary px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto"
         >
           Continue to Tier Selection
         </button>

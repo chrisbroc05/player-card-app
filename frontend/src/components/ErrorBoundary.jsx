@@ -49,7 +49,7 @@ export default class ErrorBoundary extends React.Component {
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-neonBlue px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:opacity-90"
+            className="inline-flex min-h-[44px] items-center justify-center rounded-xl btn-primary px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:opacity-90"
           >
             Refresh page
           </button>
@@ -62,7 +62,7 @@ export default class ErrorBoundary extends React.Component {
           </button>
           <Link
             to={this.props.backTo || "/my-collection"}
-            className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-5 py-2.5 text-sm font-medium text-slate-100 transition hover:border-neonBlue/40"
+            className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-5 py-2.5 text-sm font-medium text-slate-100 transition hover:border-[var(--color-border-gold)]"
           >
             Go back to collection
           </Link>

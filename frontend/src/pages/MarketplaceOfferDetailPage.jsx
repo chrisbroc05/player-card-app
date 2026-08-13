@@ -42,7 +42,7 @@ function statusHeadline(status) {
 
 function statusIndicatorClass(status) {
   const s = (status || "").toLowerCase();
-  if (s === "accepted") return "border-emerald-500/40 bg-emerald-500/15 text-emerald-200";
+  if (s === "accepted") return "bg-success-subtle text-success";
   if (s === "declined") return "border-rose-500/40 bg-rose-500/15 text-rose-200";
   if (s === "cancelled") return "border-slate-500/40 bg-slate-500/15 text-slate-300";
   if (s === "expired") return "border-slate-500/40 bg-slate-500/15 text-slate-300";
@@ -168,14 +168,14 @@ export default function MarketplaceOfferDetailPage() {
 
         {initializing || loading ? (
           <div className="flex min-h-[240px] items-center justify-center">
-            <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/15 border-t-neonTeal" />
+            <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/15 border-t-[var(--color-gold-primary)]" />
           </div>
         ) : !offer ? (
           <div className="rounded-2xl border border-white/10 bg-cardBg p-6 text-center">
             <p className="text-slate-300">Offer not found.</p>
             <Link
               to="/marketplace/my-offers"
-              className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-neonTeal px-5 text-sm font-semibold text-slate-950"
+              className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-xl btn-primary px-5 text-sm font-semibold text-slate-950"
             >
               Back to My Offers
             </Link>
@@ -184,7 +184,7 @@ export default function MarketplaceOfferDetailPage() {
           <article className="rounded-2xl border border-white/10 bg-cardBg p-5 sm:p-6">
             <div className="flex items-start gap-3">
               {statusKey === "accepted" ? (
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-emerald-400/50 bg-emerald-500/15 text-xl text-emerald-300">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border bg-success-subtle text-xl text-success">
                   ✓
                 </div>
               ) : statusKey === "declined" ? (
@@ -227,7 +227,7 @@ export default function MarketplaceOfferDetailPage() {
                     type="button"
                     disabled={actionKey === "accept"}
                     onClick={() => counterDecision("accept")}
-                    className="min-h-[44px] rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+                    className="min-h-[44px] rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
                   >
                     {actionKey === "accept"
                       ? "Accepting…"
@@ -275,7 +275,7 @@ export default function MarketplaceOfferDetailPage() {
                           <TradeCardsThumbRow cards={offeredCards} />
                         </div>
                       ) : (
-                        <p className="text-base font-semibold text-neonTeal">
+                        <p className="text-base font-semibold text-brand-gold">
                           Offer amount: {formatMoney(offer.offer_amount)}
                         </p>
                       )}
@@ -336,7 +336,7 @@ export default function MarketplaceOfferDetailPage() {
                 <button
                   type="button"
                   onClick={() => navigate("/my-collection")}
-                  className="inline-flex min-h-[48px] flex-1 items-center justify-center rounded-xl bg-neonTeal px-4 text-sm font-semibold text-slate-950"
+                  className="inline-flex min-h-[48px] flex-1 items-center justify-center rounded-xl btn-primary px-4 text-sm font-semibold text-slate-950"
                 >
                   View in My Collection
                 </button>
@@ -344,7 +344,7 @@ export default function MarketplaceOfferDetailPage() {
                 <button
                   type="button"
                   onClick={() => navigate("/marketplace")}
-                  className="inline-flex min-h-[48px] flex-1 items-center justify-center rounded-xl bg-neonTeal px-4 text-sm font-semibold text-slate-950"
+                  className="inline-flex min-h-[48px] flex-1 items-center justify-center rounded-xl btn-primary px-4 text-sm font-semibold text-slate-950"
                 >
                   Back to Marketplace
                 </button>

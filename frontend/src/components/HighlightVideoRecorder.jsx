@@ -202,7 +202,7 @@ export default function HighlightVideoRecorder({ onRecorded, onCancel }) {
           <button
             type="button"
             onClick={handleUseRecording}
-            className="inline-flex min-h-[46px] flex-1 items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950"
+            className="inline-flex min-h-[46px] flex-1 items-center justify-center rounded-xl btn-primary px-4 py-2.5 text-sm font-medium text-slate-950"
           >
             Continue to Trim
           </button>

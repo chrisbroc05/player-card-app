@@ -159,7 +159,7 @@ export default function LoginPage() {
                   setAdminError("");
                   setError("");
                 }}
-                className="text-sm text-neonTeal underline decoration-white/20 underline-offset-2 hover:text-teal-200"
+                className="text-sm text-brand-gold underline decoration-white/20 underline-offset-2 hover:text-brand-gold"
               >
                 Back to user login
               </button>

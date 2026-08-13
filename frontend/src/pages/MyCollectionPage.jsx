@@ -451,7 +451,7 @@ export default function MyCollectionPage() {
           </section>
         ) : initializing || loading ? (
           <div className="flex min-h-[240px] items-center justify-center">
-            <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/15 border-t-neonBlue" />
+            <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/15 border-t-[var(--color-gold-primary)]" />
           </div>
         ) : cards.length === 0 ? (
           <div className="flex min-h-[280px] flex-col items-center justify-center rounded-2xl border border-dashed border-white/15 bg-cardBg/50 px-6 py-16 text-center">
@@ -459,7 +459,7 @@ export default function MyCollectionPage() {
             <p className="mt-2 text-sm text-slate-500">Create your first one!</p>
             <Link
               to="/"
-              className="mt-6 inline-flex min-h-[46px] items-center justify-center rounded-xl bg-neonBlue px-6 py-2.5 text-sm font-medium text-slate-950"
+              className="mt-6 inline-flex min-h-[46px] items-center justify-center rounded-xl btn-primary px-6 py-2.5 text-sm font-medium text-slate-950"
             >
               Create a card
             </Link>
@@ -520,7 +520,7 @@ export default function MyCollectionPage() {
                     ) : null}
                     <Link
                       to={`/card/${encodeURIComponent(card.shareable_slug)}`}
-                      className="mt-2 inline-flex min-h-[40px] w-full items-center justify-center rounded-lg border border-white/20 bg-cardBg2 px-3 py-2 text-sm font-medium text-slate-100 transition hover:border-neonBlue/50 hover:text-white"
+                      className="mt-2 inline-flex min-h-[40px] w-full items-center justify-center rounded-lg border border-white/20 bg-cardBg2 px-3 py-2 text-sm font-medium text-slate-100 transition hover:border-[var(--color-gold-bright/50] hover:text-white"
                     >
                       View Card
                     </Link>
@@ -624,7 +624,7 @@ export default function MyCollectionPage() {
                           type="button"
                           disabled={expired || recoverBusyId === card.card_id}
                           onClick={() => recoverDeletedCard(card)}
-                          className="inline-flex min-h-[40px] w-full items-center justify-center rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="inline-flex min-h-[40px] w-full items-center justify-center rounded-lg btn-primary px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {recoverBusyId === card.card_id ? "Recovering…" : "Recover"}
                         </button>

@@ -378,6 +378,46 @@
   .tab-indicator-gold {
     background: var(--color-gold-primary);
   }
+
+  .text-brand-gold {
+    color: var(--color-text-gold);
+  }
+
+  .text-brand-gold-bright {
+    color: var(--color-text-gold-bright);
+  }
+
+  .text-success {
+    color: var(--color-success);
+  }
+
+  .bg-success-subtle {
+    border: 1px solid rgba(76, 175, 80, 0.35);
+    background: var(--color-success-bg);
+  }
+
+  .bg-gold-subtle {
+    border: 1px solid rgba(201, 168, 76, 0.25);
+    background: rgba(201, 168, 76, 0.1);
+  }
+
+  .marketplace-tab {
+    position: relative;
+    border-radius: 8px;
+    color: var(--color-text-secondary);
+    transition: color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .marketplace-tab:hover:not(.marketplace-tab--active) {
+    background: rgba(201, 168, 76, 0.1);
+    color: var(--color-text-gold);
+  }
+
+  .marketplace-tab--active {
+    color: var(--color-text-gold);
+    background: rgba(201, 168, 76, 0.12);
+    box-shadow: inset 0 -2px 0 var(--color-gold-primary);
+  }
 }
 
 @keyframes spin {
@@ -2765,7 +2805,7 @@
 }
 
 .highlight-card--theme-fourth_of_july .card-banner::before {
-  background: linear-gradient(to right, #dc2626, #ffffff, #2563eb) !important;
+  background: linear-gradient(to right, #dc2626, #ffffff, var(--color-gold-primary)) !important;
 }
 
 .highlight-card--theme-new_year .card-banner::before {
@@ -3076,12 +3116,22 @@
 
 .my-listings-v2__btn--primary {
   border: none;
-  background: #2dd4bf;
-  color: #0f172a;
+  background: var(--gradient-gold);
+  color: #0a0a0a;
+  font-weight: 700;
 }
 
 .my-listings-v2__btn--primary:not(:disabled):hover {
-  background: #5eead4;
+  filter: brightness(1.08);
+  box-shadow: 0 2px 12px rgba(201, 168, 76, 0.3);
+}
+
+.my-listings-v2__btn--primary:disabled {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-default);
+  color: var(--color-text-muted);
+  opacity: 1;
+  font-weight: 600;
 }
 
 .my-listings-v2__btn--danger {
@@ -3143,11 +3193,11 @@
   align-items: center;
   justify-content: center;
   border-radius: 10px;
-  background: #2dd4bf;
+  background: var(--gradient-gold);
   padding: 0 20px;
   font-size: 14px;
-  font-weight: 600;
-  color: #0f172a;
+  font-weight: 700;
+  color: #0a0a0a;
   text-decoration: none;
 }
 
@@ -4158,7 +4208,7 @@
   height: 20px;
   transform: translateY(-50%);
   border-radius: 4px;
-  background: color-mix(in srgb, var(--trim-accent, #2dd4bf) 30%, transparent);
+  background: color-mix(in srgb, var(--trim-accent, #C9A84C) 30%, transparent);
   pointer-events: none;
 }
 
@@ -4185,14 +4235,14 @@
   display: block;
   width: 18px;
   height: 36px;
-  border: 2px solid var(--trim-accent, #2dd4bf);
+  border: 2px solid var(--trim-accent, #C9A84C);
   border-radius: 4px;
   background: #fff;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
 }
 
 .highlight-trimmer__handle--active::before {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--trim-accent, #2dd4bf) 40%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--trim-accent, #C9A84C) 40%, transparent);
 }
 
 .highlight-trimmer__handle-label {
@@ -4870,8 +4920,9 @@
 }
 
 .my-offers-card__btn--primary {
-  background: #2dd4bf;
-  color: #020617;
+  background: var(--gradient-gold);
+  color: #0a0a0a;
+  font-weight: 700;
 }
 
 .my-offers-card__btn--secondary {

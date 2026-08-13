@@ -113,7 +113,7 @@ export default function AnimationLoadingScreen({
         <p className="mt-2 max-w-md text-sm text-slate-400">{ANIMATION_EMAIL_WAIT_MESSAGE}</p>
         <Link
           to="/my-collection"
-          className="mt-6 inline-flex min-h-[48px] items-center justify-center rounded-xl bg-neonTeal px-6 text-sm font-semibold text-slate-950"
+          className="mt-6 inline-flex min-h-[48px] items-center justify-center rounded-xl btn-primary px-6 text-sm font-semibold text-slate-950"
         >
           Go to My Collection
         </Link>

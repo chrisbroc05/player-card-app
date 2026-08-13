@@ -35,7 +35,7 @@ export default function PhotoNotesStep({ value, onChange, onContinue, onBack }) 
           onChange={(e) => setLocalNotes(e.target.value.slice(0, 200))}
           onBlur={handleBlur}
           placeholder={`e.g. "I'm the player on the left in the red jersey"`}
-          className="w-full resize-none rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-neonBlue/50 focus:outline-none focus:ring-1 focus:ring-neonBlue/40"
+          className="w-full resize-none rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-[var(--color-gold-bright/50] focus:outline-none focus:ring-1 focus:ring-[var(--color-gold-bright/40]"
         />
         <p className="mt-1 text-right text-xs text-slate-500">{localNotes.length} / 200</p>
       </div>
@@ -50,7 +50,7 @@ export default function PhotoNotesStep({ value, onChange, onContinue, onBack }) 
         <button
           type="button"
           onClick={handleContinue}
-          className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto"
+          className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl btn-primary px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto"
         >
           Continue to Review →
         </button>

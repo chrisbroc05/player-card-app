@@ -32,11 +32,11 @@ export default function AnimatedFlowExplainer({ open, onContinue, motionName = "
         </p>
 
         <div className="mt-6 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-          <div className="rounded-xl border border-neonTeal/35 bg-neonTeal/10 px-3 py-4 text-center">
+          <div className="rounded-xl border border-[var(--color-border-gold)] bg-[var(--color-gold-primary/10] px-3 py-4 text-center">
             <div className="mx-auto flex h-10 w-8 items-center justify-center rounded-md border border-white/15 bg-gradient-to-b from-slate-700 to-slate-900 text-lg">
               🃏
             </div>
-            <p className="mt-2 text-xs font-semibold text-neonTeal">Step 1</p>
+            <p className="mt-2 text-xs font-semibold text-brand-gold">Step 1</p>
             <p className="mt-0.5 text-[11px] leading-snug text-slate-300">Generate card art</p>
           </div>
 
@@ -62,7 +62,7 @@ export default function AnimatedFlowExplainer({ open, onContinue, motionName = "
         <button
           type="button"
           onClick={onContinue}
-          className="mt-6 inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-gradient-to-r from-violet-500 to-neonTeal px-4 text-sm font-semibold text-white shadow-lg shadow-violet-900/30 transition hover:brightness-105"
+          className="mt-6 inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-gradient-to-r from-violet-500 to-[var(--color-gold-primary] px-4 text-sm font-semibold text-white shadow-lg shadow-violet-900/30 transition hover:brightness-105"
         >
           Continue — Let&apos;s Go!
         </button>

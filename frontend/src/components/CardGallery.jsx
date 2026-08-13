@@ -24,7 +24,7 @@ export default function CardGallery({ cards }) {
             return (
               <article
                 key={key}
-                className={`group rounded-xl border border-white/10 bg-cardBg2 p-3 transition duration-200 hover:border-neonBlue/50 hover:shadow-glowBlue ${
+                className={`group rounded-xl border border-white/10 bg-cardBg2 p-3 transition duration-200 hover:border-[var(--color-gold-bright/50] hover:shadow-glowGold ${
                   videoCard ? "" : "hover:scale-[1.02]"
                 }`}
               >

@@ -57,15 +57,15 @@ export default function ActionCategoryStep({
           type="button"
           disabled={continueBusy}
           onClick={onContinue}
-          className="inline-flex min-h-[52px] w-full items-center justify-center rounded-xl bg-neonBlue px-6 text-base font-semibold text-slate-950 transition hover:brightness-110 disabled:opacity-50"
+          className="inline-flex min-h-[52px] w-full items-center justify-center rounded-xl btn-primary px-6 text-base font-semibold text-slate-950 transition hover:brightness-110 disabled:opacity-50"
         >
           {selectedCategory ? `Continue with ${selectedCategory.label} →` : "Next →"}
         </button>
       ) : null}
 
-      <div className="rounded-xl border border-cyan-400/25 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100/95">
+      <div className="rounded-xl border bg-gold-subtle px-4 py-3 text-sm text-brand-gold/95">
         <p>
-          <span className="font-medium text-cyan-50">Tip:</span> For best results, choose the action that
+          <span className="font-medium text-brand-gold-bright">Tip:</span> For best results, choose the action that
           best matches your photo. The animation will look most realistic when it matches what you&apos;re
           doing.
         </p>

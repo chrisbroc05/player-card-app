@@ -79,7 +79,7 @@ export default function PostGenerationPanel({
       {!showQty ? (
         <>
           {isLoggedIn ? (
-            <p className="mb-4 text-center text-sm font-medium text-emerald-300/95">
+            <p className="mb-4 text-center text-sm font-medium text-success/95">
               {showAnimated
                 ? "Your animated card has been added to your collection!"
                 : "Card saved to your collection!"}
@@ -88,7 +88,7 @@ export default function PostGenerationPanel({
             <p className="mb-4 text-center text-sm text-slate-400">
               <Link
                 to="/register"
-                className="font-medium text-neonTeal underline decoration-neonTeal/30 underline-offset-2 hover:text-teal-200"
+                className="font-medium text-brand-gold underline decoration-[var(--color-gold-primary/30] underline-offset-2 hover:text-brand-gold"
               >
                 Create an account
               </Link>{" "}
@@ -138,9 +138,9 @@ export default function PostGenerationPanel({
       ) : null}
 
       {showQty && phase === "success" ? (
-        <div className="mt-8 space-y-4 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-5 text-center sm:text-left">
-          <p className="text-lg font-semibold text-emerald-100">Your cards are ready! 🎉</p>
-          <p className="text-sm text-emerald-50/95">
+        <div className="mt-8 space-y-4 rounded-2xl border bg-success-subtle p-5 text-center sm:text-left">
+          <p className="text-lg font-semibold text-success">Your cards are ready! 🎉</p>
+          <p className="text-sm text-success/95">
             {total} {total === 1 ? "card" : "cards"} added to your collection
           </p>
           <p className="text-sm text-slate-200">
@@ -152,7 +152,7 @@ export default function PostGenerationPanel({
             <a
               href={imgSrc}
               download={downloadName}
-              className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl border border-cyan-300/40 bg-cyan-400/10 px-4 py-2.5 text-sm font-medium text-cyan-100"
+              className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl border bg-gold-subtle px-4 py-2.5 text-sm font-medium text-brand-gold"
             >
               Download
             </a>
@@ -160,7 +160,7 @@ export default function PostGenerationPanel({
             <button
               type="button"
               onClick={() => (onViewCollection ? onViewCollection() : navigate("/my-collection"))}
-              className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950"
+              className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl btn-primary px-4 py-2.5 text-sm font-medium text-slate-950"
             >
               View My Collection
             </button>
@@ -174,7 +174,7 @@ export default function PostGenerationPanel({
             <a
               href={imgSrc}
               download={downloadName}
-              className="inline-flex min-h-[46px] flex-1 items-center justify-center rounded-xl border border-cyan-300/40 bg-cyan-400/10 px-4 py-2.5 text-sm font-medium text-cyan-100 sm:flex-none"
+              className="inline-flex min-h-[46px] flex-1 items-center justify-center rounded-xl border bg-gold-subtle px-4 py-2.5 text-sm font-medium text-brand-gold sm:flex-none"
             >
               Download Card
             </a>
@@ -182,7 +182,7 @@ export default function PostGenerationPanel({
               <button
                 type="button"
                 onClick={onViewCollection}
-                className="inline-flex min-h-[46px] flex-1 items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:flex-none"
+                className="inline-flex min-h-[46px] flex-1 items-center justify-center rounded-xl btn-primary px-4 py-2.5 text-sm font-medium text-slate-950 sm:flex-none"
               >
                 View My Collection
               </button>

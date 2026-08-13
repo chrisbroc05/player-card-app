@@ -868,7 +868,7 @@
 }
 
 .cce-reveal-btn--primary {
-  background: #2dd4bf;
+  background: var(--color-gold-primary);
   color: #0f172a;
 }
 

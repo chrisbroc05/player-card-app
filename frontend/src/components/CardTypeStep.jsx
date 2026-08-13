@@ -8,7 +8,7 @@ const ICON_STANDARD = (
 );
 
 const ICON_HIGHLIGHT = (
-  <svg className="h-10 w-10 text-teal-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+  <svg className="h-10 w-10 text-brand-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
     <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z" />
   </svg>
 );
@@ -54,7 +54,7 @@ export default function CardTypeStep({
           <div className="mb-3">{ICON_STANDARD}</div>
           <p className="text-base font-semibold text-white">Standard Card</p>
           <p className="mt-1 text-sm text-slate-400">A premium AI-generated trading card of your player</p>
-          <p className="mt-3 text-sm font-medium text-neonTeal">Free</p>
+          <p className="mt-3 text-sm font-medium text-brand-gold">Free</p>
           <p className="mt-1 text-xs text-slate-500">No additional charge beyond tier price</p>
         </button>
 
@@ -63,11 +63,11 @@ export default function CardTypeStep({
           onClick={() => onChange("highlight")}
           className={`relative overflow-hidden rounded-2xl border p-5 text-left transition ${
             selected === "highlight"
-              ? "border-teal-400/70 bg-teal-500/10 shadow-[0_0_28px_rgba(45,212,191,0.22)]"
+              ? "border-[var(--color-border-gold)] bg-gold-subtle shadow-[0_0_28px_rgba(45,212,191,0.22)]"
               : "border-white/10 bg-cardBg2/50 opacity-80 hover:opacity-95"
           }`}
         >
-          <span className="absolute right-3 top-3 rounded-full border border-teal-400/50 bg-teal-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-teal-100">
+          <span className="absolute right-3 top-3 rounded-full border border-[var(--color-border-gold)] bg-gold-subtle px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-gold">
             New
           </span>
           <div className="mb-3">{ICON_HIGHLIGHT}</div>
@@ -75,7 +75,7 @@ export default function CardTypeStep({
           <p className="mt-1 text-sm text-slate-400">
             Upload your real highlight video — your actual moment on your card
           </p>
-          <p className="mt-3 text-sm font-medium text-teal-200">{priceLabel(highlightCardPrice)}</p>
+          <p className="mt-3 text-sm font-medium text-brand-gold">{priceLabel(highlightCardPrice)}</p>
           <p className="mt-1 text-xs text-slate-500">Max 10 seconds. Record or upload from your camera roll.</p>
         </button>
 

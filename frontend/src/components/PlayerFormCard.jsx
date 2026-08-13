@@ -33,7 +33,7 @@ export default function PlayerFormCard({
             <label className="grid gap-1.5 text-sm">
               <span className="text-slate-200">First Name</span>
               <input
-                className="min-h-[44px] rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 text-slate-100 outline-none transition focus:border-neonBlue focus:ring-2 focus:ring-neonBlue/30"
+                className="min-h-[44px] rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 text-slate-100 outline-none transition focus:border-[var(--color-gold-bright] focus:ring-2 focus:ring-[var(--color-gold-bright/30]"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 placeholder="e.g. Chris"
@@ -42,7 +42,7 @@ export default function PlayerFormCard({
             <label className="grid gap-1.5 text-sm">
               <span className="text-slate-200">Last Name</span>
               <input
-                className="min-h-[44px] rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 text-slate-100 outline-none transition focus:border-neonBlue focus:ring-2 focus:ring-neonBlue/30"
+                className="min-h-[44px] rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 text-slate-100 outline-none transition focus:border-[var(--color-gold-bright] focus:ring-2 focus:ring-[var(--color-gold-bright/30]"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 placeholder="e.g. Broccolino"
@@ -52,7 +52,7 @@ export default function PlayerFormCard({
           <label className="grid gap-1.5 text-sm">
             <span className="text-slate-200">Display Name (optional fallback)</span>
             <input
-              className="min-h-[44px] rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 text-slate-100 outline-none transition focus:border-neonBlue focus:ring-2 focus:ring-neonBlue/30"
+              className="min-h-[44px] rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 text-slate-100 outline-none transition focus:border-[var(--color-gold-bright] focus:ring-2 focus:ring-[var(--color-gold-bright/30]"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder="e.g. C. Broc"
@@ -66,7 +66,7 @@ export default function PlayerFormCard({
             <label className="grid gap-1.5 text-sm">
               <span className="text-slate-200">Jersey Number</span>
               <input
-                className="min-h-[44px] rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 text-slate-100 outline-none transition focus:border-neonBlue focus:ring-2 focus:ring-neonBlue/30"
+                className="min-h-[44px] rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 text-slate-100 outline-none transition focus:border-[var(--color-gold-bright] focus:ring-2 focus:ring-[var(--color-gold-bright/30]"
                 value={jerseyNumber}
                 onChange={(e) => setJerseyNumber(e.target.value)}
                 placeholder="e.g. 27"
@@ -75,7 +75,7 @@ export default function PlayerFormCard({
             <label className="grid gap-1.5 text-sm">
               <span className="text-slate-200">Position</span>
               <input
-                className="min-h-[44px] rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 text-slate-100 outline-none transition focus:border-neonBlue focus:ring-2 focus:ring-neonBlue/30"
+                className="min-h-[44px] rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 text-slate-100 outline-none transition focus:border-[var(--color-gold-bright] focus:ring-2 focus:ring-[var(--color-gold-bright/30]"
                 value={position}
                 onChange={(e) => setPosition(e.target.value)}
                 placeholder="e.g. Pitcher"
@@ -86,7 +86,7 @@ export default function PlayerFormCard({
             <span className="text-slate-200">Grad Year</span>
             <input
               type="number"
-              className="min-h-[44px] w-full max-w-full rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 text-slate-100 outline-none transition focus:border-neonBlue focus:ring-2 focus:ring-neonBlue/30 sm:max-w-md"
+              className="min-h-[44px] w-full max-w-full rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 text-slate-100 outline-none transition focus:border-[var(--color-gold-bright] focus:ring-2 focus:ring-[var(--color-gold-bright/30] sm:max-w-md"
               value={gradYear}
               onChange={(e) => setGradYear(e.target.value)}
               placeholder="e.g. 2027"
@@ -99,7 +99,7 @@ export default function PlayerFormCard({
           <label className="grid gap-1.5 text-sm">
             <span className="text-slate-200">Team Name</span>
             <input
-              className="min-h-[44px] rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 text-slate-100 outline-none transition focus:border-neonBlue focus:ring-2 focus:ring-neonBlue/30"
+              className="min-h-[44px] rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 text-slate-100 outline-none transition focus:border-[var(--color-gold-bright] focus:ring-2 focus:ring-[var(--color-gold-bright/30]"
               value={teamName}
               onChange={(e) => setTeamName(e.target.value)}
               placeholder="e.g. Chicago White Sox"
@@ -112,7 +112,7 @@ export default function PlayerFormCard({
           <input
             type="file"
             accept="image/*"
-            className="min-h-[44px] rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 text-slate-200 file:mr-3 file:rounded-lg file:border-0 file:bg-neonBlue/20 file:px-3 file:py-1.5 file:text-neonBlue"
+            className="min-h-[44px] rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 text-slate-200 file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--color-gold-bright/20] file:px-3 file:py-1.5 file:text-brand-gold-bright"
             onChange={(e) => setImageFile(e.target.files?.[0] || null)}
           />
           {imageFile ? <span className="text-xs text-slate-400">{imageFile.name}</span> : null}
@@ -121,7 +121,7 @@ export default function PlayerFormCard({
         <button
           type="submit"
           disabled={disabled}
-          className="mt-1 inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 shadow-glowBlue transition hover:brightness-110 sm:w-auto disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-1 inline-flex min-h-[46px] w-full items-center justify-center rounded-xl btn-primary px-4 py-2.5 text-sm font-medium text-slate-950 shadow-glowGold transition hover:brightness-110 sm:w-auto disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? "Creating Player..." : "Create Player"}
         </button>

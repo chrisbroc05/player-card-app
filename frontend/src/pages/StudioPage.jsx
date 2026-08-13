@@ -176,14 +176,14 @@ const TIER_UI = {
     sub: "RARE",
     desc: "Premium chrome look with competitive modern polish.",
     card:
-      "border-cyan-300/35 bg-gradient-to-br from-cyan-400/10 via-sky-500/10 to-indigo-500/10 backdrop-blur-sm hover:border-cyan-300/60 hover:shadow-[0_0_35px_rgba(56,189,248,0.20)]",
+      "border-[#1A6AB5]/35 bg-gradient-to-br from-[#1A6AB5]/10 via-[#1A6AB5]/10 to-indigo-500/10 backdrop-blur-sm hover:border-[#1A6AB5]/60 hover:shadow-[0_0_35px_rgba(26,106,181,0.20)]",
     active:
-      "border-cyan-300/75 bg-gradient-to-br from-cyan-400/20 via-sky-500/15 to-indigo-500/20 shadow-[0_0_0_1px_rgba(103,232,249,0.4),0_20px_42px_rgba(56,189,248,0.2)]",
-    pill: "border-cyan-300/45 bg-cyan-400/15 text-cyan-100",
+      "border-[#1A6AB5]/75 bg-gradient-to-br from-[#1A6AB5]/20 via-[#1A6AB5]/15 to-indigo-500/20 shadow-[0_0_0_1px_rgba(26,106,181,0.4),0_20px_42px_rgba(26,106,181,0.2)]",
+    pill: "border-[#1A6AB5]/45 bg-[#1A6AB5]/15 text-slate-200",
     preview:
-      "border-cyan-300/45 bg-gradient-to-b from-cyan-400/10 via-blue-400/5 to-transparent",
+      "border-[#1A6AB5]/45 bg-gradient-to-b from-[#1A6AB5]/10 via-[#1A6AB5]/5 to-transparent",
     loading:
-      "border-cyan-300/35 bg-gradient-to-r from-cyan-400/20 via-sky-500/20 to-blue-500/20",
+      "border-[#1A6AB5]/35 bg-gradient-to-r from-[#1A6AB5]/20 via-[#1A6AB5]/20 to-indigo-500/20",
   },
   legends: {
     label: "Legends",
@@ -234,15 +234,15 @@ function WizardProgress({ currentStep, isAnimated, isHighlight, cardType, onGoTo
               onClick={() => canClick && onGoToStep(step)}
               className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] transition ${
                 done
-                  ? "border-neonTeal/40 bg-neonTeal/10 text-teal-100"
+                  ? "border-[var(--color-border-gold)] bg-gold-subtle text-brand-gold"
                   : active
-                    ? "border-neonBlue/50 bg-neonBlue/15 text-neonBlue"
+                    ? "border-[var(--color-border-gold)] bg-gold-subtle text-brand-gold-bright"
                     : "border-white/10 bg-cardBg text-slate-500"
-              } ${canClick ? "cursor-pointer hover:border-neonTeal/60" : "cursor-default"}`}
+              } ${canClick ? "cursor-pointer hover:border-[var(--color-border-gold)]" : "cursor-default"}`}
             >
               <span
                 className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${
-                  done ? "bg-neonTeal text-slate-950" : active ? "bg-neonBlue text-slate-950" : "bg-white/10"
+                  done ? "btn-primary text-slate-950" : active ? "btn-primary text-slate-950" : "bg-white/10"
                 }`}
               >
                 {done ? "✓" : step}
@@ -2273,7 +2273,7 @@ export default function StudioPage() {
               <h2 className="text-base font-semibold text-white">Card Creation Experience</h2>
               <p className="text-xs text-slate-400">Guided flow to create your collectible cards.</p>
               {!initializing && !user ? (
-                <p className="mt-2 text-xs text-neonTeal/90">
+                <p className="mt-2 text-xs text-brand-gold/90">
                   Sign up or log in to enter player details and create your own collectible cards.
                 </p>
               ) : null}
@@ -2286,7 +2286,7 @@ export default function StudioPage() {
             className={`rounded-xl border px-4 py-3 text-sm shadow-lg ${
               error
                 ? "border-rose-500/40 bg-rose-500/10 text-rose-100"
-                : "border-neonTeal/40 bg-neonTeal/10 text-teal-100"
+                : "border-[var(--color-border-gold)] bg-gold-subtle text-brand-gold"
             }`}
           >
             {error || message}
@@ -2404,10 +2404,10 @@ export default function StudioPage() {
                       }}
                       className={`flex min-h-[180px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-4 text-center transition ${
                         dragActive
-                          ? "border-neonBlue/70 bg-neonBlue/10"
+                          ? "border-[var(--color-border-gold)] bg-gold-subtle"
                           : photoStepError
                             ? "border-rose-500/50 bg-rose-500/5"
-                            : "border-white/20 bg-cardBg2 hover:border-neonBlue/40"
+                            : "border-white/20 bg-cardBg2 hover:border-[var(--color-border-gold)]"
                       }`}
                     >
                       <p className="text-sm font-medium text-slate-200">Choose Photo</p>
@@ -2418,7 +2418,7 @@ export default function StudioPage() {
                       <div className="relative flex min-h-[240px] items-center justify-center rounded-xl border border-white/15 bg-zinc-900/70 p-4 sm:min-h-[300px]">
                         {photoUploading ? (
                           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-xl bg-black/50">
-                            <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-neonBlue" />
+                            <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-[var(--color-gold-primary)]" />
                             <p className="mt-3 text-sm text-slate-200">Uploading to secure storage...</p>
                           </div>
                         ) : null}
@@ -2430,16 +2430,16 @@ export default function StudioPage() {
                           />
                         ) : null}
                       </div>
-                      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
-                        <span className="text-emerald-300" aria-hidden>
+                      <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-success-subtle px-3 py-2">
+                        <span className="text-success" aria-hidden>
                           ✓
                         </span>
-                        <p className="text-sm text-emerald-100">
-                          <span className="font-medium text-emerald-50">
+                        <p className="text-sm text-success">
+                          <span className="font-medium text-success">
                             {photoUploading ? "Uploading photo..." : "Photo uploaded"}
                           </span>
                           {imageFile?.name ? (
-                            <span className="text-emerald-200/90"> — {imageFile.name}</span>
+                            <span className="text-success/90"> — {imageFile.name}</span>
                           ) : null}
                         </p>
                       </div>
@@ -2463,7 +2463,7 @@ export default function StudioPage() {
                       type="button"
                       disabled={!canAdvanceFromStep}
                       onClick={tryAdvanceStep}
-                      className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
+                      className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl btn-primary px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
                     >
                       {isAnimatedCardType ? "Continue to Action Tagging" : "Continue to Review"}
                     </button>
@@ -2503,7 +2503,7 @@ export default function StudioPage() {
                     type="button"
                     disabled={!canAdvanceFromStep}
                     onClick={tryAdvanceStep}
-                    className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
+                    className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl btn-primary px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
                   >
                     Continue to Upload
                   </button>
@@ -2648,7 +2648,7 @@ export default function StudioPage() {
                     type="button"
                     disabled={!canAdvanceFromStep}
                     onClick={tryAdvanceStep}
-                    className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
+                    className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl btn-primary px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
                   >
                     Continue to Theme Selection
                   </button>
@@ -2686,7 +2686,7 @@ export default function StudioPage() {
                     type="button"
                     disabled={!canAdvanceFromStep}
                     onClick={tryAdvanceStep}
-                    className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl bg-neonBlue px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
+                    className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl btn-primary px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
                   >
                     Continue to Card Type Selection
                   </button>
@@ -2741,7 +2741,7 @@ export default function StudioPage() {
                 </div>
                 {isHighlightCardType && highlightClipDraft?.confirmed ? (
                   <div className="grid gap-3">
-                    <p className="text-center text-xs font-medium uppercase tracking-[0.18em] text-teal-300/90">
+                    <p className="text-center text-xs font-medium uppercase tracking-[0.18em] text-brand-gold-bright/90">
                       Your highlight preview
                     </p>
                     <ExpandableCardView
@@ -2803,7 +2803,7 @@ export default function StudioPage() {
                         type="button"
                         onClick={requestGenerateFirstPreview}
                         disabled={!canCreateOrder || !generationPricing || Boolean(orderActionKey)}
-                        className="inline-flex min-h-[52px] flex-1 items-center justify-center rounded-xl bg-neonTeal px-6 py-3 text-base font-semibold text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400 sm:flex-none"
+                        className="inline-flex min-h-[52px] flex-1 items-center justify-center rounded-xl btn-primary px-6 py-3 text-base font-semibold text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400 sm:flex-none"
                       >
                         {orderActionKey === "generate-first"
                           ? "Generating..."
@@ -2843,23 +2843,23 @@ export default function StudioPage() {
                   />
                 ) : null}
                 {isHighlightCardType && highlightUploadState !== "idle" ? (
-                  <div className="rounded-xl border border-teal-500/35 bg-teal-500/10 px-4 py-3">
+                  <div className="rounded-xl border bg-gold-subtle px-4 py-3">
                     {highlightUploadState === "uploading" ? (
                       <>
-                        <p className="text-sm font-medium text-teal-100">Uploading your highlight clip...</p>
+                        <p className="text-sm font-medium text-brand-gold">Uploading your highlight clip...</p>
                         <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800">
                           <div
-                            className="h-full rounded-full bg-teal-400 transition-all"
+                            className="h-full rounded-full bg-[var(--color-gold-primary)] transition-all"
                             style={{ width: `${Math.round(highlightUploadProgress * 100)}%` }}
                           />
                         </div>
                       </>
                     ) : null}
                     {highlightUploadState === "processing" ? (
-                      <p className="text-sm font-medium text-teal-100">Processing your clip...</p>
+                      <p className="text-sm font-medium text-brand-gold">Processing your clip...</p>
                     ) : null}
                     {highlightUploadState === "done" ? (
-                      <p className="text-sm font-medium text-teal-100">Highlight clip uploaded.</p>
+                      <p className="text-sm font-medium text-brand-gold">Highlight clip uploaded.</p>
                     ) : null}
                     {highlightUploadState === "error" ? (
                       <div className="grid gap-3">
@@ -2901,9 +2901,9 @@ export default function StudioPage() {
                     />
 
                     {activePreviewCount > 0 ? (
-                      <div className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
-                        <p className="font-medium text-cyan-50">This is your free preview.</p>
-                        <p className="mt-1 text-xs text-cyan-100/90">
+                      <div className="rounded-xl border bg-gold-subtle px-4 py-3 text-sm text-brand-gold">
+                        <p className="font-medium text-brand-gold-bright">This is your free preview.</p>
+                        <p className="mt-1 text-xs text-brand-gold/90">
                           Regenerate for {formatMoney(additionalPreviewCost)} per attempt if you&apos;d like a different
                           result. Only the card you choose will be added to your collection.
                         </p>
@@ -2948,7 +2948,7 @@ export default function StudioPage() {
                             key={`${preview.image_url}-${idx}`}
                             className={`overflow-hidden rounded-xl border transition-all duration-300 ${
                               selectedPreviewUrl === preview.image_url
-                                ? `${tierTheme.active} shadow-glowBlue`
+                                ? `${tierTheme.active} shadow-glowGold`
                                 : tierTheme.card
                             }`}
                           >
@@ -3003,7 +3003,7 @@ export default function StudioPage() {
                                       setSelectedPreviewUrl(preview.image_url);
                                       setAnimatedFlowStage(ANIMATED_FLOW_STAGE.CHOICE);
                                     }}
-                                    className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl bg-neonTeal px-4 py-2 text-sm font-semibold text-slate-950"
+                                    className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl btn-primary px-4 py-2 text-sm font-semibold text-slate-950"
                                   >
                                     Choose This Card
                                   </button>
@@ -3015,7 +3015,7 @@ export default function StudioPage() {
                                     setSelectedPreviewUrl(preview.image_url);
                                     setPreviewConfigureOpen(true);
                                   }}
-                                  className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl bg-neonTeal px-4 py-2 text-sm font-semibold text-slate-950"
+                                  className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl btn-primary px-4 py-2 text-sm font-semibold text-slate-950"
                                 >
                                   Choose This Card
                                 </button>
@@ -3026,7 +3026,7 @@ export default function StudioPage() {
                                     setSelectedPreviewUrl(preview.image_url);
                                     setPreviewConfigureOpen(true);
                                   }}
-                                  className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-neonTeal px-4 py-2.5 text-sm font-semibold text-slate-950"
+                                  className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl btn-primary px-4 py-2.5 text-sm font-semibold text-slate-950"
                                 >
                                   Add This Card to My Collection
                                 </button>
@@ -3232,7 +3232,7 @@ export default function StudioPage() {
                           href="/credits"
                           target="_blank"
                           rel="noreferrer"
-                          className="mt-3 inline-flex min-h-[40px] items-center justify-center rounded-lg bg-neonTeal px-4 py-2 text-sm font-semibold text-slate-950"
+                          className="mt-3 inline-flex min-h-[40px] items-center justify-center rounded-lg btn-primary px-4 py-2 text-sm font-semibold text-slate-950"
                         >
                           Add Credits
                         </a>
@@ -3260,9 +3260,9 @@ export default function StudioPage() {
                   />
                 ) : null}
                 {!isAnimatedCardType ? (
-                <div className="rounded-xl border border-emerald-300/35 bg-emerald-400/10 p-4">
-                  <p className="text-base font-semibold text-emerald-100">Card Delivered</p>
-                  <p className="mt-1 text-sm text-emerald-50/90">
+                <div className="rounded-xl border bg-success-subtle p-4">
+                  <p className="text-base font-semibold text-success">Card Delivered</p>
+                  <p className="mt-1 text-sm text-success/90">
                     Your final card has been approved and delivered automatically.
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -3270,14 +3270,14 @@ export default function StudioPage() {
                       href={deliveredCardUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded-lg border border-emerald-300/40 bg-emerald-300/10 px-3 py-2 text-sm font-medium text-emerald-100"
+                      className="rounded-lg border bg-success-subtle px-3 py-2 text-sm font-medium text-success"
                     >
                       View Final Card
                     </a>
                     <a
                       href={deliveredCardUrl}
                       download
-                      className="rounded-lg border border-cyan-300/40 bg-cyan-300/10 px-3 py-2 text-sm font-medium text-cyan-100"
+                      className="rounded-lg border bg-gold-subtle px-3 py-2 text-sm font-medium text-brand-gold"
                     >
                       Download Card
                     </a>
@@ -3323,7 +3323,7 @@ export default function StudioPage() {
               Generate another preview for {formatMoney(additionalPreviewCost)}?
             </p>
             <p className="mt-2 text-sm text-slate-400">
-              Your balance: <span className="font-semibold text-neonTeal">{formatMoney(creditBalance)}</span>
+              Your balance: <span className="font-semibold text-brand-gold">{formatMoney(creditBalance)}</span>
             </p>
             {generationCap.blocked ? (
               <GenerationCapNotice
@@ -3344,7 +3344,7 @@ export default function StudioPage() {
                   type="button"
                   onClick={handleGeneratePreviewForCurrentOrder}
                   disabled={!canAffordRegenerate}
-                  className="min-h-[42px] rounded-lg bg-neonTeal px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50"
+                  className="min-h-[42px] rounded-lg btn-primary px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50"
                 >
                   {`Generate — ${formatMoney(additionalPreviewCost)}`}
                 </button>

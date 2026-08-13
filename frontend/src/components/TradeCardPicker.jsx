@@ -31,7 +31,7 @@ function PagerArrowButton({ direction, disabled, onClick, label }) {
       disabled={disabled}
       onClick={onClick}
       aria-label={label}
-      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-cardBg text-slate-300 transition hover:border-teal-500/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-cardBg text-slate-300 transition hover:border-[var(--color-border-gold)] hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
     >
       <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
         {direction === "up" ? (
@@ -151,7 +151,7 @@ export default function TradeCardPicker({
       {loadError ? <p className="text-sm text-rose-300">{loadError}</p> : null}
       {loading ? (
         <div className="flex justify-center py-6">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-neonTeal" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-[var(--color-gold-primary)]" />
         </div>
       ) : cards.length === 0 ? (
         <p className="text-sm text-slate-500">No cards in your collection.</p>
@@ -188,9 +188,9 @@ export default function TradeCardPicker({
                   title={reason || undefined}
                   className={`rounded-lg border p-1 text-left transition ${
                     selected
-                      ? "border-neonTeal bg-teal-500/15 ring-1 ring-neonTeal/50"
+                      ? "border-[var(--color-gold-primary)] bg-gold-subtle ring-1 ring-[var(--color-gold-primary)]/50"
                       : selectable
-                        ? "border-white/15 bg-cardBg hover:border-teal-500/40"
+                        ? "border-white/15 bg-cardBg hover:border-[var(--color-border-gold)]"
                         : "cursor-not-allowed border-white/5 bg-black/20 opacity-45"
                   }`}
                 >

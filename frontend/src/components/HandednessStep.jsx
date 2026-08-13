@@ -94,7 +94,7 @@ export default function HandednessStep({
           type="button"
           disabled={continueBusy}
           onClick={onContinue}
-          className="inline-flex min-h-[52px] w-full items-center justify-center rounded-xl bg-neonBlue px-6 text-base font-semibold text-slate-950 transition hover:brightness-110 disabled:opacity-50"
+          className="inline-flex min-h-[52px] w-full items-center justify-center rounded-xl btn-primary px-6 text-base font-semibold text-slate-950 transition hover:brightness-110 disabled:opacity-50"
         >
           Continue →
         </button>

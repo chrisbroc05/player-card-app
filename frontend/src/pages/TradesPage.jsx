@@ -30,7 +30,7 @@ function relativeSentLabel(iso) {
 function tierImageGlow(tier) {
   const t = (tier || "").toLowerCase();
   if (t === "legends") return "shadow-[0_0_28px_rgba(255,215,0,0.35)] border-amber-400/50";
-  if (t === "allstar") return "shadow-[0_0_26px_rgba(0,170,255,0.35)] border-cyan-400/50";
+  if (t === "allstar") return "shadow-[0_0_26px_rgba(26,106,181,0.4)] border-[#1A6AB5]/50";
   return "shadow-[0_0_26px_rgba(255,69,0,0.35)] border-orange-500/50";
 }
 
@@ -155,7 +155,7 @@ export default function TradesPage() {
 
         {initializing || loading ? (
           <div className="flex min-h-[200px] items-center justify-center">
-            <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/15 border-t-neonBlue" />
+            <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/15 border-t-[var(--color-gold-primary)]" />
           </div>
         ) : (
           <div className="space-y-12">
@@ -215,7 +215,7 @@ export default function TradesPage() {
                               type="button"
                               disabled={rowBusy}
                               onClick={() => postTradeAction(offer.id, "accept")}
-                              className="inline-flex min-h-[42px] flex-1 items-center justify-center rounded-xl bg-emerald-500/90 px-4 py-2 text-sm font-semibold text-slate-950 shadow-[0_0_20px_rgba(34,197,94,0.35)] transition hover:bg-emerald-400 disabled:opacity-50 sm:flex-none"
+                              className="inline-flex min-h-[42px] flex-1 items-center justify-center rounded-xl btn-primary px-4 py-2 text-sm font-semibold text-slate-950 shadow-[0_0_20px_rgba(34,197,94,0.35)] transition hover:brightness-110 disabled:opacity-50 sm:flex-none"
                             >
                               {actionKey === `accept-${offer.id}` ? "…" : "Accept"}
                             </button>
@@ -276,7 +276,7 @@ export default function TradesPage() {
                           </div>
                           <p className="text-xs text-slate-400">{formatEditionShort(c.edition_number, c.print_run)}</p>
                           <p className="text-sm text-slate-300">
-                            To <span className="font-medium text-cyan-100/90">{offer.recipient?.display_name}</span>
+                            To <span className="font-medium text-brand-gold/90">{offer.recipient?.display_name}</span>
                           </p>
                           {offer.message ? (
                             <p className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-slate-400">

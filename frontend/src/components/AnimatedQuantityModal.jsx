@@ -115,7 +115,7 @@ export default function AnimatedQuantityModal({
       >
         {step === "quantity" ? (
           <>
-            <div className="border-b border-white/10 bg-gradient-to-r from-violet-500/15 via-cardBg2 to-neonTeal/10 px-6 py-5">
+            <div className="border-b border-white/10 bg-gradient-to-r from-violet-500/15 via-cardBg2 to-[rgba(201,168,76,0.1)] px-6 py-5">
               <h2 id="animated-qty-title" className="text-lg font-semibold text-white">
                 How many animated copies would you like?
               </h2>
@@ -206,14 +206,14 @@ export default function AnimatedQuantityModal({
                 </div>
               ) : null}
 
-              {bulkMsg ? <p className="mt-3 text-sm font-semibold text-neonTeal">{bulkMsg}</p> : null}
+              {bulkMsg ? <p className="mt-3 text-sm font-semibold text-brand-gold">{bulkMsg}</p> : null}
 
               {pricing && !canAfford ? (
                 <div className="mt-4 rounded-xl border border-amber-400/35 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
                   <p>{creditTopUpShortfallMessage(shortfall)}</p>
                   <Link
                     to="/credits"
-                    className="mt-3 inline-flex min-h-[44px] w-full items-center justify-center rounded-xl bg-neonTeal px-4 text-sm font-semibold text-slate-950"
+                    className="mt-3 inline-flex min-h-[44px] w-full items-center justify-center rounded-xl btn-primary px-4 text-sm font-semibold text-slate-950"
                   >
                     Add Credits
                   </Link>
@@ -244,7 +244,7 @@ export default function AnimatedQuantityModal({
           </>
         ) : (
           <>
-            <div className="border-b border-white/10 bg-gradient-to-r from-violet-500/15 via-cardBg2 to-neonTeal/10 px-6 py-5">
+            <div className="border-b border-white/10 bg-gradient-to-r from-violet-500/15 via-cardBg2 to-[rgba(201,168,76,0.1)] px-6 py-5">
               <h2 className="text-lg font-semibold text-white">Confirm animation charge</h2>
             </div>
             <div className="px-6 py-6">
@@ -260,7 +260,7 @@ export default function AnimatedQuantityModal({
                   : ""}
               </p>
               <p className="mt-2 text-center text-xs text-slate-500">
-                Your balance: <span className="font-semibold text-neonTeal">{formatMoney(creditBalance)}</span>
+                Your balance: <span className="font-semibold text-brand-gold">{formatMoney(creditBalance)}</span>
               </p>
 
               <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row">

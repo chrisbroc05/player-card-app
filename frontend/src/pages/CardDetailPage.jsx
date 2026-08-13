@@ -222,7 +222,7 @@ export default function CardDetailPage() {
 
         {loading ? (
           <div className="flex min-h-[50vh] items-center justify-center">
-            <div className="h-12 w-12 animate-spin rounded-full border-2 border-white/15 border-t-neonBlue" />
+            <div className="h-12 w-12 animate-spin rounded-full border-2 border-white/15 border-t-[var(--color-gold-primary)]" />
           </div>
         ) : error || !card ? (
           <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-8 text-center text-rose-100">
@@ -266,7 +266,7 @@ export default function CardDetailPage() {
                 <dl className="grid gap-3 rounded-2xl border border-white/10 bg-cardBg p-4 text-sm sm:grid-cols-2">
                   <div className="sm:col-span-2">
                     <dt className="text-slate-500">Card ID</dt>
-                    <dd className="font-mono text-xs text-neonTeal">{displayCard?.card_id}</dd>
+                    <dd className="font-mono text-xs text-brand-gold">{displayCard?.card_id}</dd>
                   </div>
                   <div className="sm:col-span-2">
                     <dt className="text-slate-500">Created</dt>
@@ -344,7 +344,7 @@ export default function CardDetailPage() {
                 <div className="flex justify-center sm:justify-start">
                   <Link
                     to={user ? "/my-collection" : "/"}
-                    className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-6 py-2.5 text-sm font-medium text-slate-100 transition hover:border-neonBlue/40 hover:text-white"
+                    className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-6 py-2.5 text-sm font-medium text-slate-100 transition hover:border-[var(--color-border-gold)] hover:text-white"
                   >
                     {user ? "Back to My Collection" : "Back to Studio"}
                   </Link>

@@ -71,7 +71,7 @@ export default function MarketplaceListingActions({
         <>
           {listedTagLabel !== null ? (
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex rounded-full border border-teal-500/40 bg-teal-500/10 px-2 py-0.5 text-[11px] font-semibold text-teal-200">
+              <span className="inline-flex rounded-full border bg-gold-subtle px-2 py-0.5 text-[11px] font-semibold text-brand-gold">
                 {listedTagLabel || `Listed on Free Agency Marketplace · ${formatMoney(listingInfo.asking_price)}`}
               </span>
               {isPriorityListing(listingInfo) ? <PriorityBadge /> : null}
@@ -99,7 +99,7 @@ export default function MarketplaceListingActions({
                 setLocalError("");
                 setPriorityBoost(false);
               }}
-              className="inline-flex min-h-[40px] w-full items-center justify-center rounded-lg border border-teal-500/35 bg-teal-500/10 px-3 py-2 text-sm font-medium text-teal-100 transition hover:border-teal-400/50 disabled:opacity-50"
+              className="inline-flex min-h-[40px] w-full items-center justify-center rounded-lg border bg-gold-subtle px-3 py-2 text-sm font-medium text-brand-gold transition hover:border-[var(--color-border-gold)] disabled:opacity-50"
             >
               {listButtonLabel}
             </button>
@@ -161,12 +161,12 @@ export function ListedSuccessModal({ open, onClose, variant = "default", onViewM
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 px-3 py-4 sm:px-4">
       <div
-        className="w-full max-w-sm rounded-2xl border border-emerald-500/30 bg-cardBg p-5 shadow-2xl shadow-black/50 sm:p-6"
+        className="w-full max-w-sm rounded-2xl border border-[var(--color-success)]/30 bg-cardBg p-5 shadow-2xl shadow-black/50 sm:p-6"
         role="dialog"
         aria-modal="true"
         aria-labelledby="listed-success-title"
       >
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-emerald-400/50 bg-emerald-500/15 text-2xl text-emerald-300">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border bg-success-subtle text-2xl text-success">
           ✓
         </div>
         <h3 id="listed-success-title" className="mt-3 text-center text-xl font-semibold text-white">
@@ -187,7 +187,7 @@ export function ListedSuccessModal({ open, onClose, variant = "default", onViewM
             <button
               type="button"
               onClick={onViewMarketplace}
-              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 transition hover:opacity-90"
+              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950 transition hover:opacity-90"
             >
               View on Marketplace
             </button>
@@ -196,7 +196,7 @@ export function ListedSuccessModal({ open, onClose, variant = "default", onViewM
           <button
             type="button"
             onClick={onClose}
-            className="mt-5 inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 transition hover:opacity-90"
+            className="mt-5 inline-flex min-h-[44px] w-full items-center justify-center rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950 transition hover:opacity-90"
           >
             OK
           </button>
@@ -212,7 +212,7 @@ function ListFormActions({ busy, onCancel }) {
       <button
         type="submit"
         disabled={busy}
-        className="inline-flex min-h-[40px] flex-1 items-center justify-center rounded-lg bg-neonTeal px-3 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50"
+        className="inline-flex min-h-[40px] flex-1 items-center justify-center rounded-lg btn-primary px-3 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50"
       >
         {busy ? "Listing…" : "List Card"}
       </button>

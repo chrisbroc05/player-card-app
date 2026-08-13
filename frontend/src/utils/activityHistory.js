@@ -17,15 +17,15 @@ export const ACTIVITY_META = {
     emoji: "🔄",
     label: "Trade Sent",
     shortLabel: "Sent",
-    badgeClass: "border-sky-400/40 bg-sky-500/15 text-sky-100",
-    iconWrapClass: "border-sky-400/35 bg-sky-500/15 text-sky-100",
+    badgeClass: "border-[var(--color-border-gold)] bg-gold-subtle text-brand-gold",
+    iconWrapClass: "border-[var(--color-border-gold)] bg-gold-subtle text-brand-gold",
   },
   trade_received: {
     emoji: "📥",
     label: "Trade Received",
     shortLabel: "Received",
-    badgeClass: "border-emerald-400/40 bg-emerald-500/15 text-emerald-100",
-    iconWrapClass: "border-emerald-400/35 bg-emerald-500/15 text-emerald-100",
+    badgeClass: "border-[var(--color-success)]/40 bg-success-subtle text-success",
+    iconWrapClass: "border-[var(--color-success)]/35 bg-success-subtle text-success",
   },
   marketplace_sold: {
     emoji: "💰",
@@ -59,8 +59,8 @@ export const ACTIVITY_META = {
     emoji: "🃏",
     label: "Card Created",
     shortLabel: "Created",
-    badgeClass: "border-teal-400/40 bg-teal-500/15 text-teal-100",
-    iconWrapClass: "border-teal-400/35 bg-teal-500/15 text-teal-100",
+    badgeClass: "border-[var(--color-border-gold)] bg-gold-subtle text-brand-gold",
+    iconWrapClass: "border-[var(--color-border-gold)] bg-gold-subtle text-brand-gold",
   },
 };
 
@@ -89,8 +89,8 @@ const ACTIVITY_ROW_STYLES = {
   trade_sent: {
     label: "TRADE SENT",
     glyph: "→",
-    badgeStyle: { backgroundColor: "#2563eb", color: "#ffffff" },
-    labelColor: "#93c5fd",
+    badgeStyle: { backgroundColor: "var(--color-gold-primary)", color: "#ffffff" },
+    labelColor: "#E8C56A",
   },
   trade_received: {
     label: "TRADE RECEIVED",
@@ -125,8 +125,8 @@ const ACTIVITY_ROW_STYLES = {
   card_created: {
     label: "CARD CREATED",
     glyph: "★",
-    badgeStyle: { backgroundColor: "#0d9488", color: "#ffffff" },
-    labelColor: "#5eead4",
+    badgeStyle: { backgroundColor: "var(--color-gold-primary)", color: "#0a0a0a" },
+    labelColor: "#E8C56A",
   },
 };
 
@@ -272,7 +272,7 @@ export function marketplaceSoldAmountDisplay(item) {
   const net = Math.max(0, Math.round((gross - fee) * 100) / 100);
   return {
     text: `+${formatMoney(net)} received`,
-    className: "text-emerald-300",
+    className: "text-success",
     subtext: `Sale price ${formatMoney(gross)} — ${platformRoyaltyPercentLabel()} platform fee (${formatMoney(fee)})`,
     subtextClassName: "text-[11px] leading-tight text-slate-500",
   };
@@ -292,7 +292,7 @@ export function amountDisplay(item) {
     || type === "highlight_upgrade"
   ) {
     if (!Number.isFinite(raw) || raw === 0) {
-      return { text: "Free", className: "text-emerald-300" };
+      return { text: "Free", className: "text-success" };
     }
     return { text: `-${formatMoney(Math.abs(raw))}`, className: "text-rose-300" };
   }

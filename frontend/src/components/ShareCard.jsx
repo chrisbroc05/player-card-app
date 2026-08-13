@@ -73,7 +73,7 @@ function ShareToast({ message }) {
   return (
     <div
       role="status"
-      className="pointer-events-none fixed bottom-6 left-1/2 z-[100] max-w-[90vw] -translate-x-1/2 rounded-xl border border-emerald-400/40 bg-slate-950/95 px-4 py-2.5 text-center text-sm font-medium text-emerald-100 shadow-2xl shadow-black/50 backdrop-blur-md"
+      className="pointer-events-none fixed bottom-6 left-1/2 z-[100] max-w-[90vw] -translate-x-1/2 rounded-xl border border-[var(--color-success)]/40 bg-slate-950/95 px-4 py-2.5 text-center text-sm font-medium text-success shadow-2xl shadow-black/50 backdrop-blur-md"
     >
       {message}
     </div>
@@ -156,7 +156,7 @@ function ShareActionButtons({
     <div>
       <div className={wrap}>
         <button type="button" className={btnBase} onClick={copyLink}>
-          <Link2 className="h-5 w-5 text-cyan-200/90" strokeWidth={2} />
+          <Link2 className="h-5 w-5 text-brand-gold/90" strokeWidth={2} />
           <span>Copy link</span>
         </button>
         {socialSharingEnabled ? (
@@ -183,7 +183,7 @@ function ShareActionButtons({
         ) : null}
         {allowDownload ? (
           <button type="button" className={btnBase} onClick={downloadImage} disabled={downloading || !imgPath}>
-            <Download className="h-5 w-5 text-teal-200/90" strokeWidth={2} />
+            <Download className="h-5 w-5 text-brand-gold/90" strokeWidth={2} />
             <span>{downloading ? "Downloading..." : "Download"}</span>
           </button>
         ) : null}
@@ -249,7 +249,7 @@ export function CardSharePopover({ card, isOwner = true }) {
         type="button"
         aria-label="Share card"
         aria-expanded={open}
-        className="rounded-full border border-white/20 bg-black/55 p-2 text-white shadow-lg backdrop-blur-sm transition hover:border-cyan-400/50 hover:bg-black/75"
+        className="rounded-full border border-white/20 bg-black/55 p-2 text-white shadow-lg backdrop-blur-sm transition hover:border-[var(--color-border-gold)] hover:bg-black/75"
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();

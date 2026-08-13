@@ -5,7 +5,7 @@ export default function CollectionToast({ message, variant = "success" }) {
   const styles =
     variant === "error"
       ? "border-rose-400/40 text-rose-100"
-      : "border-emerald-400/40 text-emerald-100";
+      : "border-[var(--color-success)]/40 text-success";
   return (
     <div
       role="status"

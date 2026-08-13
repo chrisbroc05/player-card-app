@@ -80,7 +80,7 @@ export function normalizeTierKey(tier) {
 
 export function offerStatusStyle(status) {
   const s = (status || "").toLowerCase();
-  if (s === "accepted") return "border-emerald-500/50 bg-emerald-500/15 text-emerald-200";
+  if (s === "accepted") return "border-[var(--color-success)]/50 bg-success-subtle text-success";
   if (s === "declined") return "border-rose-500/50 bg-rose-500/15 text-rose-200";
   if (s === "cancelled" || s === "expired") return "border-slate-500/50 bg-slate-500/15 text-slate-400";
   return "border-amber-500/50 bg-amber-500/15 text-amber-200";

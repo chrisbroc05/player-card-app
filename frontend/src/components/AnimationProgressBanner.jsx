@@ -16,7 +16,7 @@ export default function AnimationProgressBanner({ variant = "progress", message 
     <div
       className={`mt-2 rounded-lg border px-3 py-2 text-xs font-medium ${
         isSuccess
-          ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-100"
+          ? "border-[var(--color-success)]/40 bg-success-subtle text-success"
           : isFailed
             ? "border-rose-400/35 bg-rose-500/10 text-rose-100"
             : "animation-banner-pulse border-violet-400/35 bg-violet-500/10 text-violet-100"

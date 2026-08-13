@@ -51,7 +51,7 @@ export default function MarketplaceCardGridItem({ listing, variant = "list", cur
             </span>
           ) : null}
         </div>
-        <p className="mt-2 px-0.5 text-center text-xs font-bold text-neonTeal">{formatMoney(listing.asking_price)}</p>
+        <p className="mt-2 px-0.5 text-center text-xs font-bold text-brand-gold">{formatMoney(listing.asking_price)}</p>
       </Link>
     );
   }
@@ -87,14 +87,14 @@ export default function MarketplaceCardGridItem({ listing, variant = "list", cur
         ) : null}
       </div>
       <div className="mt-3 flex flex-1 flex-col space-y-1.5 px-1">
-        <p className="text-lg font-bold text-neonTeal">{formatMoney(listing.asking_price)}</p>
+        <p className="text-lg font-bold text-brand-gold">{formatMoney(listing.asking_price)}</p>
         {listing.days_remaining != null && listing.listing_expires_at ? (
           <p className={`text-[11px] ${listingExpiresSubtextClass(listing.days_remaining)}`}>
             {listingExpiresLabel(listing.days_remaining)}
           </p>
         ) : null}
         <p className="text-xs text-slate-500">Listed by {listing.owner_display_name}</p>
-        <span className="mt-2 block rounded-lg border border-teal-500/35 bg-teal-500/10 py-2 text-center text-xs font-semibold text-neonTeal transition group-hover:bg-neonTeal/20 sm:opacity-0 sm:group-hover:opacity-100">
+        <span className="mt-2 block rounded-lg border bg-gold-subtle py-2 text-center text-xs font-semibold text-brand-gold transition group-hover:bg-[var(--color-gold-primary/20] sm:opacity-0 sm:group-hover:opacity-100">
           Make Offer
         </span>
       </div>

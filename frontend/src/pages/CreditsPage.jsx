@@ -324,11 +324,11 @@ export default function CreditsPage() {
       <main className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-8 text-center">
           <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Your balance</p>
-          <p className="mt-2 text-4xl font-bold tabular-nums text-neonTeal">{formatMoney(balance)}</p>
+          <p className="mt-2 text-4xl font-bold tabular-nums text-brand-gold">{formatMoney(balance)}</p>
         </div>
 
         {banner ? (
-          <div className="mb-6 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+          <div className="mb-6 rounded-xl border bg-success-subtle px-4 py-3 text-sm text-success">
             {banner}
           </div>
         ) : null}
@@ -362,8 +362,8 @@ export default function CreditsPage() {
                 }}
                 className={`min-h-[44px] rounded-xl border px-4 text-sm font-semibold transition ${
                   selectedAmount === amt
-                    ? "border-neonTeal bg-teal-500/20 text-neonTeal"
-                    : "border-white/15 text-slate-300 hover:border-teal-500/40"
+                    ? "border-[var(--color-gold-primary] marketplace-tab marketplace-tab--active"
+                    : "border-white/15 text-slate-300 hover:border-[var(--color-border-gold)]"
                 }`}
               >
                 ${amt}
@@ -405,7 +405,7 @@ export default function CreditsPage() {
             type="button"
             disabled={paymentsDisabled || checkoutBusy || !checkoutAmountValid}
             onClick={() => startCheckout(null)}
-            className="mt-5 min-h-[48px] w-full rounded-xl bg-neonTeal font-semibold text-slate-950 disabled:opacity-50"
+            className="mt-5 min-h-[48px] w-full rounded-xl btn-primary font-semibold text-slate-950 disabled:opacity-50"
           >
             {checkoutBusy ? "Redirecting to Stripe…" : loadCreditsButtonLabel}
           </button>
@@ -415,7 +415,7 @@ export default function CreditsPage() {
           <h2 className="text-lg font-semibold text-white">Withdraw Earnings</h2>
           {profileLoading ? (
             <div className="mt-6 flex justify-center py-6">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-neonTeal" />
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-[var(--color-gold-primary)]" />
             </div>
           ) : balance <= 0 ? (
             <p className="mt-3 text-sm text-slate-400">
@@ -425,7 +425,7 @@ export default function CreditsPage() {
             <>
               <p className="mt-1 text-sm text-slate-400">Transfer your credit balance to your connected bank account.</p>
               <p className="mt-4 text-xs font-medium uppercase tracking-wide text-slate-500">Available to withdraw</p>
-              <p className="mt-1 text-3xl font-bold tabular-nums text-neonTeal">{formatMoney(balance)}</p>
+              <p className="mt-1 text-3xl font-bold tabular-nums text-brand-gold">{formatMoney(balance)}</p>
 
               {withdrawError ? (
                 <div className="mt-4 rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
@@ -474,7 +474,7 @@ export default function CreditsPage() {
                 type="button"
                 disabled={paymentsDisabled || withdrawBusy || !withdrawValid}
                 onClick={openWithdrawConfirm}
-                className="mt-5 min-h-[48px] w-full rounded-xl bg-neonTeal font-semibold text-slate-950 disabled:opacity-50"
+                className="mt-5 min-h-[48px] w-full rounded-xl btn-primary font-semibold text-slate-950 disabled:opacity-50"
               >
                 {withdrawBusy ? "Processing withdrawal…" : "Withdraw to Bank"}
               </button>
@@ -489,7 +489,7 @@ export default function CreditsPage() {
               </p>
               <Link
                 to="/profile"
-                className="mt-5 flex min-h-[48px] w-full items-center justify-center rounded-xl border border-teal-500/40 bg-teal-500/10 font-semibold text-neonTeal"
+                className="mt-5 flex min-h-[48px] w-full items-center justify-center rounded-xl btn-primary font-semibold"
               >
                 Connect Bank Account
               </Link>
@@ -537,7 +537,7 @@ export default function CreditsPage() {
               </ul>
             ) : null}
             {giftRecipient ? (
-              <p className="mt-2 text-sm text-teal-200">
+              <p className="mt-2 text-sm text-brand-gold">
                 Gifting to: <span className="font-semibold text-white">{giftRecipient.display_name}</span>{" "}
                 <button
                   type="button"
@@ -562,7 +562,7 @@ export default function CreditsPage() {
               !checkoutAmountValid
             }
             onClick={() => startCheckout(giftRecipient?.id)}
-            className="mt-5 min-h-[48px] w-full rounded-xl border border-teal-500/40 bg-teal-500/10 font-semibold text-neonTeal disabled:opacity-50"
+            className="btn-primary mt-5 min-h-[48px] w-full font-semibold disabled:opacity-50"
           >
             {checkoutBusy ? "Redirecting to Stripe…" : "Gift Credits via Stripe"}
           </button>
@@ -572,7 +572,7 @@ export default function CreditsPage() {
           <h2 className="text-lg font-semibold text-white">Credit History</h2>
           {ledgerLoading ? (
             <div className="mt-6 flex justify-center py-8">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-neonTeal" />
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-[var(--color-gold-primary)]" />
             </div>
           ) : paymentsDisabled ? (
             <p className="mt-4 text-sm text-slate-500">History unavailable while payments are disabled.</p>
@@ -595,7 +595,7 @@ export default function CreditsPage() {
                         <p className="mt-1 text-xs text-slate-600">{formatLedgerDate(row.created_at)}</p>
                       </div>
                       <div className="text-right">
-                        <p className={`font-semibold tabular-nums ${positive ? "text-emerald-300" : "text-rose-300"}`}>
+                        <p className={`font-semibold tabular-nums ${positive ? "text-success" : "text-rose-300"}`}>
                           {positive ? "+" : ""}
                           {formatMoney(amt)}
                         </p>
@@ -646,7 +646,7 @@ export default function CreditsPage() {
                 type="button"
                 disabled={withdrawBusy}
                 onClick={submitWithdrawal}
-                className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-xl bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+                className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-xl btn-primary px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
               >
                 Confirm Withdrawal
               </button>
@@ -670,7 +670,7 @@ export default function CreditsPage() {
               Your withdrawal of {formatMoney(withdrawSuccessData.amount)} has been sent to your
               connected bank account.
             </p>
-            <p className="mt-4 text-center text-3xl font-bold tabular-nums text-neonTeal">
+            <p className="mt-4 text-center text-3xl font-bold tabular-nums text-brand-gold">
               {formatMoney(withdrawSuccessData.amount)}
             </p>
             <p className="mt-4 text-center text-xs leading-relaxed text-slate-500">
@@ -689,7 +689,7 @@ export default function CreditsPage() {
                 setWithdrawSuccessOpen(false);
                 setWithdrawSuccessData(null);
               }}
-              className="mt-6 min-h-[48px] w-full rounded-xl bg-neonTeal font-semibold text-slate-950"
+              className="mt-6 min-h-[48px] w-full rounded-xl btn-primary font-semibold text-slate-950"
             >
               Done
             </button>

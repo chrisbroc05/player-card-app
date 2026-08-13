@@ -15,14 +15,14 @@ export function vaultTierBadge(tier) {
     return {
       label: "All-Star",
       glow: "shadow-[0_0_26px_rgba(26,106,181,0.4)] border-[#1A6AB5]/50",
-      pill: "border-[#1A6AB5]/60 bg-[#1A6AB5]/15 text-blue-100",
+      pill: "border-[#1A6AB5]/60 bg-[#1A6AB5]/15 text-slate-200",
       accent: "#1A6AB5",
     };
   }
   return {
     label: "Rookie",
     glow: "shadow-[0_0_26px_rgba(74,138,26,0.4)] border-[#4A8A1A]/50",
-    pill: "border-[#4A8A1A]/60 bg-[#4A8A1A]/15 text-green-100",
+    pill: "border-[#4A8A1A]/60 bg-[#4A8A1A]/15 text-[var(--color-rookie)]",
     accent: "#4A8A1A",
   };
 }

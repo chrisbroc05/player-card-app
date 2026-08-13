@@ -68,7 +68,7 @@ export function ActivityHistoryCompactList({ items, loading }) {
   if (loading) {
     return (
       <div className="flex min-h-[120px] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-neonBlue" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-[var(--color-gold-primary)]" />
       </div>
     );
   }
@@ -234,7 +234,7 @@ export function ActivityHistorySection({
 
       {loading ? (
         <div className="activity-history__loading">
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/15 border-t-neonBlue" />
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/15 border-t-[var(--color-gold-primary)]" />
         </div>
       ) : total === 0 ? (
         <p className="activity-history__empty">{emptyMessage}</p>
@@ -281,7 +281,7 @@ export function ProfileActivityCompactList({ items, loading }) {
   if (loading) {
     return (
       <div className="profile-page__loading">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-neonBlue" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-[var(--color-gold-primary)]" />
       </div>
     );
   }
@@ -369,7 +369,7 @@ export function RecentActivitySection({ token, limit = 5 }) {
         <h2 className="text-lg font-semibold text-white">Recent Activity</h2>
         <Link
           to="/trades#activity-history"
-          className="text-sm font-medium text-neonTeal transition hover:text-teal-200"
+          className="text-sm font-medium text-brand-gold transition hover:text-brand-gold"
         >
           View Full History →
         </Link>
@@ -379,7 +379,7 @@ export function RecentActivitySection({ token, limit = 5 }) {
         <div className="mt-4 text-center sm:hidden">
           <Link
             to="/trades#activity-history"
-            className="inline-flex text-sm font-medium text-neonTeal transition hover:text-teal-200"
+            className="inline-flex text-sm font-medium text-brand-gold transition hover:text-brand-gold"
           >
             View Full History →
           </Link>

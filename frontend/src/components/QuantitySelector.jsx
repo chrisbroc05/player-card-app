@@ -188,7 +188,7 @@ export default function QuantitySelector({
       ) : null}
 
       {bulkMsg ? (
-        <p className="mt-3 text-center text-sm font-semibold text-neonTeal sm:text-left">{bulkMsg}</p>
+        <p className="mt-3 text-center text-sm font-semibold text-brand-gold sm:text-left">{bulkMsg}</p>
       ) : null}
 
       <div className="mt-3 rounded-lg border border-white/10 bg-cardBg/80 px-3 py-2.5 text-center text-sm sm:text-left">

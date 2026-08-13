@@ -236,7 +236,7 @@ export default function ProfilePage() {
 
         {loading ? (
           <div className="profile-page__loading">
-            <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/15 border-t-neonBlue" />
+            <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/15 border-t-[var(--color-gold-primary)]" />
           </div>
         ) : (
           <div className="profile-page__sections">
@@ -428,12 +428,12 @@ function ParentEmailSettings({ token, profile, onSaved }) {
       <button
         type="submit"
         disabled={saving}
-        className="min-h-[40px] rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+        className="min-h-[40px] rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
       >
         {saving ? "Saving…" : "Save"}
       </button>
       {error ? <p className="text-sm text-rose-300">{error}</p> : null}
-      {message ? <p className="text-sm text-emerald-300">{message}</p> : null}
+      {message ? <p className="text-sm text-success">{message}</p> : null}
     </form>
   );
 }
@@ -565,7 +565,7 @@ function PayoutSettings({ token, profile, loading, onProfileUpdate }) {
   if (connected) {
     return (
       <div className="space-y-4">
-        <span className="inline-flex rounded-full border border-emerald-500/40 bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-200">
+        <span className="inline-flex rounded-full border bg-success-subtle px-3 py-1 text-xs font-semibold text-success">
           Bank Account Connected
         </span>
         <p className="text-sm text-slate-400">
@@ -575,7 +575,7 @@ function PayoutSettings({ token, profile, loading, onProfileUpdate }) {
           type="button"
           disabled={busy}
           onClick={openDashboard}
-          className="min-h-[44px] rounded-xl border border-teal-500/40 bg-teal-500/10 px-4 text-sm font-semibold text-neonTeal disabled:opacity-50"
+          className="min-h-[44px] rounded-xl btn-secondary px-4 text-sm font-semibold disabled:opacity-50"
         >
           {busy ? "Opening…" : "Manage Payouts"}
         </button>
@@ -607,7 +607,7 @@ function PayoutSettings({ token, profile, loading, onProfileUpdate }) {
           type="button"
           disabled={busy}
           onClick={startOnboarding}
-          className="min-h-[44px] rounded-xl bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+          className="min-h-[44px] rounded-xl btn-primary px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
         >
           {busy ? "Redirecting…" : "Complete Verification"}
         </button>
@@ -625,7 +625,7 @@ function PayoutSettings({ token, profile, loading, onProfileUpdate }) {
         type="button"
         disabled={busy}
         onClick={startOnboarding}
-        className="min-h-[44px] rounded-xl bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+        className="min-h-[44px] rounded-xl btn-primary px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
       >
         {busy ? "Redirecting…" : "Connect Bank Account"}
       </button>

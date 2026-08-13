@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { formatMoney } from "../utils/marketplace";
 
 const WALLET_ICON = (
-  <svg className="h-4 w-4 text-neonTeal" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} aria-hidden>
+  <svg className="h-4 w-4 text-brand-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} aria-hidden>
     <path
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -14,15 +14,15 @@ const WALLET_ICON = (
 
 export default function StudioCreditBalance({ balance }) {
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-neonTeal/30 bg-neonTeal/10 px-4 py-3">
+    <div className="flex items-center gap-2 rounded-xl border border-[var(--color-gold-primary/30] bg-[var(--color-gold-primary/10] px-4 py-3">
       {WALLET_ICON}
       <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Balance</span>
-      <span className="text-sm font-bold tabular-nums text-neonTeal sm:text-base">{formatMoney(balance)}</span>
+      <span className="text-sm font-bold tabular-nums text-brand-gold sm:text-base">{formatMoney(balance)}</span>
       <Link
         to="/credits"
         target="_blank"
         rel="noreferrer"
-        className="ml-auto text-xs font-medium text-neonTeal underline decoration-neonTeal/40 underline-offset-2 hover:text-teal-200"
+        className="ml-auto text-xs font-medium text-brand-gold underline decoration-[var(--color-gold-primary/40] underline-offset-2 hover:text-brand-gold"
       >
         Add credits
       </Link>

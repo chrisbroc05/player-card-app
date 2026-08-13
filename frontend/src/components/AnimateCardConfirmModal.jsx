@@ -104,7 +104,7 @@ export default function AnimateCardConfirmModal({
                 your credit balance
               </p>
               <p className="text-slate-400">
-                Your balance: <span className="font-semibold text-neonTeal">{formatMoney(balance)}</span>
+                Your balance: <span className="font-semibold text-brand-gold">{formatMoney(balance)}</span>
               </p>
             </>
           )}
@@ -115,7 +115,7 @@ export default function AnimateCardConfirmModal({
             <p>{creditTopUpShortfallMessage(shortfall)}</p>
             <Link
               to="/credits"
-              className="mt-3 inline-flex min-h-[44px] w-full items-center justify-center rounded-xl bg-neonTeal px-4 text-sm font-semibold text-slate-950"
+              className="mt-3 inline-flex min-h-[44px] w-full items-center justify-center rounded-xl btn-primary px-4 text-sm font-semibold text-slate-950"
             >
               Add Credits
             </Link>

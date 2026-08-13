@@ -36,7 +36,7 @@ function TotalLine({ label, value, highlight = false, free = false }) {
       <span className="text-slate-300">{label}</span>
       <span
         className={`font-medium tabular-nums ${
-          free ? "text-emerald-300" : highlight ? "text-neonTeal" : "text-white"
+          free ? "text-success" : highlight ? "text-brand-gold" : "text-white"
         }`}
       >
         {value}
@@ -159,7 +159,7 @@ export default function GenerationCostSummary({
             <span className="font-semibold text-white">
               {phase === "confirm" ? "Total due on confirm" : "Total due now"}
             </span>
-            <span className="text-base font-bold tabular-nums text-neonTeal">
+            <span className="text-base font-bold tabular-nums text-brand-gold">
               {totalDue <= 0 ? "FREE" : formatMoney(totalDue)}
             </span>
           </div>
@@ -169,7 +169,7 @@ export default function GenerationCostSummary({
       {showBalance ? (
         <p className="mt-3 text-sm">
           Your credit balance:{" "}
-          <span className="font-semibold tabular-nums text-neonTeal">{formatMoney(balance)}</span>
+          <span className="font-semibold tabular-nums text-brand-gold">{formatMoney(balance)}</span>
         </p>
       ) : null}
 
@@ -184,7 +184,7 @@ export default function GenerationCostSummary({
             to="/credits"
             target="_blank"
             rel="noreferrer"
-            className="mt-3 inline-flex min-h-[40px] items-center justify-center rounded-lg bg-neonTeal px-4 py-2 text-sm font-semibold text-slate-950"
+            className="mt-3 inline-flex min-h-[40px] items-center justify-center rounded-lg btn-primary px-4 py-2 text-sm font-semibold text-slate-950"
           >
             Add Credits
           </Link>

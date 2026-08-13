@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 export default function StudioAuthGate({ onBackToTiers, backLabel = "← Back to tiers" }) {
   return (
-    <div className="rounded-2xl border border-neonBlue/30 bg-gradient-to-b from-neonBlue/10 to-cardBg2 p-6 text-center shadow-lg sm:p-8">
+    <div className="rounded-2xl border border-[var(--color-gold-bright/30] bg-gradient-to-b from-[var(--color-gold-bright/10] to-cardBg2 p-6 text-center shadow-lg sm:p-8">
       <p className="text-xs font-medium uppercase tracking-[0.2em] text-slate-400">Account required</p>
       <h3 className="mt-2 text-xl font-semibold text-white sm:text-2xl">Create your own card</h3>
       <p className="mx-auto mt-3 max-w-md text-sm text-slate-300">
@@ -13,7 +13,7 @@ export default function StudioAuthGate({ onBackToTiers, backLabel = "← Back to
       <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
         <Link
           to="/register"
-          className="inline-flex min-h-[46px] w-full max-w-xs items-center justify-center rounded-xl bg-neonTeal px-5 py-2.5 text-sm font-semibold text-slate-950 sm:w-auto"
+          className="inline-flex min-h-[46px] w-full max-w-xs items-center justify-center rounded-xl btn-primary px-5 py-2.5 text-sm font-semibold text-slate-950 sm:w-auto"
         >
           Sign up free
         </Link>

@@ -145,7 +145,7 @@ export default function NewCardCelebration({
             <button
               type="button"
               onClick={onViewCollection}
-              className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-neonTeal px-4 text-sm font-semibold text-slate-950 transition hover:opacity-90"
+              className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl btn-primary px-4 text-sm font-semibold text-slate-950 transition hover:opacity-90"
             >
               View in My Collection
             </button>

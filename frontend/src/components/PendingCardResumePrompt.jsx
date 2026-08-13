@@ -29,13 +29,13 @@ export default function PendingCardResumePrompt({
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
       <div
         ref={dialogRef}
-        className="scroll-focus-target w-full max-w-lg overflow-hidden rounded-2xl border border-neonTeal/35 bg-cardBg shadow-[0_0_60px_rgba(45,212,191,0.15)]"
+        className="scroll-focus-target w-full max-w-lg overflow-hidden rounded-2xl border border-[var(--color-border-gold)] bg-cardBg shadow-[0_0_60px_rgba(45,212,191,0.15)]"
         role="dialog"
         aria-labelledby="pending-card-title"
         aria-modal="true"
       >
-        <div className="border-b border-white/10 bg-gradient-to-r from-neonBlue/10 via-neonTeal/10 to-neonPurple/10 px-5 py-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-neonTeal">Unfinished card</p>
+        <div className="border-b border-white/10 bg-gradient-to-r from-[rgba(201,168,76,0.08)] via-[rgba(201,168,76,0.12)] to-neonPurple/10 px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-brand-gold">Unfinished card</p>
           <h2 id="pending-card-title" className="mt-1 text-xl font-semibold text-white">
             You have an unfinished card!
           </h2>
@@ -119,7 +119,7 @@ export default function PendingCardResumePrompt({
                 type="button"
                 onClick={onResume}
                 disabled={loading}
-                className="inline-flex min-h-[48px] flex-1 items-center justify-center rounded-xl bg-neonTeal px-4 py-2.5 text-sm font-semibold text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex min-h-[48px] flex-1 items-center justify-center rounded-xl btn-primary px-4 py-2.5 text-sm font-semibold text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? "Restoring..." : "Resume"}
               </button>

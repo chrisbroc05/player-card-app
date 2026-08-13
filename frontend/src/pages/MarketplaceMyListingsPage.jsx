@@ -323,7 +323,7 @@ export default function MarketplaceMyListingsPage() {
         ) : null}
         {initializing || loading ? (
           <div className="flex min-h-[200px] items-center justify-center">
-            <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/15 border-t-neonTeal" />
+            <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/15 border-t-[var(--color-gold-primary)]" />
           </div>
         ) : listings.length === 0 ? (
           <div className="my-listings-v2__empty">
@@ -599,7 +599,7 @@ function OfferReviewModal({
           <div className="offer-review-listing__details">
             <p className="text-base font-semibold text-white">{listing.player_name}</p>
             <p className="text-sm text-slate-400">{listing.team_name}</p>
-            <p className="mt-1 font-mono text-xs text-neonTeal/80">{listing.card_id}</p>
+            <p className="mt-1 font-mono text-xs text-brand-gold/80">{listing.card_id}</p>
             <p className="mt-2 text-sm text-amber-200">
               {offers.length} active offer{offers.length === 1 ? "" : "s"} (highest cash offer first)
             </p>
@@ -608,7 +608,7 @@ function OfferReviewModal({
 
         <ul className="mt-4 space-y-3">
           {declineNoticeOfferId ? (
-            <li className="rounded-lg border border-emerald-500/35 bg-emerald-500/10 px-3 py-2 text-sm font-medium text-emerald-200">
+            <li className="rounded-lg border bg-success-subtle px-3 py-2 text-sm font-medium text-success">
               Offer declined
             </li>
           ) : null}
@@ -631,7 +631,7 @@ function OfferReviewModal({
                       </>
                     ) : (
                       <>
-                        <p className="text-lg font-semibold text-neonTeal">{formatMoney(offer.offer_amount)}</p>
+                        <p className="text-lg font-semibold text-brand-gold">{formatMoney(offer.offer_amount)}</p>
                         <p className="text-xs text-slate-500">Royalty: {formatMoney(offer.royalty_amount)}</p>
                       </>
                     )}
@@ -646,7 +646,7 @@ function OfferReviewModal({
                 </div>
 
                 {offer.counter_status === "pending" ? (
-                  <div className="mt-3 rounded-lg border border-teal-500/25 bg-teal-500/10 px-3 py-2 text-sm text-teal-100">
+                  <div className="mt-3 rounded-lg border bg-gold-subtle px-3 py-2 text-sm text-brand-gold">
                     {isTrade ? (
                       <>
                         <p className="font-medium text-white">Counter sent — awaiting buyer response</p>
@@ -700,7 +700,7 @@ function OfferReviewModal({
                           type="button"
                           disabled={counterBusyId === offer.offer_id || (isTrade && counterTradeCardIds.length < 1)}
                           onClick={() => onSendCounter(offer)}
-                          className="min-h-[40px] rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+                          className="min-h-[40px] rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
                         >
                           {counterBusyId === offer.offer_id
                             ? "Sending…"
@@ -726,7 +726,7 @@ function OfferReviewModal({
                         type="button"
                         disabled={actionKey === `accept-${offer.offer_id}`}
                         onClick={() => onRequestAccept(offer, listing)}
-                        className="min-h-[40px] rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+                        className="min-h-[40px] rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
                       >
                         {actionKey === `accept-${offer.offer_id}` ? "Accepting…" : "Accept"}
                       </button>
@@ -797,7 +797,7 @@ function AcceptOfferConfirmModal({ open, payload, actionBusy, onBack, onConfirm 
               </p>
               <p className="text-slate-400">{platformRoyaltyPercentLabel()} platform fee ({formatMoney(fee)}) has been deducted</p>
               <p className="text-slate-300">
-                Net amount you receive: <span className="font-semibold text-neonTeal">{formatMoney(net)}</span>
+                Net amount you receive: <span className="font-semibold text-brand-gold">{formatMoney(net)}</span>
               </p>
             </>
           )}
@@ -816,7 +816,7 @@ function AcceptOfferConfirmModal({ open, payload, actionBusy, onBack, onConfirm 
           type="button"
           disabled={actionBusy}
           onClick={onConfirm}
-          className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+          className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
         >
           {actionBusy ? "Accepting…" : "Yes, Accept"}
         </button>
@@ -869,7 +869,7 @@ function AcceptOfferSuccessModal({ open, payload, onGoProfile, onBackListings })
   if (!open || !payload) return null;
   const { listing, isTrade, net, newBalance } = payload;
   return (
-    <MarketplaceModalShell open={open} zIndex={74} borderClass="border-emerald-500/30" ariaLabelledBy="accept-offer-success-title">
+    <MarketplaceModalShell open={open} zIndex={74} borderClass="border-[var(--color-success)]/30" ariaLabelledBy="accept-offer-success-title">
       <MarketplaceModalContent>
         <MarketplaceModalSuccessIcon />
         <h3 id="accept-offer-success-title" className="mt-4 text-center text-xl font-semibold text-white sm:text-2xl">
@@ -879,7 +879,7 @@ function AcceptOfferSuccessModal({ open, payload, onGoProfile, onBackListings })
           {isTrade ? "Card added to your collection" : `You received ${formatMoney(net)}`}
         </p>
         {newBalance != null ? (
-          <p className="mt-1 text-center text-[13px] text-neonTeal">
+          <p className="mt-1 text-center text-[13px] text-brand-gold">
             Current credit balance: {formatMoney(newBalance)}
           </p>
         ) : null}
@@ -895,7 +895,7 @@ function AcceptOfferSuccessModal({ open, payload, onGoProfile, onBackListings })
         <button
           type="button"
           onClick={onBackListings}
-          className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-neonTeal px-4 text-sm font-semibold text-slate-950"
+          className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950"
         >
           Back to My Listings
         </button>
