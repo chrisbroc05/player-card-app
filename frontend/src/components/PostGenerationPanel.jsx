@@ -36,7 +36,7 @@ export default function PostGenerationPanel({
 
   const imgSrc = toApiUrl(detail.image_url);
   const badge = vaultTierBadge(detail.tier);
-  const downloadName = detail.card_id ? `future-legends-${detail.card_id}.png` : "future-legends-card.png";
+  const downloadName = detail.card_id ? `prospect-legends-${detail.card_id}.png` : "prospect-legends-card.png";
   const showQty = Boolean(showQuantityFlow && isLoggedIn && token);
   const total = Number(detail.print_run) || completedQty || 1;
   const showAnimated = hasAnimatedVideo(detail) || isAnimatedCard(detail);

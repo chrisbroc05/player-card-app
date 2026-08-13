@@ -2,6 +2,7 @@ import React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { formatMoney } from "../utils/marketplace";
+import BrandLogo from "./BrandLogo";
 
 export default function AppHeader() {
   const location = useLocation();
@@ -21,41 +22,27 @@ export default function AppHeader() {
     navigate("/login", { replace: true });
   }
 
+  function navClass(active) {
+    return `app-nav-link px-3 py-2 text-xs font-medium sm:text-sm ${active ? "app-nav-link--active" : ""}`;
+  }
+
   return (
-    <header className="border-b border-white/10 bg-cardBg/50 backdrop-blur">
+    <header className="app-header backdrop-blur">
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
-        <Link to="/" className="text-left transition hover:opacity-90">
-          <p className="text-[10px] font-medium uppercase tracking-[0.25em] text-slate-500">Future Legends</p>
-          <h1 className="text-lg font-semibold tracking-tight text-white sm:text-xl">
-            Card<span className="text-neonBlue">Studio</span>
-          </h1>
+        <Link to="/" className="transition hover:opacity-90" aria-label="Prospect Legends home">
+          <BrandLogo />
         </Link>
         <nav className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
-          <Link
-            to="/"
-            className={`rounded-lg px-3 py-2 text-xs font-medium transition sm:text-sm ${
-              onStudio ? "bg-neonBlue/20 text-neonBlue" : "text-slate-400 hover:text-white"
-            }`}
-          >
+          <Link to="/" className={navClass(onStudio)}>
             Studio
           </Link>
           {!initializing && !user ? (
-            <Link
-              to="/my-collection"
-              className={`rounded-lg px-3 py-2 text-xs font-medium transition sm:text-sm ${
-                onVault && !onMarketplace ? "bg-violet-500/20 text-violet-200" : "text-slate-400 hover:text-white"
-              }`}
-            >
+            <Link to="/my-collection" className={navClass(onVault && !onMarketplace)}>
               Vault
             </Link>
           ) : null}
           {!initializing ? (
-            <Link
-              to="/marketplace"
-              className={`relative rounded-lg px-3 py-2 text-xs font-medium transition sm:text-sm ${
-                onMarketplace ? "bg-teal-500/20 text-neonTeal" : "text-slate-400 hover:text-white"
-              }`}
-            >
+            <Link to="/marketplace" className={`relative ${navClass(onMarketplace)}`}>
               Free Agency Marketplace
               {user && pendingIncomingMarketplaceCount > 0 ? (
                 <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[#ef4444] px-1 text-[10px] font-bold leading-none text-white shadow-sm">
@@ -66,20 +53,10 @@ export default function AppHeader() {
           ) : null}
           {!initializing && user ? (
             <>
-              <Link
-                to="/my-collection"
-                className={`rounded-lg px-3 py-2 text-xs font-medium transition sm:text-sm ${
-                  onMyCollection ? "bg-violet-500/20 text-violet-200" : "text-slate-400 hover:text-white"
-                }`}
-              >
+              <Link to="/my-collection" className={navClass(onMyCollection)}>
                 My Collection
               </Link>
-              <Link
-                to="/trades"
-                className={`relative rounded-lg px-3 py-2 text-xs font-medium transition sm:text-sm ${
-                  onTrades ? "bg-amber-500/20 text-amber-100" : "text-slate-400 hover:text-white"
-                }`}
-              >
+              <Link to="/trades" className={`relative ${navClass(onTrades)}`}>
                 Trades
                 {pendingIncomingTradesCount > 0 ? (
                   <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[#ef4444] px-1 text-[10px] font-bold leading-none text-white shadow-sm">
@@ -89,10 +66,8 @@ export default function AppHeader() {
               </Link>
               <Link
                 to="/credits"
-                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition sm:text-sm ${
-                  onCredits
-                    ? "border-teal-500/40 bg-teal-500/15 text-neonTeal"
-                    : "border-white/15 text-slate-300 hover:border-teal-500/30 hover:text-white"
+                className={`credit-badge inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition sm:text-sm ${
+                  onCredits ? "surface-card--selected" : ""
                 }`}
                 title="Your credit balance"
               >
@@ -107,32 +82,22 @@ export default function AppHeader() {
               </Link>
               <Link
                 to="/profile"
-                className={`inline-flex max-w-[140px] truncate text-xs text-slate-300 underline decoration-transparent underline-offset-2 transition hover:text-white hover:decoration-white/40 sm:max-w-[200px] ${
+                className={`inline-flex max-w-[140px] truncate text-xs text-[var(--color-text-secondary)] underline decoration-transparent underline-offset-2 transition hover:text-white hover:decoration-white/40 sm:max-w-[200px] ${
                   onProfile ? "text-white decoration-white/30" : ""
                 }`}
               >
                 {user.display_name}
               </Link>
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="rounded-lg border border-white/15 px-3 py-2 text-xs font-medium text-slate-300 transition hover:border-white/30 hover:text-white sm:text-sm"
-              >
+              <button type="button" onClick={handleLogout} className="btn-secondary px-3 py-2 text-xs sm:text-sm">
                 Logout
               </button>
             </>
           ) : !initializing ? (
             <>
-              <Link
-                to="/register"
-                className="rounded-lg border border-white/15 px-3 py-2 text-xs font-medium text-slate-200 transition hover:border-neonTeal/40 hover:text-white sm:text-sm"
-              >
+              <Link to="/register" className="btn-secondary px-3 py-2 text-xs sm:text-sm">
                 Sign Up
               </Link>
-              <Link
-                to="/login"
-                className="rounded-lg bg-neonBlue/90 px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-neonBlue sm:text-sm"
-              >
+              <Link to="/login" className="btn-primary inline-flex px-3 py-2 text-xs sm:text-sm">
                 Login
               </Link>
             </>

@@ -74,7 +74,7 @@ export default function AnimationLoadingScreen({
     try {
       if (navigator.share) {
         await navigator.share({
-          title: "My Future Legends animated card",
+          title: "My Prospect Legends animated card",
           url: cardShareUrl,
         });
         return;

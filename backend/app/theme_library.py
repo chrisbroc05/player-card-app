@@ -1,5 +1,5 @@
 """
-Future Legends theme library: categories, theme metadata, and AI prompt modifiers.
+Prospect Legends theme library: categories, theme metadata, and AI prompt modifiers.
 """
 
 from __future__ import annotations

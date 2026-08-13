@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import { useNavigate } from "react-router-dom";
 import AppFooter from "../components/AppFooter";
+import BrandLogo from "../components/BrandLogo";
 import { ADMIN_TOKEN_STORAGE_KEY, API_BASE_URL, adminHeaders } from "../config/api";
 import { motionLabel } from "../constants/animationMotions";
 import { formatMoney, platformRoyaltyPercentLabel } from "../utils/marketplace";
@@ -814,17 +815,15 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-appBg text-slate-100">
-      <header className="border-b border-white/10 bg-cardBg/80 backdrop-blur">
+      <header className="app-header backdrop-blur">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
-          <div>
-            <p className="text-[10px] font-medium uppercase tracking-[0.25em] text-slate-500">Future Legends</p>
-            <h1 className="text-lg font-semibold text-white sm:text-xl">Future Legends Admin</h1>
+          <div className="flex items-center gap-3">
+            <BrandLogo compact />
+            <div>
+              <h1 className="text-lg font-semibold text-white sm:text-xl admin-accent">Prospect Legends Admin</h1>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={logoutAdmin}
-            className="rounded-lg border border-white/15 px-4 py-2 text-sm font-medium text-slate-200 hover:border-white/30 hover:text-white"
-          >
+          <button type="button" onClick={logoutAdmin} className="btn-secondary px-4 py-2 text-sm font-medium">
             Logout
           </button>
         </div>
@@ -841,8 +840,8 @@ export default function AdminDashboard() {
               onClick={() => setTab(t.id)}
               className={`rounded-t-lg px-4 py-2 text-sm font-medium transition ${
                 tab === t.id
-                  ? "bg-neonBlue/20 text-neonBlue"
-                  : "text-slate-400 hover:bg-white/5 hover:text-white"
+                  ? "border-b-2 border-[var(--color-gold-primary)] bg-[rgba(201,168,76,0.12)] text-[var(--color-text-gold)]"
+                  : "text-slate-400 hover:bg-white/5 hover:text-[var(--color-text-gold)]"
               }`}
             >
               {t.label}

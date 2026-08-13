@@ -14,7 +14,7 @@ function buildFallbackShareText(card) {
   const label = vaultTierBadge(card?.tier).label;
   const tag = tierShareHashtagKey(card?.tier);
   const name = card?.player_name || "Player";
-  return `Check out my ${label} Future Legends card for ${name}! #${tag}Card #FutureLegends #YouthBaseball`;
+  return `Check out my ${label} Prospect Legends card for ${name}! #${tag}Card #ProspectLegends #YouthBaseball`;
 }
 
 export async function fetchCardShareMeta(cardId) {
@@ -127,7 +127,7 @@ function ShareActionButtons({
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `future-legends-${cardId}.png`;
+      a.download = `prospect-legends-${cardId}.png`;
       a.rel = "noopener";
       document.body.appendChild(a);
       a.click();

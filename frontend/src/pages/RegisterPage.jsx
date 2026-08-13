@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
+import BrandLogo from "../components/BrandLogo";
 import { useAuth } from "../context/AuthContext";
 import { API_BASE_URL } from "../config/api";
 
@@ -84,25 +85,27 @@ export default function RegisterPage() {
     <div className="min-h-screen overflow-x-hidden bg-appBg text-slate-100">
       <AppHeader />
       <main className="mx-auto flex min-h-[calc(100vh-8rem)] max-w-lg flex-col justify-center px-4 py-12 sm:px-6">
-        <div className="rounded-2xl border border-white/10 bg-cardBg p-6 shadow-2xl shadow-black/40 sm:p-8">
-          <p className="text-center text-[10px] font-medium uppercase tracking-[0.3em] text-slate-500">Future Legends</p>
-          <h1 className="mt-2 text-center text-2xl font-semibold text-white">Create your account</h1>
+        <div className="surface-card p-6 shadow-2xl sm:p-8">
+          <div className="flex justify-center">
+            <BrandLogo />
+          </div>
+          <h1 className="mt-4 text-center text-2xl font-semibold text-white">Create your account</h1>
           <p className="mt-1 text-center text-sm text-slate-400">Create cards in the studio and keep them in your collection.</p>
 
           {betaMode ? (
             <div
               className="mt-8 rounded-lg border text-[13px] leading-snug"
               style={{
-                backgroundColor: "#1a1200",
-                borderColor: "#f59e0b",
-                color: "#f59e0b",
+                backgroundColor: "rgba(201,168,76,0.1)",
+                borderColor: "#C9A84C",
+                color: "#E8C56A",
                 padding: "12px 16px",
                 marginBottom: "20px",
               }}
               role="status"
             >
               {betaBannerMessage ||
-                "Future Legends is currently in private beta. You need an invite code to create an account."}
+                "Prospect Legends is currently in private beta. You need an invite code to create an account."}
             </div>
           ) : null}
 
@@ -194,7 +197,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={submitting || !betaLoaded}
-              className="min-h-[48px] w-full rounded-xl bg-neonTeal py-3 text-sm font-semibold text-slate-950 disabled:opacity-50"
+              className="btn-primary mt-6 min-h-[48px] w-full py-3 text-sm disabled:opacity-50"
             >
               {submitting ? "Creating account…" : !betaLoaded ? "Loading…" : "Sign Up"}
             </button>
@@ -202,7 +205,7 @@ export default function RegisterPage() {
 
           <p className="mt-6 text-center text-sm text-slate-400">
             Already have an account?{" "}
-            <Link to="/login" className="font-medium text-neonBlue hover:text-sky-200">
+            <Link to="/login" className="font-medium text-[var(--color-text-gold)] hover:text-[var(--color-text-gold-bright)]">
               Login
             </Link>
           </p>

@@ -151,7 +151,7 @@ export default function PackOpeningLoader({
         <div className={`pack-opening-pack ${phase === "anticipation" ? "pack-opening-pack--pulse" : "pack-opening-pack--enter"}`}>
           <div className="pack-opening-pack-shine" aria-hidden />
           <div className="pack-opening-pack-body">
-            <p className="pack-opening-brand">Future Legends</p>
+            <p className="pack-opening-brand">Prospect Legends</p>
             <p className="pack-opening-tier">{tierStyle.label}</p>
             <div className="pack-opening-seal" aria-hidden />
           </div>

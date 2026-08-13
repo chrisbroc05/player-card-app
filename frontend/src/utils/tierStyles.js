@@ -6,24 +6,24 @@ export function vaultTierBadge(tier) {
   if (key === "legends") {
     return {
       label: "Legends",
-      glow: "shadow-[0_0_28px_rgba(255,215,0,0.35)] border-amber-400/50",
-      pill: "border-amber-400/60 bg-amber-400/15 text-amber-100",
-      accent: "#ffd700",
+      glow: "shadow-[0_0_28px_rgba(201,168,76,0.4)] border-[#C9A84C]/50",
+      pill: "border-[#C9A84C]/60 bg-[#C9A84C]/15 text-[#E8C56A]",
+      accent: "#C9A84C",
     };
   }
   if (key === "allstar") {
     return {
       label: "All-Star",
-      glow: "shadow-[0_0_26px_rgba(0,170,255,0.35)] border-cyan-400/50",
-      pill: "border-cyan-400/60 bg-cyan-400/15 text-cyan-100",
-      accent: "#00aaff",
+      glow: "shadow-[0_0_26px_rgba(26,106,181,0.4)] border-[#1A6AB5]/50",
+      pill: "border-[#1A6AB5]/60 bg-[#1A6AB5]/15 text-blue-100",
+      accent: "#1A6AB5",
     };
   }
   return {
     label: "Rookie",
-    glow: "shadow-[0_0_26px_rgba(255,69,0,0.35)] border-orange-500/50",
-    pill: "border-orange-400/60 bg-orange-500/15 text-orange-100",
-    accent: "#ff4500",
+    glow: "shadow-[0_0_26px_rgba(74,138,26,0.4)] border-[#4A8A1A]/50",
+    pill: "border-[#4A8A1A]/60 bg-[#4A8A1A]/15 text-green-100",
+    accent: "#4A8A1A",
   };
 }
 

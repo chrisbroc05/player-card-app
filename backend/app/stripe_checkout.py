@@ -33,7 +33,7 @@ def create_credit_checkout_session(
 
     stripe.api_key = _stripe_secret_key()
     cents = int(amt * 100)
-    label = f"${amt:.2f} in Future Legends credits"
+    label = f"${amt:.2f} in Prospect Legends credits"
     base = frontend_url()
 
     metadata = {
@@ -51,7 +51,7 @@ def create_credit_checkout_session(
                     "currency": "usd",
                     "unit_amount": cents,
                     "product_data": {
-                        "name": "Future Legends Credits",
+                        "name": "Prospect Legends Credits",
                         "description": label,
                     },
                 },

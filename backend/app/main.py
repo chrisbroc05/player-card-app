@@ -1897,8 +1897,8 @@ def get_card_share_meta(card_id: str, db: Session = Depends(get_db)):
     tier_readable, tier_tag = _tier_share_labels(d.get("tier") or "")
     player_name = d.get("player_name") or "Player"
     share_text = (
-        f"Check out my {tier_readable} Future Legends card for {player_name}! "
-        f"#{tier_tag}Card #FutureLegends #YouthBaseball"
+        f"Check out my {tier_readable} Prospect Legends card for {player_name}! "
+        f"#{tier_tag}Card #ProspectLegends #YouthBaseball"
     )
     return CardShareMeta(
         card_id=d["card_id"],

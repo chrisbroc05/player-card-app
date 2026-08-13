@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
+import BrandLogo from "../components/BrandLogo";
 import AppFooter from "../components/AppFooter";
 import FeaturedCard from "../components/FeaturedCard";
 import CardImage from "../components/CardImage";
@@ -213,7 +214,7 @@ function WizardProgress({ currentStep, isAnimated, isHighlight, cardType, onGoTo
       </div>
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-neonBlue via-neonTeal to-neonBlue transition-all duration-300"
+          className="h-full rounded-full bg-gradient-to-r from-[#A8832A] via-[#C9A84C] to-[#E8C56A] transition-all duration-300"
           style={{ width: `${progressPct}%` }}
         />
       </div>
@@ -2247,7 +2248,26 @@ export default function StudioPage() {
       ) : null}
 
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-3 py-6 sm:gap-8 sm:px-6 sm:py-8 lg:px-8">
-        <section className="rounded-2xl border border-white/10 bg-cardBg p-3 shadow-xl shadow-black/30 sm:p-4">
+        {!inCreationFlow ? (
+          <section className="studio-hero">
+            <div className="relative z-[1] flex flex-col items-center gap-3">
+              <BrandLogo />
+              <h1 className="text-gradient-gold text-3xl font-bold tracking-tight sm:text-4xl">Prospect Legends</h1>
+              <p className="max-w-xl text-sm text-[var(--color-text-secondary)] sm:text-base">
+                Create premium digital collectible cards, build your collection, and trade on the marketplace.
+              </p>
+              {!user ? (
+                <Link
+                  to="/register"
+                  className="btn-primary mt-2 inline-flex min-h-[44px] items-center px-6 py-2.5 text-sm"
+                >
+                  Get Started
+                </Link>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
+        <section className="surface-card p-3 sm:p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold text-white">Card Creation Experience</h2>

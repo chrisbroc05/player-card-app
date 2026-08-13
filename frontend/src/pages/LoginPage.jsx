@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
+import BrandLogo from "../components/BrandLogo";
 import { API_BASE_URL, ADMIN_TOKEN_STORAGE_KEY } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 
@@ -78,9 +79,11 @@ export default function LoginPage() {
     <div className="min-h-screen overflow-x-hidden bg-appBg text-slate-100">
       <AppHeader />
       <main className="mx-auto flex min-h-[calc(100vh-8rem)] max-w-lg flex-col justify-center px-4 py-12 sm:px-6">
-        <div className="rounded-2xl border border-white/10 bg-cardBg p-6 shadow-2xl shadow-black/40 sm:p-8">
-          <p className="text-center text-[10px] font-medium uppercase tracking-[0.3em] text-slate-500">Future Legends</p>
-          <h1 className="mt-2 text-center text-2xl font-semibold text-white">
+        <div className="surface-card p-6 shadow-2xl sm:p-8">
+          <div className="flex justify-center">
+            <BrandLogo />
+          </div>
+          <h1 className="mt-4 text-center text-2xl font-semibold text-white">
             {adminMode ? "Admin Login" : "Welcome back"}
           </h1>
           <p className="mt-1 text-center text-sm text-slate-400">
@@ -134,7 +137,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="min-h-[48px] w-full rounded-xl bg-neonBlue py-3 text-sm font-semibold text-slate-950 disabled:opacity-50"
+              className="btn-primary mt-6 min-h-[48px] w-full py-3 text-sm disabled:opacity-50"
             >
               {submitting ? "Signing in…" : adminMode ? "Admin sign in" : "Login"}
             </button>
@@ -143,7 +146,7 @@ export default function LoginPage() {
           {!adminMode ? (
             <p className="mt-6 text-center text-sm text-slate-400">
               Don&apos;t have an account?{" "}
-              <Link to="/register" className="font-medium text-neonTeal hover:text-teal-200">
+              <Link to="/register" className="font-medium text-[var(--color-text-gold)] hover:text-[var(--color-text-gold-bright)]">
                 Sign up
               </Link>
             </p>

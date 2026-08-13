@@ -1,4 +1,4 @@
-"""Resend-powered transactional emails for Future Legends (trading flow)."""
+"""Resend-powered transactional emails for Prospect Legends (trading flow)."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ def _from_email() -> str:
     raw = (os.environ.get("FROM_EMAIL") or "onboarding@resend.dev").strip()
     if "<" in raw:
         return raw
-    return f"Future Legends <{raw}>"
+    return f"Prospect Legends <{raw}>"
 
 
 def _public_api_base() -> str:
@@ -63,7 +63,7 @@ def _tier_label(tier: str) -> str:
 def _tier_color(tier: str) -> str:
     t = (tier or "").lower()
     if t == "legends":
-        return "#ffd700"
+        return "#C9A84C"
     if t == "allstar":
         return "#00aaff"
     return "#ff4500"
@@ -98,10 +98,10 @@ def _email_shell(content_tables: str) -> str:
     <td align="center" bgcolor="{c}" style="padding:0;background-color:{c};">
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#111111" style="max-width:600px;width:100%;background-color:#111111;border:1px solid #2a2a2a;border-radius:12px;overflow:hidden;">
         <tr>
-          <td align="center" style="padding:30px;background:linear-gradient(135deg,#1a1a1a 0%,#2a2a2a 100%);border-bottom:2px solid #ffd700;">
+          <td align="center" style="padding:30px;background:linear-gradient(135deg,#1a1a1a 0%,#2a2a2a 100%);border-bottom:2px solid #C9A84C;">
             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
               <tr>
-                <td align="center" style="padding:0;font-size:28px;font-weight:900;color:#ffd700;letter-spacing:3px;text-transform:uppercase;line-height:1.2;">⚡ FUTURE LEGENDS</td>
+                <td align="center" style="padding:0;font-size:28px;font-weight:900;color:#C9A84C;letter-spacing:3px;text-transform:uppercase;line-height:1.2;">⚡ PROSPECT LEGENDS</td>
               </tr>
               <tr>
                 <td align="center" style="padding:6px 0 0 0;font-size:11px;color:#888888;letter-spacing:4px;text-transform:uppercase;line-height:1.4;">Digital Collectibles</td>
@@ -120,7 +120,7 @@ def _email_shell(content_tables: str) -> str:
           <td align="center" bgcolor="#0d0d0d" style="background-color:#0d0d0d;padding:24px 40px;border-top:1px solid #222222;">
             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
               <tr>
-                <td align="center" style="padding:0;font-size:12px;color:#555555;line-height:1.5;">Future Legends Digital Collectibles</td>
+                <td align="center" style="padding:0;font-size:12px;color:#555555;line-height:1.5;">Prospect Legends Digital Collectibles</td>
               </tr>
               <tr>
                 <td align="center" style="padding:4px 0 0 0;font-size:11px;color:#444444;line-height:1.5;">This is an automated message. Please do not reply.</td>
@@ -228,7 +228,7 @@ def _message_box(sender_name: str, trade_message: str) -> str:
     msg = html_module.escape(trade_message)
     inner = (
         '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" '
-        'style="background-color:#161616;border-left:3px solid #ffd700;border-radius:0 8px 8px 0;padding:0;margin:0 0 28px 0;">'
+        'style="background-color:#161616;border-left:3px solid #C9A84C;border-radius:0 8px 8px 0;padding:0;margin:0 0 28px 0;">'
         '<tr><td style="padding:16px 20px;font-size:14px;color:#cccccc;line-height:1.6;font-style:italic;">'
         f'<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">'
         f'<tr><td style="padding:0 0 8px 0;font-size:13px;color:#aaaaaa;font-style:normal;font-weight:600;">{sn} says:</td></tr>'
@@ -245,7 +245,7 @@ def _cta_button(href: str, label: str) -> str:
         '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">'
         '<tr><td align="center" style="padding:0;">'
         f'<a href="{esc_href}" style="display:inline-block;padding:14px 36px;'
-        "background:linear-gradient(135deg,#ffd700 0%,#ffaa00 100%);color:#000000;font-weight:800;font-size:15px;"
+        "background:linear-gradient(135deg,#C9A84C 0%,#E8C56A 100%);color:#000000;font-weight:800;font-size:15px;"
         'text-decoration:none;border-radius:8px;letter-spacing:1px;text-transform:uppercase;">'
         f"{esc_label}</a></td></tr></table>"
     )
@@ -347,7 +347,7 @@ def send_trade_offer_email(
         tier_word = html_module.escape(_tier_label(card_tier))
         tc = _tier_color(card_tier)
         sub_inner = (
-            f'{sn_plain} has sent you a <span style="color:{tc};font-weight:700;">{tier_word}</span> Future Legends card.<br />'
+            f'{sn_plain} has sent you a <span style="color:{tc};font-weight:700;">{tier_word}</span> Prospect Legends card.<br />'
             "Log in to accept or decline the offer."
         )
         parts = [
@@ -367,7 +367,7 @@ def send_trade_offer_email(
             ]
         )
         html = _email_shell("".join(parts))
-        subject = f"⚡ {sender_name} sent you a Future Legends card!"
+        subject = f"⚡ {sender_name} sent you a Prospect Legends card!"
         _send_resend_html(recipient_email, subject, html, trade_id, "trade_offer", parent_email=parent_email)
     except Exception as e:
         logger.error("Email failed for trade %s: %s", trade_id, e)
@@ -528,16 +528,16 @@ def send_marketplace_offer_received_email(
         player = html_module.escape(card_player_name)
         if is_card_trade:
             sub_inner = (
-                f"{bn} submitted a <span style=\"color:#ffd700;font-weight:700;\">Card Trade Offer</span> "
-                f"on your {player} card. View and respond in your Future Legends account."
+                f"{bn} submitted a <span style=\"color:#C9A84C;font-weight:700;\">Card Trade Offer</span> "
+                f"on your {player} card. View and respond in your Prospect Legends account."
             )
             heading = "New Card Trade Offer"
             subject = f"Card trade offer on your {card_player_name} card"
         else:
             amt = html_module.escape(_money_label(offer_amount))
             sub_inner = (
-                f"{bn} made an offer of <span style=\"color:#ffd700;font-weight:700;\">{amt}</span> "
-                f"on your {player} card. View and respond to the offer in your Future Legends account."
+                f"{bn} made an offer of <span style=\"color:#C9A84C;font-weight:700;\">{amt}</span> "
+                f"on your {player} card. View and respond to the offer in your Prospect Legends account."
             )
             heading = "New marketplace offer"
             subject = f"Someone wants your {card_player_name} card!"
@@ -577,7 +577,7 @@ def send_marketplace_offer_accepted_buyer_email(
         player = html_module.escape(card_player_name)
         if is_card_trade:
             sub_inner = (
-                f"Your <span style=\"color:#ffd700;font-weight:700;\">Card Trade Offer</span> for the "
+                f"Your <span style=\"color:#C9A84C;font-weight:700;\">Card Trade Offer</span> for the "
                 f"{player} card was accepted. The card is now in your collection."
             )
             trade_block = _trade_cards_email_block(trade_cards_summary)
@@ -585,7 +585,7 @@ def send_marketplace_offer_accepted_buyer_email(
         else:
             amt = html_module.escape(_money_label(offer_amount))
             sub_inner = (
-                f"Your offer of <span style=\"color:#ffd700;font-weight:700;\">{amt}</span> for the "
+                f"Your offer of <span style=\"color:#C9A84C;font-weight:700;\">{amt}</span> for the "
                 f"{player} card was accepted. The card is now in your collection."
             )
             trade_block = ""
@@ -648,7 +648,7 @@ def send_marketplace_sale_confirmed_seller_email(
             amt = html_module.escape(_money_label(offer_amount))
             sub_inner = (
                 f"Sale confirmed — {bn} purchased your {player} card for "
-                f"<span style=\"color:#ffd700;font-weight:700;\">{amt}</span>."
+                f"<span style=\"color:#C9A84C;font-weight:700;\">{amt}</span>."
             )
             trade_block = ""
             heading = "Sale confirmed"
@@ -678,7 +678,7 @@ def send_marketplace_sale_confirmed_seller_email(
             )
             else "",
             _divider(),
-            _cta_button(collection_url, "Open Future Legends →"),
+            _cta_button(collection_url, "Open Prospect Legends →"),
         ]
         html = _email_shell("".join(parts))
         _send_resend_html(seller_email, subject, html, offer_id, "marketplace_sale_confirmed", parent_email=parent_email)
@@ -706,7 +706,7 @@ def send_marketplace_offer_declined_email(
         player = html_module.escape(card_player_name)
         if is_card_trade:
             sub_inner = (
-                f"The owner declined your <span style=\"color:#ffd700;font-weight:700;\">Card Trade Offer</span> "
+                f"The owner declined your <span style=\"color:#C9A84C;font-weight:700;\">Card Trade Offer</span> "
                 f"for {player}. Your offered cards are available again in your collection."
             )
             trade_block = _trade_cards_email_block(trade_cards_summary)
@@ -714,7 +714,7 @@ def send_marketplace_offer_declined_email(
         else:
             amt = html_module.escape(_money_label(offer_amount))
             sub_inner = (
-                f"The owner declined your offer of <span style=\"color:#ffd700;font-weight:700;\">{amt}</span> "
+                f"The owner declined your offer of <span style=\"color:#C9A84C;font-weight:700;\">{amt}</span> "
                 f"for {player}. You can browse more cards on Free Agency Marketplace."
             )
             trade_block = ""
@@ -797,7 +797,7 @@ def send_marketplace_offer_expired_buyer_email(
         player = html_module.escape(card_player_name)
         amt = html_module.escape(_money_label(offer_amount))
         sub_inner = (
-            f"Your offer of <span style=\"color:#ffd700;font-weight:700;\">{amt}</span> on the "
+            f"Your offer of <span style=\"color:#C9A84C;font-weight:700;\">{amt}</span> on the "
             f"{player} card expired after 14 days without a response from the seller. "
             "You can make a new offer anytime on Free Agency Marketplace."
         )
@@ -832,7 +832,7 @@ def send_marketplace_counter_sent_buyer_email(
         player = html_module.escape(card_player_name)
         if is_card_trade:
             sub_inner = (
-                f"The seller sent a <span style=\"color:#ffd700;font-weight:700;\">Card Trade Counter</span> "
+                f"The seller sent a <span style=\"color:#C9A84C;font-weight:700;\">Card Trade Counter</span> "
                 f"on your offer for {player}. Log in to accept or decline."
             )
             trade_block = _trade_cards_email_block(trade_cards_summary)
@@ -843,8 +843,8 @@ def send_marketplace_counter_sent_buyer_email(
             orig = html_module.escape(_money_label(original_amount))
             ctr = html_module.escape(_money_label(counter_amount))
             sub_inner = (
-                f"You offered <span style=\"color:#ffd700;font-weight:700;\">{orig}</span> on the {player} card. "
-                f"The seller has countered with <span style=\"color:#ffd700;font-weight:700;\">{ctr}</span>. "
+                f"You offered <span style=\"color:#C9A84C;font-weight:700;\">{orig}</span> on the {player} card. "
+                f"The seller has countered with <span style=\"color:#C9A84C;font-weight:700;\">{ctr}</span>. "
                 "Log in to accept or decline the counter."
             )
             trade_block = ""
@@ -887,7 +887,7 @@ def send_marketplace_counter_accepted_seller_email(
         player = html_module.escape(card_player_name)
         if is_card_trade:
             sub_inner = (
-                f"Your <span style=\"color:#ffd700;font-weight:700;\">Card Trade Counter</span> for {player} "
+                f"Your <span style=\"color:#C9A84C;font-weight:700;\">Card Trade Counter</span> for {player} "
                 "was accepted. Cards have been transferred."
             )
             trade_block = _trade_cards_email_block(trade_cards_summary)
@@ -896,7 +896,7 @@ def send_marketplace_counter_accepted_seller_email(
         else:
             amt = html_module.escape(_money_label(counter_amount))
             sub_inner = (
-                f"Your counter of <span style=\"color:#ffd700;font-weight:700;\">{amt}</span> for {player} "
+                f"Your counter of <span style=\"color:#C9A84C;font-weight:700;\">{amt}</span> for {player} "
                 "was accepted. The card has been transferred to the buyer."
             )
             trade_block = ""
@@ -953,7 +953,7 @@ def send_marketplace_counter_declined_seller_email(
         player = html_module.escape(card_player_name)
         if is_card_trade:
             sub_inner = (
-                f"The buyer declined your <span style=\"color:#ffd700;font-weight:700;\">Card Trade Counter</span> "
+                f"The buyer declined your <span style=\"color:#C9A84C;font-weight:700;\">Card Trade Counter</span> "
                 f"on {player}. Offered and counter cards are available again."
             )
             trade_block = _trade_cards_email_block(trade_cards_summary)
@@ -962,7 +962,7 @@ def send_marketplace_counter_declined_seller_email(
         else:
             amt = html_module.escape(_money_label(counter_amount))
             sub_inner = (
-                f"The buyer declined your counter of <span style=\"color:#ffd700;font-weight:700;\">{amt}</span> "
+                f"The buyer declined your counter of <span style=\"color:#C9A84C;font-weight:700;\">{amt}</span> "
                 f"on {player}. The card remains listed on Free Agency Marketplace."
             )
             trade_block = ""
@@ -996,7 +996,7 @@ def send_withdrawal_confirmation_email(
         amt = html_module.escape(_money_label(withdrawal_amount))
         bal = html_module.escape(_money_label(new_credit_balance))
         sub_inner = (
-            f"A withdrawal of <span style=\"color:#ffd700;font-weight:700;\">{amt}</span> "
+            f"A withdrawal of <span style=\"color:#C9A84C;font-weight:700;\">{amt}</span> "
             "has been initiated to your connected bank account.<br><br>"
             "Funds typically arrive in 2-3 business days.<br><br>"
             f"Your new credit balance: <span style=\"color:#00ffcc;font-weight:700;\">{bal}</span>"
@@ -1006,7 +1006,7 @@ def send_withdrawal_confirmation_email(
             _subtext_html(sub_inner),
         ]
         html = _email_shell("".join(parts))
-        subject = "Your withdrawal is on the way — Future Legends"
+        subject = "Your withdrawal is on the way — Prospect Legends"
         _send_resend_html(
             user_email,
             subject,
@@ -1138,7 +1138,7 @@ def _numbered_steps(steps: list[str]) -> str:
         esc = html_module.escape(step)
         rows.append(
             f'<tr><td style="padding:0 0 10px 0;font-size:15px;color:#dddddd;line-height:1.5;">'
-            f'<span style="color:#ffd700;font-weight:700;margin-right:8px;">{i}.</span>{esc}</td></tr>'
+            f'<span style="color:#C9A84C;font-weight:700;margin-right:8px;">{i}.</span>{esc}</td></tr>'
         )
     inner = (
         '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" '
@@ -1174,15 +1174,15 @@ def send_welcome_email(
             _cta_button(studio_url, "Create Your First Card"),
             _divider(),
             _subtext_plain(
-                "Share your experience with friends using invite code: FUTURELEGENDS2026"
+                "Share your experience with friends using invite code: PROSPECTLEGENDS2026"
             ),
             _muted_center(
-                "You're receiving this because you created a Future Legends account. "
+                "You're receiving this because you created a Prospect Legends account. "
                 "To stop account emails, contact support."
             ),
         ]
         html = _email_shell("".join(parts))
-        subject = "Welcome to Future Legends! 🎉"
+        subject = "Welcome to Prospect Legends! 🎉"
         _send_resend_html(user_email, subject, html, 0, "welcome", parent_email=parent_email)
     except Exception as e:
         logger.error("Welcome email failed for %s: %s", user_email, e)

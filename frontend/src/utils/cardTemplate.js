@@ -16,30 +16,30 @@ export function tierFrameStyles(tier) {
   if (key === "legends") {
     return {
       key,
-      borderClass: "border-[3px] border-[#BA7517]",
-      glowClass: "shadow-[0_0_28px_rgba(186,117,23,0.45)] card-tier-legends-shimmer",
-      bgClass: "bg-gradient-to-b from-[#2a1f0a]/95 via-[#14120c] to-[#0a0908]",
+      borderClass: "border-[3px] border-[#C9A84C]",
+      glowClass: "shadow-[0_0_40px_rgba(201,168,76,0.5)] card-tier-legends-shimmer",
+      bgClass: "bg-gradient-to-b from-[#1a1408]/95 via-[#14120c] to-[#0a0908]",
       bannerClass: "from-[#1a1408] via-[#12100a] to-[#0c0b08]",
-      accentClass: "border-[#BA7517]/40",
+      accentClass: "border-[#C9A84C]/40",
     };
   }
   if (key === "allstar") {
     return {
       key,
-      borderClass: "border-2 border-[#185FA5]",
-      glowClass: "shadow-[0_0_24px_rgba(24,95,165,0.4)]",
+      borderClass: "border-2 border-[#1A6AB5]",
+      glowClass: "shadow-[0_0_20px_rgba(26,106,181,0.4)]",
       bgClass: "bg-gradient-to-b from-[#0c1a2e]/95 via-[#0a1018] to-[#06080c]",
       bannerClass: "from-[#0a1628] via-[#081018] to-[#060a10]",
-      accentClass: "border-[#185FA5]/40",
+      accentClass: "border-[#1A6AB5]/40",
     };
   }
   return {
     key,
-    borderClass: "border-2 border-[#3B6D11]",
-    glowClass: "shadow-[0_0_22px_rgba(59,109,17,0.38)]",
+    borderClass: "border-2 border-[#4A8A1A]",
+    glowClass: "shadow-[0_0_20px_rgba(74,138,26,0.4)]",
     bgClass: "bg-gradient-to-b from-[#0f1a0c]/95 via-[#0a1208] to-[#060806]",
     bannerClass: "from-[#0c160a] via-[#081008] to-[#060806]",
-    accentClass: "border-[#3B6D11]/40",
+    accentClass: "border-[#4A8A1A]/40",
   };
 }
 

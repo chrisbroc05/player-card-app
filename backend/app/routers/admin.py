@@ -986,7 +986,7 @@ def admin_withdraw_royalties(
             amount=amount_cents,
             currency="usd",
             description=(
-                f"Future Legends platform royalty withdrawal — {date_str} — ${amount_label}"
+                f"Prospect Legends platform royalty withdrawal — {date_str} — ${amount_label}"
             ),
             metadata={
                 "withdrawal_date": now.isoformat(),
