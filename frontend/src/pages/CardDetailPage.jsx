@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
@@ -127,6 +127,7 @@ export default function CardDetailPage() {
     () => (card ? normalizeCardForDisplay(card) : null),
     [card]
   );
+  const cardCaptureRef = useRef(null);
 
   const loadListingStatus = useCallback(async () => {
     if (!token || !card?.card_id || !isOwner) {
@@ -243,6 +244,7 @@ export default function CardDetailPage() {
                   }
                   protectMedia={!isOwner && isAnimatedCard(displayCard)}
                   token={token || ""}
+                  captureRef={cardCaptureRef}
                 />
               </CardDetailHero>
 
@@ -308,7 +310,7 @@ export default function CardDetailPage() {
                   </div>
                 ) : null}
 
-                <ShareCard card={displayCard} sectionTitle="Share This Card" isOwner={isOwner} />
+                <ShareCard card={displayCard} sectionTitle="Share This Card" isOwner={isOwner} captureRef={cardCaptureRef} />
 
                 {isOwner && displayCard?.face_photo_url ? (
                   <p className="mt-3 text-center text-xs text-slate-500 sm:text-left">

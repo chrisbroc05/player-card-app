@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { API_BASE_URL, authHeaders } from "../config/api";
 import { vaultTierBadge, rarityDisplay } from "../utils/tierStyles";
@@ -7,7 +7,7 @@ import ShareCard from "./ShareCard";
 import QuantitySelector from "./QuantitySelector";
 import { isAnimatedCard, hasAnimatedVideo } from "../utils/animationCard";
 import { isHighlightCard } from "../utils/highlightCard";
-import { downloadCardMedia, getCardDownloadTarget } from "../utils/downloadCardMedia";
+import { downloadCardMedia, isMobileDownloadDevice } from "../utils/downloadCardMedia";
 
 export default function PostGenerationPanel({
   detail,
@@ -20,6 +20,7 @@ export default function PostGenerationPanel({
   copyPricingTiers,
 }) {
   const navigate = useNavigate();
+  const cardCaptureRef = useRef(null);
   const [phase, setPhase] = useState("select");
   const [completedQty, setCompletedQty] = useState(1);
   const [qtyLoading, setQtyLoading] = useState(false);
@@ -38,7 +39,10 @@ export default function PostGenerationPanel({
   if (!detail?.image_url) return null;
 
   const badge = vaultTierBadge(detail.tier);
-  const canDownload = Boolean(getCardDownloadTarget(detail)?.url);
+  const canDownload = Boolean(detail?.card_id);
+  const isMobileShare = isMobileDownloadDevice();
+  const downloadLabel = isMobileShare ? "Share / Save to Photos" : "Download Card";
+  const downloadingLabel = isMobileShare ? "Sharing..." : "Downloading...";
   const showQty = Boolean(showQuantityFlow && isLoggedIn && token);
   const total = Number(detail.print_run) || completedQty || 1;
   const showAnimated = hasAnimatedVideo(detail) || isAnimatedCard(detail);
@@ -48,7 +52,7 @@ export default function PostGenerationPanel({
     setDownloadError("");
     setDownloading(true);
     try {
-      await downloadCardMedia(detail, token);
+      await downloadCardMedia(detail, { captureRef: cardCaptureRef });
     } catch (error) {
       console.error("Download failed:", error);
       setDownloadError("Download failed — please try again.");
@@ -126,6 +130,7 @@ export default function PostGenerationPanel({
             frameClassName="w-full"
             variant="detail"
             forcePlay={showAnimated || isHighlightCard(detail)}
+            captureRef={cardCaptureRef}
           />
         </div>
       </div>
@@ -174,12 +179,12 @@ export default function PostGenerationPanel({
               {downloading ? (
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand-gold/30 border-t-brand-gold" aria-hidden />
               ) : null}
-              {downloading ? "Downloading..." : "Download"}
+              {downloading ? downloadingLabel : downloadLabel}
             </button>
             {downloadError ? (
               <p className="text-center text-xs text-rose-200">{downloadError}</p>
             ) : null}
-            <ShareCard card={detail} sectionTitle="Share" />
+            <ShareCard card={detail} sectionTitle="Share" captureRef={cardCaptureRef} />
             <button
               type="button"
               onClick={() => (onViewCollection ? onViewCollection() : navigate("/my-collection"))}
@@ -203,7 +208,7 @@ export default function PostGenerationPanel({
               {downloading ? (
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand-gold/30 border-t-brand-gold" aria-hidden />
               ) : null}
-              {downloading ? "Downloading..." : "Download Card"}
+              {downloading ? downloadingLabel : downloadLabel}
             </button>
             {downloadError ? (
               <p className="w-full text-center text-xs text-rose-200 sm:order-last">{downloadError}</p>
@@ -218,7 +223,7 @@ export default function PostGenerationPanel({
               </button>
             ) : null}
           </div>
-          <ShareCard card={detail} sectionTitle="Share Your Card" />
+          <ShareCard card={detail} sectionTitle="Share Your Card" captureRef={cardCaptureRef} />
         </>
       ) : null}
     </div>

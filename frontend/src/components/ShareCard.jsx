@@ -1,10 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link2, Download, Instagram, Share2, X } from "lucide-react";
 import { API_BASE_URL } from "../config/api";
-import { useAuth } from "../context/AuthContext";
 import { useFeatures } from "../context/FeatureContext";
 import { vaultTierBadge, tierShareHashtagKey } from "../utils/tierStyles";
-import { downloadCardMedia, getCardDownloadTarget } from "../utils/downloadCardMedia";
+import { downloadCardMedia, isMobileDownloadDevice } from "../utils/downloadCardMedia";
 
 function buildClientCardUrl(card) {
   const slug = card?.shareable_slug || card?.card_id;
@@ -105,13 +104,22 @@ function ShareActionButtons({
   setIgHint,
   compact,
   allowDownload = true,
+  captureRef = null,
 }) {
-  const { token } = useAuth();
   const { socialSharingEnabled } = useFeatures();
   const cardUrl = resolved.card_url;
   const shareText = resolved.share_text;
-  const downloadTarget = getCardDownloadTarget(card);
-  const canDownload = Boolean(allowDownload && downloadTarget?.url);
+  const canDownload = Boolean(allowDownload && (card?.card_id || card?.cardId));
+  const isMobileShare = isMobileDownloadDevice();
+  const downloadLabel = compact
+    ? isMobileShare
+      ? "Share"
+      : "Download"
+    : isMobileShare
+      ? "Share / Save to Photos"
+      : "Download Card";
+  const downloadingLabel = isMobileShare ? "Sharing..." : "Downloading...";
+  const DownloadActionIcon = isMobileShare ? Share2 : Download;
 
   const twitterHref = useMemo(() => {
     const text = encodeURIComponent(shareText);
@@ -137,8 +145,12 @@ function ShareActionButtons({
     if (!canDownload) return;
     setDownloading(true);
     try {
-      await downloadCardMedia(card, token);
-      onCopyToast("Card downloaded successfully!");
+      const result = await downloadCardMedia(card, { captureRef });
+      if (result?.method === "share") {
+        onCopyToast("Card shared successfully!");
+      } else if (result?.method === "download") {
+        onCopyToast("Card downloaded successfully!");
+      }
     } catch (error) {
       console.error("Download failed:", error);
       onCopyToast("Download failed — please try again.", "error");
@@ -191,8 +203,8 @@ function ShareActionButtons({
         ) : null}
         {allowDownload ? (
           <button type="button" className={btnBase} onClick={downloadCard} disabled={downloading || !canDownload}>
-            {downloading ? <DownloadSpinner /> : <Download className="h-5 w-5 text-brand-gold/90" strokeWidth={2} />}
-            <span>{downloading ? "Downloading..." : "Download"}</span>
+            {downloading ? <DownloadSpinner /> : <DownloadActionIcon className="h-5 w-5 text-brand-gold/90" strokeWidth={2} />}
+            <span>{downloading ? downloadingLabel : downloadLabel}</span>
           </button>
         ) : null}
         {allowDownload && socialSharingEnabled && !compact ? (
@@ -222,7 +234,7 @@ function ShareActionButtons({
   );
 }
 
-export function CardSharePopover({ card, isOwner = true }) {
+export function CardSharePopover({ card, isOwner = true, captureRef = null }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
   const { resolved } = useShareMeta(card);
@@ -286,6 +298,7 @@ export function CardSharePopover({ card, isOwner = true }) {
             setIgHint={setIgHint}
             compact
             allowDownload={isOwner}
+            captureRef={captureRef}
           />
         </div>
       ) : null}
@@ -294,7 +307,7 @@ export function CardSharePopover({ card, isOwner = true }) {
   );
 }
 
-export default function ShareCard({ card, sectionTitle = "Share this card", isOwner = true }) {
+export default function ShareCard({ card, sectionTitle = "Share this card", isOwner = true, captureRef = null }) {
   const { error, resolved } = useShareMeta(card);
   const [toast, setToast] = useState("");
   const [toastVariant, setToastVariant] = useState("success");
@@ -328,6 +341,7 @@ export default function ShareCard({ card, sectionTitle = "Share this card", isOw
           setIgHint={setIgHint}
           compact={false}
           allowDownload={isOwner}
+          captureRef={captureRef}
         />
       </div>
       <ShareToast message={toast} variant={toastVariant} />

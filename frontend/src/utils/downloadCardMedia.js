@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "../config/api";
+import html2canvas from "html2canvas";
 import { isAnimatedCard } from "./animationCard";
 import { highlightVideoUrl, isHighlightCard } from "./highlightCard";
 
@@ -24,7 +24,7 @@ function inferExtensionFromUrl(url) {
   return ALLOWED_EXTENSIONS.has(ext) ? ext : null;
 }
 
-/** Pick the best media URL and extension for a card download. */
+/** Pick metadata used for download filenames (styled capture is always PNG). */
 export function getCardDownloadTarget(card) {
   if (!card) return null;
 
@@ -66,7 +66,7 @@ export function getCardDownloadTarget(card) {
   };
 }
 
-export function buildCardDownloadFilename(card, extension) {
+export function buildCardDownloadFilename(card, extension = "png") {
   const target = getCardDownloadTarget(card);
   const ext = (extension || target?.extension || "png").replace(/^\./, "");
   const name = sanitizeFilenamePart(target?.playerName ?? card?.player_name ?? card?.playerName);
@@ -74,13 +74,58 @@ export function buildCardDownloadFilename(card, extension) {
   return `${name}-${id}.${ext}`;
 }
 
-function filenameFromContentDisposition(header) {
-  if (!header) return null;
-  const match = header.match(/filename="([^"]+)"/);
-  return match?.[1] || null;
+export function isMobileDownloadDevice() {
+  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 }
 
-function triggerBlobDownload(blob, filename) {
+function resolveCaptureElement(card, { captureElement, captureRef } = {}) {
+  if (captureElement) return captureElement;
+  if (captureRef?.current) return captureRef.current;
+  const cardId = card?.card_id || card?.cardId;
+  if (cardId) {
+    const escaped = typeof CSS !== "undefined" && CSS.escape ? CSS.escape(cardId) : cardId;
+    return document.querySelector(`[data-card-capture-id="${escaped}"]`);
+  }
+  return document.querySelector(".card-display-container");
+}
+
+/** Replace playing videos with a still frame so html2canvas captures the current frame. */
+function snapshotVideosForCapture(root) {
+  const restores = [];
+  root.querySelectorAll("video").forEach((video) => {
+    try {
+      if (video.readyState < 2 || !video.videoWidth) return;
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.drawImage(video, 0, 0);
+      const img = document.createElement("img");
+      img.src = canvas.toDataURL("image/png");
+      img.className = video.className;
+      img.style.cssText = video.style.cssText;
+      const computed = window.getComputedStyle(video);
+      img.style.width = video.style.width || computed.width;
+      img.style.height = video.style.height || computed.height;
+      img.style.objectFit = computed.objectFit || "cover";
+      img.style.objectPosition = computed.objectPosition || "center";
+      const parent = video.parentNode;
+      if (!parent) return;
+      parent.insertBefore(img, video);
+      video.style.visibility = "hidden";
+      restores.push(() => {
+        video.style.visibility = "";
+        img.remove();
+      });
+    } catch (error) {
+      console.warn("Video snapshot failed:", error);
+    }
+  });
+  return () => restores.forEach((fn) => fn());
+}
+
+function fallbackDownload(blob, filename) {
   const blobUrl = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = blobUrl;
@@ -91,31 +136,73 @@ function triggerBlobDownload(blob, filename) {
   URL.revokeObjectURL(blobUrl);
 }
 
-/** Download card media via backend proxy (works on mobile; avoids R2 CORS). */
-export async function downloadCardMedia(card, token) {
-  const cardId = card?.card_id || card?.cardId;
-  if (!cardId) {
-    throw new Error("No downloadable media for this card.");
-  }
-  if (!token) {
-    throw new Error("Authentication required.");
-  }
-
-  const response = await fetch(`${API_BASE_URL}/cards/${encodeURIComponent(cardId)}/download`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Download failed (${response.status}).`);
+/**
+ * Capture the styled card DOM as PNG and download or share natively on mobile.
+ * @returns {Promise<{ method: 'share' | 'download' | 'cancelled' }>}
+ */
+export async function downloadCardMedia(card, { captureElement, captureRef } = {}) {
+  const cardElement = resolveCaptureElement(card, { captureElement, captureRef });
+  if (!cardElement) {
+    throw new Error("Card element not found");
   }
 
-  const blob = await response.blob();
-  const target = getCardDownloadTarget(card);
-  const filename =
-    filenameFromContentDisposition(response.headers.get("Content-Disposition")) ||
-    buildCardDownloadFilename(card, target?.extension);
+  const restoreVideos = snapshotVideosForCapture(cardElement);
 
-  triggerBlobDownload(blob, filename);
+  try {
+    const cardId = card?.card_id || card?.cardId;
+    const canvas = await html2canvas(cardElement, {
+      useCORS: true,
+      allowTaint: false,
+      backgroundColor: null,
+      scale: 2,
+      logging: false,
+      imageTimeout: 15000,
+      onclone: (clonedDoc) => {
+        const selector = cardId
+          ? `[data-card-capture-id="${typeof CSS !== "undefined" && CSS.escape ? CSS.escape(cardId) : cardId}"]`
+          : ".card-display-container";
+        const clonedCard = clonedDoc.querySelector(selector);
+        if (clonedCard) {
+          clonedCard.style.transform = "none";
+        }
+      },
+    });
+
+    const filename = buildCardDownloadFilename(card, "png");
+    const playerName = card?.player_name || card?.playerName || "Player";
+
+    return await new Promise((resolve, reject) => {
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          reject(new Error("Failed to create image"));
+          return;
+        }
+
+        const isMobile = isMobileDownloadDevice();
+        if (isMobile && typeof navigator.share === "function" && typeof File !== "undefined") {
+          try {
+            const file = new File([blob], filename, { type: "image/png" });
+            await navigator.share({
+              title: `${playerName} — Prospect Legends`,
+              text: "Check out my Prospect Legends card!",
+              files: [file],
+            });
+            resolve({ method: "share" });
+          } catch (shareError) {
+            if (shareError?.name === "AbortError") {
+              resolve({ method: "cancelled" });
+              return;
+            }
+            fallbackDownload(blob, filename);
+            resolve({ method: "download" });
+          }
+        } else {
+          fallbackDownload(blob, filename);
+          resolve({ method: "download" });
+        }
+      }, "image/png", 1.0);
+    });
+  } finally {
+    restoreVideos();
+  }
 }

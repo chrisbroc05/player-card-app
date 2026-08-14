@@ -13,25 +13,31 @@ import ThemeVideoIcon from "./ThemeVideoIcon";
 /**
  * Fixed trading card shell — frame, player media (72%), UI banner (28%).
  */
-export default function CardDisplay({
-  card,
-  children,
-  size = "default",
-  className = "",
-  showAnimatedBadge = false,
-  showHighlightBadge = false,
-  isHighlight = false,
-  inProgressOverlay = false,
-  inProgressLabel = "Animation in progress...",
-  inProgressTone = "border-violet-400/40 bg-violet-500/20 text-violet-100",
-  topRightSlot = null,
-}) {
+const CardDisplay = React.forwardRef(function CardDisplay(
+  {
+    card,
+    captureId,
+    children,
+    size = "default",
+    className = "",
+    showAnimatedBadge = false,
+    showHighlightBadge = false,
+    isHighlight = false,
+    inProgressOverlay = false,
+    inProgressLabel = "Animation in progress...",
+    inProgressTone = "border-violet-400/40 bg-violet-500/20 text-violet-100",
+    topRightSlot = null,
+  },
+  ref
+) {
   const meta = resolveCardDisplayMeta(card);
 
   if (!meta) {
     return (
       <div
-        className={`flex ${CARD_ASPECT_CLASS} w-full min-w-0 items-center justify-center rounded-[12px] border border-white/10 bg-slate-900/90 ${className}`}
+        ref={ref}
+        data-card-capture-id={captureId || undefined}
+        className={`card-display-container flex ${CARD_ASPECT_CLASS} w-full min-w-0 items-center justify-center rounded-[12px] border border-white/10 bg-slate-900/90 ${className}`}
       >
         {children || (
           <span className="px-3 text-center text-xs text-slate-500">Card preview unavailable</span>
@@ -65,7 +71,9 @@ export default function CardDisplay({
 
   return (
     <div
-      className={`card-shell relative flex w-full min-w-[210px] min-h-0 flex-col overflow-hidden ${shellRadiusClass} ${CARD_ASPECT_CLASS} ${frameClasses} ${className}`}
+      ref={ref}
+      data-card-capture-id={captureId || undefined}
+      className={`card-display-container card-shell relative flex w-full min-w-[210px] min-h-0 flex-col overflow-hidden ${shellRadiusClass} ${CARD_ASPECT_CLASS} ${frameClasses} ${className}`}
     >
       {!isHighlight && meta.themeOverlay ? (
         <div className={`pointer-events-none absolute inset-0 z-[4] ${meta.themeOverlay}`} aria-hidden />
@@ -134,4 +142,6 @@ export default function CardDisplay({
       </div>
     </div>
   );
-}
+});
+
+export default CardDisplay;

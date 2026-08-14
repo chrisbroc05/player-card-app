@@ -7,6 +7,10 @@ import {
 } from "../utils/themeOverlayColor";
 import { normalizeHighlightThemeKey } from "../utils/highlightCardStyles";
 
+function crossOriginMediaProps(src) {
+  return src && /^https?:\/\//i.test(String(src)) ? { crossOrigin: "anonymous" } : {};
+}
+
 /** Static player photo with the same tier background, tint, and theme icon as highlight/animated video. */
 export default function ThemedStaticPoster({
   src,
@@ -42,6 +46,7 @@ export default function ThemedStaticPoster({
         loading="lazy"
         decoding="async"
         onError={() => {}}
+        {...crossOriginMediaProps(src)}
         {...mediaProtectionProps}
       />
 
@@ -68,6 +73,7 @@ export default function ThemedStaticPoster({
         loading="lazy"
         decoding="async"
         onError={onError}
+        {...crossOriginMediaProps(src)}
         {...mediaProtectionProps}
       />
 
