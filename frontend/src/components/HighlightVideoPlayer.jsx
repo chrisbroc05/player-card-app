@@ -8,10 +8,6 @@ import {
 } from "../utils/themeOverlayColor";
 import { normalizeHighlightThemeKey } from "../utils/highlightCardStyles";
 
-function crossOriginMediaProps(src) {
-  return src && /^https?:\/\//i.test(String(src)) ? { crossOrigin: "anonymous" } : {};
-}
-
 function HighlightSoundToggle({ muted, onToggle, position = "left" }) {
   const positionClass = position === "right" ? "bottom-2 right-2" : "bottom-2 left-2";
   return (
@@ -109,7 +105,6 @@ function HighlightVideoPlayer({
         aria-hidden
         tabIndex={-1}
         onError={() => {}}
-        {...crossOriginMediaProps(videoSrc)}
         {...mediaProtectionProps}
       />
 
@@ -141,7 +136,6 @@ function HighlightVideoPlayer({
         preload="auto"
         aria-label={ariaLabel}
         onError={onError}
-        {...crossOriginMediaProps(videoSrc)}
         {...mediaProtectionProps}
       />
 

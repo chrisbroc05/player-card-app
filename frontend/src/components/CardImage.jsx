@@ -84,10 +84,6 @@ function HighlightProcessingPlaceholder() {
   );
 }
 
-function crossOriginMediaProps(src) {
-  return src && /^https?:\/\//i.test(String(src)) ? { crossOrigin: "anonymous" } : {};
-}
-
 function HighlightVideoUnavailable({ posterSrc, alt }) {
   return (
     <div className="flex h-full min-h-[80px] w-full flex-col items-center justify-center gap-2 bg-gradient-to-b from-slate-900 to-slate-950 p-4 text-center">
@@ -98,7 +94,6 @@ function HighlightVideoUnavailable({ posterSrc, alt }) {
           className="mb-2 max-h-[45%] max-w-full rounded object-contain opacity-80"
           loading="lazy"
           decoding="async"
-          {...crossOriginMediaProps(posterSrc)}
         />
       ) : (
         <span className="text-xl opacity-50" aria-hidden>
@@ -222,17 +217,13 @@ export default function CardImage({
         : useThemedAnimatedMedia && fields.playerPhotoUrl
           ? fields.playerPhotoUrl
           : fields.imageUrl;
-    const base = toApiUrl(posterSourceUrl);
-    if (!base || !cacheBust) return base;
-    const sep = base.includes("?") ? "&" : "?";
-    return `${base}${sep}cb=${encodeURIComponent(String(cacheBust))}`;
+    return toApiUrl(posterSourceUrl);
   }, [
     fields.imageUrl,
     fields.highlightThumbnailUrl,
     fields.playerPhotoUrl,
     highlightActive,
     useThemedAnimatedMedia,
-    cacheBust,
   ]);
 
   const publicVideoSrc = useMemo(() => {
@@ -541,7 +532,6 @@ export default function CardImage({
             decoding="async"
             onError={() => setImgFailed(true)}
             onLoad={handleImageLoad}
-            {...crossOriginMediaProps(imgSrc)}
             {...mediaProtectionProps}
           />
         </ProtectedMediaShell>
@@ -570,7 +560,6 @@ export default function CardImage({
                 decoding="async"
                 onError={() => setImgFailed(true)}
                 onLoad={handleImageLoad}
-                {...crossOriginMediaProps(imgSrc)}
                 {...mediaProtectionProps}
               />
             </ProtectedMediaShell>
