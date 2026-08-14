@@ -9,10 +9,13 @@ import tempfile
 import traceback
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import urlparse
 from uuid import uuid4
 
+import httpx
+
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
@@ -60,7 +63,7 @@ from marketplace_repo import cancel_pending_marketplace_offers_for_card
 from parent_email_utils import parent_email_for_notify
 from models import Card, MarketplaceOffer, TradeOffer, User, utcnow
 from utils.pika_video import fetch_pika_catalog_status, is_pika_configured, model_fallback_chain
-from utils.storage import app_data_root, content_type_for_filename, save_bytes_to_storage
+from utils.storage import app_data_root, content_type_for_filename, local_path_from_media_url, save_bytes_to_storage
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -632,6 +635,93 @@ def cleanup_failed_highlight_card(
         "card_id": deleted_id,
         "refunded": float(refund_amount),
     }
+
+
+def _sanitize_download_filename_part(value: str | None) -> str:
+    s = re.sub(r"[^\w\s-]", "", (value or "Player").strip())
+    s = re.sub(r"\s+", "-", s).strip("-")
+    return (s[:80] or "Player")
+
+
+def _download_target_for_card(card: Card) -> tuple[str, str, str]:
+    """Return (file_url, filename, media_type) for the card owner's download."""
+    base_name = f"{_sanitize_download_filename_part(card.player_name)}-{card.card_id}"
+
+    if card.is_animated and (card.animated_video_url or "").strip():
+        url = card.animated_video_url.strip()
+        return url, f"{base_name}.mp4", "video/mp4"
+    if card.is_highlight and (card.highlight_video_url or "").strip():
+        url = card.highlight_video_url.strip()
+        return url, f"{base_name}.mp4", "video/mp4"
+
+    url = (card.image_url or "").strip()
+    if not url:
+        return "", "", ""
+
+    ext = Path(urlparse(url).path).suffix.lower()
+    if ext in (".jpg", ".jpeg"):
+        return url, f"{base_name}.jpg", "image/jpeg"
+    if ext == ".webp":
+        return url, f"{base_name}.webp", "image/webp"
+    if ext == ".gif":
+        return url, f"{base_name}.gif", "image/gif"
+    return url, f"{base_name}.png", content_type_for_filename(url, "image/png")
+
+
+@router.get("/{card_id}/download")
+async def download_card(
+    card_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Stream card media for download — owners only (proxies R2 to avoid client CORS issues)."""
+    card = _resolve_card(db, card_id)
+    if card.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not own this card")
+
+    file_url, filename, media_type = _download_target_for_card(card)
+    if not file_url:
+        raise HTTPException(status_code=404, detail="No file found")
+
+    local = local_path_from_media_url(file_url)
+    if local is not None and local.is_file():
+        return FileResponse(str(local), media_type=media_type, filename=filename)
+
+    fetch_url = file_url
+    if not fetch_url.startswith("http://") and not fetch_url.startswith("https://"):
+        fetch_url = _absolute_image_url(file_url) or file_url
+    if not fetch_url.startswith("http://") and not fetch_url.startswith("https://"):
+        raise HTTPException(status_code=404, detail="No file found")
+
+    client = httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=30.0), follow_redirects=True)
+    try:
+        req = client.build_request("GET", fetch_url)
+        resp = await client.send(req, stream=True)
+        if resp.status_code >= 400:
+            await resp.aclose()
+            await client.aclose()
+            raise HTTPException(status_code=500, detail="Failed to fetch file")
+
+        async def iter_content():
+            try:
+                async for chunk in resp.aiter_bytes(8192):
+                    yield chunk
+            finally:
+                await resp.aclose()
+                await client.aclose()
+
+        headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+        content_length = resp.headers.get("content-length")
+        if content_length:
+            headers["Content-Length"] = content_length
+        return StreamingResponse(iter_content(), media_type=media_type, headers=headers)
+    except HTTPException:
+        await client.aclose()
+        raise
+    except Exception as exc:
+        await client.aclose()
+        logger.exception("Download failed for card %s: %s", card_id, exc)
+        raise HTTPException(status_code=500, detail="Failed to fetch file") from exc
 
 
 @router.get("/{card_id}/video")

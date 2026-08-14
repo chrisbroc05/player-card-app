@@ -1,4 +1,4 @@
-import { toApiUrl } from "../config/api";
+import { API_BASE_URL } from "../config/api";
 import { isAnimatedCard } from "./animationCard";
 import { highlightVideoUrl, isHighlightCard } from "./highlightCard";
 
@@ -74,30 +74,48 @@ export function buildCardDownloadFilename(card, extension) {
   return `${name}-${id}.${ext}`;
 }
 
-/** Fetch media as a blob and trigger a file download without window.open. */
-export async function downloadCardMedia(card) {
-  const target = getCardDownloadTarget(card);
-  if (!target?.url) {
+function filenameFromContentDisposition(header) {
+  if (!header) return null;
+  const match = header.match(/filename="([^"]+)"/);
+  return match?.[1] || null;
+}
+
+function triggerBlobDownload(blob, filename) {
+  const blobUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = blobUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(blobUrl);
+}
+
+/** Download card media via backend proxy (works on mobile; avoids R2 CORS). */
+export async function downloadCardMedia(card, token) {
+  const cardId = card?.card_id || card?.cardId;
+  if (!cardId) {
     throw new Error("No downloadable media for this card.");
   }
-
-  const src = toApiUrl(target.url);
-  if (!src) {
-    throw new Error("Invalid media URL.");
+  if (!token) {
+    throw new Error("Authentication required.");
   }
 
-  const response = await fetch(src, { mode: "cors" });
+  const response = await fetch(`${API_BASE_URL}/cards/${encodeURIComponent(cardId)}/download`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
   if (!response.ok) {
     throw new Error(`Download failed (${response.status}).`);
   }
 
   const blob = await response.blob();
-  const blobUrl = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = blobUrl;
-  link.download = buildCardDownloadFilename(card, target.extension);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(blobUrl);
+  const target = getCardDownloadTarget(card);
+  const filename =
+    filenameFromContentDisposition(response.headers.get("Content-Disposition")) ||
+    buildCardDownloadFilename(card, target?.extension);
+
+  triggerBlobDownload(blob, filename);
 }

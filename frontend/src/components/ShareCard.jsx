@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link2, Download, Instagram, Share2, X } from "lucide-react";
 import { API_BASE_URL } from "../config/api";
+import { useAuth } from "../context/AuthContext";
 import { useFeatures } from "../context/FeatureContext";
 import { vaultTierBadge, tierShareHashtagKey } from "../utils/tierStyles";
 import { downloadCardMedia, getCardDownloadTarget } from "../utils/downloadCardMedia";
@@ -105,6 +106,7 @@ function ShareActionButtons({
   compact,
   allowDownload = true,
 }) {
+  const { token } = useAuth();
   const { socialSharingEnabled } = useFeatures();
   const cardUrl = resolved.card_url;
   const shareText = resolved.share_text;
@@ -135,7 +137,7 @@ function ShareActionButtons({
     if (!canDownload) return;
     setDownloading(true);
     try {
-      await downloadCardMedia(card);
+      await downloadCardMedia(card, token);
       onCopyToast("Card downloaded successfully!");
     } catch (error) {
       console.error("Download failed:", error);
