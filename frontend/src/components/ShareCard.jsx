@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link2, Download, Instagram, Share2, X } from "lucide-react";
-import { API_BASE_URL, toApiUrl } from "../config/api";
+import { API_BASE_URL } from "../config/api";
 import { useFeatures } from "../context/FeatureContext";
 import { vaultTierBadge, tierShareHashtagKey } from "../utils/tierStyles";
+import { downloadCardMedia, getCardDownloadTarget } from "../utils/downloadCardMedia";
 
 function buildClientCardUrl(card) {
   const slug = card?.shareable_slug || card?.card_id;
@@ -68,19 +69,33 @@ function useShareMeta(card) {
   return { meta, error, resolved };
 }
 
-function ShareToast({ message }) {
+function ShareToast({ message, variant = "success" }) {
   if (!message) return null;
+  const tone =
+    variant === "error"
+      ? "border-rose-500/40 text-rose-100"
+      : "border-[var(--color-success)]/40 text-success";
   return (
     <div
       role="status"
-      className="pointer-events-none fixed bottom-6 left-1/2 z-[100] max-w-[90vw] -translate-x-1/2 rounded-xl border border-[var(--color-success)]/40 bg-slate-950/95 px-4 py-2.5 text-center text-sm font-medium text-success shadow-2xl shadow-black/50 backdrop-blur-md"
+      className={`pointer-events-none fixed bottom-6 left-1/2 z-[100] max-w-[90vw] -translate-x-1/2 rounded-xl border bg-slate-950/95 px-4 py-2.5 text-center text-sm font-medium shadow-2xl shadow-black/50 backdrop-blur-md ${tone}`}
     >
       {message}
     </div>
   );
 }
 
+function DownloadSpinner() {
+  return (
+    <span
+      className="h-4 w-4 animate-spin rounded-full border-2 border-brand-gold/30 border-t-brand-gold"
+      aria-hidden
+    />
+  );
+}
+
 function ShareActionButtons({
+  card,
   resolved,
   onCopyToast,
   downloading,
@@ -93,8 +108,8 @@ function ShareActionButtons({
   const { socialSharingEnabled } = useFeatures();
   const cardUrl = resolved.card_url;
   const shareText = resolved.share_text;
-  const imgPath = resolved.image_url;
-  const cardId = resolved.card_id || "card";
+  const downloadTarget = getCardDownloadTarget(card);
+  const canDownload = Boolean(allowDownload && downloadTarget?.url);
 
   const twitterHref = useMemo(() => {
     const text = encodeURIComponent(shareText);
@@ -112,36 +127,27 @@ function ShareActionButtons({
       await navigator.clipboard.writeText(cardUrl);
       onCopyToast("Link copied!");
     } catch {
-      onCopyToast("Copy failed — try the address bar.");
+      onCopyToast("Copy failed — try the address bar.", "error");
     }
   }
 
-  async function downloadImage() {
-    const src = toApiUrl(imgPath);
-    if (!src) return;
+  async function downloadCard() {
+    if (!canDownload) return;
     setDownloading(true);
     try {
-      const res = await fetch(src, { mode: "cors" });
-      if (!res.ok) throw new Error("fetch");
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `prospect-legends-${cardId}.png`;
-      a.rel = "noopener";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch {
-      window.open(src, "_blank", "noopener,noreferrer");
+      await downloadCardMedia(card);
+      onCopyToast("Card downloaded successfully!");
+    } catch (error) {
+      console.error("Download failed:", error);
+      onCopyToast("Download failed — please try again.", "error");
     } finally {
       setDownloading(false);
     }
   }
 
   async function instagramDownload() {
-    await downloadImage();
+    await downloadCard();
+    if (!canDownload) return;
     setIgHint(true);
     window.setTimeout(() => setIgHint(false), 4000);
   }
@@ -182,8 +188,8 @@ function ShareActionButtons({
           </a>
         ) : null}
         {allowDownload ? (
-          <button type="button" className={btnBase} onClick={downloadImage} disabled={downloading || !imgPath}>
-            <Download className="h-5 w-5 text-brand-gold/90" strokeWidth={2} />
+          <button type="button" className={btnBase} onClick={downloadCard} disabled={downloading || !canDownload}>
+            {downloading ? <DownloadSpinner /> : <Download className="h-5 w-5 text-brand-gold/90" strokeWidth={2} />}
             <span>{downloading ? "Downloading..." : "Download"}</span>
           </button>
         ) : null}
@@ -194,9 +200,9 @@ function ShareActionButtons({
               className={`${btnBase} w-full min-w-[4.5rem] bg-gradient-to-br from-[#833ab4]/25 via-[#fd1d1d]/20 to-[#fcb045]/20`}
               style={{ borderColor: "rgba(252,176,69,0.35)" }}
               onClick={instagramDownload}
-              disabled={downloading || !imgPath}
+              disabled={downloading || !canDownload}
             >
-              <Instagram className="h-5 w-5 text-pink-100" strokeWidth={2} />
+              {downloading ? <DownloadSpinner /> : <Instagram className="h-5 w-5 text-pink-100" strokeWidth={2} />}
               <span>Instagram</span>
             </button>
             {igHint ? (
@@ -219,6 +225,7 @@ export function CardSharePopover({ card, isOwner = true }) {
   const rootRef = useRef(null);
   const { resolved } = useShareMeta(card);
   const [toast, setToast] = useState("");
+  const [toastVariant, setToastVariant] = useState("success");
   const [downloading, setDownloading] = useState(false);
   const [igHint, setIgHint] = useState(false);
 
@@ -236,7 +243,8 @@ export function CardSharePopover({ card, isOwner = true }) {
     };
   }, [open]);
 
-  const showToast = useCallback((msg) => {
+  const showToast = useCallback((msg, variant = "success") => {
+    setToastVariant(variant);
     setToast(msg);
     window.setTimeout(() => setToast(""), 2000);
   }, []);
@@ -264,10 +272,11 @@ export function CardSharePopover({ card, isOwner = true }) {
           onClick={(e) => e.stopPropagation()}
         >
           <ShareActionButtons
+            card={card}
             resolved={resolved}
-            onCopyToast={(m) => {
-              showToast(m);
-              setOpen(false);
+            onCopyToast={(m, variant) => {
+              showToast(m, variant);
+              if (variant !== "error") setOpen(false);
             }}
             downloading={downloading}
             setDownloading={setDownloading}
@@ -278,7 +287,7 @@ export function CardSharePopover({ card, isOwner = true }) {
           />
         </div>
       ) : null}
-      <ShareToast message={toast} />
+      <ShareToast message={toast} variant={toastVariant} />
     </div>
   );
 }
@@ -286,10 +295,12 @@ export function CardSharePopover({ card, isOwner = true }) {
 export default function ShareCard({ card, sectionTitle = "Share this card", isOwner = true }) {
   const { error, resolved } = useShareMeta(card);
   const [toast, setToast] = useState("");
+  const [toastVariant, setToastVariant] = useState("success");
   const [downloading, setDownloading] = useState(false);
   const [igHint, setIgHint] = useState(false);
 
-  const showToast = useCallback((msg) => {
+  const showToast = useCallback((msg, variant = "success") => {
+    setToastVariant(variant);
     setToast(msg);
     window.setTimeout(() => setToast(""), 2000);
   }, []);
@@ -306,6 +317,7 @@ export default function ShareCard({ card, sectionTitle = "Share this card", isOw
           <p className="mb-3 text-center text-xs text-amber-200/90">Using on-page links — share server unavailable.</p>
         ) : null}
         <ShareActionButtons
+          card={card}
           resolved={resolved}
           onCopyToast={showToast}
           downloading={downloading}
@@ -316,7 +328,7 @@ export default function ShareCard({ card, sectionTitle = "Share this card", isOw
           allowDownload={isOwner}
         />
       </div>
-      <ShareToast message={toast} />
+      <ShareToast message={toast} variant={toastVariant} />
     </section>
   );
 }

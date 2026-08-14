@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { toApiUrl, API_BASE_URL, authHeaders } from "../config/api";
+import { API_BASE_URL, authHeaders } from "../config/api";
 import { vaultTierBadge, rarityDisplay } from "../utils/tierStyles";
 import CardImage from "./CardImage";
 import ShareCard from "./ShareCard";
 import QuantitySelector from "./QuantitySelector";
 import { isAnimatedCard, hasAnimatedVideo } from "../utils/animationCard";
 import { isHighlightCard } from "../utils/highlightCard";
+import { downloadCardMedia, getCardDownloadTarget } from "../utils/downloadCardMedia";
 
 export default function PostGenerationPanel({
   detail,
@@ -23,6 +24,8 @@ export default function PostGenerationPanel({
   const [completedQty, setCompletedQty] = useState(1);
   const [qtyLoading, setQtyLoading] = useState(false);
   const [qtyError, setQtyError] = useState("");
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState("");
 
   useEffect(() => {
     if (!detail?.card_id) return;
@@ -34,12 +37,25 @@ export default function PostGenerationPanel({
 
   if (!detail?.image_url) return null;
 
-  const imgSrc = toApiUrl(detail.image_url);
   const badge = vaultTierBadge(detail.tier);
-  const downloadName = detail.card_id ? `prospect-legends-${detail.card_id}.png` : "prospect-legends-card.png";
+  const canDownload = Boolean(getCardDownloadTarget(detail)?.url);
   const showQty = Boolean(showQuantityFlow && isLoggedIn && token);
   const total = Number(detail.print_run) || completedQty || 1;
   const showAnimated = hasAnimatedVideo(detail) || isAnimatedCard(detail);
+
+  async function handleDownload() {
+    if (!canDownload) return;
+    setDownloadError("");
+    setDownloading(true);
+    try {
+      await downloadCardMedia(detail);
+    } catch (error) {
+      console.error("Download failed:", error);
+      setDownloadError("Download failed — please try again.");
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   async function handleQuantityConfirm(quantity) {
     if (!detail?.card_id || !token) return;
@@ -149,13 +165,20 @@ export default function PostGenerationPanel({
               : `Card #1 of ${total} through Card #${total} of ${total}`}
           </p>
           <div className="flex flex-col gap-3">
-            <a
-              href={imgSrc}
-              download={downloadName}
-              className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl border bg-gold-subtle px-4 py-2.5 text-sm font-medium text-brand-gold"
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={downloading || !canDownload}
+              className="inline-flex min-h-[46px] w-full items-center justify-center gap-2 rounded-xl border bg-gold-subtle px-4 py-2.5 text-sm font-medium text-brand-gold disabled:opacity-50"
             >
-              Download
-            </a>
+              {downloading ? (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand-gold/30 border-t-brand-gold" aria-hidden />
+              ) : null}
+              {downloading ? "Downloading..." : "Download"}
+            </button>
+            {downloadError ? (
+              <p className="text-center text-xs text-rose-200">{downloadError}</p>
+            ) : null}
             <ShareCard card={detail} sectionTitle="Share" />
             <button
               type="button"
@@ -171,13 +194,20 @@ export default function PostGenerationPanel({
       {!showQty ? (
         <>
           <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-center">
-            <a
-              href={imgSrc}
-              download={downloadName}
-              className="inline-flex min-h-[46px] flex-1 items-center justify-center rounded-xl border bg-gold-subtle px-4 py-2.5 text-sm font-medium text-brand-gold sm:flex-none"
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={downloading || !canDownload}
+              className="inline-flex min-h-[46px] flex-1 items-center justify-center gap-2 rounded-xl border bg-gold-subtle px-4 py-2.5 text-sm font-medium text-brand-gold disabled:opacity-50 sm:flex-none"
             >
-              Download Card
-            </a>
+              {downloading ? (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand-gold/30 border-t-brand-gold" aria-hidden />
+              ) : null}
+              {downloading ? "Downloading..." : "Download Card"}
+            </button>
+            {downloadError ? (
+              <p className="w-full text-center text-xs text-rose-200 sm:order-last">{downloadError}</p>
+            ) : null}
             {isLoggedIn && onViewCollection ? (
               <button
                 type="button"
