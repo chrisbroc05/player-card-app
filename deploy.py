@@ -56,8 +56,10 @@ Backend on Render should also set:
   RUNWAY_API_KEY=
     Optional emergency fallback if all Pika models fail.
 
-Backend on Render: legacy media lived under APP_DATA_DIR (e.g. /var/render/data).
-New media uses R2 when configured; APP_DATA_DIR remains the local-dev fallback.
+Media storage: all production media is on Cloudflare R2 (R2_* env vars above).
+APP_DATA_DIR is no longer required on Render — it is only used for local dev
+when R2 is not configured. The Render persistent disk can be removed after
+running backend/scripts/migrate_to_r2.py.
 """
 
 from __future__ import annotations

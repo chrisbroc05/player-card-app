@@ -10,14 +10,13 @@ import httpx
 
 from services.runway_service import generate_animation as generate_runway_animation
 from utils.pika_video import generate_video_with_fallback, is_pika_configured
-from utils.storage import save_bytes_to_storage
+from utils.storage import app_data_root, save_bytes_to_storage
 
 logger = logging.getLogger(__name__)
 
 
 def _animations_dir() -> Path:
-    base = (os.environ.get("APP_DATA_DIR") or "").strip() or "./data"
-    return Path(base).expanduser().resolve() / "animations"
+    return app_data_root() / "animations"
 
 
 def _runway_configured() -> bool:

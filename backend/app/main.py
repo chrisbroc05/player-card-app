@@ -105,11 +105,10 @@ from theme_library import (  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
-# Image uploads (local disk; not linked to players yet)
+# Media storage paths (local dev fallback only — production uses Cloudflare R2)
 # ---------------------------------------------------------------------------
-# Generated cards → {APP_DATA_DIR}/cards/, uploads → {APP_DATA_DIR}/uploads/.
-# APP_DATA_DIR unset locally defaults to ./data (resolved from cwd). On Render,
-# set APP_DATA_DIR to your mounted disk (e.g. /var/render/data).
+# When R2 env vars are set, uploads go to R2 and StaticFiles mounts are disabled.
+# APP_DATA_DIR (default ./data) is only used for local development without R2.
 def _app_data_root() -> Path:
     base = (os.environ.get("APP_DATA_DIR") or "").strip() or "./data"
     return Path(base).expanduser().resolve()
@@ -131,7 +130,8 @@ def _card_generation_price() -> float:
 UPLOAD_DIR, CARD_DIR = _upload_and_card_dirs()
 ANIMATIONS_DIR = _app_data_root() / "animations"
 HIGHLIGHTS_DIR = _app_data_root() / "highlights"
-# Served via StaticFiles — must not overlap REST routes /cards, /cards/{id}
+# Local dev only — served via StaticFiles when R2 is not configured.
+# Must not overlap REST routes /cards, /cards/{id}.
 CARD_MEDIA_URL_PREFIX = "/media/cards"
 # Layout reference for AI card generation (replace with your own asset).
 CARD_TEMPLATE_PATH = Path(__file__).resolve().parent / "templates" / "cardtemplate.png"
@@ -144,11 +144,18 @@ _IMAGE_TYPES: dict[str, str] = {
     "image/webp": ".webp",
 }
 
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-os.makedirs(CARD_DIR, exist_ok=True)
-os.makedirs(ANIMATIONS_DIR, exist_ok=True)
-os.makedirs(HIGHLIGHTS_DIR, exist_ok=True)
-os.makedirs(HIGHLIGHTS_DIR / "thumbnails", exist_ok=True)
+def _ensure_local_media_dirs() -> None:
+    """Create local media directories only when R2 is not configured (dev fallback)."""
+    if is_r2_configured():
+        return
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    os.makedirs(CARD_DIR, exist_ok=True)
+    os.makedirs(ANIMATIONS_DIR, exist_ok=True)
+    os.makedirs(HIGHLIGHTS_DIR, exist_ok=True)
+    os.makedirs(HIGHLIGHTS_DIR / "thumbnails", exist_ok=True)
+
+
+_ensure_local_media_dirs()
 
 
 def _startup_validate_admin_account() -> None:
@@ -178,18 +185,28 @@ def _startup_validate_admin_account() -> None:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-    os.makedirs(CARD_DIR, exist_ok=True)
-    os.makedirs(ANIMATIONS_DIR, exist_ok=True)
-    os.makedirs(HIGHLIGHTS_DIR, exist_ok=True)
-    os.makedirs(HIGHLIGHTS_DIR / "thumbnails", exist_ok=True)
+    app_data_dir = (os.environ.get("APP_DATA_DIR") or "").strip()
+    if app_data_dir and not os.path.exists(app_data_dir):
+        logger.warning(
+            "APP_DATA_DIR %s does not exist. All media should be served from R2. "
+            "If you see file not found errors, check for remaining disk references.",
+            app_data_dir,
+        )
+    _ensure_local_media_dirs()
     Base.metadata.create_all(bind=engine)
     run_schema_migrations_after_models(engine)
     _startup_validate_admin_account()
     run_marketplace_expiration_pass()
     run_deleted_cards_cleanup_pass()
     start_marketplace_scheduler()
-    print(f"[startup] UPLOAD_DIR={UPLOAD_DIR} CARD_DIR={CARD_DIR} (writable={os.access(CARD_DIR, os.W_OK)})")
+    if is_r2_configured():
+        print("[startup] Media storage: Cloudflare R2 (local disk mounts disabled)", flush=True)
+    else:
+        print(
+            f"[startup] Media storage: local disk UPLOAD_DIR={UPLOAD_DIR} "
+            f"CARD_DIR={CARD_DIR} (writable={os.access(CARD_DIR, os.W_OK)})",
+            flush=True,
+        )
     print("FRONTEND_URL:", os.environ.get("FRONTEND_URL"), flush=True)
     yield
     shutdown_marketplace_scheduler()

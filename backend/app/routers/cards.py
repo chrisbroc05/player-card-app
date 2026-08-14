@@ -60,7 +60,7 @@ from marketplace_repo import cancel_pending_marketplace_offers_for_card
 from parent_email_utils import parent_email_for_notify
 from models import Card, MarketplaceOffer, TradeOffer, User, utcnow
 from utils.pika_video import fetch_pika_catalog_status, is_pika_configured, model_fallback_chain
-from utils.storage import content_type_for_filename, save_bytes_to_storage
+from utils.storage import app_data_root, content_type_for_filename, save_bytes_to_storage
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -91,16 +91,11 @@ def _resolve_card(db: Session, card_id_raw: str) -> Card:
 
 
 def _animations_dir() -> Path:
-    base = (os.environ.get("APP_DATA_DIR") or "").strip() or "./data"
-    return Path(base).expanduser().resolve() / "animations"
+    return app_data_root() / "animations"
 
 
 def _highlights_dir() -> Path:
-    base = (os.environ.get("APP_DATA_DIR") or "").strip() or "./data"
-    path = Path(base).expanduser().resolve() / "highlights"
-    path.mkdir(parents=True, exist_ok=True)
-    (path / "thumbnails").mkdir(parents=True, exist_ok=True)
-    return path
+    return app_data_root() / "highlights"
 
 
 def _is_failed_highlight_card(card: Card) -> bool:

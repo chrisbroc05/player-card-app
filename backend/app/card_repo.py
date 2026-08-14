@@ -12,6 +12,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from models import Card, utcnow
+from utils.storage import app_data_root
 
 _CARD_ID_PATTERN = re.compile(r"^FL-\d{4}-\d{6}$", re.IGNORECASE)
 
@@ -599,11 +600,6 @@ def list_pending_preview_cards(db: Session, owner_id: int) -> list[Card]:
     )
 
 
-def _app_data_root() -> Path:
-    base = (os.environ.get("APP_DATA_DIR") or "").strip() or "./data"
-    return Path(base).expanduser().resolve()
-
-
 def _canonical_pending_card_id(card_id: str | None) -> str | None:
     s = (card_id or "").strip()
     if not _CARD_ID_PATTERN.match(s):
@@ -623,7 +619,7 @@ def _pending_preview_image_available(image_url: str | None) -> bool:
 
     if is_r2_public_url(s):
         return True
-    root = _app_data_root()
+    root = app_data_root()
     filename = s.rsplit("/", 1)[-1]
     if not filename:
         return False

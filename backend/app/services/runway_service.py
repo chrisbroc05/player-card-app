@@ -10,7 +10,7 @@ from pathlib import Path
 import httpx
 
 from email_service import _absolute_image_url
-from utils.storage import save_bytes_to_storage
+from utils.storage import app_data_root, save_bytes_to_storage
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +28,7 @@ def _api_key() -> str:
 
 
 def _animations_dir() -> Path:
-    base = (os.environ.get("APP_DATA_DIR") or "").strip() or "./data"
-    return Path(base).expanduser().resolve() / "animations"
+    return app_data_root() / "animations"
 
 
 def _runway_headers() -> dict[str, str]:
@@ -157,7 +156,7 @@ async def generate_animation(
     card_id: str,
 ) -> dict:
     """
-    Send image + prompt to Runway, poll until complete, save video to disk.
+    Send image + prompt to Runway, poll until complete, save video to R2 (or local dev disk).
     Retries once on failure (2 attempts total).
     """
     last_error: str | None = None

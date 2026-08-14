@@ -106,16 +106,16 @@ def save_bytes_to_storage(
 ) -> str:
     """
     Upload to R2 when configured; otherwise write under local_dir and return a relative URL.
+    When R2 is configured, local disk is never used (production must not depend on APP_DATA_DIR).
     """
     key = r2_key.lstrip("/")
     if is_r2_configured():
         url = upload_file_to_r2(file_bytes, key, content_type)
         if url:
             return url
-        logger.warning("R2 upload failed for %s; falling back to local disk", key)
-    else:
-        logger.warning("R2 not configured; saving %s to local disk", key)
+        raise RuntimeError(f"R2 upload failed for {key}")
 
+    logger.warning("R2 not configured; saving %s to local disk", key)
     local_dir.mkdir(parents=True, exist_ok=True)
     filename = Path(key).name
     dest = local_dir / filename
