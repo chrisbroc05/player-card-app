@@ -310,6 +310,12 @@ export default function CardDetailPage() {
 
                 <ShareCard card={displayCard} sectionTitle="Share This Card" isOwner={isOwner} />
 
+                {isOwner && displayCard?.face_photo_url ? (
+                  <p className="mt-3 text-center text-xs text-slate-500 sm:text-left">
+                    Face reference used for AI likeness on this card.
+                  </p>
+                ) : null}
+
                 {showSendTrade ? <SendCard card={displayCard} onSent={refetchCard} /> : null}
                 {showPendingTradePanel ? (
                   <SendCard card={displayCard} onCancelTrade={refetchCard} />

@@ -8,6 +8,7 @@ from card_repo import (
     action_category_for_card,
     animation_scenario_id_for_card,
     batting_side_for_card,
+    face_photo_url_for_card,
     photo_notes_for_card,
     player_photo_url_for_card,
     throwing_hand_for_card,
@@ -81,6 +82,7 @@ async def process_animation(card_id: str, motion_id: str) -> None:
             action_category=category,
             throwing_hand=throwing_hand,
             batting_side=batting_side,
+            face_photo_url=face_photo_url_for_card(card),
         )
         if motion_prompt is None:
             raise RuntimeError(f"No video prompt for motion_id {motion_key} on card {card_id}")

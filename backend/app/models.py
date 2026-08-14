@@ -112,6 +112,7 @@ class Card(Base):
     highlight_trim_end: Mapped[float | None] = mapped_column(Float, nullable=True)
     highlight_thumbnail_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     player_photo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    face_photo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     photo_notes: Mapped[str | None] = mapped_column(String(200), nullable=True)
     animation_scenario_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     animation_model_used: Mapped[str | None] = mapped_column(String(50), nullable=True)

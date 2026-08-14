@@ -37,6 +37,7 @@ def delete_card_media_from_r2(card: Card) -> None:
         card.animated_video_url,
         card.highlight_video_url,
         card.player_photo_url,
+        card.face_photo_url,
         card.highlight_thumbnail_url,
     ):
         key = extract_r2_key(url_field)

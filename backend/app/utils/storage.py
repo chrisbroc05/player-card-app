@@ -96,6 +96,57 @@ def delete_file_from_r2(filename: str) -> None:
     client.delete_object(Bucket=R2_BUCKET_NAME, Key=filename.lstrip("/"))
 
 
+def r2_key_from_public_url(url: str | None) -> str | None:
+    s = (url or "").strip()
+    if not s:
+        return None
+    base = (R2_PUBLIC_URL or "").rstrip("/")
+    if base and s.startswith(f"{base}/"):
+        return s[len(base) + 1 :]
+    if s.startswith("https://pub-"):
+        path = urlparse(s).path.lstrip("/")
+        return path or None
+    return None
+
+
+def finalize_face_photo_url(source_url: str | None, card_id: str) -> str | None:
+    """
+    Move a temp face upload to uploads/face/{card_id}_{uuid}.ext on R2.
+    Returns the final public URL, or the original URL when R2 is not configured.
+    """
+    s = (source_url or "").strip()
+    if not s or not card_id:
+        return None
+    if not is_r2_configured():
+        return s
+
+    temp_key = r2_key_from_public_url(s)
+    safe_id = card_id.replace("/", "_")
+    ext = Path(temp_key or s).suffix.lower() or ".jpg"
+    if ext not in (".jpg", ".jpeg", ".png", ".webp", ".gif"):
+        ext = ".jpg"
+    final_key = f"uploads/face/{safe_id}_{os.urandom(8).hex()}{ext}"
+
+    try:
+        with httpx.Client(timeout=60.0, follow_redirects=True) as client:
+            resp = client.get(s)
+            resp.raise_for_status()
+            file_bytes = resp.content
+        content_type = content_type_for_filename(final_key, "image/jpeg")
+        final_url = upload_file_to_r2(file_bytes, final_key, content_type)
+        if not final_url:
+            return s
+        if temp_key and temp_key.startswith("uploads/face/temp_"):
+            try:
+                delete_file_from_r2(temp_key)
+            except Exception:
+                logger.warning("Could not delete temp face photo %s", temp_key)
+        return final_url
+    except Exception as exc:
+        logger.warning("Could not finalize face photo for %s: %s", card_id, exc)
+        return s
+
+
 def save_bytes_to_storage(
     file_bytes: bytes,
     *,
@@ -139,6 +190,7 @@ def local_path_from_media_url(url: str | None) -> Path | None:
         path = f"/{path}"
     root = app_data_root()
     mappings = (
+        ("/uploads/face/", root / "uploads" / "face"),
         ("/media/cards/", root / "cards"),
         ("/uploads/", root / "uploads"),
         ("/animations/", root / "animations"),

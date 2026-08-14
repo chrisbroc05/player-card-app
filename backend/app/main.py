@@ -468,6 +468,7 @@ def _draft_metadata_from_order(order: dict) -> str:
         "player_grad_year": order.get("player_grad_year") or 2000,
         "player_team_name": order.get("player_team_name") or order.get("player_team") or "",
         "player_image_url": order.get("player_image_url") or "",
+        "face_photo_url": order.get("face_photo_url") or "",
         "tier": order.get("tier") or "rookie",
         "card_type": order.get("card_type") or "standard",
         "special_theme": order.get("special_theme"),
@@ -565,6 +566,7 @@ def _store_generated_card(
     preview_session_id: str | None = None,
     draft_metadata: str | None = None,
     player_photo_url: str | None = None,
+    face_photo_url: str | None = None,
     photo_notes: str | None = None,
     animation_scenario_id: str | None = None,
     action_category: str | None = None,
@@ -600,6 +602,7 @@ def _store_generated_card(
         preview_session_id=preview_session_id,
         draft_metadata=draft_metadata,
         player_photo_url=player_photo_url,
+        face_photo_url=face_photo_url,
         photo_notes=photo_notes,
         animation_scenario_id=animation_scenario_id,
         action_category=action_category,
@@ -654,13 +657,24 @@ def _gpt_image_portrait_edit_bytes(
     model: str,
     tier: str,
     special_theme: str | None,
+    face_path: Path | None = None,
 ) -> bytes:
     """Portrait-only edit from the uploaded player photo — no card template."""
     player_f = _bytesio_image_file_for_edit(player_path, "player")
     prompt = _tier_player_portrait_prompt(tier, variant="single_edit", special_theme=special_theme)
+    image_inputs = [player_f]
+    if face_path is not None:
+        face_f = _bytesio_image_file_for_edit(face_path, "face")
+        image_inputs.append(face_f)
+        prompt += (
+            " Use the provided face reference photo to accurately depict the player's facial "
+            "features, skin tone, and likeness. The face reference shows the actual player — "
+            "maintain their exact appearance including face shape, features, and any visible "
+            "characteristics. The action photo shows their athletic pose and uniform."
+        )
     kwargs: dict = {
         "model": model,
-        "image": [player_f],
+        "image": image_inputs,
         "prompt": prompt,
         "size": "1024x1024",
         "n": 1,
@@ -692,6 +706,7 @@ def _gpt_image_dual_edit_bytes(
     model: str,
     tier: str,
     special_theme: str | None,
+    face_path: Path | None = None,
 ) -> bytes:
     """Legacy name — portrait-only edit (template ignored; layout is frontend UI)."""
     _ = (template_path, name, team)
@@ -701,6 +716,7 @@ def _gpt_image_dual_edit_bytes(
         model=model,
         tier=tier,
         special_theme=special_theme,
+        face_path=face_path,
     )
 
 
@@ -1082,6 +1098,7 @@ def _generate_card_openai(
     *,
     tier: str = "base",
     special_theme: str | None = None,
+    face_source_path: Path | None = None,
 ) -> dict:
     """
     1) Prefer GPT Image edit on the player photo only (portrait — UI renders card chrome).
@@ -1111,6 +1128,7 @@ def _generate_card_openai(
                 model=model,
                 tier=tier_norm,
                 special_theme=special_theme,
+                face_path=face_source_path,
             )
             logger.info("Card generation succeeded via gpt-image model=%s player_id=%s", model, player_id)
             break
@@ -1130,6 +1148,7 @@ def _generate_card_openai(
                     model=model,
                     tier=tier_norm,
                     special_theme=special_theme,
+                    face_path=face_source_path,
                 )
                 generation = "gpt-image-template"
                 logger.info("Card generation succeeded via legacy path model=%s player_id=%s", model, player_id)
@@ -1258,6 +1277,7 @@ class CardVaultSummary(BaseModel):
     throwing_hand: str | None = Field(default=None)
     batting_side: str | None = Field(default=None)
     player_photo_url: str | None = Field(default=None)
+    face_photo_url: str | None = Field(default=None)
     photo_notes: str | None = Field(default=None)
     animation_scenario_id: str | None = Field(default=None)
     animation_model_used: str | None = Field(default=None)
@@ -1310,6 +1330,7 @@ class Card(BaseModel):
     throwing_hand: str | None = Field(default=None)
     batting_side: str | None = Field(default=None)
     player_photo_url: str | None = Field(default=None)
+    face_photo_url: str | None = Field(default=None)
     photo_notes: str | None = Field(default=None)
     animation_scenario_id: str | None = Field(default=None)
     animation_model_used: str | None = Field(default=None)
@@ -1367,6 +1388,7 @@ class OrderCreate(BaseModel):
     player_grad_year: int = Field(..., ge=2000, le=2100)
     player_team_name: str = Field(..., min_length=1, max_length=200)
     player_image_url: str = Field(..., min_length=1, max_length=2000)
+    face_photo_url: str | None = Field(default=None, max_length=2000)
 
     # Order details
     tier: OrderTier
@@ -2087,6 +2109,7 @@ def create_order(
         player_grad_year=body.player_grad_year,
         player_team_name=body.player_team_name,
         player_image_url=body.player_image_url,
+        face_photo_url=(body.face_photo_url or "").strip() or None,
         tier=body.tier,
         card_type=body.card_type,
         special_theme=body.special_theme,
@@ -2202,6 +2225,7 @@ def generate_card_for_order(
         "special_theme": order.get("special_theme"),
     }
     card_tier = _order_tier_to_card_tier(order["tier"])
+    face_photo_raw = (order.get("face_photo_url") or "").strip() or None
 
     if card_type == "highlight":
         result = _generate_highlight_placeholder(
@@ -2212,10 +2236,22 @@ def generate_card_for_order(
         )
     else:
         source_path, is_temp = _resolve_source_path_from_image_url(order["player_image_url"])
+        face_path: Path | None = None
+        face_is_temp = False
+        if face_photo_raw:
+            try:
+                face_path, face_is_temp = _resolve_source_image_path(face_photo_raw, UPLOAD_DIR)
+            except ValueError as exc:
+                logger.warning("Face photo could not be resolved for order %s: %s", order_id, exc)
         try:
             try:
                 result = _generate_card_openai(
-                    player_row, order_id, source_path, tier=card_tier, special_theme=order.get("special_theme")
+                    player_row,
+                    order_id,
+                    source_path,
+                    tier=card_tier,
+                    special_theme=order.get("special_theme"),
+                    face_source_path=face_path,
                 )
             except Exception as exc:
                 logger.exception(
@@ -2228,6 +2264,8 @@ def generate_card_for_order(
                 )
         finally:
             _cleanup_temp_source(source_path, is_temp)
+            if face_path is not None and face_is_temp:
+                _cleanup_temp_source(face_path, face_is_temp)
 
     new_card_id = next_collectible_card_id(db)
     owner_id = current_user.id
@@ -2237,6 +2275,11 @@ def generate_card_for_order(
         draft_metadata = _draft_metadata_from_order(order)
         order["draft_metadata"] = draft_metadata
     player_photo_url = (order.get("player_image_url") or "").strip() or None
+    face_photo_stored = None
+    if face_photo_raw:
+        from utils.storage import finalize_face_photo_url
+
+        face_photo_stored = finalize_face_photo_url(face_photo_raw, new_card_id)
     photo_notes = (order.get("photo_notes") or "").strip()[:200] or None
     animation_scenario_id = (order.get("animation_scenario_id") or "").strip() or None
     action_category = (order.get("action_category") or "").strip() or None
@@ -2258,6 +2301,7 @@ def generate_card_for_order(
         preview_session_id=preview_session_id,
         draft_metadata=draft_metadata,
         player_photo_url=player_photo_url if card_type == "animated" else None,
+        face_photo_url=face_photo_stored,
         photo_notes=photo_notes if card_type == "animated" else None,
         animation_scenario_id=animation_scenario_id if card_type == "animated" else None,
         action_category=action_category if card_type == "animated" else None,
@@ -2409,6 +2453,53 @@ async def upload_image(
             content_type=content_type,
             local_dir=UPLOAD_DIR,
             local_url_prefix="/uploads",
+        )
+
+    return {
+        "filename": filename,
+        "url": public_url,
+    }
+
+
+@app.post("/upload-face-image")
+async def upload_face_image(
+    file: UploadFile = File(..., description="Front-facing player photo (JPEG, PNG, or WebP)"),
+    _current_user: User = Depends(get_current_user),
+):
+    """Accept an optional face reference photo for AI likeness during card creation."""
+    content_type = (file.content_type or "").split(";")[0].strip().lower()
+    allowed = {"image/jpeg", "image/png", "image/webp"}
+    ext = _IMAGE_TYPES.get(content_type)
+    if ext is None or content_type not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail="Only JPG, PNG, or WebP face photos are allowed.",
+        )
+
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file.")
+
+    filename = f"temp_{uuid4().hex}{ext}"
+    r2_key = f"uploads/face/{filename}"
+    face_local_dir = UPLOAD_DIR / "face"
+
+    from utils.storage import is_r2_configured, upload_file_to_r2
+
+    if is_r2_configured():
+        public_url = upload_file_to_r2(data, r2_key, content_type)
+        if not public_url:
+            raise HTTPException(
+                status_code=503,
+                detail="Could not upload your face photo to storage. Please try again in a moment.",
+            )
+    else:
+        public_url = save_bytes_to_storage(
+            data,
+            r2_key=r2_key,
+            content_type=content_type,
+            local_dir=face_local_dir,
+            local_url_prefix="/uploads/face",
         )
 
     return {

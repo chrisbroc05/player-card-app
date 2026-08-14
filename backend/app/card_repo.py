@@ -133,6 +133,7 @@ def create_card_row(
     throwing_hand: str | None = None,
     batting_side: str | None = None,
     player_photo_url: str | None = None,
+    face_photo_url: str | None = None,
     photo_notes: str | None = None,
     animation_scenario_id: str | None = None,
     commit: bool = True,
@@ -165,6 +166,7 @@ def create_card_row(
         throwing_hand=(throwing_hand or "").strip().lower() or None,
         batting_side=(batting_side or "").strip().lower() or None,
         player_photo_url=(player_photo_url or "").strip() or None,
+        face_photo_url=(face_photo_url or "").strip() or None,
         photo_notes=(photo_notes or "").strip()[:200] or None,
         animation_scenario_id=(animation_scenario_id or "").strip() or None,
     )
@@ -241,6 +243,7 @@ def animation_fields_for_card(card: Card) -> dict:
         "throwing_hand": getattr(card, "throwing_hand", None) or None,
         "batting_side": getattr(card, "batting_side", None) or None,
         "player_photo_url": getattr(card, "player_photo_url", None) or None,
+        "face_photo_url": getattr(card, "face_photo_url", None) or None,
         "photo_notes": getattr(card, "photo_notes", None) or None,
         "animation_scenario_id": getattr(card, "animation_scenario_id", None) or None,
         "animation_model_used": getattr(card, "animation_model_used", None) or None,
@@ -254,6 +257,16 @@ def player_photo_url_for_card(card: Card) -> str | None:
         return url
     draft = _parse_draft_metadata(getattr(card, "draft_metadata", None))
     fallback = (draft.get("player_image_url") or draft.get("player_photo_url") or "").strip()
+    return fallback or None
+
+
+def face_photo_url_for_card(card: Card) -> str | None:
+    """Optional front-facing reference photo for AI likeness."""
+    url = (getattr(card, "face_photo_url", None) or "").strip()
+    if url:
+        return url
+    draft = _parse_draft_metadata(getattr(card, "draft_metadata", None))
+    fallback = (draft.get("face_photo_url") or "").strip()
     return fallback or None
 
 
@@ -454,6 +467,7 @@ def create_animated_upgrade_card(
     row.animation_completed_at = None
     row.animated_video_url = None
     row.player_photo_url = getattr(source, "player_photo_url", None) or player_photo_url_for_card(source)
+    row.face_photo_url = getattr(source, "face_photo_url", None) or face_photo_url_for_card(source)
     row.photo_notes = getattr(source, "photo_notes", None) or photo_notes_for_card(source)
     row.animation_scenario_id = (
         getattr(source, "animation_scenario_id", None) or animation_scenario_id_for_card(source)
@@ -531,6 +545,8 @@ def expand_print_run_for_owner_image(
             owner_name=template.owner_name,
             owner_id=template.owner_id,
             creator_user_id=getattr(template, "creator_user_id", None) or template.owner_id,
+            player_photo_url=getattr(template, "player_photo_url", None),
+            face_photo_url=getattr(template, "face_photo_url", None),
             commit=False,
         )
         new_rows.append(row)

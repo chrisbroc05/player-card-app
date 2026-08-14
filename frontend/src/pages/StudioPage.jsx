@@ -33,6 +33,7 @@ import AnimatedFlowExplainer from "../components/AnimatedFlowExplainer";
 import AnimatedAiDisclaimer from "../components/AnimatedAiDisclaimer";
 import PlayerDetailsStep from "../components/PlayerDetailsStep";
 import PhotoNotesStep from "../components/PhotoNotesStep";
+import FacePhotoStep from "../components/FacePhotoStep";
 import {
   getActionCategory,
   klingMotionForCategory,
@@ -65,13 +66,14 @@ const STEP_TIER = 2;
 const STEP_THEME = 3;
 const STEP_CARD_TYPE = 4;
 const STEP_UPLOAD = 5;
-const STEP_HANDEDNESS = 6;
-const STEP_ACTION = 7;
-const STEP_SCENARIO = 8;
-const STEP_PHOTO_NOTES = 9;
-const STEP_HIGHLIGHT_VIDEO = 10;
-const STEP_REVIEW = 11;
-const TOTAL_WIZARD_STEPS = 11;
+const STEP_FACE_PHOTO = 6;
+const STEP_HANDEDNESS = 7;
+const STEP_ACTION = 8;
+const STEP_SCENARIO = 9;
+const STEP_PHOTO_NOTES = 10;
+const STEP_HIGHLIGHT_VIDEO = 11;
+const STEP_REVIEW = 12;
+const TOTAL_WIZARD_STEPS = 12;
 
 const WIZARD_STEP_LABELS = {
   [STEP_DETAILS]: "Player Details",
@@ -79,6 +81,7 @@ const WIZARD_STEP_LABELS = {
   [STEP_THEME]: "Choose Theme",
   [STEP_CARD_TYPE]: "Choose Card Type",
   [STEP_UPLOAD]: "Upload",
+  [STEP_FACE_PHOTO]: "Face Photo",
   [STEP_HANDEDNESS]: "Player Handedness",
   [STEP_ACTION]: "Tag Your Action",
   [STEP_SCENARIO]: "Match Your Photo",
@@ -116,6 +119,10 @@ function isHighlightOnlyStep(step) {
   return step === STEP_HIGHLIGHT_VIDEO;
 }
 
+function isFacePhotoOnlyStep(step) {
+  return step === STEP_FACE_PHOTO;
+}
+
 function getNextWizardStep(step, cardType) {
   const isAnimated = cardType === "animated";
   const isHighlight = cardType === "highlight";
@@ -124,8 +131,11 @@ function getNextWizardStep(step, cardType) {
   if (step === STEP_THEME) return STEP_CARD_TYPE;
   if (step === STEP_CARD_TYPE) return STEP_UPLOAD;
   if (step === STEP_UPLOAD) {
-    if (isAnimated) return STEP_HANDEDNESS;
     if (isHighlight) return STEP_HIGHLIGHT_VIDEO;
+    return STEP_FACE_PHOTO;
+  }
+  if (step === STEP_FACE_PHOTO) {
+    if (isAnimated) return STEP_HANDEDNESS;
     return STEP_REVIEW;
   }
   if (step === STEP_HANDEDNESS) return STEP_ACTION;
@@ -142,12 +152,13 @@ function getPrevWizardStep(step, cardType) {
   if (step === STEP_REVIEW) {
     if (isHighlight) return STEP_HIGHLIGHT_VIDEO;
     if (isAnimated) return STEP_PHOTO_NOTES;
-    return STEP_UPLOAD;
+    return STEP_FACE_PHOTO;
   }
   if (step === STEP_PHOTO_NOTES) return STEP_SCENARIO;
   if (step === STEP_SCENARIO) return STEP_ACTION;
   if (step === STEP_ACTION) return STEP_HANDEDNESS;
-  if (step === STEP_HANDEDNESS) return STEP_UPLOAD;
+  if (step === STEP_HANDEDNESS) return STEP_FACE_PHOTO;
+  if (step === STEP_FACE_PHOTO) return STEP_UPLOAD;
   if (step === STEP_HIGHLIGHT_VIDEO) return STEP_UPLOAD;
   if (step === STEP_UPLOAD) return STEP_CARD_TYPE;
   if (step === STEP_CARD_TYPE) return STEP_THEME;
@@ -223,6 +234,7 @@ function WizardProgress({ currentStep, isAnimated, isHighlight, cardType, onGoTo
           const step = i + 1;
           if (isAnimatedOnlyStep(step) && !isAnimated) return null;
           if (isHighlightOnlyStep(step) && !isHighlight) return null;
+          if (isFacePhotoOnlyStep(step) && isHighlight) return null;
           const done = step < currentStep;
           const active = step === currentStep;
           const canClick = done && typeof onGoToStep === "function";
@@ -294,6 +306,11 @@ export default function StudioPage() {
   const [imageFile, setImageFile] = useState(null);
   const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState("");
   const [photoUploading, setPhotoUploading] = useState(false);
+  const [facePhotoFile, setFacePhotoFile] = useState(null);
+  const [facePhotoUrl, setFacePhotoUrl] = useState("");
+  const [facePhotoUploading, setFacePhotoUploading] = useState(false);
+  const [facePhotoDragActive, setFacePhotoDragActive] = useState(false);
+  const [facePhotoError, setFacePhotoError] = useState("");
 
   const [playerId, setPlayerId] = useState(null);
   const [currentPlayer, setCurrentPlayer] = useState(null);
@@ -732,6 +749,7 @@ export default function StudioPage() {
       [STEP_UPLOAD]: isHighlightCardType
         ? Boolean(highlightClipDraft?.file)
         : Boolean(uploadedPhotoUrl) && !photoUploading,
+      [STEP_FACE_PHOTO]: isHighlightCardType || true,
       [STEP_HANDEDNESS]:
         !isAnimatedCardType || (Boolean(throwingHand) && Boolean(battingSide)),
       [STEP_ACTION]: !isAnimatedCardType || Boolean(actionCategory),
@@ -822,6 +840,10 @@ export default function StudioPage() {
     setUploadedPhotoUrl("");
     setPhotoUploading(false);
     setPhotoStepError("");
+    setFacePhotoFile(null);
+    setFacePhotoUrl("");
+    setFacePhotoUploading(false);
+    setFacePhotoError("");
     setHighlightUploadState("idle");
     setHighlightUploadProgress(0);
     setHighlightUploadError("");
@@ -921,6 +943,10 @@ export default function StudioPage() {
         setPhotoStepError("");
       }
       setCurrentStep(getNextWizardStep(STEP_UPLOAD, cardType));
+      return;
+    }
+    if (currentStep === STEP_FACE_PHOTO) {
+      setCurrentStep(getNextWizardStep(STEP_FACE_PHOTO, cardType));
       return;
     }
     if (currentStep === STEP_HANDEDNESS) {
@@ -1321,6 +1347,7 @@ export default function StudioPage() {
     setThrowingHand(draft.throwing_hand || "");
     setBattingSide(draft.batting_side || "");
     setPhotoNotes(draft.photo_notes || "");
+    setFacePhotoUrl(draft.face_photo_url || "");
     if (draft.action_category) {
       setSelectedMotionId(draft.selected_motion_id || klingMotionForCategory(draft.action_category) || "");
     }
@@ -1826,6 +1853,7 @@ export default function StudioPage() {
         player_grad_year: playerData.grad_year,
         player_team_name: playerData.team_name,
         player_image_url: playerData.image_url,
+        face_photo_url: facePhotoUrl.trim() || null,
         tier: orderTier,
         card_type: cardType,
         special_theme: specialTheme || null,
@@ -2167,6 +2195,57 @@ export default function StudioPage() {
     await startCardAnimation(animationLoadingCardId);
   }, [animationLoadingCardId, selectedMotionId, actionCategory, token]);
 
+  async function handleFacePhotoFileSelect(file) {
+    if (!file) return;
+    const type = (file.type || "").toLowerCase();
+    const ext = file.name.split(".").pop()?.toLowerCase() || "";
+    const acceptedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+    const acceptedExt = new Set(["jpg", "jpeg", "png", "webp"]);
+    if (!acceptedTypes.has(type) && !acceptedExt.has(ext)) {
+      setFacePhotoError("Please choose a JPG, PNG, or WebP image");
+      return;
+    }
+    if (!token) {
+      setFacePhotoError("Please sign in before uploading a photo.");
+      return;
+    }
+
+    setFacePhotoFile(file);
+    setFacePhotoUrl("");
+    setFacePhotoError("");
+    setFacePhotoUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const uploadRes = await fetch(`${API_BASE_URL}/upload-face-image`, {
+        method: "POST",
+        headers: { ...authHeaders(token) },
+        body: formData,
+      });
+      const uploadData = await uploadRes.json().catch(() => ({}));
+      if (!uploadRes.ok) {
+        throw new Error(formatApiError(uploadData?.detail, "Face photo upload failed."));
+      }
+      if (!uploadData?.url) {
+        throw new Error("Face photo upload did not return a URL.");
+      }
+      setFacePhotoUrl(uploadData.url);
+    } catch (err) {
+      setFacePhotoFile(null);
+      setFacePhotoUrl("");
+      setFacePhotoError(err.message || "Face photo upload failed.");
+    } finally {
+      setFacePhotoUploading(false);
+    }
+  }
+
+  function handleRemoveFacePhoto() {
+    setFacePhotoFile(null);
+    setFacePhotoUrl("");
+    setFacePhotoError("");
+  }
+
   async function handlePhotoFileSelect(file) {
     if (!file) return;
     const type = (file.type || "").toLowerCase();
@@ -2465,11 +2544,31 @@ export default function StudioPage() {
                       onClick={tryAdvanceStep}
                       className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl btn-primary px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
                     >
-                      {isAnimatedCardType ? "Continue to Action Tagging" : "Continue to Review"}
+                      Continue
                     </button>
                   </div>
                 </div>
               )
+            ) : null}
+
+            {currentStep === STEP_FACE_PHOTO && !isHighlightCardType ? (
+              <FacePhotoStep
+                actionPhotoUrl={uploadedPhotoUrl}
+                facePhotoFile={facePhotoFile}
+                facePhotoUrl={facePhotoUrl}
+                facePhotoUploading={facePhotoUploading}
+                facePhotoError={facePhotoError}
+                dragActive={facePhotoDragActive}
+                onDragActiveChange={setFacePhotoDragActive}
+                onFileSelect={handleFacePhotoFileSelect}
+                onRemove={handleRemoveFacePhoto}
+                onSkip={() => setCurrentStep(getNextWizardStep(STEP_FACE_PHOTO, cardType))}
+                onContinue={() => setCurrentStep(getNextWizardStep(STEP_FACE_PHOTO, cardType))}
+                onBack={goBackStep}
+                continueLabel={
+                  isAnimatedCardType ? "Continue to Handedness" : "Continue to Review"
+                }
+              />
             ) : null}
 
             {currentStep === STEP_CARD_TYPE ? (

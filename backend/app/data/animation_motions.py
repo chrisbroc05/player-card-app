@@ -105,6 +105,12 @@ _LEGACY_MOTION_PROMPTS: dict[str, str] = {
 }
 
 
+FACE_REFERENCE_PROMPT = (
+    "Maintain the player's facial appearance as shown in the reference — "
+    "do not alter or generalize their face, skin tone, or distinguishing features."
+)
+
+
 def build_runway_prompt(
     motion_id: str,
     scenario_id: str | None = None,
@@ -113,6 +119,7 @@ def build_runway_prompt(
     action_category: str | None = None,
     throwing_hand: str | None = None,
     batting_side: str | None = None,
+    face_photo_url: str | None = None,
 ) -> str | None:
     """Build the full Kling prompt: scenario, handedness, notes, universal constraints."""
     from config.motion_scenarios import (
@@ -152,6 +159,8 @@ def build_runway_prompt(
     parts = [scenario_text, handedness]
     if user_context:
         parts.append(user_context)
+    if (face_photo_url or "").strip():
+        parts.append(FACE_REFERENCE_PROMPT)
     parts.append(UNIVERSAL_KLING_CONSTRAINTS)
     return " ".join(parts)
 
@@ -169,6 +178,7 @@ def get_motion_prompt(
     action_category: str | None = None,
     throwing_hand: str | None = None,
     batting_side: str | None = None,
+    face_photo_url: str | None = None,
 ) -> str | None:
     """Return the Kling prompt for a motion id, or None if unknown."""
     built = build_runway_prompt(
@@ -178,6 +188,7 @@ def get_motion_prompt(
         action_category=action_category,
         throwing_hand=throwing_hand,
         batting_side=batting_side,
+        face_photo_url=face_photo_url,
     )
     if built:
         return built

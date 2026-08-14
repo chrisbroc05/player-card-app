@@ -22,6 +22,7 @@ export function normalizeCardForDisplay(card) {
     highlight_trim_end: card.highlight_trim_end ?? card.highlightTrimEnd ?? null,
     animated_video_url: card.animated_video_url ?? card.animatedVideoUrl ?? null,
     player_photo_url: card.player_photo_url ?? card.playerPhotoUrl ?? null,
+    face_photo_url: card.face_photo_url ?? card.facePhotoUrl ?? null,
     animation_motion: card.animation_motion ?? card.animationMotion ?? null,
     animation_scenario_id: card.animation_scenario_id ?? card.animationScenarioId ?? null,
     animation_status: card.animation_status ?? card.animationStatus ?? null,

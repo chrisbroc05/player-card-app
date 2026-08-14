@@ -52,6 +52,7 @@ class ProfileCardOut(BaseModel):
     throwing_hand: str | None = None
     batting_side: str | None = None
     player_photo_url: str | None = None
+    face_photo_url: str | None = None
     photo_notes: str | None = None
     animation_scenario_id: str | None = None
     animation_model_used: str | None = None
