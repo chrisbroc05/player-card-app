@@ -667,10 +667,19 @@ def _gpt_image_portrait_edit_bytes(
         face_f = _bytesio_image_file_for_edit(face_path, "face")
         image_inputs.append(face_f)
         prompt += (
-            " Use the provided face reference photo to accurately depict the player's facial "
-            "features, skin tone, and likeness. The face reference shows the actual player — "
-            "maintain their exact appearance including face shape, features, and any visible "
-            "characteristics. The action photo shows their athletic pose and uniform."
+            " Two reference photos are provided. Use them together as follows: "
+            "FACE REFERENCE PHOTO: Use this to accurately capture the player's facial structure, "
+            "bone structure, skin tone, eye shape, nose, jaw, and overall likeness — "
+            "this is who the player actually looks like. Maintain their exact facial features and "
+            "identity from this reference. "
+            "ACTION PHOTO: Use this for the athletic pose, body position, uniform, emotion, "
+            "and facial expression — the intensity, focus, or emotion visible in this photo "
+            "should be preserved. The player's face should show the same expression and "
+            "emotion as in the action photo. "
+            "COMBINED: Generate the player with the facial identity from the face reference "
+            "photo but wearing the expression and showing the emotion captured in the "
+            "action photo. The result should look like the actual player in that specific "
+            "athletic moment."
         )
     kwargs: dict = {
         "model": model,
