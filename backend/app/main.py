@@ -2240,7 +2240,7 @@ def generate_card_for_order(
         face_is_temp = False
         if face_photo_raw:
             try:
-                face_path, face_is_temp = _resolve_source_image_path(face_photo_raw, UPLOAD_DIR)
+                face_path, face_is_temp = resolve_source_image_path(face_photo_raw, UPLOAD_DIR)
             except ValueError as exc:
                 logger.warning("Face photo could not be resolved for order %s: %s", order_id, exc)
         try:
