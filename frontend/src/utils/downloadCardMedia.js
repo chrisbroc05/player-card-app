@@ -136,6 +136,34 @@ function fallbackDownload(blob, filename) {
   URL.revokeObjectURL(blobUrl);
 }
 
+/** Temporarily set crossOrigin on remote card images so html2canvas can read them. */
+async function prepareImagesForCapture(images) {
+  await Promise.all(
+    images.map(
+      (img) =>
+        new Promise((resolve) => {
+          const originalSrc = img.src;
+          if (!originalSrc || !/^https?:\/\//i.test(originalSrc)) {
+            resolve();
+            return;
+          }
+          img.crossOrigin = "anonymous";
+          img.src = "";
+          img.src = originalSrc;
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+          setTimeout(resolve, 3000);
+        })
+    )
+  );
+}
+
+function restoreCrossOriginImages(images) {
+  images.forEach((img) => {
+    img.removeAttribute("crossOrigin");
+  });
+}
+
 /**
  * Capture the styled card DOM as PNG and download or share natively on mobile.
  * @returns {Promise<{ method: 'share' | 'download' | 'cancelled' }>}
@@ -147,8 +175,11 @@ export async function downloadCardMedia(card, { captureElement, captureRef } = {
   }
 
   const restoreVideos = snapshotVideosForCapture(cardElement);
+  const images = Array.from(cardElement.querySelectorAll("img"));
 
   try {
+    await prepareImagesForCapture(images);
+
     const cardId = card?.card_id || card?.cardId;
     const canvas = await html2canvas(cardElement, {
       useCORS: true,
@@ -179,30 +210,37 @@ export async function downloadCardMedia(card, { captureElement, captureRef } = {
         }
 
         const isMobile = isMobileDownloadDevice();
-        if (isMobile && typeof navigator.share === "function" && typeof File !== "undefined") {
-          try {
-            const file = new File([blob], filename, { type: "image/png" });
-            await navigator.share({
-              title: `${playerName} — Prospect Legends`,
-              text: "Check out my Prospect Legends card!",
-              files: [file],
-            });
-            resolve({ method: "share" });
-          } catch (shareError) {
-            if (shareError?.name === "AbortError") {
-              resolve({ method: "cancelled" });
+        if (
+          isMobile &&
+          typeof navigator.share === "function" &&
+          typeof navigator.canShare === "function" &&
+          typeof File !== "undefined"
+        ) {
+          const file = new File([blob], filename, { type: "image/png" });
+          if (navigator.canShare({ files: [file] })) {
+            try {
+              await navigator.share({
+                title: `${playerName} — Prospect Legends`,
+                text: "Check out my Prospect Legends card!",
+                files: [file],
+              });
+              resolve({ method: "share" });
               return;
+            } catch (shareError) {
+              if (shareError?.name === "AbortError") {
+                resolve({ method: "cancelled" });
+                return;
+              }
             }
-            fallbackDownload(blob, filename);
-            resolve({ method: "download" });
           }
-        } else {
-          fallbackDownload(blob, filename);
-          resolve({ method: "download" });
         }
+
+        fallbackDownload(blob, filename);
+        resolve({ method: "download" });
       }, "image/png", 1.0);
     });
   } finally {
+    restoreCrossOriginImages(images);
     restoreVideos();
   }
 }
