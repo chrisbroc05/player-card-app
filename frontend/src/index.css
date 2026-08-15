@@ -343,6 +343,207 @@
     color: var(--color-text-gold);
   }
 
+  /* ——— Mobile header & bottom pill nav (≤768px) ——— */
+  .mobile-header {
+    display: none;
+  }
+
+  .mobile-bottom-nav {
+    display: none;
+  }
+
+  .mobile-header__logo-link {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    text-decoration: none;
+  }
+
+  .mobile-header__logo {
+    height: 32px;
+    width: auto;
+    object-fit: contain;
+  }
+
+  .mobile-header__credits {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: "Barlow Condensed", sans-serif;
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--color-gold-primary);
+    text-decoration: none;
+    transition: opacity 0.15s ease;
+  }
+
+  .mobile-header__credits:hover {
+    opacity: 0.9;
+  }
+
+  .mobile-header__credits--guest {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .mobile-header__credits-icon {
+    width: 18px;
+    height: 18px;
+    color: var(--color-gold-primary);
+  }
+
+  .mobile-header__bell {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+
+  .mobile-header__bell:hover,
+  .mobile-header__bell--active {
+    color: var(--color-gold-primary);
+  }
+
+  .mobile-header__sign-in {
+    text-decoration: none;
+  }
+
+  .notification-dot {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 8px;
+    height: 8px;
+    background: #ef5350;
+    border-radius: 50%;
+    border: 2px solid var(--color-bg-secondary);
+  }
+
+  .mobile-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 6px 12px;
+    border-radius: 30px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 56px;
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.4);
+    border: none;
+    background: transparent;
+  }
+
+  .mobile-nav-item:active {
+    transform: scale(0.95);
+    transition: transform 0.15s ease;
+  }
+
+  .mobile-nav-item.active {
+    background: rgba(201, 168, 76, 0.15);
+    color: var(--color-gold-primary);
+    border: 1px solid rgba(201, 168, 76, 0.3);
+  }
+
+  .mobile-nav-item.active svg {
+    filter: drop-shadow(0 0 6px rgba(201, 168, 76, 0.6));
+    color: var(--color-gold-primary);
+  }
+
+  .mobile-nav-item__label {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    line-height: 1;
+  }
+
+  @keyframes pageFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (max-width: 768px) {
+    .desktop-header {
+      display: none !important;
+    }
+
+    .mobile-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+      padding-top: calc(12px + env(safe-area-inset-top, 0px));
+      background: var(--color-bg-secondary);
+      border-bottom: 1px solid rgba(201, 168, 76, 0.15);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .desktop-nav-links,
+    .desktop-nav-tabs {
+      display: none !important;
+    }
+
+    .mobile-bottom-nav {
+      display: flex;
+      position: fixed;
+      bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      width: calc(100% - 48px);
+      max-width: 420px;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    .mobile-nav-pill {
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      width: 100%;
+      background: rgba(22, 22, 22, 0.92);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(201, 168, 76, 0.25);
+      border-radius: 40px;
+      padding: 10px 8px;
+      box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.6),
+        0 0 0 1px rgba(201, 168, 76, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+
+    main,
+    .page-content {
+      padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .page-content {
+      animation: pageFadeIn 0.15s ease;
+    }
+  }
+
+  @media (min-width: 769px) {
+    .mobile-header,
+    .mobile-bottom-nav {
+      display: none !important;
+    }
+  }
+
   .studio-hero {
     position: relative;
     overflow: hidden;

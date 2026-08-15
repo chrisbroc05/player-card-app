@@ -1,5 +1,5 @@
 import React from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import StudioPage from "./pages/StudioPage";
 import CardDetailPage from "./pages/CardDetailPage";
 import LoginPage from "./pages/LoginPage";
@@ -17,10 +17,14 @@ import MarketplaceOfferDetailPage from "./pages/MarketplaceOfferDetailPage";
 import CreditsPage from "./pages/CreditsPage";
 
 export default function App() {
+  const location = useLocation();
+
   return (
-    <Routes>
+    <div key={location.pathname} className="page-content">
+      <Routes location={location}>
       <Route path="/index.html" element={<Navigate to="/" replace />} />
       <Route path="/" element={<StudioPage />} />
+      <Route path="/studio" element={<StudioPage />} />
       <Route path="/vault" element={<Navigate to="/my-collection" replace />} />
       <Route path="/card/:cardId" element={<CardDetailPage />} />
       <Route path="/login" element={<LoginPage />} />
@@ -42,6 +46,7 @@ export default function App() {
       <Route path="/trades" element={<TradesPage />} />
       <Route path="/profile" element={<ProfilePage />} />
       <Route path="/credits" element={<CreditsPage />} />
-    </Routes>
+      </Routes>
+    </div>
   );
 }
