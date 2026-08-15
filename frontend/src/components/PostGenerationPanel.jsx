@@ -52,7 +52,7 @@ export default function PostGenerationPanel({
     setDownloadError("");
     setDownloading(true);
     try {
-      await downloadCardMedia(detail, { captureRef: cardCaptureRef });
+      await downloadCardMedia(detail, { captureRef: cardCaptureRef, token });
     } catch (error) {
       console.error("Download failed:", error);
       setDownloadError("Download failed — please try again.");

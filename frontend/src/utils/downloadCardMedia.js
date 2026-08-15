@@ -1,4 +1,5 @@
 import html2canvas from "html2canvas";
+import { API_BASE_URL } from "../config/api";
 import { isAnimatedCard } from "./animationCard";
 import { highlightVideoUrl, isHighlightCard } from "./highlightCard";
 
@@ -89,40 +90,37 @@ function resolveCaptureElement(card, { captureElement, captureRef } = {}) {
   return document.querySelector(".card-display-container");
 }
 
-/** Replace playing videos with a still frame so html2canvas captures the current frame. */
-function snapshotVideosForCapture(root) {
-  const restores = [];
-  root.querySelectorAll("video").forEach((video) => {
+/** Swap cloned videos for still frames using live video elements (never touches displayed DOM). */
+function replaceClonedVideosWithFrames(cardElement, clonedElement, clonedDoc) {
+  const liveVideos = Array.from(cardElement.querySelectorAll("video"));
+  const clonedVideos = Array.from(clonedElement.querySelectorAll("video"));
+
+  clonedVideos.forEach((clonedVideo, index) => {
+    const liveVideo = liveVideos[index];
+    if (!liveVideo || liveVideo.readyState < 2 || !liveVideo.videoWidth) return;
+
     try {
-      if (video.readyState < 2 || !video.videoWidth) return;
       const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      canvas.width = liveVideo.videoWidth;
+      canvas.height = liveVideo.videoHeight;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
-      ctx.drawImage(video, 0, 0);
-      const img = document.createElement("img");
+      ctx.drawImage(liveVideo, 0, 0);
+
+      const img = clonedDoc.createElement("img");
       img.src = canvas.toDataURL("image/png");
-      img.className = video.className;
-      img.style.cssText = video.style.cssText;
-      const computed = window.getComputedStyle(video);
-      img.style.width = video.style.width || computed.width;
-      img.style.height = video.style.height || computed.height;
+      img.className = clonedVideo.className;
+      img.style.cssText = clonedVideo.style.cssText;
+      const computed = window.getComputedStyle(clonedVideo);
+      img.style.width = clonedVideo.style.width || computed.width;
+      img.style.height = clonedVideo.style.height || computed.height;
       img.style.objectFit = computed.objectFit || "cover";
       img.style.objectPosition = computed.objectPosition || "center";
-      const parent = video.parentNode;
-      if (!parent) return;
-      parent.insertBefore(img, video);
-      video.style.visibility = "hidden";
-      restores.push(() => {
-        video.style.visibility = "";
-        img.remove();
-      });
+      clonedVideo.parentNode?.replaceChild(img, clonedVideo);
     } catch (error) {
-      console.warn("Video snapshot failed:", error);
+      console.warn("Video frame capture failed:", error);
     }
   });
-  return () => restores.forEach((fn) => fn());
 }
 
 function fallbackDownload(blob, filename) {
@@ -136,65 +134,71 @@ function fallbackDownload(blob, filename) {
   URL.revokeObjectURL(blobUrl);
 }
 
-/** Temporarily set crossOrigin on remote card images so html2canvas can read them. */
-async function prepareImagesForCapture(images) {
-  await Promise.all(
-    images.map(
-      (img) =>
-        new Promise((resolve) => {
-          const originalSrc = img.src;
-          if (!originalSrc || !/^https?:\/\//i.test(originalSrc)) {
-            resolve();
-            return;
-          }
-          img.crossOrigin = "anonymous";
-          img.src = "";
-          img.src = originalSrc;
-          img.onload = () => resolve();
-          img.onerror = () => resolve();
-          setTimeout(resolve, 3000);
-        })
-    )
-  );
-}
+async function fetchProxiedCardImageBlob(card, token) {
+  const cardId = card?.card_id || card?.cardId;
+  if (!cardId || !token) return null;
 
-function restoreCrossOriginImages(images) {
-  images.forEach((img) => {
-    img.removeAttribute("crossOrigin");
-  });
+  try {
+    const proxyResponse = await fetch(`${API_BASE_URL}/cards/${encodeURIComponent(cardId)}/image-proxy`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (proxyResponse.ok) {
+      return proxyResponse.blob();
+    }
+  } catch (error) {
+    console.warn("Proxy fetch failed:", error);
+  }
+  return null;
 }
 
 /**
  * Capture the styled card DOM as PNG and download or share natively on mobile.
+ * Never modifies displayed image elements — proxy blob URLs are applied in onclone only.
  * @returns {Promise<{ method: 'share' | 'download' | 'cancelled' }>}
  */
-export async function downloadCardMedia(card, { captureElement, captureRef } = {}) {
+export async function downloadCardMedia(card, { captureElement, captureRef, token } = {}) {
   const cardElement = resolveCaptureElement(card, { captureElement, captureRef });
   if (!cardElement) {
     throw new Error("Card element not found");
   }
 
-  const restoreVideos = snapshotVideosForCapture(cardElement);
-  const images = Array.from(cardElement.querySelectorAll("img"));
+  const cardId = card?.card_id || card?.cardId;
+  let blobImageUrl = null;
+  let imageBlob = null;
 
   try {
-    await prepareImagesForCapture(images);
+    imageBlob = await fetchProxiedCardImageBlob(card, token);
+    if (imageBlob) {
+      blobImageUrl = URL.createObjectURL(imageBlob);
+    }
 
-    const cardId = card?.card_id || card?.cardId;
     const canvas = await html2canvas(cardElement, {
-      useCORS: true,
-      allowTaint: false,
-      backgroundColor: null,
+      useCORS: false,
+      allowTaint: true,
+      backgroundColor: "#0A0A0A",
       scale: 2,
       logging: false,
       imageTimeout: 15000,
-      onclone: (clonedDoc) => {
+      onclone: (clonedDoc, clonedElement) => {
         const selector = cardId
           ? `[data-card-capture-id="${typeof CSS !== "undefined" && CSS.escape ? CSS.escape(cardId) : cardId}"]`
           : ".card-display-container";
-        const clonedCard = clonedDoc.querySelector(selector);
+        const clonedCard = clonedDoc.querySelector(selector) || clonedElement;
         if (clonedCard) {
           clonedCard.style.transform = "none";
+        }
+
+        replaceClonedVideosWithFrames(cardElement, clonedElement, clonedDoc);
+
+        if (blobImageUrl) {
+          clonedElement.querySelectorAll("img").forEach((img) => {
+            if (img.src && img.src.includes("r2.dev")) {
+              img.src = blobImageUrl;
+              img.crossOrigin = "anonymous";
+            }
+          });
         }
       },
     });
@@ -240,7 +244,8 @@ export async function downloadCardMedia(card, { captureElement, captureRef } = {
       }, "image/png", 1.0);
     });
   } finally {
-    restoreCrossOriginImages(images);
-    restoreVideos();
+    if (blobImageUrl) {
+      URL.revokeObjectURL(blobImageUrl);
+    }
   }
 }

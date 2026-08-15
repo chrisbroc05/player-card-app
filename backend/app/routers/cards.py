@@ -12,8 +12,10 @@ from pathlib import Path
 from urllib.parse import urlparse
 from uuid import uuid4
 
+import httpx
+
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
@@ -633,6 +635,60 @@ def cleanup_failed_highlight_card(
         "card_id": deleted_id,
         "refunded": float(refund_amount),
     }
+
+
+@router.get("/{card_id}/image-proxy")
+def proxy_card_image(
+    card_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Proxy card image bytes for owner download capture (avoids browser CORS to R2)."""
+    card = _resolve_card(db, card_id)
+    if card.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not own this card")
+
+    image_url = (card.image_url or "").strip()
+    if not image_url:
+        raise HTTPException(status_code=404, detail="No image found")
+
+    local = local_path_from_media_url(image_url)
+    if local is not None and local.is_file():
+        media_type = content_type_for_filename(str(local), "image/png")
+        return Response(
+            content=local.read_bytes(),
+            media_type=media_type,
+            headers={
+                "Cache-Control": "public, max-age=3600",
+                "Access-Control-Allow-Origin": "*",
+            },
+        )
+
+    fetch_url = image_url
+    if not fetch_url.startswith("http://") and not fetch_url.startswith("https://"):
+        fetch_url = _absolute_image_url(image_url) or image_url
+    if not fetch_url.startswith("http://") and not fetch_url.startswith("https://"):
+        raise HTTPException(status_code=404, detail="No image found")
+
+    try:
+        with httpx.Client(timeout=30.0, follow_redirects=True) as client:
+            resp = client.get(fetch_url)
+    except Exception as exc:
+        logger.exception("Image proxy failed for card %s: %s", card_id, exc)
+        raise HTTPException(status_code=500, detail="Failed to fetch image") from exc
+
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=500, detail="Failed to fetch image")
+
+    media_type = resp.headers.get("content-type") or content_type_for_filename(fetch_url, "image/png")
+    return Response(
+        content=resp.content,
+        media_type=media_type,
+        headers={
+            "Cache-Control": "public, max-age=3600",
+            "Access-Control-Allow-Origin": "*",
+        },
+    )
 
 
 @router.get("/{card_id}/video")

@@ -298,6 +298,20 @@ export default function CardImage({
     notifyMediaReady();
   }, [notifyMediaReady]);
 
+  const handleImageError = useCallback((event) => {
+    const target = event.target;
+    if (!target?.dataset?.retried) {
+      target.dataset.retried = "true";
+      window.setTimeout(() => {
+        const src = target.src;
+        target.src = "";
+        target.src = src;
+      }, 500);
+      return;
+    }
+    setImgFailed(true);
+  }, []);
+
   const useViewportAutoplay = isGridBrowse && !canHover && hasVideo;
   const browseActive =
     isGridBrowse && (canHover ? hovered : useViewportAutoplay ? viewportActive : mobileActive);
@@ -490,7 +504,7 @@ export default function CardImage({
           objectFit="cover"
           wrapperClass={isDetail ? CARD_VIDEO_DETAIL_WRAPPER : ""}
           alt={alt || "Animated card"}
-          onError={() => setImgFailed(true)}
+          onError={handleImageError}
           mediaProtectionProps={mediaProtectionProps}
         />
       </ProtectedMediaShell>
@@ -505,6 +519,7 @@ export default function CardImage({
     alt,
     protectMedia,
     mediaProtectionProps,
+    handleImageError,
   ]);
 
   let mediaInner;
@@ -530,7 +545,7 @@ export default function CardImage({
             className={imgClass}
             loading="lazy"
             decoding="async"
-            onError={() => setImgFailed(true)}
+            onError={handleImageError}
             onLoad={handleImageLoad}
             {...mediaProtectionProps}
           />
@@ -558,7 +573,7 @@ export default function CardImage({
                 }`}
                 loading="lazy"
                 decoding="async"
-                onError={() => setImgFailed(true)}
+                onError={handleImageError}
                 onLoad={handleImageLoad}
                 {...mediaProtectionProps}
               />
@@ -655,7 +670,7 @@ function PlaceholderInner({ alt }) {
       <span className="text-2xl opacity-50" aria-hidden>
         ?
       </span>
-      <p className="text-xs leading-snug">Image file missing (often after a deploy without persistent disk).</p>
+      <p className="text-xs leading-snug">Image unavailable</p>
     </div>
   );
 }
