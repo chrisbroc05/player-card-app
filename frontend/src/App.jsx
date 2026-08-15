@@ -25,7 +25,7 @@ export default function App() {
       <Route path="/index.html" element={<Navigate to="/" replace />} />
       <Route path="/" element={<StudioPage />} />
       <Route path="/studio" element={<StudioPage />} />
-      <Route path="/vault" element={<Navigate to="/my-collection" replace />} />
+      <Route path="/vault" element={<MyCollectionPage vaultView />} />
       <Route path="/card/:cardId" element={<CardDetailPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route

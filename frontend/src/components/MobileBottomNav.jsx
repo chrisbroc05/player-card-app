@@ -1,23 +1,17 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import {
-  ArrowLeftRight,
-  LayoutGrid,
-  ShoppingBag,
-  Sparkles,
-  User,
-} from "lucide-react";
+import { Archive, LayoutGrid, ShoppingBag, Sparkles, User } from "lucide-react";
 
 const TABS = [
   { route: "/studio", match: (path) => path === "/" || path.startsWith("/studio"), label: "Studio", Icon: Sparkles },
-  { route: "/marketplace", match: (path) => path.startsWith("/marketplace"), label: "Market", Icon: ShoppingBag },
+  { route: "/marketplace", match: (path) => path.startsWith("/marketplace"), label: "Marketplace", Icon: ShoppingBag },
   {
     route: "/my-collection",
-    match: (path) => path.startsWith("/my-collection") || path === "/vault",
+    match: (path) => path.startsWith("/my-collection"),
     label: "Collection",
     Icon: LayoutGrid,
   },
-  { route: "/trades", match: (path) => path.startsWith("/trades"), label: "Trades", Icon: ArrowLeftRight },
+  { route: "/vault", match: (path) => path === "/vault" || path.startsWith("/vault/"), label: "Vault", Icon: Archive },
   { route: "/profile", match: (path) => path.startsWith("/profile"), label: "Profile", Icon: User },
 ];
 

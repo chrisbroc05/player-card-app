@@ -21,7 +21,7 @@ import { vaultTierBadge } from "../utils/tierStyles";
 import { scrollAfterPaint } from "../utils/smoothScroll";
 import { generationUsageFromPayload } from "../utils/generationUsage";
 
-export default function MyCollectionPage() {
+export default function MyCollectionPage({ vaultView = false }) {
   const { token, user, initializing, refreshIncomingTradeCount, refreshNavBadges } = useAuth();
   const navigate = useNavigate();
   const [cards, setCards] = useState([]);
@@ -41,7 +41,7 @@ export default function MyCollectionPage() {
   const [deleteModalCard, setDeleteModalCard] = useState(null);
   const [deleteBusyId, setDeleteBusyId] = useState("");
   const [deletedCards, setDeletedCards] = useState([]);
-  const [deletedExpanded, setDeletedExpanded] = useState(false);
+  const [deletedExpanded, setDeletedExpanded] = useState(vaultView);
   const [permanentDeleteModalCard, setPermanentDeleteModalCard] = useState(null);
   const [recoverBusyId, setRecoverBusyId] = useState("");
   const [permanentDeleteBusyId, setPermanentDeleteBusyId] = useState("");

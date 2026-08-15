@@ -137,33 +137,39 @@ export default function AppHeader() {
 
       {!hideMobileChrome ? (
         <header className="mobile-header">
-          <Link to="/" className="mobile-header__logo-link" aria-label="Prospect Legends home">
-            <img src="/prospect-legends-logo.png" alt="" className="mobile-header__logo" height={32} />
-          </Link>
+          <div className="mobile-header-left">
+            <Link to="/" className="mobile-header__logo-link" aria-label="Prospect Legends home">
+              <img src="/prospect-legends-logo.png" alt="" className="mobile-header__logo" height={28} />
+            </Link>
+            {user ? (
+              <Link to="/profile" className="mobile-header__username" title={user.display_name}>
+                @{user.display_name}
+              </Link>
+            ) : null}
+          </div>
 
-          {user ? (
-            <Link to="/credits" className="mobile-header__credits" title="Your credit balance">
-              <Coins className="mobile-header__credits-icon" strokeWidth={2} aria-hidden />
-              <span className="tabular-nums">{formatMoney(user.credit_balance ?? 0)}</span>
-            </Link>
-          ) : (
-            <span className="mobile-header__credits mobile-header__credits--guest" aria-hidden />
-          )}
-
-          {user ? (
-            <Link
-              to="/trades"
-              className={`mobile-header__bell${hasNotifications ? " mobile-header__bell--active" : ""}`}
-              aria-label={hasNotifications ? "Trades and offers — new activity" : "Trades and offers"}
-            >
-              <Bell className="h-[22px] w-[22px]" strokeWidth={2} aria-hidden />
-              {hasNotifications ? <span className="notification-dot" aria-hidden /> : null}
-            </Link>
-          ) : (
-            <Link to="/login" className="mobile-header__sign-in text-xs font-medium text-brand-gold">
-              Sign in
-            </Link>
-          )}
+          <div className="mobile-header-right">
+            {user ? (
+              <>
+                <Link to="/credits" className="credits-badge" title="Your credit balance">
+                  <Coins className="credits-badge__icon" strokeWidth={2} aria-hidden />
+                  <span className="credits-badge__amount tabular-nums">{formatMoney(user.credit_balance ?? 0)}</span>
+                </Link>
+                <Link
+                  to="/trades"
+                  className={`mobile-header__bell${hasNotifications ? " mobile-header__bell--active" : ""}`}
+                  aria-label={hasNotifications ? "Trades and offers — new activity" : "Trades and offers"}
+                >
+                  <Bell className="h-5 w-5" strokeWidth={2} aria-hidden />
+                  {hasNotifications ? <span className="notification-dot" aria-hidden /> : null}
+                </Link>
+              </>
+            ) : (
+              <Link to="/login" className="mobile-header__sign-in text-xs font-medium text-brand-gold">
+                Sign in
+              </Link>
+            )}
+          </div>
         </header>
       ) : null}
 
