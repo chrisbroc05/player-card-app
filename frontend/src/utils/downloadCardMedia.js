@@ -1,9 +1,45 @@
-import html2canvas from "html2canvas";
 import { API_BASE_URL } from "../config/api";
 import { isAnimatedCard } from "./animationCard";
 import { highlightVideoUrl, isHighlightCard } from "./highlightCard";
+import {
+  formatBannerEdition,
+  themeDisplayLabel,
+  tierPillLabel,
+} from "./cardBannerStyles";
+import { normalizeTierKey, resolveCardDisplayMeta } from "./cardTemplate";
 
 const ALLOWED_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "gif", "mp4", "webm", "mov"]);
+
+const CARD_WIDTH = 600;
+const CARD_HEIGHT = 840;
+const BANNER_HEIGHT = 200;
+const IMAGE_HEIGHT = CARD_HEIGHT - BANNER_HEIGHT;
+const BORDER_RADIUS = 20;
+const BORDER_WIDTH = 4;
+
+const TIER_COLORS = {
+  rookie: {
+    primary: "#3B6D11",
+    secondary: "#1a3a1a",
+    glow: "rgba(59,109,17,0.6)",
+    text: "#7bc832",
+    banner: ["#0d200d", "#1a3a1a"],
+  },
+  allstar: {
+    primary: "#185FA5",
+    secondary: "#0d1a2e",
+    glow: "rgba(24,95,165,0.6)",
+    text: "#4a9eff",
+    banner: ["#060d1a", "#0d1a2e"],
+  },
+  legends: {
+    primary: "#BA7517",
+    secondary: "#1a1200",
+    glow: "rgba(186,117,23,0.6)",
+    text: "#f0d060",
+    banner: ["#0d0900", "#1a1200"],
+  },
+};
 
 function sanitizeFilenamePart(value) {
   return (
@@ -25,7 +61,7 @@ function inferExtensionFromUrl(url) {
   return ALLOWED_EXTENSIONS.has(ext) ? ext : null;
 }
 
-/** Pick metadata used for download filenames (styled capture is always PNG). */
+/** Pick metadata used for download filenames (canvas export is always PNG). */
 export function getCardDownloadTarget(card) {
   if (!card) return null;
 
@@ -79,50 +115,6 @@ export function isMobileDownloadDevice() {
   return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 }
 
-function resolveCaptureElement(card, { captureElement, captureRef } = {}) {
-  if (captureElement) return captureElement;
-  if (captureRef?.current) return captureRef.current;
-  const cardId = card?.card_id || card?.cardId;
-  if (cardId) {
-    const escaped = typeof CSS !== "undefined" && CSS.escape ? CSS.escape(cardId) : cardId;
-    return document.querySelector(`[data-card-capture-id="${escaped}"]`);
-  }
-  return document.querySelector(".card-display-container");
-}
-
-/** Swap cloned videos for still frames using live video elements (never touches displayed DOM). */
-function replaceClonedVideosWithFrames(cardElement, clonedElement, clonedDoc) {
-  const liveVideos = Array.from(cardElement.querySelectorAll("video"));
-  const clonedVideos = Array.from(clonedElement.querySelectorAll("video"));
-
-  clonedVideos.forEach((clonedVideo, index) => {
-    const liveVideo = liveVideos[index];
-    if (!liveVideo || liveVideo.readyState < 2 || !liveVideo.videoWidth) return;
-
-    try {
-      const canvas = document.createElement("canvas");
-      canvas.width = liveVideo.videoWidth;
-      canvas.height = liveVideo.videoHeight;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.drawImage(liveVideo, 0, 0);
-
-      const img = clonedDoc.createElement("img");
-      img.src = canvas.toDataURL("image/png");
-      img.className = clonedVideo.className;
-      img.style.cssText = clonedVideo.style.cssText;
-      const computed = window.getComputedStyle(clonedVideo);
-      img.style.width = clonedVideo.style.width || computed.width;
-      img.style.height = clonedVideo.style.height || computed.height;
-      img.style.objectFit = computed.objectFit || "cover";
-      img.style.objectPosition = computed.objectPosition || "center";
-      clonedVideo.parentNode?.replaceChild(img, clonedVideo);
-    } catch (error) {
-      console.warn("Video frame capture failed:", error);
-    }
-  });
-}
-
 function fallbackDownload(blob, filename) {
   const blobUrl = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -132,6 +124,84 @@ function fallbackDownload(blob, filename) {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(blobUrl);
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function drawBannerBackground(ctx, bannerY, colors) {
+  const bannerGrad = ctx.createLinearGradient(0, bannerY, 0, CARD_HEIGHT);
+  bannerGrad.addColorStop(0, colors.banner[0]);
+  bannerGrad.addColorStop(1, colors.banner[1]);
+
+  ctx.beginPath();
+  ctx.moveTo(0, bannerY);
+  ctx.lineTo(CARD_WIDTH, bannerY);
+  ctx.lineTo(CARD_WIDTH, CARD_HEIGHT - BORDER_RADIUS);
+  ctx.quadraticCurveTo(CARD_WIDTH, CARD_HEIGHT, CARD_WIDTH - BORDER_RADIUS, CARD_HEIGHT);
+  ctx.lineTo(BORDER_RADIUS, CARD_HEIGHT);
+  ctx.quadraticCurveTo(0, CARD_HEIGHT, 0, CARD_HEIGHT - BORDER_RADIUS);
+  ctx.closePath();
+  ctx.fillStyle = bannerGrad;
+  ctx.fill();
+}
+
+function drawCoverImage(ctx, img, x, y, w, h) {
+  const scale = Math.max(w / img.width, h / img.height);
+  const sw = img.width * scale;
+  const sh = img.height * scale;
+  const sx = x + (w - sw) / 2;
+  const sy = y + (h - sh) / 2;
+  ctx.drawImage(img, sx, sy, sw, sh);
+}
+
+async function loadImageFromBlob(blob) {
+  const blobUrl = URL.createObjectURL(blob);
+  try {
+    return await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = blobUrl;
+    });
+  } finally {
+    URL.revokeObjectURL(blobUrl);
+  }
+}
+
+async function loadVideoFrameFromElement(cardElement) {
+  if (!cardElement) return null;
+  const video = cardElement.querySelector("video");
+  if (!video || video.readyState < 2 || !video.videoWidth) return null;
+
+  try {
+    const frameCanvas = document.createElement("canvas");
+    frameCanvas.width = video.videoWidth;
+    frameCanvas.height = video.videoHeight;
+    const frameCtx = frameCanvas.getContext("2d");
+    if (!frameCtx) return null;
+    frameCtx.drawImage(video, 0, 0);
+    return await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = frameCanvas.toDataURL("image/png");
+    });
+  } catch (error) {
+    console.warn("Video frame load failed:", error);
+    return null;
+  }
 }
 
 async function fetchProxiedCardImageBlob(card, token) {
@@ -153,99 +223,192 @@ async function fetchProxiedCardImageBlob(card, token) {
   return null;
 }
 
-/**
- * Capture the styled card DOM as PNG and download or share natively on mobile.
- * Never modifies displayed image elements — proxy blob URLs are applied in onclone only.
- * @returns {Promise<{ method: 'share' | 'download' | 'cancelled' }>}
- */
-export async function downloadCardMedia(card, { captureElement, captureRef, token } = {}) {
-  const cardElement = resolveCaptureElement(card, { captureElement, captureRef });
-  if (!cardElement) {
-    throw new Error("Card element not found");
+async function loadCardImageForDownload(card, token, captureRef) {
+  const cardElement = captureRef?.current || null;
+  const videoFrame = await loadVideoFrameFromElement(cardElement);
+  if (videoFrame) return videoFrame;
+
+  const imageBlob = await fetchProxiedCardImageBlob(card, token);
+  if (imageBlob) {
+    return loadImageFromBlob(imageBlob);
+  }
+  return null;
+}
+
+function drawCardToCanvas(card, cardImage) {
+  const meta = resolveCardDisplayMeta(card);
+  if (!meta) {
+    throw new Error("Card metadata unavailable");
   }
 
-  const cardId = card?.card_id || card?.cardId;
-  let blobImageUrl = null;
-  let imageBlob = null;
+  const tierKey = normalizeTierKey(meta.tier);
+  const colors = TIER_COLORS[tierKey] || TIER_COLORS.rookie;
+  const theme = card.theme || card.special_theme || card.specialTheme || "";
+  const themeLabel = themeDisplayLabel(theme);
+  const tierLabel = tierPillLabel(tierKey);
+  const edition = formatBannerEdition(card.edition_number ?? card.editionNumber, card.print_run ?? card.printRun);
 
-  try {
-    imageBlob = await fetchProxiedCardImageBlob(card, token);
-    if (imageBlob) {
-      blobImageUrl = URL.createObjectURL(imageBlob);
-    }
+  const canvas = document.createElement("canvas");
+  canvas.width = CARD_WIDTH;
+  canvas.height = CARD_HEIGHT;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Canvas not supported");
+  }
 
-    const canvas = await html2canvas(cardElement, {
-      useCORS: false,
-      allowTaint: true,
-      backgroundColor: "#0A0A0A",
-      scale: 2,
-      logging: false,
-      imageTimeout: 15000,
-      onclone: (clonedDoc, clonedElement) => {
-        const selector = cardId
-          ? `[data-card-capture-id="${typeof CSS !== "undefined" && CSS.escape ? CSS.escape(cardId) : cardId}"]`
-          : ".card-display-container";
-        const clonedCard = clonedDoc.querySelector(selector) || clonedElement;
-        if (clonedCard) {
-          clonedCard.style.transform = "none";
-        }
+  ctx.fillStyle = "#0A0A0A";
+  roundRect(ctx, 0, 0, CARD_WIDTH, CARD_HEIGHT, BORDER_RADIUS);
+  ctx.fill();
 
-        replaceClonedVideosWithFrames(cardElement, clonedElement, clonedDoc);
+  ctx.save();
+  roundRect(
+    ctx,
+    BORDER_WIDTH,
+    BORDER_WIDTH,
+    CARD_WIDTH - BORDER_WIDTH * 2,
+    IMAGE_HEIGHT - BORDER_WIDTH,
+    BORDER_RADIUS - BORDER_WIDTH
+  );
+  ctx.clip();
 
-        if (blobImageUrl) {
-          clonedElement.querySelectorAll("img").forEach((img) => {
-            if (img.src && img.src.includes("r2.dev")) {
-              img.src = blobImageUrl;
-              img.crossOrigin = "anonymous";
-            }
-          });
-        }
-      },
-    });
+  if (cardImage) {
+    drawCoverImage(ctx, cardImage, 0, 0, CARD_WIDTH, IMAGE_HEIGHT);
+  } else {
+    const grad = ctx.createLinearGradient(0, 0, 0, IMAGE_HEIGHT);
+    grad.addColorStop(0, colors.secondary);
+    grad.addColorStop(1, "#0A0A0A");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, CARD_WIDTH, IMAGE_HEIGHT);
+  }
+  ctx.restore();
 
-    const filename = buildCardDownloadFilename(card, "png");
-    const playerName = card?.player_name || card?.playerName || "Player";
+  const bannerY = IMAGE_HEIGHT;
+  drawBannerBackground(ctx, bannerY, colors);
 
-    return await new Promise((resolve, reject) => {
-      canvas.toBlob(async (blob) => {
-        if (!blob) {
-          reject(new Error("Failed to create image"));
-          return;
-        }
+  ctx.fillStyle = colors.primary;
+  ctx.fillRect(0, bannerY, CARD_WIDTH, 3);
 
-        const isMobile = isMobileDownloadDevice();
-        if (
-          isMobile &&
-          typeof navigator.share === "function" &&
-          typeof navigator.canShare === "function" &&
-          typeof File !== "undefined"
-        ) {
-          const file = new File([blob], filename, { type: "image/png" });
-          if (navigator.canShare({ files: [file] })) {
-            try {
-              await navigator.share({
-                title: `${playerName} — Prospect Legends`,
-                text: "Check out my Prospect Legends card!",
-                files: [file],
-              });
-              resolve({ method: "share" });
+  ctx.textAlign = "center";
+  ctx.fillStyle = tierKey === "legends" ? colors.text : "#FFFFFF";
+
+  const playerName = meta.playerName.toUpperCase();
+  let nameFontSize = 36;
+  ctx.font = `800 ${nameFontSize}px "Barlow Condensed", sans-serif`;
+  while (ctx.measureText(playerName).width > CARD_WIDTH - 60 && nameFontSize > 20) {
+    nameFontSize -= 2;
+    ctx.font = `800 ${nameFontSize}px "Barlow Condensed", sans-serif`;
+  }
+  ctx.fillText(playerName, CARD_WIDTH / 2, bannerY + 50);
+
+  if (meta.team) {
+    ctx.fillStyle = colors.text;
+    ctx.font = `600 22px "Barlow Condensed", sans-serif`;
+    ctx.fillText(meta.team.toUpperCase(), CARD_WIDTH / 2, bannerY + 82);
+  }
+
+  if (meta.statsLine) {
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.font = `500 18px "Barlow Condensed", sans-serif`;
+    ctx.fillText(meta.statsLine, CARD_WIDTH / 2, bannerY + 112);
+  }
+
+  const pillX = 20;
+  const pillY = bannerY + 135;
+  const pillW = 90;
+  const pillH = 28;
+  const pillR = 14;
+
+  ctx.fillStyle = colors.secondary;
+  ctx.strokeStyle = colors.primary;
+  ctx.lineWidth = 1.5;
+  roundRect(ctx, pillX, pillY, pillW, pillH, pillR);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = colors.text;
+  ctx.font = `700 13px "Barlow Condensed", sans-serif`;
+  ctx.textAlign = "center";
+  ctx.fillText(tierLabel, pillX + pillW / 2, pillY + 19);
+
+  if (themeLabel) {
+    ctx.textAlign = "center";
+    ctx.fillStyle = colors.text;
+    ctx.font = `500 13px "Barlow Condensed", sans-serif`;
+    ctx.fillText(themeLabel, CARD_WIDTH / 2, pillY + 19);
+  }
+
+  ctx.textAlign = "right";
+  ctx.fillStyle = colors.text;
+  ctx.font = `500 13px "Barlow Condensed", sans-serif`;
+  ctx.fillText(edition, CARD_WIDTH - 20, pillY + 19);
+
+  ctx.shadowColor = colors.glow;
+  ctx.shadowBlur = 20;
+  ctx.strokeStyle = colors.primary;
+  ctx.lineWidth = BORDER_WIDTH;
+  roundRect(
+    ctx,
+    BORDER_WIDTH / 2,
+    BORDER_WIDTH / 2,
+    CARD_WIDTH - BORDER_WIDTH,
+    CARD_HEIGHT - BORDER_WIDTH,
+    BORDER_RADIUS
+  );
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  return canvas;
+}
+
+/**
+ * Draw the complete card onto a canvas and download or share natively on mobile.
+ * @returns {Promise<{ method: 'share' | 'download' | 'cancelled' }>}
+ */
+export async function downloadCardMedia(card, { captureRef, token } = {}) {
+  if (!card?.card_id && !card?.cardId) {
+    throw new Error("Card not found");
+  }
+
+  const cardImage = await loadCardImageForDownload(card, token, captureRef);
+  const canvas = drawCardToCanvas(card, cardImage);
+  const filename = buildCardDownloadFilename(card, "png");
+  const playerName = card?.player_name || card?.playerName || "Player";
+
+  return await new Promise((resolve, reject) => {
+    canvas.toBlob(async (blob) => {
+      if (!blob) {
+        reject(new Error("Failed to create image"));
+        return;
+      }
+
+      const isMobile = isMobileDownloadDevice();
+      if (
+        isMobile &&
+        typeof navigator.share === "function" &&
+        typeof navigator.canShare === "function" &&
+        typeof File !== "undefined"
+      ) {
+        const file = new File([blob], filename, { type: "image/png" });
+        if (navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              title: `${playerName} — Prospect Legends`,
+              text: "Check out my Prospect Legends card!",
+              files: [file],
+            });
+            resolve({ method: "share" });
+            return;
+          } catch (shareError) {
+            if (shareError?.name === "AbortError") {
+              resolve({ method: "cancelled" });
               return;
-            } catch (shareError) {
-              if (shareError?.name === "AbortError") {
-                resolve({ method: "cancelled" });
-                return;
-              }
             }
           }
         }
+      }
 
-        fallbackDownload(blob, filename);
-        resolve({ method: "download" });
-      }, "image/png", 1.0);
-    });
-  } finally {
-    if (blobImageUrl) {
-      URL.revokeObjectURL(blobImageUrl);
-    }
-  }
+      fallbackDownload(blob, filename);
+      resolve({ method: "download" });
+    }, "image/png", 1.0);
+  });
 }
