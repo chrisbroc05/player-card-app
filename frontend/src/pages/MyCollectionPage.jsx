@@ -6,6 +6,7 @@ import { API_BASE_URL, authHeaders } from "../config/api";
 import CardImage from "../components/CardImage";
 import { CardSharePopover } from "../components/ShareCard";
 import { useAuth } from "../context/AuthContext";
+import { useSettings } from "../context/SettingsContext";
 import MarketplaceListingActions, { ListedSuccessModal } from "../components/MarketplaceListingActions";
 import AnimateCardModal from "../components/AnimateCardModal";
 import AnimationLoadingScreen from "../components/AnimationLoadingScreen";
@@ -15,6 +16,7 @@ import CollectionToast from "../components/CollectionToast";
 import DeleteCardModal from "../components/DeleteCardModal";
 import PermanentDeleteCardModal from "../components/PermanentDeleteCardModal";
 import { authFetch, formatApiError } from "../utils/authFetch";
+import { formatMoney } from "../utils/marketplace";
 import { canAnimateCard, isAnimatedCard, isAnimationInProgress } from "../utils/animationCard";
 import { cardMediaFrameClass, cardPlaysVideoOnHover } from "../utils/highlightCard";
 import { vaultTierBadge } from "../utils/tierStyles";
@@ -23,6 +25,7 @@ import { generationUsageFromPayload } from "../utils/generationUsage";
 
 export default function MyCollectionPage({ vaultView = false }) {
   const { token, user, initializing, refreshIncomingTradeCount, refreshNavBadges } = useAuth();
+  const { settings } = useSettings();
   const navigate = useNavigate();
   const [cards, setCards] = useState([]);
   const [listingByCardId, setListingByCardId] = useState({});
@@ -49,6 +52,12 @@ export default function MyCollectionPage({ vaultView = false }) {
   const [listSuccessOpen, setListSuccessOpen] = useState(false);
   const [pendingOffersByCardId, setPendingOffersByCardId] = useState({});
   const animationFocusRef = useRef(null);
+
+  const collectionGridClass = settings.large_card_grid
+    ? "grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-6 sm:grid-cols-2 lg:grid-cols-3"
+    : "grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-5 sm:grid-cols-2 lg:grid-cols-3";
+  const cardAutoplay = settings.autoplay_videos !== false;
+  const showPrices = settings.show_prices !== false;
 
   const loadCards = useCallback(async () => {
     if (!token) return;
@@ -465,13 +474,14 @@ export default function MyCollectionPage({ vaultView = false }) {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className={collectionGridClass}>
             {displayRows.map(({ card, stackCount }) => {
               const badge = vaultTierBadge(card.tier);
               const pending = (card.status || "active") === "pending_trade";
               const showDelete = canDeleteCard(card);
               const videoCard = cardPlaysVideoOnHover(card);
               const pendingOfferCount = pendingOffersByCardId[card.card_id] || 0;
+              const listingPrice = listingByCardId[card.card_id]?.asking_price;
               return (
                 <article
                   key={card.card_id}
@@ -485,7 +495,7 @@ export default function MyCollectionPage({ vaultView = false }) {
                       alt={card.player_name}
                       cacheBust={card.created_at}
                       frameClassName={`${cardMediaFrameClass(card)} w-full`}
-                      playOnHover
+                      playOnHover={cardAutoplay}
                       showInfoBanner
                     />
                     <div className="absolute left-2 top-2 z-10 flex flex-col items-start gap-1">
@@ -513,6 +523,11 @@ export default function MyCollectionPage({ vaultView = false }) {
                     </div>
                   </div>
                   <div className="mt-3 space-y-2 px-1">
+                    {showPrices && listingPrice != null ? (
+                      <p className="text-center text-sm font-bold text-[var(--color-gold-primary)] tabular-nums">
+                        {formatMoney(listingPrice)}
+                      </p>
+                    ) : null}
                     {pending ? (
                       <span className="inline-flex rounded-full border border-[#f59e0b]/50 bg-[#f59e0b]/15 px-2 py-0.5 text-[11px] font-semibold text-[#fbbf24]">
                         Pending Trade
@@ -587,7 +602,7 @@ export default function MyCollectionPage({ vaultView = false }) {
             </button>
 
             {deletedExpanded ? (
-              <div className="mt-5 grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              <div className={`mt-5 ${collectionGridClass}`}>
                 {deletedCards.map((card) => {
                   const badge = vaultTierBadge(card.tier);
                   const { daysAgo, daysRemaining } = deletedCardTiming(card.deleted_at);

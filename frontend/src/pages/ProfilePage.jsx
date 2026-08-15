@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Navigate, useLocation, useSearchParams } from "react-router-dom";
+import { ChevronDown } from "lucide-react";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import CardImage from "../components/CardImage";
@@ -40,6 +41,76 @@ function rarityEditionDisplay(editionNumber, printRun) {
   if (p <= 5) return { text, tone: "silver" };
   if (p <= 10) return { text, tone: "bronze" };
   return { text, tone: "default" };
+}
+
+function ProfileFinancials({ token }) {
+  const [expanded, setExpanded] = useState(false);
+  const [financials, setFinancials] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!expanded || !token) return undefined;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`${API_BASE_URL}/auth/profile/financials`, {
+          headers: { ...authHeaders(token) },
+          cache: "no-store",
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled && res.ok) setFinancials(data);
+      } catch {
+        if (!cancelled) setFinancials(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [expanded, token]);
+
+  const rows = financials
+    ? [
+        { label: "Total spent on cards", value: financials.total_spent_on_cards },
+        { label: "Total earned from sales", value: financials.total_earned_from_sales },
+        { label: "Total withdrawn", value: financials.total_withdrawn },
+        { label: "Current balance", value: financials.current_balance },
+        { label: "Total animated cards cost", value: financials.total_animated_cards_cost },
+        { label: "Total highlight cards cost", value: financials.total_highlight_cards_cost },
+      ]
+    : [];
+
+  return (
+    <section className="profile-financials">
+      <button
+        type="button"
+        className="profile-financials__toggle"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+      >
+        <span>My Financials</span>
+        <ChevronDown className={`profile-financials__chevron${expanded ? " profile-financials__chevron--open" : ""}`} aria-hidden />
+      </button>
+      {expanded ? (
+        <div className="profile-financials__panel">
+          {loading ? (
+            <p className="profile-financials__loading">Loading financials…</p>
+          ) : (
+            <dl className="profile-financials__grid">
+              {rows.map((row) => (
+                <React.Fragment key={row.label}>
+                  <dt className="profile-financials__label">{row.label}</dt>
+                  <dd className="profile-financials__amount">{formatMoney(row.value ?? 0)}</dd>
+                </React.Fragment>
+              ))}
+            </dl>
+          )}
+        </div>
+      ) : null}
+    </section>
+  );
 }
 
 function ProfileKpi({ label, value }) {
@@ -278,6 +349,10 @@ export default function ProfilePage() {
                 />
               </div>
             </section>
+
+            <hr className="profile-page__divider" />
+
+            {token ? <ProfileFinancials token={token} /> : null}
 
             <hr className="profile-page__divider" />
 

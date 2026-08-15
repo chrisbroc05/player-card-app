@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, JSON, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
@@ -28,6 +28,7 @@ class User(Base):
     stripe_account_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
     stripe_onboarding_complete: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     stripe_payouts_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    settings: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     cards: Mapped[list["Card"]] = relationship(

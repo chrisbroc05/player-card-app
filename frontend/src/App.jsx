@@ -15,6 +15,7 @@ import MarketplaceMyListingsPage from "./pages/MarketplaceMyListingsPage";
 import MarketplaceMyOffersPage from "./pages/MarketplaceMyOffersPage";
 import MarketplaceOfferDetailPage from "./pages/MarketplaceOfferDetailPage";
 import CreditsPage from "./pages/CreditsPage";
+import SettingsPage from "./pages/SettingsPage";
 
 export default function App() {
   const location = useLocation();
@@ -45,6 +46,7 @@ export default function App() {
       <Route path="/marketplace" element={<MarketplacePage />} />
       <Route path="/trades" element={<TradesPage />} />
       <Route path="/profile" element={<ProfilePage />} />
+      <Route path="/settings" element={<SettingsPage />} />
       <Route path="/credits" element={<CreditsPage />} />
       </Routes>
     </div>

@@ -96,6 +96,7 @@ from routers.connect import router as connect_router  # noqa: E402
 from routers.credits import router as credits_router  # noqa: E402
 from routers.marketplace import router as marketplace_router  # noqa: E402
 from routers.stripe_webhook import router as stripe_webhook_router  # noqa: E402
+from routers.settings import router as settings_router  # noqa: E402
 from routers.users import router as users_router  # noqa: E402
 from theme_library import (  # noqa: E402
     THEME_CATEGORIES,
@@ -216,6 +217,7 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(trade_router, prefix="/trades", tags=["trades"])
 app.include_router(admin_router, prefix="/admin", tags=["admin"])
 app.include_router(auth_user_router, prefix="/auth", tags=["auth"])
+app.include_router(settings_router, prefix="/settings", tags=["settings"])
 app.include_router(activity_router, prefix="/activity", tags=["activity"])
 app.include_router(credits_router, prefix="/credits", tags=["credits"])
 app.include_router(connect_router, prefix="/connect", tags=["connect"])

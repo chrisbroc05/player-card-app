@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Bell, Coins } from "lucide-react";
+import { Bell, Coins, Settings } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { formatMoney } from "../utils/marketplace";
 import MobileBottomNav from "./MobileBottomNav";
@@ -27,6 +27,7 @@ export default function AppHeader() {
   const onMyCollection = location.pathname.startsWith("/my-collection");
   const onTrades = location.pathname.startsWith("/trades");
   const onProfile = location.pathname.startsWith("/profile");
+  const onSettings = location.pathname.startsWith("/settings");
   const onCredits = location.pathname.startsWith("/credits");
 
   const hasNotifications = pendingIncomingTradesCount + pendingIncomingMarketplaceCount > 0;
@@ -110,6 +111,14 @@ export default function AppHeader() {
                   <span className="tabular-nums">{formatMoney(user.credit_balance ?? 0)}</span>
                 </Link>
                 <Link
+                  to="/settings"
+                  className={`desktop-header__settings${onSettings ? " desktop-header__settings--active" : ""}`}
+                  aria-label="Settings"
+                  title="Settings"
+                >
+                  <Settings size={20} strokeWidth={2} aria-hidden />
+                </Link>
+                <Link
                   to="/profile"
                   className={`inline-flex max-w-[140px] truncate text-xs text-[var(--color-text-secondary)] underline decoration-transparent underline-offset-2 transition hover:text-white hover:decoration-white/40 sm:max-w-[200px] ${
                     onProfile ? "text-white decoration-white/30" : ""
@@ -154,6 +163,14 @@ export default function AppHeader() {
                 <Link to="/credits" className="credits-badge" title="Your credit balance">
                   <Coins className="credits-badge__icon" strokeWidth={2} aria-hidden />
                   <span className="credits-badge__amount tabular-nums">{formatMoney(user.credit_balance ?? 0)}</span>
+                </Link>
+                <Link
+                  to="/settings"
+                  className={`mobile-header__settings${onSettings ? " mobile-header__settings--active" : ""}`}
+                  aria-label="Settings"
+                  title="Settings"
+                >
+                  <Settings size={20} strokeWidth={2} aria-hidden />
                 </Link>
                 <Link
                   to="/trades"

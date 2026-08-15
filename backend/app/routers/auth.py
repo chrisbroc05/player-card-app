@@ -3,15 +3,24 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from decimal import Decimal
 
 from card_repo import animation_fields_for_card, highlight_fields_for_card
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from auth import get_current_user
+from auth import get_current_user, hash_password, verify_password
+from credit_service import (
+    TX_ANIMATION,
+    TX_CARD_SALE,
+    TX_GENERATION,
+    TX_HIGHLIGHT,
+    TX_WITHDRAWAL,
+)
 from database import get_db
-from models import Card, MarketplaceOffer, User
+from models import Card, CreditLedger, MarketplaceOffer, User
 from parent_email_utils import normalize_optional_parent_email
 from profile_stats import compute_profile_kpis
 from marketplace_repo import float_from_decimal
@@ -24,6 +33,31 @@ class UpdateProfileBody(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     parent_email: str | None = Field(default=None, max_length=320)
+    display_name: str | None = Field(default=None, min_length=1, max_length=200)
+
+
+class ChangePasswordBody(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+
+class DeleteAccountBody(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    confirmation: str = Field(..., min_length=1)
+
+
+class ProfileFinancialsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    total_spent_on_cards: float = 0.0
+    total_earned_from_sales: float = 0.0
+    total_withdrawn: float = 0.0
+    current_balance: float = 0.0
+    total_animated_cards_cost: float = 0.0
+    total_highlight_cards_cost: float = 0.0
 
 
 class ProfileCardOut(BaseModel):
@@ -232,10 +266,109 @@ def update_profile(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    try:
-        user.parent_email = normalize_optional_parent_email(body.parent_email)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid parent email address")
+    if body.display_name is not None:
+        name = body.display_name.strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="Display name cannot be empty")
+        user.display_name = name
+    if body.parent_email is not None:
+        try:
+            user.parent_email = normalize_optional_parent_email(body.parent_email)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid parent email address")
     db.commit()
     db.refresh(user)
-    return {"success": True, "parent_email": user.parent_email}
+    return {
+        "success": True,
+        "display_name": user.display_name,
+        "parent_email": user.parent_email,
+    }
+
+
+@router.post("/change-password")
+def change_password(
+    body: ChangePasswordBody,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if not verify_password(body.current_password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    if verify_password(body.new_password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="New password must differ from current password")
+    user.hashed_password = hash_password(body.new_password)
+    db.commit()
+    return {"success": True}
+
+
+@router.delete("/account")
+def delete_account(
+    body: DeleteAccountBody = Body(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if body.confirmation.strip() != "DELETE":
+        raise HTTPException(status_code=400, detail='Type "DELETE" to confirm account deletion')
+
+    active_listings = (
+        db.query(Card)
+        .filter(
+            Card.owner_id == user.id,
+            Card.listed_on_marketplace.is_(True),
+        )
+        .count()
+    )
+    if active_listings > 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Remove all marketplace listings before deleting your account",
+        )
+
+    db.query(CreditLedger).filter(CreditLedger.user_id == user.id).delete(synchronize_session=False)
+    db.query(Card).filter(Card.owner_id == user.id).delete(synchronize_session=False)
+    db.query(Card).filter(Card.creator_user_id == user.id).update(
+        {Card.creator_user_id: None},
+        synchronize_session=False,
+    )
+    db.delete(user)
+    db.commit()
+    return {"success": True}
+
+
+def _sum_abs_ledger(db: Session, user_id: int, transaction_type: str) -> Decimal:
+    total = (
+        db.query(func.coalesce(func.sum(func.abs(CreditLedger.amount)), 0))
+        .filter(
+            CreditLedger.user_id == user_id,
+            CreditLedger.transaction_type == transaction_type,
+        )
+        .scalar()
+    )
+    return Decimal(str(total or 0))
+
+
+def _sum_positive_ledger(db: Session, user_id: int, transaction_type: str) -> Decimal:
+    total = (
+        db.query(func.coalesce(func.sum(CreditLedger.amount), 0))
+        .filter(
+            CreditLedger.user_id == user_id,
+            CreditLedger.transaction_type == transaction_type,
+            CreditLedger.amount > 0,
+        )
+        .scalar()
+    )
+    return Decimal(str(total or 0))
+
+
+@router.get("/profile/financials", response_model=ProfileFinancialsResponse)
+def get_profile_financials(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return ProfileFinancialsResponse(
+        total_spent_on_cards=float_from_decimal(_sum_abs_ledger(db, user.id, TX_GENERATION)),
+        total_earned_from_sales=float_from_decimal(_sum_positive_ledger(db, user.id, TX_CARD_SALE)),
+        total_withdrawn=float_from_decimal(_sum_abs_ledger(db, user.id, TX_WITHDRAWAL)),
+        current_balance=float_from_decimal(user.credit_balance),
+        total_animated_cards_cost=float_from_decimal(_sum_abs_ledger(db, user.id, TX_ANIMATION)),
+        total_highlight_cards_cost=float_from_decimal(_sum_abs_ledger(db, user.id, TX_HIGHLIGHT)),
+    )

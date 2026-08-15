@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import { SettingsProvider } from "./context/SettingsContext";
 import { FeatureProvider } from "./context/FeatureContext";
 import { NewCardCelebrationProvider } from "./context/NewCardCelebrationContext";
 import App from "./App";
@@ -12,9 +13,11 @@ createRoot(document.getElementById("root")).render(
     <BrowserRouter>
       <FeatureProvider>
         <AuthProvider>
-          <NewCardCelebrationProvider>
-            <App />
-          </NewCardCelebrationProvider>
+          <SettingsProvider>
+            <NewCardCelebrationProvider>
+              <App />
+            </NewCardCelebrationProvider>
+          </SettingsProvider>
         </AuthProvider>
       </FeatureProvider>
     </BrowserRouter>

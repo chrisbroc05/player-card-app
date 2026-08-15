@@ -15,6 +15,7 @@ import {
   isHighlightType,
 } from "../utils/highlightCard";
 import { usePrefersHover } from "../hooks/usePrefersReducedMotion";
+import { useSettings } from "../context/SettingsContext";
 import { normalizeCardForDisplay } from "../utils/cardDetailUtils";
 import CardDisplay from "./CardDisplay";
 import HighlightVideoPlayer from "./HighlightVideoPlayer";
@@ -137,6 +138,10 @@ export default function CardImage({
   captureRef = null,
   onMediaReady,
 }) {
+  const { settings } = useSettings();
+  const autoplayEnabled = settings.autoplay_videos !== false;
+  const effectivePlayOnHover = playOnHover && autoplayEnabled;
+
   const [imgFailed, setImgFailed] = useState(false);
   const [videoFailed, setVideoFailed] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -150,7 +155,7 @@ export default function CardImage({
   const mediaReadyFiredRef = useRef(false);
   const canHover = usePrefersHover();
   const isDetail = variant === "detail";
-  const isGridBrowse = variant === "grid" && playOnHover;
+  const isGridBrowse = variant === "grid" && effectivePlayOnHover;
   const cardIdForApi = card?.card_id || card?.cardId || "";
 
   const fields = resolveCardFields(card, {
@@ -345,10 +350,10 @@ export default function CardImage({
           ? forcePlay || true
           : isGridBrowse
             ? browseActive
-            : forcePlay || !playOnHover
+            : forcePlay || !effectivePlayOnHover
         : isGridBrowse
           ? browseActive
-          : forcePlay || (!playOnHover && !isGridBrowse));
+          : forcePlay || (!effectivePlayOnHover && !isGridBrowse));
 
   const highlightPlaying = highlightActive && shouldPlayVideo;
 

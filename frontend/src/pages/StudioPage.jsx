@@ -40,6 +40,7 @@ import {
 } from "../constants/actionCategories";
 import { API_BASE_URL, authHeaders, toApiUrl } from "../config/api";
 import { useAuth } from "../context/AuthContext";
+import { useSettings } from "../context/SettingsContext";
 import { useFeatures } from "../context/FeatureContext";
 import { useNewCardCelebration } from "../context/NewCardCelebrationContext";
 import { fetchGenerationPrice } from "../utils/cardPricing";
@@ -291,6 +292,7 @@ function formatApiError(detail, fallback) {
 export default function StudioPage() {
   const navigate = useNavigate();
   const { token, user, initializing, refreshUser } = useAuth();
+  const { settings, settingsLoaded } = useSettings();
   const { showCelebration } = useNewCardCelebration();
   const { highlightCardPrice } = useFeatures();
   const [currentStep, setCurrentStep] = useState(1);
@@ -403,6 +405,14 @@ export default function StudioPage() {
   const prevStepRef = useRef(currentStep);
   const prevGeneratingRef = useRef(false);
   const prevReviewSubPhaseRef = useRef(reviewSubPhase);
+  const studioDefaultsAppliedRef = useRef(false);
+
+  useEffect(() => {
+    if (!settingsLoaded || studioDefaultsAppliedRef.current) return;
+    studioDefaultsAppliedRef.current = true;
+    if (settings.default_tier) setOrderTier(settings.default_tier);
+    if (settings.default_theme) setSpecialTheme(settings.default_theme);
+  }, [settingsLoaded, settings.default_tier, settings.default_theme]);
   const prevPreviewConfigureRef = useRef(false);
   const prevAnimationLoadingRef = useRef(null);
   const animatedChoiceShownForRef = useRef("");

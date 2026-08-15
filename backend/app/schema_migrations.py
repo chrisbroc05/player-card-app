@@ -553,6 +553,20 @@ def run_schema_migrations_after_models(engine: Engine) -> None:
                             "BOOLEAN NOT NULL DEFAULT 0"
                         )
                     )
+            if "settings" not in ucols:
+                if dialect == "postgresql":
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS "
+                            "settings JSONB NOT NULL DEFAULT '{}'::jsonb"
+                        )
+                    )
+                else:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ADD COLUMN settings TEXT NOT NULL DEFAULT '{}'"
+                        )
+                    )
 
         tables = set(insp.get_table_names())
         if "credit_ledger" not in tables:
