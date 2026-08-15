@@ -715,7 +715,7 @@ function BuyAtAskingConfirmModal({
       ariaLabelledBy="buy-confirm-title"
       onBackdropClick={onCancel}
     >
-      <MarketplaceModalContent className="marketplace-buy-sheet">
+      <MarketplaceModalContent className="marketplace-buy-sheet buy-bottom-sheet">
         <h3 id="buy-confirm-title" className="marketplace-buy-sheet__title text-xl font-semibold text-white">
           Confirm Purchase
         </h3>

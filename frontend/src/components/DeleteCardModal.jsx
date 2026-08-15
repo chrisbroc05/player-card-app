@@ -4,7 +4,7 @@ export default function DeleteCardModal({ card, open, busy, onClose, onConfirm }
   if (!open || !card) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 sm:items-center sm:p-4">
+    <div className="mobile-bottom-sheet-overlay fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 sm:items-center sm:p-4">
       <div
         className="w-full max-w-md rounded-2xl border border-white/10 bg-cardBg p-5 shadow-2xl sm:p-6"
         role="dialog"

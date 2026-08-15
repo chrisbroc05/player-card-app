@@ -31,7 +31,7 @@ export function MarketplaceModalShell({
       }}
     >
       <div
-        className={`marketplace-modal-panel border ${borderClass} bg-cardBg shadow-2xl shadow-black/50`}
+        className={`marketplace-modal-panel mobile-bottom-sheet border ${borderClass} bg-cardBg shadow-2xl shadow-black/50`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={ariaLabelledBy}
@@ -49,7 +49,9 @@ export function MarketplaceModalContent({ children, className = "" }) {
 }
 
 export function MarketplaceModalActions({ children, className = "" }) {
-  return <div className={`marketplace-modal-actions ${className}`.trim()}>{children}</div>;
+  return (
+    <div className={`marketplace-modal-actions sticky-button ${className}`.trim()}>{children}</div>
+  );
 }
 
 export function MarketplaceModalSuccessIcon() {

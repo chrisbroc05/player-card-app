@@ -83,7 +83,7 @@ export default function NewCardCelebration({
   const canAffordAnimate = Number(creditBalance) >= ANIMATE_COST;
 
   return (
-    <div className="fixed inset-0 z-[115] flex items-end justify-center bg-black/75 p-3 sm:items-center sm:p-4">
+    <div className="mobile-bottom-sheet-overlay fixed inset-0 z-[115] flex items-end justify-center bg-black/75 p-3 sm:items-center sm:p-4">
       <div
         ref={dialogRef}
         className="scroll-focus-target relative max-h-[92vh] w-full min-w-0 overflow-y-auto rounded-2xl border border-white/10 bg-cardBg shadow-2xl shadow-black/60 sm:min-w-[440px] sm:max-w-[520px]"

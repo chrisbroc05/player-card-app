@@ -44,7 +44,7 @@ export default function AnimateCardModal({ card, open, onClose, onConfirm, busy,
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 sm:items-center sm:p-4">
+      <div className="mobile-bottom-sheet-overlay fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 sm:items-center sm:p-4">
         <div
           ref={dialogRef}
           className="scroll-focus-target max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/10 bg-cardBg p-4 shadow-2xl sm:p-6"

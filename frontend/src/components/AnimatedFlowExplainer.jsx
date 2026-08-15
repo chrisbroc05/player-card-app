@@ -8,7 +8,7 @@ export default function AnimatedFlowExplainer({ open, onContinue, motionName = "
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[55] flex items-end justify-center bg-black/75 p-3 sm:items-center sm:p-4">
+    <div className="mobile-bottom-sheet-overlay fixed inset-0 z-[55] flex items-end justify-center bg-black/75 p-3 sm:items-center sm:p-4">
       <div
         ref={dialogRef}
         className="scroll-focus-target w-full max-w-lg overflow-hidden rounded-2xl border border-violet-400/30 bg-gradient-to-b from-violet-500/15 via-cardBg to-cardBg p-5 shadow-2xl shadow-violet-900/30 sm:p-6"

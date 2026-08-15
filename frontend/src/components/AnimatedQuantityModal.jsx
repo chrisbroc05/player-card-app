@@ -105,7 +105,7 @@ export default function AnimatedQuantityModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[59] flex items-end justify-center bg-black/75 p-3 sm:items-center sm:p-4">
+    <div className="mobile-bottom-sheet-overlay fixed inset-0 z-[59] flex items-end justify-center bg-black/75 p-3 sm:items-center sm:p-4">
       <div
         ref={dialogRef}
         className="scroll-focus-target max-h-[90vh] w-full min-w-0 overflow-y-auto rounded-2xl border border-violet-400/30 bg-cardBg shadow-2xl sm:min-w-[480px] sm:max-w-lg"

@@ -36,7 +36,7 @@ export default function StartOverConfirmModal({ open, onClose, onConfirm, busy =
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[65] flex items-end justify-center bg-black/75 p-3 sm:items-center sm:p-4">
+    <div className="mobile-bottom-sheet-overlay fixed inset-0 z-[65] flex items-end justify-center bg-black/75 p-3 sm:items-center sm:p-4">
       <div
         ref={dialogRef}
         className="scroll-focus-target w-full max-w-md rounded-2xl border border-white/10 bg-cardBg p-5 shadow-2xl sm:p-6"
