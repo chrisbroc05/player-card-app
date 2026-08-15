@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Archive, LayoutGrid, ShoppingBag, Sparkles, User } from "lucide-react";
+import { LayoutGrid, ShoppingBag, Sparkles, User } from "lucide-react";
 
 const TABS = [
   { route: "/studio", match: (path) => path === "/" || path.startsWith("/studio"), label: "Studio", Icon: Sparkles },
@@ -11,7 +11,6 @@ const TABS = [
     label: "Collection",
     Icon: LayoutGrid,
   },
-  { route: "/vault", match: (path) => path === "/vault" || path.startsWith("/vault/"), label: "Vault", Icon: Archive },
   { route: "/profile", match: (path) => path.startsWith("/profile"), label: "Profile", Icon: User },
 ];
 

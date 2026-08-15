@@ -143,7 +143,7 @@ export default function AppHeader() {
             </Link>
             {user ? (
               <Link to="/profile" className="mobile-header__username" title={user.display_name}>
-                @{user.display_name}
+                {user.display_name}
               </Link>
             ) : null}
           </div>
