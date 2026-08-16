@@ -360,20 +360,20 @@ def run_schema_migrations_after_models(engine: Engine) -> None:
                         "ALTER TABLE cards ADD COLUMN permanently_deleted BOOLEAN NOT NULL DEFAULT 0"
                     )
                 )
-            if "is_public" not in cols:
-                if dialect == "postgresql":
-                    conn.execute(
-                        text(
-                            "ALTER TABLE cards ADD COLUMN IF NOT EXISTS is_public BOOLEAN "
-                            "NOT NULL DEFAULT true"
-                        )
+        if "is_public" not in cols:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN IF NOT EXISTS is_public BOOLEAN "
+                        "NOT NULL DEFAULT true"
                     )
-                else:
-                    conn.execute(
-                        text(
-                            "ALTER TABLE cards ADD COLUMN is_public BOOLEAN NOT NULL DEFAULT 1"
-                        )
+                )
+            else:
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN is_public BOOLEAN NOT NULL DEFAULT 1"
                     )
+                )
 
         if "marketplace_offers" in insp.get_table_names():
             mcols = {c["name"] for c in insp.get_columns("marketplace_offers")}
