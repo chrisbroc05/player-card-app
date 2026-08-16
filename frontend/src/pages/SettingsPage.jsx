@@ -335,12 +335,6 @@ export default function SettingsPage() {
                 onChange={(v) => updateSetting("autoplay_videos", v)}
               />
               <SettingsToggleRow
-                label="Large card grid"
-                description="Show bigger cards in My Collection and Vault"
-                checked={settings.large_card_grid}
-                onChange={(v) => updateSetting("large_card_grid", v)}
-              />
-              <SettingsToggleRow
                 label="Show card prices in collection"
                 description="Display current market value on your cards"
                 checked={settings.show_prices}

@@ -206,8 +206,7 @@ export default function PublicProfilePage() {
   const [tradeSuccess, setTradeSuccess] = useState("");
 
   const cardAutoplay = settings?.autoplay_videos !== false;
-  const isLargeGrid = Boolean(settings?.large_card_grid);
-  const gridClass = `collection-grid ${isLargeGrid ? "grid-large" : "grid-normal"}`;
+  const gridClass = "collection-grid";
 
   const loadProfile = useCallback(async () => {
     if (!username) return;

@@ -18,7 +18,6 @@ class SettingsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     autoplay_videos: bool = True
-    large_card_grid: bool = False
     show_prices: bool = True
     default_tier: str = "all_star"
     default_theme: str | None = None
@@ -35,7 +34,6 @@ class SettingsUpdateBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     autoplay_videos: bool | None = None
-    large_card_grid: bool | None = None
     show_prices: bool | None = None
     default_tier: str | None = None
     default_theme: str | None = Field(default=None)

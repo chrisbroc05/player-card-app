@@ -5611,30 +5611,24 @@
   color: var(--color-text-muted);
 }
 
-/* Collection grid — respects large_card_grid setting */
+/* Collection grid — fixed 3-across on desktop */
 .collection-grid {
+  display: grid;
   width: 100%;
-}
-
-.grid-normal {
-  display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
+  gap: 12px;
 }
 
-.grid-large {
-  display: grid;
-  grid-template-columns: repeat(1, 1fr);
-  gap: 20px;
-}
-
-@media (min-width: 640px) {
-  .grid-normal {
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+@media (min-width: 600px) {
+  .collection-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
   }
+}
 
-  .grid-large {
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+@media (min-width: 900px) {
+  .collection-grid {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
@@ -5647,17 +5641,9 @@
   min-height: 200px;
 }
 
-.collection-card-stage--large {
-  min-height: 320px;
-}
-
 @media (min-width: 640px) {
   .collection-card-stage--normal {
     min-height: 240px;
-  }
-
-  .collection-card-stage--large {
-    min-height: 400px;
   }
 }
 

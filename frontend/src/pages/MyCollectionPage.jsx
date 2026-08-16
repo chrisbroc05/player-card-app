@@ -54,11 +54,8 @@ export default function MyCollectionPage({ vaultView = false }) {
   const [pendingOffersByCardId, setPendingOffersByCardId] = useState({});
   const animationFocusRef = useRef(null);
 
-  const isLargeGrid = Boolean(settings?.large_card_grid);
-  const collectionGridClass = `collection-grid ${isLargeGrid ? "grid-large" : "grid-normal"}`;
-  const cardStageClass = isLargeGrid
-    ? "collection-card-stage collection-card-stage--large"
-    : "collection-card-stage collection-card-stage--normal";
+  const collectionGridClass = "collection-grid";
+  const cardStageClass = "collection-card-stage collection-card-stage--normal";
   const cardAutoplay = settings?.autoplay_videos !== false;
   const showPrices = settings?.show_prices !== false;
 

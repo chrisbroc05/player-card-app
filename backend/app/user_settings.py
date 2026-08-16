@@ -7,7 +7,6 @@ from typing import Any
 
 DEFAULT_USER_SETTINGS: dict[str, Any] = {
     "autoplay_videos": True,
-    "large_card_grid": False,
     "show_prices": True,
     "default_tier": "all_star",
     "default_theme": None,

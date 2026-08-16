@@ -4,7 +4,6 @@ import { useAuth } from "./AuthContext";
 
 export const DEFAULT_SETTINGS = {
   autoplay_videos: true,
-  large_card_grid: false,
   show_prices: true,
   default_tier: "all_star",
   default_theme: null,
