@@ -11,7 +11,7 @@ const TABS = [
     label: "Collection",
     Icon: LayoutGrid,
   },
-  { route: "/profile", match: (path) => path.startsWith("/profile"), label: "Profile", Icon: User },
+  { route: "/profile", match: (path) => path === "/profile" || path === "/profile/", label: "Profile", Icon: User },
 ];
 
 export default function MobileBottomNav() {

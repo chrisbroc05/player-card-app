@@ -16,6 +16,9 @@ import MarketplaceMyOffersPage from "./pages/MarketplaceMyOffersPage";
 import MarketplaceOfferDetailPage from "./pages/MarketplaceOfferDetailPage";
 import CreditsPage from "./pages/CreditsPage";
 import SettingsPage from "./pages/SettingsPage";
+import ContactPage from "./pages/ContactPage";
+import HelpPage from "./pages/HelpPage";
+import PublicProfilePage from "./pages/PublicProfilePage";
 
 export default function App() {
   const location = useLocation();
@@ -45,8 +48,11 @@ export default function App() {
       <Route path="/marketplace/:cardId" element={<MarketplaceCardDetailPage />} />
       <Route path="/marketplace" element={<MarketplacePage />} />
       <Route path="/trades" element={<TradesPage />} />
+      <Route path="/profile/:username" element={<PublicProfilePage />} />
       <Route path="/profile" element={<ProfilePage />} />
       <Route path="/settings" element={<SettingsPage />} />
+      <Route path="/contact" element={<ContactPage />} />
+      <Route path="/help" element={<HelpPage />} />
       <Route path="/credits" element={<CreditsPage />} />
       </Routes>
     </div>

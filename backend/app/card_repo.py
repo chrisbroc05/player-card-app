@@ -11,7 +11,8 @@ from pathlib import Path
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from models import Card, utcnow
+from models import Card, User, utcnow
+from user_settings import user_has_public_collection
 from utils.storage import app_data_root
 
 _CARD_ID_PATTERN = re.compile(r"^FL-\d{4}-\d{6}$", re.IGNORECASE)
@@ -214,6 +215,9 @@ def card_to_dict(card: Card, db: Session | None = None) -> dict:
         "owner_name": card.owner_name,
         "owner_id": card.owner_id,
         "status": st,
+        "is_public": bool(getattr(card, "is_public", True)),
+        "listed_on_marketplace": bool(getattr(card, "listed_on_marketplace", False)),
+        "asking_price": float(card.asking_price) if card.asking_price is not None else None,
         "trade_offered_to": getattr(card, "trade_offered_to", None),
         "pending_trade_offer_id": None,
     }
@@ -339,6 +343,61 @@ def list_my_cards_dicts(db: Session, owner_id: int) -> list[dict]:
     rows = (
         db.query(Card)
         .filter(owned_collection_filter(owner_id))
+        .order_by(Card.created_at.desc())
+        .all()
+    )
+    return [card_to_dict(r, db) for r in rows]
+
+
+def list_public_vault_cards_dicts(db: Session, viewer_user_id: int | None = None) -> list[dict]:
+    """Public vault — others' cards require is_public + public_collection; viewer always sees own."""
+    from sqlalchemy import and_, or_
+
+    visibility_filters = []
+    if viewer_user_id is not None:
+        visibility_filters.append(Card.owner_id == viewer_user_id)
+
+    public_owner_ids: set[int] = set()
+    for user in db.query(User).all():
+        if user_has_public_collection(user):
+            public_owner_ids.add(user.id)
+
+    if public_owner_ids:
+        visibility_filters.append(
+            and_(
+                Card.owner_id.in_(public_owner_ids),
+                Card.is_public.is_(True),
+            )
+        )
+
+    if not visibility_filters:
+        return []
+
+    rows = (
+        db.query(Card)
+        .filter(
+            active_card_filter(),
+            Card.status.in_(COLLECTION_STATUSES),
+            or_(*visibility_filters),
+        )
+        .order_by(Card.created_at.desc())
+        .all()
+    )
+    return [card_to_dict(r, db) for r in rows]
+
+
+def list_user_public_profile_cards_dicts(db: Session, owner_id: int) -> list[dict]:
+    """Cards visible on a user's public profile."""
+    owner = db.query(User).filter(User.id == owner_id).first()
+    if owner is None or not user_has_public_collection(owner):
+        return []
+
+    rows = (
+        db.query(Card)
+        .filter(
+            owned_collection_filter(owner_id),
+            Card.is_public.is_(True),
+        )
         .order_by(Card.created_at.desc())
         .all()
     )

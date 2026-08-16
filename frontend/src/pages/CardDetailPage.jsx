@@ -7,6 +7,7 @@ import CardImage from "../components/CardImage";
 import CardDetailHero from "../components/CardDetailHero";
 import ShareCard from "../components/ShareCard";
 import SendCard from "../components/SendCard";
+import ProfileLink from "../components/ProfileLink";
 import MarketplaceListingActions from "../components/MarketplaceListingActions";
 import { useAuth } from "../context/AuthContext";
 import CardHistoryTimeline from "../components/CardHistoryTimeline";
@@ -264,6 +265,12 @@ export default function CardDetailPage() {
                   {isAnimatedCard(displayCard) ? <AnimatedBadge /> : null}
                   {isHighlightCard(displayCard) ? <HighlightBadge /> : null}
                 </div>
+
+                {!isOwner && displayCard?.owner_name ? (
+                  <p className="text-sm text-slate-400">
+                    Owned by <ProfileLink displayName={displayCard.owner_name} className="profile-link" />
+                  </p>
+                ) : null}
 
                 <dl className="grid gap-3 rounded-2xl border border-white/10 bg-cardBg p-4 text-sm sm:grid-cols-2">
                   <div className="sm:col-span-2">

@@ -450,6 +450,14 @@ export default function SettingsPage() {
                 onClick={() => setModal("delete")}
               />
             </section>
+
+            <section className="settings-section">
+              <h2 className="settings-section__label">Support</h2>
+              <div className="settings-section__rows">
+                <SettingsLinkRow label="Help Center" description="Browse FAQs and guides" to="/help" />
+                <SettingsLinkRow label="Contact Us" description="Get in touch with our team" to="/contact" />
+              </div>
+            </section>
           </>
         )}
       </main>

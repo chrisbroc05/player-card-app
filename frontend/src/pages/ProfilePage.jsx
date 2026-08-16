@@ -7,6 +7,7 @@ import CardImage from "../components/CardImage";
 import { ProfileActivityCompactList } from "../components/ActivityHistory";
 import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY, authHeaders } from "../config/api";
 import { useAuth } from "../context/AuthContext";
+import { useSettings } from "../context/SettingsContext";
 import { formatMoney } from "../utils/marketplace";
 import { formatEditionShort } from "../utils/tierStyles";
 
@@ -133,6 +134,8 @@ function ProfileHighlightCard({ label, children, footer }) {
 }
 
 function ProfileCardThumb({ card }) {
+  const { settings } = useSettings();
+  const cardAutoplay = settings?.autoplay_videos !== false;
   if (!card) return null;
   return (
     <div className="profile-highlight__thumb">
@@ -141,7 +144,7 @@ function ProfileCardThumb({ card }) {
         alt={card.player_name || "Card"}
         frameClassName="profile-highlight__frame"
         showInfoBanner
-        playOnHover
+        playOnHover={cardAutoplay}
       />
     </div>
   );

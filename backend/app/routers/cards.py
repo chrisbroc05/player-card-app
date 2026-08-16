@@ -733,6 +733,32 @@ def list_recently_deleted(
     return rows
 
 
+class CardVisibilityBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    is_public: bool
+
+
+@router.patch("/{card_id}/visibility")
+def update_card_visibility(
+    card_id: str,
+    body: CardVisibilityBody,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Toggle whether a card appears on the owner's public profile and in the Vault."""
+    card = _resolve_card(db, card_id)
+    if card.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not own this card")
+    if (card.status or "active") == DELETED_STATUS:
+        raise HTTPException(status_code=400, detail="Cannot change visibility of a deleted card")
+
+    card.is_public = bool(body.is_public)
+    db.commit()
+    db.refresh(card)
+    return card_to_dict(card, db)
+
+
 @router.delete("/{card_id}")
 def delete_card(
     card_id: str,

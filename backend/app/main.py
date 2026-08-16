@@ -71,6 +71,7 @@ from card_repo import (  # noqa: E402
     list_cards_for_player_dicts,
     finalize_order_preview,
     list_my_cards_dicts,
+    list_public_vault_cards_dicts,
     next_collectible_card_id,
     get_pending_session_by_id,
     pending_session_cards,
@@ -96,6 +97,8 @@ from routers.connect import router as connect_router  # noqa: E402
 from routers.credits import router as credits_router  # noqa: E402
 from routers.marketplace import router as marketplace_router  # noqa: E402
 from routers.stripe_webhook import router as stripe_webhook_router  # noqa: E402
+from routers.contact import router as contact_router  # noqa: E402
+from routers.public_profile import router as public_profile_router  # noqa: E402
 from routers.settings import router as settings_router  # noqa: E402
 from routers.users import router as users_router  # noqa: E402
 from theme_library import (  # noqa: E402
@@ -218,6 +221,8 @@ app.include_router(trade_router, prefix="/trades", tags=["trades"])
 app.include_router(admin_router, prefix="/admin", tags=["admin"])
 app.include_router(auth_user_router, prefix="/auth", tags=["auth"])
 app.include_router(settings_router, prefix="/settings", tags=["settings"])
+app.include_router(contact_router, prefix="/contact", tags=["contact"])
+app.include_router(public_profile_router, prefix="/profile", tags=["profile"])
 app.include_router(activity_router, prefix="/activity", tags=["activity"])
 app.include_router(credits_router, prefix="/credits", tags=["credits"])
 app.include_router(connect_router, prefix="/connect", tags=["connect"])
@@ -1298,6 +1303,9 @@ class CardVaultSummary(BaseModel):
     highlight_status: str | None = Field(default=None)
     highlight_trim_start: float | None = Field(default=None)
     highlight_trim_end: float | None = Field(default=None)
+    is_public: bool = Field(default=True)
+    listed_on_marketplace: bool = Field(default=False)
+    asking_price: float | None = Field(default=None)
 
 
 class CardDuplicateBody(BaseModel):
@@ -1796,6 +1804,17 @@ def list_my_cards(
 ):
     """Authenticated user's cards only."""
     rows = list_my_cards_dicts(db, current_user.id)
+    return [CardVaultSummary.model_validate(r) for r in rows]
+
+
+@app.get("/cards/public-vault", response_model=list[CardVaultSummary])
+def list_public_vault(
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+):
+    """Browse public collections; viewers always include their own cards when signed in."""
+    viewer_id = current_user.id if current_user is not None else None
+    rows = list_public_vault_cards_dicts(db, viewer_user_id=viewer_id)
     return [CardVaultSummary.model_validate(r) for r in rows]
 
 

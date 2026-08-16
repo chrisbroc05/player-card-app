@@ -8,6 +8,7 @@ import {
   MarketplaceModalCardDetails,
   MarketplaceModalCardSection,
 } from "../components/MarketplaceModalLayout";
+import ProfileLink from "../components/ProfileLink";
 import { useAuth } from "../context/AuthContext";
 import { authFetch, formatApiError } from "../utils/authFetch";
 import {
@@ -256,16 +257,19 @@ export default function MarketplaceOfferDetailPage() {
                       {statusKey === "accepted" ? (
                         <p className="text-[13px] text-slate-300">
                           Purchased from{" "}
-                          <span className="font-medium text-white">
-                            @{offer.seller_display_name || offer.owner_display_name || "seller"}
-                          </span>
+                          <ProfileLink
+                            displayName={offer.seller_display_name || offer.owner_display_name || "seller"}
+                            className="profile-link profile-link--inline font-medium text-white"
+                          />
                         </p>
                       ) : offer.seller_display_name || offer.owner_display_name ? (
                         <p className="text-[13px] text-slate-400">
                           Seller:{" "}
-                          <span className="font-medium text-slate-200">
-                            {offer.seller_display_name || offer.owner_display_name}
-                          </span>
+                          <ProfileLink
+                            displayName={offer.seller_display_name || offer.owner_display_name}
+                            className="profile-link profile-link--inline font-medium text-slate-200"
+                            prefixAt={false}
+                          />
                         </p>
                       ) : null}
 

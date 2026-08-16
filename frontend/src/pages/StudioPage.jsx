@@ -405,13 +405,13 @@ export default function StudioPage() {
   const prevStepRef = useRef(currentStep);
   const prevGeneratingRef = useRef(false);
   const prevReviewSubPhaseRef = useRef(reviewSubPhase);
-  const studioDefaultsAppliedRef = useRef(false);
 
   useEffect(() => {
-    if (!settingsLoaded || studioDefaultsAppliedRef.current) return;
-    studioDefaultsAppliedRef.current = true;
-    if (settings.default_tier) setOrderTier(settings.default_tier);
-    if (settings.default_theme) setSpecialTheme(settings.default_theme);
+    if (!settingsLoaded) return;
+    setOrderTier((prev) => prev || settings.default_tier || "all_star");
+    if (settings.default_theme) {
+      setSpecialTheme((prev) => prev || settings.default_theme);
+    }
   }, [settingsLoaded, settings.default_tier, settings.default_theme]);
   const prevPreviewConfigureRef = useRef(false);
   const prevAnimationLoadingRef = useRef(null);

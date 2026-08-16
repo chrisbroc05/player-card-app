@@ -19,6 +19,7 @@ import { isCardOwner } from "../utils/cardOwnership";
 import AnimatedBadge from "../components/AnimatedBadge";
 import HighlightBadge from "../components/HighlightBadge";
 import CardHistoryTimeline from "../components/CardHistoryTimeline";
+import ProfileLink from "../components/ProfileLink";
 import { themeDisplayLabel } from "../utils/cardBannerStyles";
 import { vaultTierBadge, rarityDisplay } from "../utils/tierStyles";
 import { CARD_IMAGE_FRAME_DETAIL } from "../utils/cardImageStyles";
@@ -290,7 +291,10 @@ export default function MarketplaceCardDetailPage() {
                     : `Listing expires in ${listing.days_remaining} day${listing.days_remaining === 1 ? "" : "s"}`}
                 </p>
               ) : null}
-              <p className="text-sm text-slate-500">Listed by {listing.owner_display_name}</p>
+              <p className="text-sm text-slate-500">
+                Listed by{" "}
+                <ProfileLink displayName={listing.owner_display_name} className="profile-link profile-link--inline" prefixAt={false} />
+              </p>
               <p className="text-xs text-slate-600">{listedAgeLabel(listing.listed_at)}</p>
               {(listing.pending_offer_count || 0) > 0 ? (
                 <p className="mt-2 text-xs text-amber-200">{listing.pending_offer_count} pending offer(s)</p>
@@ -755,7 +759,12 @@ function BuyAtAskingConfirmModal({
               </span>
             </p>
             <p className="marketplace-buy-sheet__seller">
-              Seller: {listing.owner_display_name || "Unknown Seller"}
+              Seller:{" "}
+              {listing.owner_display_name ? (
+                <ProfileLink displayName={listing.owner_display_name} className="profile-link profile-link--inline" prefixAt={false} />
+              ) : (
+                "Unknown Seller"
+              )}
             </p>
           </div>
         </div>

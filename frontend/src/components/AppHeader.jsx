@@ -26,7 +26,8 @@ export default function AppHeader() {
   const onMarketplace = location.pathname.startsWith("/marketplace");
   const onMyCollection = location.pathname.startsWith("/my-collection");
   const onTrades = location.pathname.startsWith("/trades");
-  const onProfile = location.pathname.startsWith("/profile");
+  const onProfile =
+    location.pathname === "/profile" || location.pathname === "/profile/";
   const onSettings = location.pathname.startsWith("/settings");
   const onCredits = location.pathname.startsWith("/credits");
 
@@ -67,7 +68,7 @@ export default function AppHeader() {
               Studio
             </Link>
             {!initializing && !user ? (
-              <Link to="/my-collection" className={navClass(onVault && !onMarketplace)}>
+              <Link to="/vault" className={navClass(onVault && !onMarketplace)}>
                 Vault
               </Link>
             ) : null}

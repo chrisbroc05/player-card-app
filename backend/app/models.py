@@ -121,6 +121,7 @@ class Card(Base):
     draft_metadata: Mapped[str | None] = mapped_column(Text, nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     permanently_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_public: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     owner: Mapped["User | None"] = relationship(
         "User",

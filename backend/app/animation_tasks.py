@@ -22,6 +22,7 @@ from email_service import (
     send_animation_failed_email,
 )
 from parent_email_utils import parent_email_for_notify
+from user_settings import user_wants_email
 from models import Card, User, utcnow
 from services.video_generation_service import generate_animation
 
@@ -120,7 +121,7 @@ async def process_animation(card_id: str, motion_id: str) -> None:
             result.get("provider") or "unknown",
             result.get("model_used") or "unknown",
         )
-        if owner and owner.email:
+        if owner and owner.email and user_wants_email(owner, "email_animation_ready"):
             send_animation_complete_email(
                 owner.email,
                 owner.display_name,

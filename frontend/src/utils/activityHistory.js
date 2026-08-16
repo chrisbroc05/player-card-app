@@ -170,7 +170,19 @@ export function formatActivityTimestamp(iso) {
   }
 }
 
-export function counterpartyLine(item) {
+export function counterpartyProfileName(item) {
+  const type = item?.activity_type;
+  if (
+    type === "animated_upgrade" ||
+    type === "highlight_upgrade" ||
+    type === "card_created"
+  ) {
+    return null;
+  }
+  return item?.counterparty?.display_name || null;
+}
+
+export function counterpartyPrefix(item) {
   const type = item?.activity_type;
   if (type === "animated_upgrade" || type === "highlight_upgrade") {
     return "Upgraded by you";
@@ -178,12 +190,19 @@ export function counterpartyLine(item) {
   if (type === "card_created") {
     return "Created by you";
   }
-  const name = item?.counterparty?.display_name;
-  if (!name) return null;
-  if (type === "trade_sent") return `Traded to @${name}`;
-  if (type === "trade_received") return `Received from @${name}`;
-  if (type === "marketplace_bought") return `Purchased from @${name}`;
-  if (type === "marketplace_sold") return `Sold to @${name}`;
+  if (type === "trade_sent") return "Traded to";
+  if (type === "trade_received") return "Received from";
+  if (type === "marketplace_bought") return "Purchased from";
+  if (type === "marketplace_sold") return "Sold to";
+  return null;
+}
+
+export function counterpartyLine(item) {
+  const prefix = counterpartyPrefix(item);
+  const name = counterpartyProfileName(item);
+  if (prefix === "Upgraded by you" || prefix === "Created by you") return prefix;
+  if (!name) return prefix || null;
+  if (prefix) return `${prefix} @${name}`;
   return name;
 }
 

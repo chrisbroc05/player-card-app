@@ -22,6 +22,7 @@ from email_service import (
 )
 from database import get_db
 from parent_email_utils import parent_email_for_notify
+from email_notify import schedule_user_email
 from models import Card, TradeOffer, User
 from marketplace_repo import cancel_pending_marketplace_offers_for_card, clear_marketplace_listing
 from trade_repo import (
@@ -169,7 +170,10 @@ def trades_send(
     offer = get_trade_by_id(db, new_id)
     if offer is None:
         raise HTTPException(status_code=500, detail="Trade creation failed")
-    background_tasks.add_task(
+    schedule_user_email(
+        background_tasks,
+        recipient,
+        "email_trade_request",
         send_trade_offer_email,
         recipient.email,
         recipient.display_name,

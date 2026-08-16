@@ -9,6 +9,7 @@ import { vaultTierBadge } from "../utils/tierStyles";
 import { formatMoney, listingExpiresLabel, listingExpiresSubtextClass } from "../utils/marketplace";
 import { isAnimatedCard } from "../utils/animationCard";
 import { cardMediaFrameClass, cardPlaysVideoOnHover, isHighlightCard } from "../utils/highlightCard";
+import ProfileLink from "./ProfileLink";
 
 /** @param {"list" | "compact"} [variant] — list = current marketplace cards; compact = thumbnail grid */
 export default function MarketplaceCardGridItem({ listing, variant = "list", currentUserId = null }) {
@@ -57,47 +58,54 @@ export default function MarketplaceCardGridItem({ listing, variant = "list", cur
   }
 
   return (
-    <Link
-      to={cardPath}
+    <article
       className={`group flex flex-col rounded-2xl border border-white/10 bg-cardBg p-3 shadow-lg transition duration-300 hover:border-white/20 ${mediaCard ? "" : "hover:scale-[1.02]"} ${badge.glow}`}
     >
-      <div className="relative">
-        <CardImage
-          card={listing}
-          alt={listing.player_name}
-          frameClassName={cardMediaFrameClass(listing)}
-          playOnHover
-          showAnimatedBadge={false}
-          showHighlightBadge={false}
-          showInfoBanner
-        />
-        <div className="pointer-events-none absolute left-2 top-2 z-10 flex max-w-[calc(100%-1rem)] flex-col items-start gap-1">
-          <UserOfferBadge listing={listing} currentUserId={currentUserId} />
-          {priority ? <PriorityBadge /> : null}
+      <Link to={cardPath} className="block">
+        <div className="relative">
+          <CardImage
+            card={listing}
+            alt={listing.player_name}
+            frameClassName={cardMediaFrameClass(listing)}
+            playOnHover
+            showAnimatedBadge={false}
+            showHighlightBadge={false}
+            showInfoBanner
+          />
+          <div className="pointer-events-none absolute left-2 top-2 z-10 flex max-w-[calc(100%-1rem)] flex-col items-start gap-1">
+            <UserOfferBadge listing={listing} currentUserId={currentUserId} />
+            {priority ? <PriorityBadge /> : null}
+          </div>
+          {animated ? (
+            <span className="pointer-events-none absolute right-2 top-2 z-10">
+              <AnimatedBadge />
+            </span>
+          ) : null}
+          {highlight ? (
+            <span className="pointer-events-none absolute right-2 top-2 z-10">
+              <HighlightBadge />
+            </span>
+          ) : null}
         </div>
-        {animated ? (
-          <span className="pointer-events-none absolute right-2 top-2 z-10">
-            <AnimatedBadge />
-          </span>
-        ) : null}
-        {highlight ? (
-          <span className="pointer-events-none absolute right-2 top-2 z-10">
-            <HighlightBadge />
-          </span>
-        ) : null}
-      </div>
-      <div className="mt-3 flex flex-1 flex-col space-y-1.5 px-1">
-        <p className="text-lg font-bold text-brand-gold">{formatMoney(listing.asking_price)}</p>
+        <p className="mt-3 px-1 text-lg font-bold text-brand-gold">{formatMoney(listing.asking_price)}</p>
         {listing.days_remaining != null && listing.listing_expires_at ? (
-          <p className={`text-[11px] ${listingExpiresSubtextClass(listing.days_remaining)}`}>
+          <p className={`px-1 text-[11px] ${listingExpiresSubtextClass(listing.days_remaining)}`}>
             {listingExpiresLabel(listing.days_remaining)}
           </p>
         ) : null}
-        <p className="text-xs text-slate-500">Listed by {listing.owner_display_name}</p>
-        <span className="mt-2 block rounded-lg border bg-gold-subtle py-2 text-center text-xs font-semibold text-brand-gold transition group-hover:bg-[var(--color-gold-primary/20] sm:opacity-0 sm:group-hover:opacity-100">
+      </Link>
+      <div className="mt-1.5 flex flex-1 flex-col space-y-1.5 px-1">
+        <p className="text-xs text-slate-500">
+          Listed by{" "}
+          <ProfileLink displayName={listing.owner_display_name} className="profile-link profile-link--inline" prefixAt={false} />
+        </p>
+        <Link
+          to={cardPath}
+          className="mt-2 block rounded-lg border bg-gold-subtle py-2 text-center text-xs font-semibold text-brand-gold transition hover:bg-[var(--color-gold-primary/20] sm:opacity-0 sm:group-hover:opacity-100"
+        >
           Make Offer
-        </span>
+        </Link>
       </div>
-    </Link>
+    </article>
   );
 }

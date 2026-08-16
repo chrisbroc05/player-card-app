@@ -9,6 +9,8 @@ import {
   activityRowStyle,
   amountDisplay,
   counterpartyLine,
+  counterpartyPrefix,
+  counterpartyProfileName,
   filterActivityItems,
   formatActivityFullTimestamp,
   relativeTimeAgo,
@@ -16,6 +18,7 @@ import {
 import { getCardBannerStyles, themeDisplayLabel } from "../utils/cardBannerStyles";
 import { normalizeTierKey } from "../utils/cardTemplate";
 import { formatEditionShort, vaultTierBadge } from "../utils/tierStyles";
+import ProfileLink from "./ProfileLink";
 
 const ACTIVITY_PAGE_SIZE = 20;
 
@@ -85,6 +88,8 @@ export function ActivityHistoryCompactList({ items, loading }) {
     <ul className="divide-y divide-white/10 rounded-xl border border-white/10 bg-cardBg2/60">
       {items.map((item) => {
         const cp = counterpartyLine(item);
+        const cpName = counterpartyProfileName(item);
+        const cpLead = counterpartyPrefix(item);
         const amt = amountDisplay(item);
         return (
           <li key={item.id} className="flex items-start gap-3 px-4 py-3.5">
@@ -95,7 +100,14 @@ export function ActivityHistoryCompactList({ items, loading }) {
                 <ActivityTypeBadge item={item} />
               </div>
               <p className="mt-0.5 truncate text-xs text-slate-500">{item.card?.card_id}</p>
-              {cp ? <p className="mt-1 text-sm text-slate-400">{cp}</p> : null}
+              {cpName ? (
+                <p className="mt-1 text-sm text-slate-400">
+                  {cpLead}{" "}
+                  <ProfileLink displayName={cpName} className="profile-link profile-link--inline" />
+                </p>
+              ) : cp ? (
+                <p className="mt-1 text-sm text-slate-400">{cp}</p>
+              ) : null}
               <div className="mt-1 flex flex-wrap items-center gap-3 text-xs">
                 <ActivityAmount amount={amt} />
                 <span className="text-slate-500">{relativeTimeAgo(item.completed_at || item.created_at)}</span>
@@ -119,6 +131,8 @@ function ActivityRow({ item }) {
   const themeLabel = themeDisplayLabel(theme);
   const edition = formatEditionShort(card?.edition_number, card?.print_run);
   const counterparty = counterpartyLine(item);
+  const counterpartyName = counterpartyProfileName(item);
+  const counterpartyLead = counterpartyPrefix(item);
   const amount = activityAmountDisplay(item);
   const timestamp = formatActivityFullTimestamp(item?.completed_at || item?.created_at);
 
@@ -161,7 +175,14 @@ function ActivityRow({ item }) {
       </div>
 
       <div className="activity-row__foot">
-        {counterparty ? <p className="activity-row__counterparty">{counterparty}</p> : null}
+        {counterpartyName ? (
+          <p className="activity-row__counterparty">
+            {counterpartyLead}{" "}
+            <ProfileLink displayName={counterpartyName} className="profile-link profile-link--inline" />
+          </p>
+        ) : counterparty ? (
+          <p className="activity-row__counterparty">{counterparty}</p>
+        ) : null}
         {timestamp ? <p className="activity-row__time">{timestamp}</p> : null}
       </div>
 

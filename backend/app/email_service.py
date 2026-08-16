@@ -1186,3 +1186,78 @@ def send_welcome_email(
         _send_resend_html(user_email, subject, html, 0, "welcome", parent_email=parent_email)
     except Exception as e:
         logger.error("Welcome email failed for %s: %s", user_email, e)
+
+
+def support_inbox_email() -> str:
+    """Support inbox — ADMIN_EMAIL env, else public support address."""
+    return (os.environ.get("ADMIN_EMAIL") or "support@prospectlegends.com").strip()
+
+
+def send_contact_support_email(
+    *,
+    support_to: str,
+    name: str,
+    email: str,
+    subject_key: str,
+    subject_label: str,
+    message: str,
+    user_id: int | None,
+    submitted_at: str,
+) -> None:
+    """Deliver a contact form submission to the support inbox."""
+    key = (os.environ.get("RESEND_API_KEY") or "").strip()
+    if not key:
+        raise RuntimeError("Email service is not configured")
+
+    user_line = f"User ID: {user_id}" if user_id is not None else "User ID: (guest — not signed in)"
+    esc_name = html_module.escape(name)
+    esc_email = html_module.escape(email)
+    esc_subject = html_module.escape(subject_label)
+    esc_message = html_module.escape(message).replace("\n", "<br />")
+    esc_time = html_module.escape(submitted_at)
+    esc_user = html_module.escape(user_line)
+
+    meta_rows = "".join(
+        f'<tr><td style="padding:6px 0;font-size:13px;color:#888888;width:120px;vertical-align:top;">{html_module.escape(label)}</td>'
+        f'<td style="padding:6px 0;font-size:14px;color:#ffffff;">{value}</td></tr>'
+        for label, value in [
+            ("Name", esc_name),
+            ("Email", esc_email),
+            ("Subject", esc_subject),
+            ("Submitted", esc_time),
+            ("Account", esc_user),
+        ]
+    )
+
+    parts = [
+        _heading("New Contact Form Message"),
+        _subtext_plain(f"Category: {subject_label} ({subject_key})"),
+        _content_row(
+            '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" '
+            'style="background-color:#161616;border:1px solid #2a2a2a;border-radius:8px;margin:0 0 24px 0;">'
+            f'<tr><td style="padding:16px 18px;"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">{meta_rows}</table></td></tr></table>'
+        ),
+        _content_row(
+            '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">'
+            '<tr><td style="padding:0 0 8px 0;font-size:13px;font-weight:700;color:#C9A84C;text-transform:uppercase;letter-spacing:1px;">Message</td></tr>'
+            f'<tr><td style="padding:12px 16px;background-color:#161616;border:1px solid #2a2a2a;border-radius:8px;font-size:14px;color:#dddddd;line-height:1.6;">{esc_message}</td></tr>'
+            "</table>"
+        ),
+        _muted_center(f"Reply directly to {esc_email} to respond to this user."),
+    ]
+    html = _email_shell("".join(parts))
+    mail_subject = f"[Contact] {subject_label} — {name}"
+
+    resend.api_key = key
+    params: dict[str, Any] = {
+        "from": _from_email(),
+        "to": [support_to.strip()],
+        "reply_to": email,
+        "subject": mail_subject,
+        "html": html,
+    }
+    try:
+        resend.Emails.send(params)
+    except Exception as exc:
+        logger.error("Contact form email failed for %s: %s", email, exc)
+        raise RuntimeError("Could not send message. Please try again later.") from exc

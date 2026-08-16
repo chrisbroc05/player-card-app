@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import { API_BASE_URL, authHeaders } from "../config/api";
@@ -53,52 +54,64 @@ export default function MyCollectionPage({ vaultView = false }) {
   const [pendingOffersByCardId, setPendingOffersByCardId] = useState({});
   const animationFocusRef = useRef(null);
 
-  const collectionGridClass = settings.large_card_grid
-    ? "grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-6 sm:grid-cols-2 lg:grid-cols-3"
-    : "grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-5 sm:grid-cols-2 lg:grid-cols-3";
-  const cardAutoplay = settings.autoplay_videos !== false;
-  const showPrices = settings.show_prices !== false;
+  const isLargeGrid = Boolean(settings?.large_card_grid);
+  const collectionGridClass = `collection-grid ${isLargeGrid ? "grid-large" : "grid-normal"}`;
+  const cardStageClass = isLargeGrid
+    ? "collection-card-stage collection-card-stage--large"
+    : "collection-card-stage collection-card-stage--normal";
+  const cardAutoplay = settings?.autoplay_videos !== false;
+  const showPrices = settings?.show_prices !== false;
 
   const loadCards = useCallback(async () => {
-    if (!token) return;
+    if (!vaultView && !token) return;
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`${API_BASE_URL}/cards/my-cards`, {
-        headers: { ...authHeaders(token) },
+      const cardsUrl = vaultView
+        ? `${API_BASE_URL}/cards/public-vault`
+        : `${API_BASE_URL}/cards/my-cards`;
+      const res = await fetch(cardsUrl, {
+        headers: token ? { ...authHeaders(token) } : {},
       });
-      if (!res.ok) throw new Error("Could not load your collection.");
+      if (!res.ok) throw new Error(vaultView ? "Could not load the vault." : "Could not load your collection.");
       const data = await res.json();
       setCards(Array.isArray(data) ? data : []);
-      const deletedRes = await authFetch(token, "/cards/recently-deleted");
-      if (deletedRes.res.ok) {
-        const deletedData = await deletedRes.res.json().catch(() => []);
-        setDeletedCards(Array.isArray(deletedData) ? deletedData : []);
+
+      if (!vaultView && token) {
+        const deletedRes = await authFetch(token, "/cards/recently-deleted");
+        if (deletedRes.res.ok) {
+          const deletedData = await deletedRes.res.json().catch(() => []);
+          setDeletedCards(Array.isArray(deletedData) ? deletedData : []);
+        } else {
+          setDeletedCards([]);
+        }
+        const listRes = await authFetch(token, "/marketplace/my-listings");
+        if (listRes.res.ok) {
+          const listings = await listRes.res.json().catch(() => []);
+          const map = {};
+          if (Array.isArray(listings)) {
+            for (const row of listings) {
+              if (row.card_id) map[row.card_id] = row;
+            }
+          }
+          setListingByCardId(map);
+        }
+        const incRes = await authFetch(token, "/marketplace/incoming-offers");
+        if (incRes.res.ok) {
+          const incoming = await incRes.res.json().catch(() => []);
+          const offerMap = {};
+          if (Array.isArray(incoming)) {
+            for (const row of incoming) {
+              if (row.card_id) offerMap[row.card_id] = (offerMap[row.card_id] || 0) + 1;
+            }
+          }
+          setPendingOffersByCardId(offerMap);
+        } else {
+          setPendingOffersByCardId({});
+        }
       } else {
         setDeletedCards([]);
-      }
-      const listRes = await authFetch(token, "/marketplace/my-listings");
-      if (listRes.res.ok) {
-        const listings = await listRes.res.json().catch(() => []);
-        const map = {};
-        if (Array.isArray(listings)) {
-          for (const row of listings) {
-            if (row.card_id) map[row.card_id] = row;
-          }
-        }
-        setListingByCardId(map);
-      }
-      const incRes = await authFetch(token, "/marketplace/incoming-offers");
-      if (incRes.res.ok) {
-        const incoming = await incRes.res.json().catch(() => []);
-        const offerMap = {};
-        if (Array.isArray(incoming)) {
-          for (const row of incoming) {
-            if (row.card_id) offerMap[row.card_id] = (offerMap[row.card_id] || 0) + 1;
-          }
-        }
-        setPendingOffersByCardId(offerMap);
-      } else {
+        setListingByCardId({});
         setPendingOffersByCardId({});
       }
     } catch (e) {
@@ -106,7 +119,7 @@ export default function MyCollectionPage({ vaultView = false }) {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, vaultView]);
 
   async function listCardOnMarketplace(cardId, askingPrice, isPriority = false) {
     if (!token) return;
@@ -181,9 +194,10 @@ export default function MyCollectionPage({ vaultView = false }) {
   }, [cards]);
 
   useEffect(() => {
-    if (!token || initializing) return;
+    if (initializing) return;
+    if (!vaultView && !token) return;
     loadCards();
-  }, [token, initializing, loadCards]);
+  }, [token, initializing, vaultView, loadCards]);
 
   useEffect(() => {
     if (!token) return undefined;
@@ -392,6 +406,41 @@ export default function MyCollectionPage({ vaultView = false }) {
     }
   }
 
+  async function toggleCardVisibility(card, event) {
+    event?.stopPropagation?.();
+    event?.preventDefault?.();
+    if (!token || !card?.card_id || vaultView) return;
+    const nextPublic = card.is_public === false;
+    setCards((prev) =>
+      prev.map((c) => (c.card_id === card.card_id ? { ...c, is_public: nextPublic } : c))
+    );
+    try {
+      const { res, unauthorized } = await authFetch(
+        token,
+        `/cards/${encodeURIComponent(card.card_id)}/visibility`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ is_public: nextPublic }),
+        }
+      );
+      if (unauthorized) throw new Error("Session expired.");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(formatApiError(data?.detail, "Could not update visibility."));
+      }
+      setCards((prev) =>
+        prev.map((c) => (c.card_id === card.card_id ? { ...c, ...data, is_public: nextPublic } : c))
+      );
+      showToast(nextPublic ? "Card is now public." : "Card is now private.");
+    } catch (e) {
+      setCards((prev) =>
+        prev.map((c) => (c.card_id === card.card_id ? { ...c, is_public: !nextPublic } : c))
+      );
+      showToast(e.message || "Could not update visibility.", "error");
+    }
+  }
+
   async function cancelTradeForCard(card) {
     if (!token || !card?.pending_trade_offer_id) return;
     setCancelKey(card.card_id);
@@ -412,7 +461,7 @@ export default function MyCollectionPage({ vaultView = false }) {
     }
   }
 
-  if (!initializing && !user) {
+  if (!initializing && !user && !vaultView) {
     return <Navigate to="/login" replace />;
   }
 
@@ -422,11 +471,21 @@ export default function MyCollectionPage({ vaultView = false }) {
 
       <main className="mx-auto w-full max-w-6xl px-3 py-8 sm:px-6 lg:px-8">
         <div className="mb-8 text-center sm:text-left">
-          <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">My Collection</h2>
+          <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+            {vaultView ? "Vault" : "My Collection"}
+          </h2>
           {user ? (
             <p className="mt-2 text-sm text-slate-400">
-              Signed in as <span className="font-medium text-slate-200">{user.display_name}</span>
+              {vaultView ? (
+                <>Browse public collections from across the platform</>
+              ) : (
+                <>
+                  Signed in as <span className="font-medium text-slate-200">{user.display_name}</span>
+                </>
+              )}
             </p>
+          ) : vaultView ? (
+            <p className="mt-2 text-sm text-slate-400">Browse public card collections</p>
           ) : null}
         </div>
 
@@ -489,7 +548,7 @@ export default function MyCollectionPage({ vaultView = false }) {
                     pending ? "opacity-70" : videoCard ? "" : "hover:scale-[1.02]"
                   }`}
                 >
-                  <div className="relative min-h-[280px] sm:min-h-[320px]">
+                  <div className={`relative ${cardStageClass}`}>
                     <CardImage
                       card={card}
                       alt={card.player_name}
@@ -499,6 +558,21 @@ export default function MyCollectionPage({ vaultView = false }) {
                       showInfoBanner
                     />
                     <div className="absolute left-2 top-2 z-10 flex flex-col items-start gap-1">
+                      {!vaultView ? (
+                        <button
+                          type="button"
+                          onClick={(e) => toggleCardVisibility(card, e)}
+                          className={`card-visibility-toggle${card.is_public === false ? " card-visibility-toggle--private" : ""}`}
+                          aria-label={card.is_public === false ? "Private — click to make public" : "Public — click to make private"}
+                          title={card.is_public === false ? "Private card" : "Public card"}
+                        >
+                          {card.is_public === false ? (
+                            <EyeOff className="h-3.5 w-3.5" aria-hidden />
+                          ) : (
+                            <Eye className="h-3.5 w-3.5" aria-hidden />
+                          )}
+                        </button>
+                      ) : null}
                       {stackCount ? (
                         <span className="rounded-md border border-white/15 bg-black/70 px-2 py-0.5 text-[11px] font-semibold text-slate-200 backdrop-blur-sm">
                           x{stackCount}
@@ -523,7 +597,7 @@ export default function MyCollectionPage({ vaultView = false }) {
                     </div>
                   </div>
                   <div className="mt-3 space-y-2 px-1">
-                    {showPrices && listingPrice != null ? (
+                    {showPrices && !vaultView && listingPrice != null ? (
                       <p className="text-center text-sm font-bold text-[var(--color-gold-primary)] tabular-nums">
                         {formatMoney(listingPrice)}
                       </p>
@@ -539,7 +613,7 @@ export default function MyCollectionPage({ vaultView = false }) {
                     >
                       View Card
                     </Link>
-                    {pending && card.pending_trade_offer_id ? (
+                    {pending && !vaultView && card.pending_trade_offer_id ? (
                       <button
                         type="button"
                         disabled={cancelKey === card.card_id}
@@ -550,7 +624,7 @@ export default function MyCollectionPage({ vaultView = false }) {
                       </button>
                     ) : null}
                     {renderAnimationBanner(card)}
-                    {canAnimateCard(card) ? (
+                    {!vaultView && canAnimateCard(card) ? (
                       <button
                         type="button"
                         onClick={() => setAnimateModalCard(card)}
@@ -559,15 +633,17 @@ export default function MyCollectionPage({ vaultView = false }) {
                         Animate This Card
                       </button>
                     ) : null}
-                    <MarketplaceListingActions
-                      card={card}
-                      listingInfo={listingByCardId[card.card_id]}
-                      busy={marketplaceBusyId === card.card_id}
-                      onList={(price, isPriority) => listCardOnMarketplace(card.card_id, price, isPriority)}
-                      onUnlist={() => unlistCardFromMarketplace(card.card_id)}
-                      onListSuccess={() => setListSuccessOpen(true)}
-                    />
-                    {showDelete ? (
+                    {!vaultView ? (
+                      <MarketplaceListingActions
+                        card={card}
+                        listingInfo={listingByCardId[card.card_id]}
+                        busy={marketplaceBusyId === card.card_id}
+                        onList={(price, isPriority) => listCardOnMarketplace(card.card_id, price, isPriority)}
+                        onUnlist={() => unlistCardFromMarketplace(card.card_id)}
+                        onListSuccess={() => setListSuccessOpen(true)}
+                      />
+                    ) : null}
+                    {!vaultView && showDelete ? (
                       <button
                         type="button"
                         onClick={() => setDeleteModalCard(card)}
@@ -585,7 +661,7 @@ export default function MyCollectionPage({ vaultView = false }) {
           </div>
         )}
 
-        {deletedCards.length > 0 ? (
+        {!vaultView && deletedCards.length > 0 ? (
           <section className="mt-12 border-t border-white/10 pt-8">
             <button
               type="button"
@@ -612,16 +688,14 @@ export default function MyCollectionPage({ vaultView = false }) {
                       key={card.card_id}
                       className={`rounded-2xl border border-white/10 bg-cardBg p-3 shadow-lg ${badge.glow}`}
                     >
-                      <div className="relative min-h-[280px] sm:min-h-[320px]">
-                        <div className="h-full grayscale opacity-60">
-                          <CardImage
-                            card={card}
-                            alt={card.player_name}
-                            cacheBust={card.deleted_at || card.created_at}
-                            frameClassName={`${cardMediaFrameClass(card)} w-full`}
-                            showInfoBanner
-                          />
-                        </div>
+                      <div className={`relative ${cardStageClass} grayscale opacity-60`}>
+                        <CardImage
+                          card={card}
+                          alt={card.player_name}
+                          cacheBust={card.deleted_at || card.created_at}
+                          frameClassName={`${cardMediaFrameClass(card)} w-full`}
+                          showInfoBanner
+                        />
                         <span className="absolute left-2 top-2 z-10 rounded-md border border-rose-500/50 bg-rose-600/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
                           Deleted
                         </span>

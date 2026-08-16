@@ -69,6 +69,7 @@ from marketplace_trade_repo import (
 )
 from models import Card, MarketplaceOffer, MarketplaceTradeCard, User, utcnow
 from parent_email_utils import parent_email_for_notify
+from email_notify import schedule_user_email
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -559,7 +560,10 @@ def marketplace_submit_offer(
     owner = db.query(User).filter(User.id == card.owner_id).first()
     if owner:
         extras = _email_trade_extras(db, offer)
-        background_tasks.add_task(
+        schedule_user_email(
+            background_tasks,
+            owner,
+            "email_new_offer",
             send_marketplace_offer_received_email,
             owner.email,
             owner.display_name,
@@ -692,7 +696,10 @@ def marketplace_accept_offer(
         except Exception as e:
             print(f"TRANSFER ERROR: {str(e)}", flush=True)
 
-    background_tasks.add_task(
+    schedule_user_email(
+        background_tasks,
+        buyer,
+        "email_offer_accepted",
         send_marketplace_offer_accepted_buyer_email,
         buyer.email,
         buyer.display_name,
@@ -1005,7 +1012,10 @@ def marketplace_offer_counter_accept(
         except Exception as e:
             print(f"TRANSFER ERROR: {str(e)}", flush=True)
 
-    background_tasks.add_task(
+    schedule_user_email(
+        background_tasks,
+        buyer,
+        "email_offer_accepted",
         send_marketplace_offer_accepted_buyer_email,
         buyer.email,
         buyer.display_name,

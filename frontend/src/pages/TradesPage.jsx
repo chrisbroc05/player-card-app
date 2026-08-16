@@ -9,6 +9,7 @@ import { useAuth } from "../context/AuthContext";
 import { useNewCardCelebration } from "../context/NewCardCelebrationContext";
 import { vaultTierBadge, formatEditionShort, rarityDisplay } from "../utils/tierStyles";
 import { ActivityHistorySection } from "../components/ActivityHistory";
+import ProfileLink from "../components/ProfileLink";
 
 function relativeSentLabel(iso) {
   if (!iso) return "";
@@ -202,7 +203,7 @@ export default function TradesPage() {
                           </div>
                           <p className="text-xs text-slate-400">{formatEditionShort(c.edition_number, c.print_run)}</p>
                           <p className="text-sm text-slate-300">
-                            From <span className="font-medium text-amber-100/95">{offer.sender?.display_name}</span>
+                            From <ProfileLink displayName={offer.sender?.display_name} className="profile-link profile-link--inline font-medium text-amber-100/95" prefixAt={false} />
                           </p>
                           {offer.message ? (
                             <p className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-slate-200">
@@ -276,7 +277,7 @@ export default function TradesPage() {
                           </div>
                           <p className="text-xs text-slate-400">{formatEditionShort(c.edition_number, c.print_run)}</p>
                           <p className="text-sm text-slate-300">
-                            To <span className="font-medium text-brand-gold/90">{offer.recipient?.display_name}</span>
+                            To <ProfileLink displayName={offer.recipient?.display_name} className="profile-link profile-link--inline font-medium text-brand-gold/90" prefixAt={false} />
                           </p>
                           {offer.message ? (
                             <p className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-slate-400">

@@ -76,3 +76,17 @@ def validate_settings_patch(patch: dict[str, Any]) -> dict[str, Any]:
         else:
             cleaned[key] = value
     return cleaned
+
+
+def user_has_public_collection(user: User | None) -> bool:
+    if user is None:
+        return False
+    merged = merge_user_settings(user.settings if isinstance(user.settings, dict) else None)
+    return bool(merged.get("public_collection", True))
+
+
+def user_wants_email(user: User | None, setting_key: str) -> bool:
+    if user is None:
+        return True
+    merged = merge_user_settings(user.settings if isinstance(user.settings, dict) else None)
+    return bool(merged.get(setting_key, True))
