@@ -11,8 +11,11 @@ from sqlalchemy.orm import Session, joinedload
 from card_repo import cards_created_by_user_filter, owned_collection_filter
 from marketplace_repo import float_from_decimal
 from models import Card, MarketplaceOffer, TradeOffer, User
+from utils.rarity import rarity_sort_weight
 
 logger = logging.getLogger(__name__)
+
+RARITY_COUNT_KEYS = ("foil", "refractor", "gold_auto", "one_of_one", "black_label")
 
 
 @dataclass
@@ -33,6 +36,51 @@ class ProfileKpiSnapshot:
     top_purchase: MarketplaceOffer | None
     top_sale: MarketplaceOffer | None
     marketplace_activity_count: int
+
+
+@dataclass
+class RarityCollectionStats:
+    rarest_pull: str | None
+    rarest_card: Card | None
+    rarity_counts: dict[str, int]
+    total_rare_cards: int
+
+
+def compute_rarity_collection_stats(db: Session, user_id: int) -> RarityCollectionStats:
+    """Non-standard rarity cards owned by the user (active collection only)."""
+    rare_cards = (
+        db.query(Card)
+        .filter(
+            owned_collection_filter(user_id),
+            Card.status == "active",
+            Card.rarity.isnot(None),
+            Card.rarity != "standard",
+        )
+        .all()
+    )
+
+    counts = {key: 0 for key in RARITY_COUNT_KEYS}
+    for card in rare_cards:
+        rarity_key = (card.rarity or "").strip().lower()
+        if rarity_key in counts:
+            counts[rarity_key] += 1
+
+    rarest_card: Card | None = None
+    rarest_pull: str | None = None
+    best_weight = -1
+    for card in rare_cards:
+        weight = rarity_sort_weight(card.rarity)
+        if weight > best_weight:
+            best_weight = weight
+            rarest_card = card
+            rarest_pull = (card.rarity or "").strip().lower()
+
+    return RarityCollectionStats(
+        rarest_pull=rarest_pull,
+        rarest_card=rarest_card,
+        rarity_counts=counts,
+        total_rare_cards=len(rare_cards),
+    )
 
 
 def _tier_display(db_tier: str) -> str:

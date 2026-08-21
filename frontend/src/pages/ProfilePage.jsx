@@ -4,12 +4,18 @@ import { ChevronDown } from "lucide-react";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import CardImage from "../components/CardImage";
+import RarityBadge from "../components/RarityBadge";
 import { ProfileActivityCompactList } from "../components/ActivityHistory";
 import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY, authHeaders } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import { useSettings } from "../context/SettingsContext";
 import { formatMoney } from "../utils/marketplace";
 import { formatEditionShort } from "../utils/tierStyles";
+import {
+  formatRarityBreakdownLine,
+  isPremiumRarity,
+  rarityDisplayLabel,
+} from "../utils/rarityStyles";
 
 function formatApiError(detail, fallback) {
   if (!detail) return fallback;
@@ -163,6 +169,86 @@ function CardPlaceholder({ icon, message, linkTo, linkLabel }) {
         </Link>
       ) : null}
     </div>
+  );
+}
+
+function ProfileCollectionHighlights({ token }) {
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!token) return undefined;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`${API_BASE_URL}/auth/profile/rarity-stats`, {
+          headers: { ...authHeaders(token) },
+          cache: "no-store",
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled && res.ok) setStats(data);
+        else if (!cancelled) setStats(null);
+      } catch {
+        if (!cancelled) setStats(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  if (loading || !stats || Number(stats.total_rare_cards || 0) <= 0) return null;
+
+  const breakdown = formatRarityBreakdownLine(stats.rarity_counts);
+  const rarestCard = stats.rarest_card;
+  const showRarest = rarestCard && isPremiumRarity(stats.rarest_pull || rarestCard.rarity);
+  const rarityLabel = rarityDisplayLabel(
+    stats.rarest_pull || rarestCard?.rarity,
+    rarestCard?.rarity_display_name
+  );
+  const templateName = rarestCard?.template_name || "Classic";
+
+  return (
+    <section className="profile-page__collection-highlights">
+      <h2 className="profile-page__section-title">Collection Highlights</h2>
+      {breakdown ? (
+        <p className="profile-rarity-breakdown" aria-label="Rarity breakdown">
+          {breakdown.split(" · ").map((part, index, arr) => {
+            const isPremium = /Auto|1 of 1|Black Label/i.test(part);
+            const toneClass = isPremium
+              ? "profile-rarity-breakdown__pill profile-rarity-breakdown__pill--premium"
+              : "profile-rarity-breakdown__pill profile-rarity-breakdown__pill--standard";
+            return (
+              <React.Fragment key={part}>
+                <span className={toneClass}>{part}</span>
+                {index < arr.length - 1 ? (
+                  <span className="profile-rarity-breakdown__sep" aria-hidden>
+                    {" "}
+                    ·{" "}
+                  </span>
+                ) : null}
+              </React.Fragment>
+            );
+          })}
+        </p>
+      ) : null}
+      {showRarest ? (
+        <div className="profile-rarest-pull">
+          <div className="profile-rarest-pull__thumb">
+            <div className="profile-rarest-pull__badge">
+              <RarityBadge rarity={rarestCard.rarity} />
+            </div>
+            <ProfileCardThumb card={rarestCard} />
+          </div>
+          <p className="profile-rarest-pull__caption">
+            {rarityLabel} — {templateName}
+          </p>
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -352,6 +438,8 @@ export default function ProfilePage() {
                 />
               </div>
             </section>
+
+            {token ? <ProfileCollectionHighlights token={token} /> : null}
 
             <hr className="profile-page__divider" />
 

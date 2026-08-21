@@ -5,6 +5,7 @@ import RarityBadge from "./RarityBadge";
 import AutoSignature from "./AutoSignature";
 import {
   CARD_ASPECT_CLASS,
+  normalizeTierKey,
   resolveCardDisplayMeta,
   tierFrameStyles,
 } from "../utils/cardTemplate";
@@ -73,6 +74,7 @@ const CardDisplay = React.forwardRef(function CardDisplay(
     : "card-player-vignette relative h-full w-full overflow-hidden";
 
   const shellRadiusClass = size === "detail" ? "card-shell--detail rounded-[16px]" : "rounded-[12px]";
+  const tierMediaBg = `card-media-bg--${normalizeTierKey(tier)}`;
 
   return (
     <div
@@ -87,7 +89,7 @@ const CardDisplay = React.forwardRef(function CardDisplay(
         <div className={`pointer-events-none absolute inset-0 z-[4] ${meta.themeOverlay}`} aria-hidden />
       ) : null}
 
-      <div className="card-shell__media relative z-[1] flex min-h-0 w-full flex-1 flex-col overflow-hidden">
+      <div className={`card-shell__media relative z-[1] flex min-h-0 w-full flex-1 flex-col overflow-hidden ${tierMediaBg}`}>
         <div className={`${mediaWrapperClass} h-full min-h-0 w-full flex-1`}>
           {children}
           {!isHighlight && size === "detail" ? (

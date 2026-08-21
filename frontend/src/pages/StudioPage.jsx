@@ -2959,6 +2959,25 @@ export default function StudioPage() {
                     token={token || ""}
                     onHighlightVideoReady={handleHighlightVideoReady}
                     onRevealComplete={handlePackOpeningComplete}
+                    showPrimaryAction
+                    onPrimaryAction={() => {
+                      setPackOpeningActive(false);
+                      setPreviewConfigureOpen(true);
+                    }}
+                    onGenerateAnother={() => {
+                      setPackOpeningActive(false);
+                      if (!canAffordRegenerate) {
+                        setError(
+                          `You need ${formatMoney(additionalPreviewCost)} to generate another preview.`
+                        );
+                        return;
+                      }
+                      setShowRegenerateConfirm(true);
+                    }}
+                    onStartOver={() => {
+                      setPackOpeningActive(false);
+                      setShowStartOverConfirm(true);
+                    }}
                   />
                 ) : null}
                 {isHighlightCardType && highlightUploadState !== "idle" ? (

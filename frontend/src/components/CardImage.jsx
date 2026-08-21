@@ -469,7 +469,7 @@ export default function CardImage({
           showSoundToggle={isDetail}
           soundMuted={animatedActive ? animatedMuted : highlightMuted}
           onToggleSound={animatedActive ? handleToggleAnimatedSound : handleToggleHighlightSound}
-          objectFit={animatedActive ? "cover" : "contain"}
+          objectFit="contain"
           soundTogglePosition={animatedActive ? "right" : "left"}
         />
       </ProtectedMediaShell>

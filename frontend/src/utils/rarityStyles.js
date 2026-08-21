@@ -209,6 +209,41 @@ export function rarityDisplayLabel(rarity, apiName) {
   return labels[key] || "Base";
 }
 
+export function getRevealCelebrationMessage(rarity) {
+  const key = normalizeRarityKey(rarity);
+  switch (key) {
+    case RARITY_KEYS.GOLD_AUTO:
+      return "🎉 Congratulations on your Gold Auto pull!";
+    case RARITY_KEYS.ONE_OF_ONE:
+      return "🔥 This card can never be created again.";
+    case RARITY_KEYS.BLACK_LABEL:
+      return "⚫ You pulled the rarest card in existence.";
+    default:
+      return "";
+  }
+}
+
+export function formatRarityBreakdownLine(rarityCounts) {
+  if (!rarityCounts || typeof rarityCounts !== "object") return "";
+  const parts = [];
+  const order = [
+    [RARITY_KEYS.FOIL, "Foil"],
+    [RARITY_KEYS.REFRACTOR, "Refractor"],
+    [RARITY_KEYS.GOLD_AUTO, "Auto"],
+    [RARITY_KEYS.ONE_OF_ONE, "1 of 1"],
+    [RARITY_KEYS.BLACK_LABEL, "Black Label"],
+  ];
+  for (const [key, label] of order) {
+    const count = Number(rarityCounts[key] || 0);
+    if (count > 0) parts.push(`${count} ${label}`);
+  }
+  return parts.join(" · ");
+}
+
+export function isPremiumRarity(rarity) {
+  return raritySortWeight(rarity) >= raritySortWeight(RARITY_KEYS.REFRACTOR);
+}
+
 export const MARKETPLACE_RARITY_FILTER_OPTIONS = [
   { value: "", label: "All rarities" },
   { value: "foil", label: "Foil" },

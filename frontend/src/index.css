@@ -793,8 +793,8 @@
     height: 100%;
     max-width: 100%;
     max-height: 100%;
-    object-fit: cover;
-    object-position: center;
+    object-fit: contain;
+    object-position: center top;
     border-radius: inherit;
   }
 
@@ -1664,22 +1664,51 @@
   }
 }
 
+/* ── Card image (full photo, tier background) ── */
+
+.card-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center top;
+}
+
+.card-media-bg--rookie {
+  background-color: #0d200d;
+}
+
+.card-media-bg--allstar {
+  background-color: #060d1a;
+}
+
+.card-media-bg--legends {
+  background-color: #0d0900;
+}
+
 /* ── Auto signature overlay ── */
 
 .auto-signature {
-  padding: 0 12px;
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  text-align: right;
+  z-index: 5;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.5) 0%, transparent 100%);
+  padding: 16px 12px 8px 24px;
+  border-radius: 4px;
 }
 
 .signature-text {
+  display: block;
   font-family: "Dancing Script", cursive;
-  font-size: clamp(1.1rem, 4vw, 1.6rem);
-  font-weight: 700;
-  color: rgba(255, 215, 0, 0.85);
-  transform: rotate(-5deg);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  font-size: 22px;
+  color: #ffd700;
+  opacity: 0.92;
+  line-height: 1.1;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
   white-space: nowrap;
   overflow: hidden;
-  max-width: 90%;
+  max-width: 100%;
   text-overflow: ellipsis;
 }
 
@@ -1688,12 +1717,24 @@
   opacity: 0;
 }
 
-.certified-text {
-  margin-top: 2px;
-  font-size: 7px;
+.certified-auto-text {
+  display: block;
+  font-size: 8px;
+  letter-spacing: 2.5px;
+  color: #c9a84c;
+  text-transform: uppercase;
   font-weight: 700;
-  letter-spacing: 1.2px;
-  color: rgba(255, 215, 0, 0.65);
+  margin-top: 2px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+.card-grid .signature-text {
+  font-size: 13px;
+}
+
+.card-grid .certified-auto-text {
+  font-size: 6px;
+  letter-spacing: 1.5px;
 }
 
 @keyframes draw-signature {
@@ -1702,7 +1743,7 @@
     clip-path: inset(0 100% 0 0);
   }
   100% {
-    opacity: 0.85;
+    opacity: 0.92;
     clip-path: inset(0 0% 0 0);
   }
 }
@@ -1889,10 +1930,11 @@
 }
 
 .card-shell--detail .card-shell__media img,
-.card-shell--detail .card-shell__media .card-animated-video {
+.card-shell--detail .card-shell__media .card-animated-video,
+.card-shell--detail .card-shell__media .card-image {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center top;
 }
 
@@ -4251,6 +4293,59 @@
   color: var(--text-secondary);
 }
 
+.profile-page__collection-highlights {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.profile-rarity-breakdown {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.profile-rarity-breakdown__pill--premium {
+  color: var(--color-gold-primary);
+  font-weight: 600;
+}
+
+.profile-rarity-breakdown__pill--standard {
+  color: var(--text-secondary);
+}
+
+.profile-rarity-breakdown__sep {
+  color: var(--text-secondary);
+}
+
+.profile-rarest-pull {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 180px;
+}
+
+.profile-rarest-pull__thumb {
+  position: relative;
+  width: 100%;
+}
+
+.profile-rarest-pull__badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.profile-rarest-pull__caption {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
 .profile-page__highlights-section {
   overflow: visible;
 }
@@ -5870,25 +5965,37 @@
   color: var(--color-text-muted);
 }
 
-/* Collection grid — 1 col mobile, 2 tablet, 3 desktop */
+/* Collection grid — 2 cols mobile/tablet, 3 desktop */
+.collection-page {
+  padding: 8px;
+}
+
+@media (min-width: 640px) {
+  .collection-page {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .collection-page {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
 .collection-grid {
   display: grid;
   width: 100%;
   min-width: 0;
-  grid-template-columns: 1fr;
-  gap: 12px;
-}
-
-@media (min-width: 641px) {
-  .collection-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
-  }
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
 }
 
 @media (min-width: 901px) {
   .collection-grid {
     grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
   }
 }
 
@@ -5897,6 +6004,53 @@
   min-width: 0;
   width: 100%;
   max-width: 100%;
+  aspect-ratio: 5 / 7;
+}
+
+.collection-grid.card-grid .card-banner--size-default .card-banner__name--rookie,
+.collection-grid.card-grid .card-banner--size-default .card-banner__name--allstar,
+.collection-grid.card-grid .card-banner--size-default .card-banner__name--legends,
+.collection-grid.card-grid .card-banner--size-compact .card-banner__name--rookie,
+.collection-grid.card-grid .card-banner--size-compact .card-banner__name--allstar,
+.collection-grid.card-grid .card-banner--size-compact .card-banner__name--legends,
+.collection-grid.card-grid .card-banner--size-thumb .card-banner__name--rookie,
+.collection-grid.card-grid .card-banner--size-thumb .card-banner__name--allstar,
+.collection-grid.card-grid .card-banner--size-thumb .card-banner__name--legends {
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+.collection-grid.card-grid .card-banner--size-default .card-banner__team--rookie,
+.collection-grid.card-grid .card-banner--size-default .card-banner__team--allstar,
+.collection-grid.card-grid .card-banner--size-default .card-banner__team--legends,
+.collection-grid.card-grid .card-banner--size-compact .card-banner__team--rookie,
+.collection-grid.card-grid .card-banner--size-compact .card-banner__team--allstar,
+.collection-grid.card-grid .card-banner--size-compact .card-banner__team--legends,
+.collection-grid.card-grid .card-banner--size-default .card-banner__stats--rookie,
+.collection-grid.card-grid .card-banner--size-default .card-banner__stats--allstar,
+.collection-grid.card-grid .card-banner--size-default .card-banner__stats--legends,
+.collection-grid.card-grid .card-banner--size-compact .card-banner__stats--rookie,
+.collection-grid.card-grid .card-banner--size-compact .card-banner__stats--allstar,
+.collection-grid.card-grid .card-banner--size-compact .card-banner__stats--legends,
+.collection-grid.card-grid .card-banner--size-thumb .card-banner__team--rookie,
+.collection-grid.card-grid .card-banner--size-thumb .card-banner__team--allstar,
+.collection-grid.card-grid .card-banner--size-thumb .card-banner__team--legends,
+.collection-grid.card-grid .card-banner--size-thumb .card-banner__stats--rookie,
+.collection-grid.card-grid .card-banner--size-thumb .card-banner__stats--allstar,
+.collection-grid.card-grid .card-banner--size-thumb .card-banner__stats--legends {
+  font-size: 9px;
+}
+
+.collection-grid.card-grid .card-banner--size-default .card-banner__tier-pill,
+.collection-grid.card-grid .card-banner--size-compact .card-banner__tier-pill,
+.collection-grid.card-grid .card-banner--size-thumb .card-banner__tier-pill,
+.collection-grid.card-grid .card-banner--size-default .card-banner__theme,
+.collection-grid.card-grid .card-banner--size-compact .card-banner__theme,
+.collection-grid.card-grid .card-banner--size-thumb .card-banner__theme,
+.collection-grid.card-grid .card-banner--size-default .card-banner__edition,
+.collection-grid.card-grid .card-banner--size-compact .card-banner__edition,
+.collection-grid.card-grid .card-banner--size-thumb .card-banner__edition {
+  font-size: 8px;
 }
 
 .collection-card-stage {
@@ -5905,13 +6059,7 @@
 }
 
 .collection-card-stage--normal {
-  min-height: 200px;
-}
-
-@media (min-width: 640px) {
-  .collection-card-stage--normal {
-    min-height: 240px;
-  }
+  min-height: 0;
 }
 
 /* ——— Support / Contact / Help pages ——— */

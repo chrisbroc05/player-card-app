@@ -22,7 +22,8 @@ from credit_service import (
 from database import get_db
 from models import Card, CreditLedger, MarketplaceOffer, User
 from parent_email_utils import normalize_optional_parent_email
-from profile_stats import compute_profile_kpis
+from profile_stats import compute_profile_kpis, compute_rarity_collection_stats
+from utils.rarity import get_template_name, rarity_display_name
 from marketplace_repo import float_from_decimal
 from stripe_connect import sync_connect_account_status
 
@@ -74,6 +75,9 @@ class ProfileCardOut(BaseModel):
     tier: str
     theme: str
     rarity: str = ""
+    rarity_display_name: str = "Base"
+    rarity_template: int = 1
+    template_name: str = "Classic"
     edition_number: int = 1
     print_run: int = 1
     image_url: str
@@ -124,6 +128,25 @@ class MarketplaceStatsOut(BaseModel):
     active_listings: int
 
 
+class RarityCountsOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    foil: int = 0
+    refractor: int = 0
+    gold_auto: int = 0
+    one_of_one: int = 0
+    black_label: int = 0
+
+
+class ProfileRarityStatsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    rarest_pull: str | None = None
+    rarest_card: ProfileCardOut | None = None
+    rarity_counts: RarityCountsOut
+    total_rare_cards: int = 0
+
+
 class UserProfileResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -172,6 +195,9 @@ def _profile_card_out(card: Card) -> ProfileCardOut:
         "tier": card.tier or "rookie",
         "theme": card.theme or "none",
         "rarity": card.rarity or "",
+        "rarity_display_name": rarity_display_name(card.rarity),
+        "rarity_template": int(getattr(card, "rarity_template", None) or 1),
+        "template_name": get_template_name(card.tier, int(getattr(card, "rarity_template", None) or 1)),
         "edition_number": int(card.edition_number or 1),
         "print_run": int(card.print_run or 1),
         "image_url": card.image_url or "",
@@ -357,6 +383,24 @@ def _sum_positive_ledger(db: Session, user_id: int, transaction_type: str) -> De
         .scalar()
     )
     return Decimal(str(total or 0))
+
+
+@router.get("/profile/rarity-stats", response_model=ProfileRarityStatsResponse)
+def get_profile_rarity_stats(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Rarity breakdown and rarest pull for the authenticated user's collection."""
+    stats = compute_rarity_collection_stats(db, user.id)
+    rarest_out: ProfileCardOut | None = None
+    if stats.rarest_card is not None:
+        rarest_out = _profile_card_out(stats.rarest_card)
+    return ProfileRarityStatsResponse(
+        rarest_pull=stats.rarest_pull,
+        rarest_card=rarest_out,
+        rarity_counts=RarityCountsOut(**stats.rarity_counts),
+        total_rare_cards=stats.total_rare_cards,
+    )
 
 
 @router.get("/profile/financials", response_model=ProfileFinancialsResponse)

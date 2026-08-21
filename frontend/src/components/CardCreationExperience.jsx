@@ -19,7 +19,7 @@ import {
   normalizeExperienceTier,
   themeDisplayName,
 } from "../utils/cardCreationExperience";
-import { forgeLoadingMessage, getRevealConfig } from "../utils/rarityStyles";
+import { forgeLoadingMessage, getRevealConfig, getRevealCelebrationMessage } from "../utils/rarityStyles";
 import "../styles/cardCreationExperience.css";
 
 const TEXT_FADE_MS = 500;
@@ -392,6 +392,8 @@ function RevealSection({
   onPrimaryAction,
   secondaryAction,
   revealTitle,
+  onGenerateAnother,
+  onStartOver,
 }) {
   const isHighlight = cardType === "highlight";
   const isAnimated = cardType === "animated";
@@ -449,6 +451,8 @@ function RevealSection({
   const showGoldBurst = particleTheme === "gold" || particleTheme === "legendary";
   const showLegendaryBurst = particleTheme === "legendary" || particleTheme === "black-label";
   const isBlackout = revealMode === "pre_reveal";
+  const celebrationMessage = getRevealCelebrationMessage(rarity);
+  const showActions = mediaReady && revealMode === "landed" && (showPrimaryAction || onPrimaryAction);
 
   return (
     <>
@@ -579,11 +583,28 @@ function RevealSection({
         )}
       </div>
 
-      {showPrimaryAction && mediaReady && revealMode === "landed" ? (
+      {showActions ? (
         <div className="cce-reveal-actions">
+          {celebrationMessage ? (
+            <p className="cce-reveal-celebration">{celebrationMessage}</p>
+          ) : null}
           <button type="button" className="cce-reveal-btn cce-reveal-btn--primary" onClick={onPrimaryAction}>
             {primaryActionLabel || "Add to Collection"}
           </button>
+          {onGenerateAnother ? (
+            <button
+              type="button"
+              className="cce-reveal-btn cce-reveal-btn--secondary"
+              onClick={onGenerateAnother}
+            >
+              Generate Another Preview
+            </button>
+          ) : null}
+          {onStartOver ? (
+            <button type="button" className="cce-reveal-btn cce-reveal-btn--tertiary" onClick={onStartOver}>
+              Start Over
+            </button>
+          ) : null}
           {secondaryAction}
         </div>
       ) : null}
@@ -615,6 +636,8 @@ export default function CardCreationExperience({
   primaryActionLabel = "Add to Collection",
   onPrimaryAction,
   secondaryAction = null,
+  onGenerateAnother,
+  onStartOver,
   revealTitle = "",
   fullscreen = false,
   hint = "This usually takes 30–60 seconds. Please keep this page open.",
@@ -723,14 +746,14 @@ export default function CardCreationExperience({
 
   useEffect(() => {
     if (mode !== "landed" || completedRef.current) return undefined;
-    if (showPrimaryAction) return undefined;
+    if (showPrimaryAction || onPrimaryAction) return undefined;
 
     completedRef.current = true;
     const timer = window.setTimeout(() => {
       onRevealComplete?.();
     }, postRevealDisplayMs);
     return () => window.clearTimeout(timer);
-  }, [active, mode, onRevealComplete, showPrimaryAction, postRevealDisplayMs]);
+  }, [active, mode, onRevealComplete, showPrimaryAction, onPrimaryAction, postRevealDisplayMs]);
 
   if (!active) return null;
 
@@ -815,6 +838,22 @@ export default function CardCreationExperience({
             onPrimaryAction?.();
             onRevealComplete?.();
           }}
+          onGenerateAnother={
+            onGenerateAnother
+              ? () => {
+                  onGenerateAnother();
+                  onRevealComplete?.();
+                }
+              : undefined
+          }
+          onStartOver={
+            onStartOver
+              ? () => {
+                  onStartOver();
+                  onRevealComplete?.();
+                }
+              : undefined
+          }
           secondaryAction={secondaryAction}
           revealTitle={revealTitle}
         />

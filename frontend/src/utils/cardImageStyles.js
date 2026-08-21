@@ -20,11 +20,10 @@ export const CARD_VIDEO_WRAPPER_OVERLAY = `absolute inset-0 z-[1] ${CARD_VIDEO_C
 export const CARD_VIDEO_DETAIL_WRAPPER =
   "relative h-full w-full min-h-0 min-w-0 overflow-hidden card-animated-video-container card-media-fill";
 
-/** Player portrait — cover fill inside top 70% art window */
-export const CARD_IMAGE_MEDIA_CLASS =
-  "block h-full w-full object-cover object-center";
+/** Player portrait — full photo visible inside art window */
+export const CARD_IMAGE_MEDIA_CLASS = "card-image block h-full w-full";
 
-export const CARD_VIDEO_CLASS = "card-animated-video";
+export const CARD_VIDEO_CLASS = "card-image card-animated-video";
 
 export const CARD_VIDEO_GRID_CLASS = CARD_VIDEO_CLASS;
 
@@ -32,9 +31,9 @@ export const CARD_VIDEO_DETAIL_CLASS = CARD_VIDEO_CLASS;
 
 export const CARD_IMAGE_FRAME_DETAIL = `relative w-full min-h-0 min-w-0 ${CARD_ASPECT}`;
 
-/** Detail view static image — cover fill, face prioritized */
+/** Detail view static image — contain so full player photo shows */
 export const CARD_IMAGE_MEDIA_DETAIL =
-  "block h-full w-full object-cover object-[center_top]";
+  "card-image block h-full w-full";
 
 export const CARD_IMAGE_FRAME_MODAL = `relative w-full min-w-[210px] max-w-[280px] ${CARD_ASPECT}`;
 

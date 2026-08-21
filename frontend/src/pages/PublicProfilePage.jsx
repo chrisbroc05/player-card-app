@@ -206,7 +206,7 @@ export default function PublicProfilePage() {
   const [tradeSuccess, setTradeSuccess] = useState("");
 
   const cardAutoplay = settings?.autoplay_videos !== false;
-  const gridClass = "collection-grid";
+  const gridClass = "collection-grid card-grid";
 
   const loadProfile = useCallback(async () => {
     if (!username) return;

@@ -54,7 +54,7 @@ export default function MyCollectionPage({ vaultView = false }) {
   const [pendingOffersByCardId, setPendingOffersByCardId] = useState({});
   const animationFocusRef = useRef(null);
 
-  const collectionGridClass = "collection-grid";
+  const collectionGridClass = "collection-grid card-grid";
   const cardStageClass = "collection-card-stage collection-card-stage--normal";
   const cardAutoplay = settings?.autoplay_videos !== false;
   const showPrices = settings?.show_prices !== false;
@@ -466,7 +466,7 @@ export default function MyCollectionPage({ vaultView = false }) {
     <div className="min-h-screen overflow-x-hidden bg-appBg text-slate-100">
       <AppHeader />
 
-      <main className="mx-auto w-full max-w-6xl px-3 py-8 sm:px-6 lg:px-8">
+      <main className="collection-page mx-auto w-full max-w-6xl py-8 sm:px-6 lg:px-8">
         <div className="mb-8 text-center sm:text-left">
           <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
             {vaultView ? "Vault" : "My Collection"}
