@@ -17,7 +17,7 @@ export default function CardGallery({ cards }) {
           <p className="text-sm text-slate-400">No generated cards yet.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="collection-grid">
           {cards.map((card) => {
             const key = card.card_id || card.id;
             const videoCard = cardPlaysVideoOnHover(card);

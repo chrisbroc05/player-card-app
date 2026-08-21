@@ -52,7 +52,7 @@ const CardDisplay = React.forwardRef(function CardDisplay(
 
   const { tier, theme, rarity, rarityTemplate, templateName, templateTierKey } = meta;
   const bannerStyles = getCardBannerStyles(tier, theme);
-  const centerBannerLabel = templateName || bannerStyles.themeLabel || "\u00A0";
+  const centerBannerLabel = templateName || "\u00A0";
   const highlightStyles = isHighlight ? getHighlightCardStyles(tier, theme) : null;
   const frame = tierFrameStyles(tier);
   const bannerSize = size === "detail" || size === "compact" || size === "thumb" ? size : "default";
@@ -101,23 +101,25 @@ const CardDisplay = React.forwardRef(function CardDisplay(
             rarity={rarity}
             animate={animateSignature}
           />
+          {showRarityBadge ? (
+            <div className="card-rarity-badge-slot">
+              <RarityBadge rarity={rarity} />
+            </div>
+          ) : null}
         </div>
-        {showRarityBadge ? (
-          <span className="absolute left-2 top-2 z-[3]">
-            <RarityBadge rarity={rarity} />
-          </span>
-        ) : null}
         {showAnimatedBadge ? (
-          <span className="absolute right-2 top-2 z-[3]">
+          <span className="card-media-badge-slot card-media-badge-slot--right">
             <AnimatedBadge />
           </span>
         ) : null}
         {showHighlightBadge ? (
-          <span className="absolute right-2 top-2 z-[3]">
+          <span className="card-media-badge-slot card-media-badge-slot--right">
             <HighlightBadge />
           </span>
         ) : null}
-        {topRightSlot ? <div className="absolute right-1 top-1 z-[3]">{topRightSlot}</div> : null}
+        {topRightSlot ? (
+          <div className="card-media-badge-slot card-media-badge-slot--right">{topRightSlot}</div>
+        ) : null}
         {inProgressOverlay ? (
           <div className="absolute inset-0 z-[5] flex items-center justify-center bg-black/55 backdrop-blur-[2px]">
             <span
@@ -143,17 +145,17 @@ const CardDisplay = React.forwardRef(function CardDisplay(
         </div>
 
         <div className="card-banner__footer shrink-0">
-          <div className="card-banner__footer-col card-banner__footer-col--start">
+          <div className="card-banner__footer-col card-banner__footer-col--start banner-bottom-left">
             <span className={`card-banner__tier-pill ${bannerStyles.tierPillClass}`}>
               {bannerStyles.tierPillLabel}
             </span>
           </div>
-          <div className="card-banner__footer-col card-banner__footer-col--center">
+          <div className="card-banner__footer-col card-banner__footer-col--center banner-bottom-center">
             <span className={`card-banner__theme ${bannerStyles.themeClass}`}>
               {centerBannerLabel}
             </span>
           </div>
-          <div className="card-banner__footer-col card-banner__footer-col--end">
+          <div className="card-banner__footer-col card-banner__footer-col--end banner-bottom-right">
             <span className={`card-banner__edition ${bannerStyles.editionClass}`}>{meta.edition}</span>
           </div>
         </div>

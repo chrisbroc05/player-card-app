@@ -1572,6 +1572,25 @@
 
 /* ── Rarity badges on cards ── */
 
+.card-rarity-badge-slot {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.card-media-badge-slot {
+  position: absolute;
+  top: 8px;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.card-media-badge-slot--right {
+  right: 8px;
+}
+
 .rarity-badge {
   display: inline-flex;
   align-items: center;
@@ -1749,12 +1768,12 @@
 .card-banner__footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   width: 100%;
   padding-left: 8px;
   padding-right: 8px;
   margin-top: 4px;
   flex-shrink: 0;
+  gap: 0;
 }
 
 .card-banner__footer-col {
@@ -1762,18 +1781,33 @@
   min-width: 0;
 }
 
+.banner-bottom-left,
 .card-banner__footer-col--start {
   display: flex;
+  flex: 1;
+  min-width: 0;
   justify-content: flex-start;
   align-items: center;
 }
 
+.banner-bottom-center,
 .card-banner__footer-col--center {
-  text-align: center;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  padding: 0 4px;
 }
 
+.banner-bottom-right,
 .card-banner__footer-col--end {
-  text-align: right;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-end;
+  align-items: center;
 }
 
 .card-banner__tier-pill {
@@ -1791,8 +1825,10 @@
 .card-banner__theme {
   display: block;
   width: 100%;
+  max-width: 100%;
   text-align: center;
   font-weight: 600;
+  font-size: 10px;
   letter-spacing: 0.04em;
   opacity: 0.92;
   overflow: hidden;
@@ -1822,6 +1858,7 @@
 
 /* Card shell — flexible media + fixed minimum banner height */
 .card-shell__media {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
 }
@@ -5833,25 +5870,33 @@
   color: var(--color-text-muted);
 }
 
-/* Collection grid — fixed 3-across on desktop */
+/* Collection grid — 1 col mobile, 2 tablet, 3 desktop */
 .collection-grid {
   display: grid;
   width: 100%;
-  grid-template-columns: repeat(2, 1fr);
+  min-width: 0;
+  grid-template-columns: 1fr;
   gap: 12px;
 }
 
-@media (min-width: 600px) {
+@media (min-width: 641px) {
   .collection-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 16px;
   }
 }
 
-@media (min-width: 900px) {
+@media (min-width: 901px) {
   .collection-grid {
     grid-template-columns: repeat(3, 1fr);
   }
+}
+
+.collection-grid .card-display-container,
+.collection-grid .card-shell {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
 }
 
 .collection-card-stage {

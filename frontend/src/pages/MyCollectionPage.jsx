@@ -554,7 +554,7 @@ export default function MyCollectionPage({ vaultView = false }) {
                       playOnHover={cardAutoplay}
                       showInfoBanner
                     />
-                    <div className="absolute left-2 top-2 z-10 flex flex-col items-start gap-1">
+                    <div className="absolute left-2 top-10 z-10 flex flex-col items-start gap-1">
                       {!vaultView ? (
                         <button
                           type="button"
@@ -693,7 +693,7 @@ export default function MyCollectionPage({ vaultView = false }) {
                           frameClassName={`${cardMediaFrameClass(card)} w-full`}
                           showInfoBanner
                         />
-                        <span className="absolute left-2 top-2 z-10 rounded-md border border-rose-500/50 bg-rose-600/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                        <span className="absolute left-2 top-10 z-10 rounded-md border border-rose-500/50 bg-rose-600/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
                           Deleted
                         </span>
                       </div>
