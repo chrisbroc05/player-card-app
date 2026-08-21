@@ -11,6 +11,28 @@ export function normalizeTierKey(tier) {
   return "rookie";
 }
 
+/** CSS data-tier attribute key (matches template variant selectors). */
+export function templateTierDataKey(tier) {
+  const t = String(tier || "rookie").toLowerCase().replace(/-/g, "_");
+  if (t === "legends" || t === "legendary") return "legends";
+  if (t === "allstar" || t === "all_star" || t === "rare") return "all_star";
+  return "rookie";
+}
+
+const TEMPLATE_NAMES = {
+  rookie: { 1: "Classic", 2: "Vintage", 3: "Neon", 4: "Chrome", 5: "Prizm" },
+  all_star: { 1: "Elite", 2: "Starlight", 3: "Ice", 4: "Blueprint", 5: "Optic" },
+  legends: { 1: "Prestige", 2: "Black Gold", 3: "Holo", 4: "Dynasty", 5: "Crown" },
+};
+
+export function templateDisplayName(tier, template, apiName) {
+  const fromApi = String(apiName || "").trim();
+  if (fromApi) return fromApi;
+  const tierKey = templateTierDataKey(tier);
+  const num = Number(template) || 1;
+  return TEMPLATE_NAMES[tierKey]?.[num] || TEMPLATE_NAMES.rookie[1];
+}
+
 export function tierFrameStyles(tier) {
   const key = normalizeTierKey(tier);
   if (key === "legends") {
@@ -68,6 +90,13 @@ export function resolveCardDisplayMeta(card) {
   const gradYear = (card.grad_year ?? card.gradYear ?? "").toString().trim();
   const tier = card.tier || card.card_tier || "rookie";
   const theme = card.theme || card.special_theme || card.specialTheme || "standard";
+  const rarity = card.rarity || "standard";
+  const rarityTemplate = card.rarity_template ?? card.rarityTemplate ?? 1;
+  const templateName = templateDisplayName(
+    tier,
+    rarityTemplate,
+    card.template_name || card.templateName
+  );
   const edition = formatBannerEdition(card.edition_number, card.print_run);
   const badge = vaultTierBadge(tier);
 
@@ -85,6 +114,10 @@ export function resolveCardDisplayMeta(card) {
     statsLine,
     tier,
     theme,
+    rarity,
+    rarityTemplate,
+    templateName,
+    templateTierKey: templateTierDataKey(tier),
     edition,
     badge,
     frame: tierFrameStyles(tier),

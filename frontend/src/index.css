@@ -1466,6 +1466,228 @@
   background: radial-gradient(circle at 80% 10%, rgba(255, 255, 255, 0.04), transparent 45%);
 }
 
+/* ── Template variant borders (rarity_template 1–5 per tier) ── */
+
+.card-display-container[data-template] {
+  border-color: var(--card-border, inherit);
+  box-shadow: 0 0 20px var(--card-glow, transparent);
+}
+
+[data-tier="rookie"][data-template="1"] {
+  --card-border: #3b6d11;
+  --card-glow: rgba(59, 109, 17, 0.4);
+}
+
+[data-tier="rookie"][data-template="2"] {
+  --card-border: #5a6b3a;
+  --card-glow: rgba(90, 107, 58, 0.4);
+  filter: sepia(0.15);
+}
+
+[data-tier="rookie"][data-template="3"] {
+  --card-border: #39ff14;
+  --card-glow: rgba(57, 255, 20, 0.5);
+}
+
+[data-tier="rookie"][data-template="4"] {
+  --card-border: #c0c0c0;
+  --card-glow: rgba(192, 192, 192, 0.4);
+}
+
+[data-tier="rookie"][data-template="5"] {
+  --card-border: #c9a84c;
+  animation: prizm-border 3s linear infinite;
+}
+
+[data-tier="all_star"][data-template="1"] {
+  --card-border: #185fa5;
+  --card-glow: rgba(24, 95, 165, 0.4);
+}
+
+[data-tier="all_star"][data-template="2"] {
+  --card-border: #4169e1;
+  --card-glow: rgba(65, 105, 225, 0.5);
+}
+
+[data-tier="all_star"][data-template="3"] {
+  --card-border: #87ceeb;
+  --card-glow: rgba(135, 206, 235, 0.5);
+}
+
+[data-tier="all_star"][data-template="4"] {
+  --card-border: #1e90ff;
+  --card-glow: rgba(30, 144, 255, 0.4);
+}
+
+[data-tier="all_star"][data-template="5"] {
+  --card-border: #ffffff;
+  --card-glow: rgba(255, 255, 255, 0.5);
+}
+
+[data-tier="legends"][data-template="1"] {
+  --card-border: #c9a84c;
+  --card-glow: rgba(201, 168, 76, 0.5);
+}
+
+[data-tier="legends"][data-template="2"] {
+  --card-border: #ffd700;
+  --card-glow: rgba(255, 215, 0, 0.6);
+}
+
+[data-tier="legends"][data-template="3"] {
+  --card-border: #ffd700;
+  animation: holo-border 4s linear infinite;
+}
+
+[data-tier="legends"][data-template="4"] {
+  --card-border: #8b0000;
+  --card-glow: rgba(139, 0, 0, 0.4);
+}
+
+[data-tier="legends"][data-template="5"] {
+  --card-border: #800080;
+  --card-glow: rgba(128, 0, 128, 0.5);
+}
+
+@keyframes prizm-border {
+  0% {
+    filter: hue-rotate(0deg);
+  }
+  100% {
+    filter: hue-rotate(360deg);
+  }
+}
+
+@keyframes holo-border {
+  0% {
+    filter: hue-rotate(0deg) brightness(1.2);
+  }
+  50% {
+    filter: hue-rotate(180deg) brightness(1.4);
+  }
+  100% {
+    filter: hue-rotate(360deg) brightness(1.2);
+  }
+}
+
+/* ── Rarity badges on cards ── */
+
+.rarity-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.rarity-badge--detail {
+  font-size: 10px;
+  padding: 4px 9px;
+}
+
+.rarity-badge__icon {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+}
+
+.rarity-badge--foil {
+  background: linear-gradient(135deg, #e8c56a, #c9a84c);
+  color: #0a0a0a;
+}
+
+.rarity-badge--refractor {
+  background: linear-gradient(135deg, #85b7eb, #4169e1);
+  color: #fff;
+}
+
+.rarity-badge--gold-auto {
+  background: linear-gradient(135deg, #ffd700, #ffa500);
+  color: #0a0a0a;
+}
+
+.rarity-badge--one-of-one {
+  background: linear-gradient(135deg, #ff4444, #cc0000);
+  color: #fff;
+  animation: rarity-one-of-one-pulse 2s ease-in-out infinite;
+}
+
+.rarity-badge--black-label {
+  background: linear-gradient(135deg, #1a1a1a, #000);
+  border: 1px solid #ffd700;
+  color: #ffd700;
+  animation: rarity-black-label-shimmer 3s linear infinite;
+}
+
+@keyframes rarity-one-of-one-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 8px rgba(255, 68, 68, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(255, 68, 68, 0.75);
+  }
+}
+
+@keyframes rarity-black-label-shimmer {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.35);
+  }
+}
+
+/* ── Auto signature overlay ── */
+
+.auto-signature {
+  padding: 0 12px;
+}
+
+.signature-text {
+  font-family: "Dancing Script", cursive;
+  font-size: clamp(1.1rem, 4vw, 1.6rem);
+  font-weight: 700;
+  color: rgba(255, 215, 0, 0.85);
+  transform: rotate(-5deg);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  max-width: 90%;
+  text-overflow: ellipsis;
+}
+
+.signature-text--animate {
+  animation: draw-signature 1.5s ease forwards 0.5s;
+  opacity: 0;
+}
+
+.certified-text {
+  margin-top: 2px;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: rgba(255, 215, 0, 0.65);
+}
+
+@keyframes draw-signature {
+  0% {
+    opacity: 0;
+    clip-path: inset(0 100% 0 0);
+  }
+  100% {
+    opacity: 0.85;
+    clip-path: inset(0 0% 0 0);
+  }
+}
+
 /* ── Unified card banner (all card types) ── */
 
 .card-banner {

@@ -12,6 +12,7 @@ import { API_BASE_URL } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import { authFetch } from "../utils/authFetch";
 import { normalizeTierKey, sortMarketplaceBrowseRows } from "../utils/marketplace";
+import { normalizeRarityKey, MARKETPLACE_RARITY_FILTER_OPTIONS } from "../utils/rarityStyles";
 
 const TIER_OPTIONS = [
   { value: "", label: "All tiers" },
@@ -21,6 +22,7 @@ const TIER_OPTIONS = [
 ];
 
 const SORT_OPTIONS = [
+  { value: "rarity-desc", label: "Rarest first" },
   { value: "listed_at-desc", label: "Newest listed" },
   { value: "listed_at-asc", label: "Oldest listed" },
   { value: "asking_price-asc", label: "Price: low to high" },
@@ -46,7 +48,8 @@ export default function MarketplacePage() {
   const [search, setSearch] = useState("");
   const [tier, setTier] = useState("");
   const [gradYear, setGradYear] = useState("");
-  const [sort, setSort] = useState("listed_at-desc");
+  const [sort, setSort] = useState("rarity-desc");
+  const [rarityFilter, setRarityFilter] = useState("");
 
   const debouncedSearch = useDebouncedValue(search, 300);
   const [viewMode, setViewMode] = useState(readMarketplaceViewPreference);
@@ -96,12 +99,14 @@ export default function MarketplacePage() {
 
   const filtered = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase();
+    const wantRarity = rarityFilter ? normalizeRarityKey(rarityFilter) : "";
     const wantTier = tier ? normalizeTierKey(tier) : "";
     const wantYear = gradYear ? Number(gradYear) : null;
     const [sortBy, sortOrder] = sort.split("-");
 
     let rows = listings.filter((row) => {
       if (wantTier && normalizeTierKey(row.tier) !== wantTier) return false;
+      if (wantRarity && normalizeRarityKey(row.rarity) !== wantRarity) return false;
       if (wantYear && Number(row.grad_year) !== wantYear) return false;
       if (!q) return true;
       const hay = `${row.player_name || ""} ${row.team_name || ""} ${row.card_id || ""}`.toLowerCase();
@@ -109,7 +114,7 @@ export default function MarketplacePage() {
     });
 
     return sortMarketplaceBrowseRows(rows, sortBy, sortOrder);
-  }, [listings, debouncedSearch, tier, gradYear, sort]);
+  }, [listings, debouncedSearch, tier, gradYear, sort, rarityFilter]);
 
   return (
     <MarketplaceBrowseLayout
@@ -123,6 +128,8 @@ export default function MarketplacePage() {
       gradYears={gradYears}
       gradYear={gradYear}
       setGradYear={setGradYear}
+      rarityFilter={rarityFilter}
+      setRarityFilter={setRarityFilter}
       sort={sort}
       setSort={setSort}
       viewMode={viewMode}
@@ -143,6 +150,8 @@ function MarketplaceBrowseLayout({
   gradYears,
   gradYear,
   setGradYear,
+  rarityFilter,
+  setRarityFilter,
   sort,
   setSort,
   viewMode,
@@ -167,7 +176,7 @@ function MarketplaceBrowseLayout({
           <p className="text-xs text-slate-500 sm:sr-only">Layout</p>
           <MarketplaceViewToggle value={viewMode} onChange={onViewModeChange} />
         </div>
-        <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <div className="sm:col-span-2">
             <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Search</label>
             <input
@@ -187,6 +196,20 @@ function MarketplaceBrowseLayout({
             >
               {TIER_OPTIONS.map((o) => (
                 <option key={o.value || "all"} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Rarity</label>
+            <select
+              value={rarityFilter}
+              onChange={(e) => setRarityFilter(e.target.value)}
+              className="mt-1 min-h-[44px] w-full rounded-xl border border-white/15 bg-cardBg px-3 py-2 text-sm text-slate-100"
+            >
+              {MARKETPLACE_RARITY_FILTER_OPTIONS.map((o) => (
+                <option key={o.value || "all-rarities"} value={o.value}>
                   {o.label}
                 </option>
               ))}

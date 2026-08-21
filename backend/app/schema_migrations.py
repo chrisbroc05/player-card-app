@@ -374,6 +374,20 @@ def run_schema_migrations_after_models(engine: Engine) -> None:
                         "ALTER TABLE cards ADD COLUMN is_public BOOLEAN NOT NULL DEFAULT 1"
                     )
                 )
+        if "rarity_template" not in cols:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN IF NOT EXISTS rarity_template "
+                        "INTEGER NOT NULL DEFAULT 1"
+                    )
+                )
+            else:
+                conn.execute(
+                    text(
+                        "ALTER TABLE cards ADD COLUMN rarity_template INTEGER NOT NULL DEFAULT 1"
+                    )
+                )
 
         if "marketplace_offers" in insp.get_table_names():
             mcols = {c["name"] for c in insp.get_columns("marketplace_offers")}

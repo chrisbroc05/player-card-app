@@ -1,6 +1,8 @@
 import React from "react";
 import AnimatedBadge from "./AnimatedBadge";
 import HighlightBadge from "./HighlightBadge";
+import RarityBadge from "./RarityBadge";
+import AutoSignature from "./AutoSignature";
 import {
   CARD_ASPECT_CLASS,
   resolveCardDisplayMeta,
@@ -22,6 +24,8 @@ const CardDisplay = React.forwardRef(function CardDisplay(
     className = "",
     showAnimatedBadge = false,
     showHighlightBadge = false,
+    showRarityBadge = true,
+    animateSignature = false,
     isHighlight = false,
     inProgressOverlay = false,
     inProgressLabel = "Animation in progress...",
@@ -46,8 +50,9 @@ const CardDisplay = React.forwardRef(function CardDisplay(
     );
   }
 
-  const { tier, theme } = meta;
+  const { tier, theme, rarity, rarityTemplate, templateName, templateTierKey } = meta;
   const bannerStyles = getCardBannerStyles(tier, theme);
+  const centerBannerLabel = templateName || bannerStyles.themeLabel || "\u00A0";
   const highlightStyles = isHighlight ? getHighlightCardStyles(tier, theme) : null;
   const frame = tierFrameStyles(tier);
   const bannerSize = size === "detail" || size === "compact" || size === "thumb" ? size : "default";
@@ -73,6 +78,9 @@ const CardDisplay = React.forwardRef(function CardDisplay(
     <div
       ref={ref}
       data-card-capture-id={captureId || undefined}
+      data-tier={templateTierKey}
+      data-template={String(rarityTemplate || 1)}
+      data-rarity={rarity || "standard"}
       className={`card-display-container card-shell relative flex w-full min-w-[210px] min-h-0 flex-col overflow-hidden ${shellRadiusClass} ${CARD_ASPECT_CLASS} ${frameClasses} ${className}`}
     >
       {!isHighlight && meta.themeOverlay ? (
@@ -88,7 +96,17 @@ const CardDisplay = React.forwardRef(function CardDisplay(
           {!isHighlight ? (
             <div className="card-player-inner-border pointer-events-none absolute inset-0" aria-hidden />
           ) : null}
+          <AutoSignature
+            playerName={meta.playerName}
+            rarity={rarity}
+            animate={animateSignature}
+          />
         </div>
+        {showRarityBadge ? (
+          <span className="absolute left-2 top-2 z-[3]">
+            <RarityBadge rarity={rarity} />
+          </span>
+        ) : null}
         {showAnimatedBadge ? (
           <span className="absolute right-2 top-2 z-[3]">
             <AnimatedBadge />
@@ -132,7 +150,7 @@ const CardDisplay = React.forwardRef(function CardDisplay(
           </div>
           <div className="card-banner__footer-col card-banner__footer-col--center">
             <span className={`card-banner__theme ${bannerStyles.themeClass}`}>
-              {bannerStyles.themeLabel || "\u00A0"}
+              {centerBannerLabel}
             </span>
           </div>
           <div className="card-banner__footer-col card-banner__footer-col--end">

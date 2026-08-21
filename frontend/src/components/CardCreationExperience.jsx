@@ -4,7 +4,6 @@ import CardImage from "./CardImage";
 import { toApiUrl } from "../config/api";
 import {
   MIN_DURATION_MS,
-  POST_REVEAL_DISPLAY_MS,
   useCardCreationTiming,
 } from "../hooks/useCardCreationTiming";
 import {
@@ -20,6 +19,7 @@ import {
   normalizeExperienceTier,
   themeDisplayName,
 } from "../utils/cardCreationExperience";
+import { forgeLoadingMessage, getRevealConfig } from "../utils/rarityStyles";
 import "../styles/cardCreationExperience.css";
 
 const TEXT_FADE_MS = 500;
@@ -99,11 +99,23 @@ function tierCssVars(tierConfig) {
   };
 }
 
-function ForgeExperience({ phaseIndex, themeLabel, tierConfig, playerName, teamName, cardImageUrl }) {
+function ForgeExperience({
+  phaseIndex,
+  themeLabel,
+  tierConfig,
+  playerName,
+  teamName,
+  cardImageUrl,
+  rarity,
+  elapsedMs,
+  generationComplete,
+}) {
   const theme = themeDisplayName(themeLabel);
   const phaseTexts = FORGE_PHASE_TEXT(theme, tierConfig.label);
+  const rareLoadingHint = forgeLoadingMessage(rarity, elapsedMs, generationComplete);
 
   const getTextForPhase = (phase) => {
+    if (rareLoadingHint) return rareLoadingHint;
     if (phase === 0) return phaseTexts[0];
     if (phase === 1) return phaseTexts[1];
     if (phase === 3) return phaseTexts[5];
@@ -373,6 +385,8 @@ function RevealSection({
   videoUrl,
   playerName,
   revealVariant,
+  revealConfig,
+  revealMode,
   showPrimaryAction,
   primaryActionLabel,
   onPrimaryAction,
@@ -382,6 +396,9 @@ function RevealSection({
   const isHighlight = cardType === "highlight";
   const isAnimated = cardType === "animated";
   const [mediaReady, setMediaReady] = React.useState(false);
+  const rarity = revealCard?.rarity || "standard";
+  const config = revealConfig || getRevealConfig(rarity);
+  const animateSignature = Boolean(config.animateSignature) && mediaReady;
 
   React.useEffect(() => {
     setMediaReady(false);
@@ -402,33 +419,89 @@ function RevealSection({
     return undefined;
   }, [isHighlight, revealCard, videoUrl]);
 
-  const wrapClass =
-    revealVariant === "rise"
-      ? "cce-reveal-card-wrap cce-reveal-card-wrap--rise"
-      : "cce-reveal-card-wrap cce-reveal-card-wrap--bounce";
+  const variantClass = config.variant || revealVariant;
+  const wrapClass = [
+    "cce-reveal-card-wrap",
+    variantClass === "rise" ? "cce-reveal-card-wrap--rise" : "",
+    variantClass === "shimmer" ? "cce-reveal-card-wrap--shimmer" : "",
+    variantClass === "flip" ? "cce-reveal-card-wrap--flip" : "",
+    variantClass === "slam" ? "cce-reveal-card-wrap--slam" : "",
+    variantClass === "materialize" ? "cce-reveal-card-wrap--materialize" : "",
+    variantClass === "bounce" || !variantClass ? "cce-reveal-card-wrap--bounce" : "",
+    config.permanentGlow ? "cce-reveal-card-wrap--permanent-glow" : "",
+    revealMode === "landed" ? "cce-reveal-card-wrap--settled" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   const readyTitle =
     revealTitle ||
+    config.title ||
     (isAnimated
       ? AWAKENING_FLIP_TEXT
       : isHighlight
         ? "Lights. Camera. Card."
         : "Your card is ready!");
 
+  const particleTheme = config.particleTheme || "standard";
+  const showConfetti = cardType === "standard" && particleTheme !== "refractor";
+  const showRefractorBurst = particleTheme === "refractor";
+  const showGoldBurst = particleTheme === "gold" || particleTheme === "legendary";
+  const showLegendaryBurst = particleTheme === "legendary" || particleTheme === "black-label";
+  const isBlackout = revealMode === "pre_reveal";
+
   return (
     <>
-      <div className={`cce-reveal-flash ${isHighlight ? "cce-reveal-flash--hit" : ""}`} aria-hidden />
-      <div className="cce-reveal-rays" aria-hidden />
+      {isBlackout ? (
+        <div className="cce-rarity-blackout" aria-hidden>
+          {config.subtitle && particleTheme === "black-label" ? (
+            <p className="cce-rarity-blackout__text">{config.subtitle}</p>
+          ) : null}
+        </div>
+      ) : null}
 
-      <div className="cce-particles" aria-hidden>
-        {Array.from({ length: 24 }, (_, i) => (
+      <div
+        className={`cce-reveal-flash ${isHighlight ? "cce-reveal-flash--hit" : ""} ${
+          particleTheme === "refractor" ? "cce-reveal-flash--silver" : ""
+        } ${showGoldBurst ? "cce-reveal-flash--gold" : ""}`}
+        aria-hidden
+      />
+      <div
+        className={`cce-reveal-rays ${showGoldBurst ? "cce-reveal-rays--gold" : ""} ${
+          showLegendaryBurst ? "cce-reveal-rays--legendary" : ""
+        }`}
+        aria-hidden
+      />
+
+      {showLegendaryBurst ? (
+        <div className="cce-rarity-rings" aria-hidden>
+          {Array.from({ length: 4 }, (_, i) => (
+            <span key={i} className="cce-rarity-ring" style={{ "--ring-i": i }} />
+          ))}
+        </div>
+      ) : null}
+
+      {config.screenShake && revealMode === "reveal" ? (
+        <div className="cce-screen-shake" aria-hidden />
+      ) : null}
+
+      <div className={`cce-particles cce-particles--${particleTheme}`} aria-hidden>
+        {Array.from({ length: particleTheme === "legendary" ? 40 : 24 }, (_, i) => (
           <span key={i} className="cce-particle" style={{ "--i": i }} />
         ))}
       </div>
 
-      {cardType === "standard" ? (
-        <div className="cce-confetti" aria-hidden>
-          {Array.from({ length: 28 }, (_, i) => (
+      {showRefractorBurst ? (
+        <div className="cce-particles cce-particles--refractor-burst" aria-hidden>
+          {Array.from({ length: 32 }, (_, i) => (
+            <span key={i} className="cce-particle cce-particle--refractor" style={{ "--i": i }} />
+          ))}
+        </div>
+      ) : null}
+
+      {showConfetti ? (
+        <div className={`cce-confetti cce-confetti--${particleTheme}`} aria-hidden>
+          {Array.from({ length: config.confettiMs >= 5000 ? 48 : 28 }, (_, i) => (
             <span key={i} className="cce-confetti-piece" style={{ "--i": i }} />
           ))}
         </div>
@@ -458,6 +531,7 @@ function RevealSection({
             showInfoBanner
             forcePlay
             variant="detail"
+            animateSignature={animateSignature}
             onMediaReady={() => setMediaReady(true)}
           />
         ) : videoUrl ? (
@@ -477,27 +551,35 @@ function RevealSection({
             card={revealCard}
             alt={playerName || "Your generated card"}
             showInfoBanner
+            animateSignature={animateSignature}
             onMediaReady={() => setMediaReady(true)}
           />
         ) : null}
       </div>
 
       <div className="cce-reveal-copy">
-        {!mediaReady ? (
+        {!mediaReady || revealMode === "pre_reveal" ? (
           <div className="cce-reveal-loading">
             <div className="cce-reveal-loading__spinner" aria-hidden />
-            <p className="cce-reveal-title">Almost ready...</p>
+            <p className="cce-reveal-title">
+              {revealMode === "pre_reveal" && config.subtitle && particleTheme !== "black-label"
+                ? config.subtitle
+                : "Almost ready..."}
+            </p>
           </div>
         ) : (
           <>
             <p className="cce-reveal-title">{readyTitle}</p>
+            {config.subtitle && particleTheme !== "black-label" ? (
+              <p className="cce-reveal-subtitle">{config.subtitle}</p>
+            ) : null}
             {isHighlight ? <span className="cce-reveal-badge">HIGHLIGHT</span> : null}
             {isAnimated ? <span className="cce-reveal-badge cce-reveal-badge--animated">ANIMATED</span> : null}
           </>
         )}
       </div>
 
-      {showPrimaryAction && mediaReady ? (
+      {showPrimaryAction && mediaReady && revealMode === "landed" ? (
         <div className="cce-reveal-actions">
           <button type="button" className="cce-reveal-btn cce-reveal-btn--primary" onClick={onPrimaryAction}>
             {primaryActionLabel || "Add to Collection"}
@@ -579,10 +661,13 @@ export default function CardCreationExperience({
   const waitingForHighlightVideo =
     cardType === "highlight" && apiGenerationComplete && !highlightMediaReady;
 
-  const { mode, phaseIndex, elapsedMs } = useCardCreationTiming({
+  const cardRarity = card?.rarity || "standard";
+
+  const { mode, phaseIndex, elapsedMs, revealConfig, postRevealDisplayMs } = useCardCreationTiming({
     active,
     cardType,
     generationComplete: revealReady,
+    rarity: cardRarity,
   });
 
   const waitingAfterFlip =
@@ -643,13 +728,13 @@ export default function CardCreationExperience({
     completedRef.current = true;
     const timer = window.setTimeout(() => {
       onRevealComplete?.();
-    }, POST_REVEAL_DISPLAY_MS);
+    }, postRevealDisplayMs);
     return () => window.clearTimeout(timer);
-  }, [active, mode, onRevealComplete, showPrimaryAction]);
+  }, [active, mode, onRevealComplete, showPrimaryAction, postRevealDisplayMs]);
 
   if (!active) return null;
 
-  const isReveal = mode === "reveal" || mode === "landed";
+  const isReveal = mode === "pre_reveal" || mode === "reveal" || mode === "landed";
   const isAnimatedReveal = cardType === "animated" && isReveal;
   const revealVariant = cardType === "highlight" ? "rise" : "bounce";
   const showAnimatedActions =
@@ -657,7 +742,7 @@ export default function CardCreationExperience({
 
   return (
     <div
-      className={`cce-scene ${fullscreen ? "cce-scene--fullscreen" : ""} ${isAnimatedReveal ? "cce-scene--animated-reveal" : ""} ${isReveal && !isAnimatedReveal ? "cce-scene--reveal" : ""}`}
+      className={`cce-scene ${fullscreen ? "cce-scene--fullscreen" : ""} ${isAnimatedReveal ? "cce-scene--animated-reveal" : ""} ${isReveal && !isAnimatedReveal ? "cce-scene--reveal" : ""} ${isReveal && !isAnimatedReveal ? revealConfig.sceneClass : ""}`}
       style={cssVars}
       aria-live="polite"
       aria-busy={!revealReady}
@@ -675,6 +760,9 @@ export default function CardCreationExperience({
               playerName={playerName}
               teamName={teamName}
               cardImageUrl={cardImageUrl}
+              rarity={cardRarity}
+              elapsedMs={elapsedMs}
+              generationComplete={revealReady}
             />
           ) : null}
           {cardType === "highlight" ? (
@@ -719,6 +807,8 @@ export default function CardCreationExperience({
           videoUrl={resolvedVideoUrl}
           playerName={playerName}
           revealVariant={revealVariant}
+          revealConfig={revealConfig}
+          revealMode={mode}
           showPrimaryAction={showPrimaryAction && mode === "landed"}
           primaryActionLabel={primaryActionLabel}
           onPrimaryAction={() => {

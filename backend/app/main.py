@@ -22,6 +22,7 @@ except ValueError:
 sys.path.insert(0, _app_dir)
 
 from utils.storage import is_r2_configured, resolve_source_image_path, save_bytes_to_storage
+from utils.rarity import resolve_rarity_pull, get_template_prompt
 from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -289,6 +290,8 @@ def _tier_player_portrait_prompt(
     variant: Literal["single_edit", "text_generate"] = "single_edit",
     special_theme: str | None = None,
     caption: str | None = None,
+    vault_tier: str | None = None,
+    rarity_template: int | None = None,
 ) -> str:
     """
     Portrait-only prompt — UI renders card frame, banner, and tier styling.
@@ -302,6 +305,11 @@ def _tier_player_portrait_prompt(
     modifier = theme_prompt_for_slug(special_theme)
     theme_aesthetic = f"{modifier} " if modifier else ""
 
+    template_line = ""
+    if vault_tier and rarity_template:
+        template_style = get_template_prompt(vault_tier, rarity_template)
+        template_line = f"Visual style: {template_style}. "
+
     identity = (
         "Preserve the subject's identity, likeness, skin tone, and athletic pose from the reference photo. "
         "Match the same action shown in the photo (do not invent a different pose). "
@@ -314,6 +322,7 @@ def _tier_player_portrait_prompt(
         f"{_STYLE_ANCHOR} "
         f"{identity}"
         f"{caption_line}"
+        f"{template_line}"
         "Professional youth baseball player portrait, centered, head and upper body fully visible, "
         "stadium or sports background, dramatic sports photography lighting, "
         f"{tier_style}, {theme_aesthetic}"
@@ -579,23 +588,38 @@ def _store_generated_card(
     action_category: str | None = None,
     throwing_hand: str | None = None,
     batting_side: str | None = None,
+    pulled_rarity: str | None = None,
+    pulled_template: int | None = None,
 ) -> dict:
     """Persist generated card to PostgreSQL; returns API-shaped dict."""
     vt = vault_tier or _vault_tier_from_gen_tier(gen_tier)
     cid = predefined_card_id or next_collectible_card_id(db)
     grad_year_str = str(_grad_year_from_player_row(player_row))
+    player_name = _player_display_name(player_row)
+    if pulled_rarity is not None and pulled_template is not None:
+        rarity_value = pulled_rarity
+        template_value = int(pulled_template)
+    else:
+        rarity_value, template_value = resolve_rarity_pull(
+            db,
+            card_id=cid,
+            player_name=player_name,
+            tier=vt,
+            logger=logger,
+        )
     row = create_card_row(
         db,
         card_id=cid,
         player_id=player_id,
-        player_name=_player_display_name(player_row),
+        player_name=player_name,
         team_name=_player_team_name(player_row),
         position=str(player_row.get("position") or "").strip(),
         jersey_number=_player_jersey_number(player_row),
         grad_year=grad_year_str,
         tier=vt,
         theme=_theme_field(special_theme),
-        rarity=_normalize_rarity(gen_tier),
+        rarity=rarity_value,
+        rarity_template=template_value,
         edition_number=1,
         print_run=1,
         image_url=image_url,
@@ -665,10 +689,18 @@ def _gpt_image_portrait_edit_bytes(
     tier: str,
     special_theme: str | None,
     face_path: Path | None = None,
+    vault_tier: str | None = None,
+    rarity_template: int | None = None,
 ) -> bytes:
     """Portrait-only edit from the uploaded player photo — no card template."""
     player_f = _bytesio_image_file_for_edit(player_path, "player")
-    prompt = _tier_player_portrait_prompt(tier, variant="single_edit", special_theme=special_theme)
+    prompt = _tier_player_portrait_prompt(
+        tier,
+        variant="single_edit",
+        special_theme=special_theme,
+        vault_tier=vault_tier,
+        rarity_template=rarity_template,
+    )
     image_inputs = [player_f]
     if face_path is not None:
         face_f = _bytesio_image_file_for_edit(face_path, "face")
@@ -723,6 +755,8 @@ def _gpt_image_dual_edit_bytes(
     tier: str,
     special_theme: str | None,
     face_path: Path | None = None,
+    vault_tier: str | None = None,
+    rarity_template: int | None = None,
 ) -> bytes:
     """Legacy name — portrait-only edit (template ignored; layout is frontend UI)."""
     _ = (template_path, name, team)
@@ -733,6 +767,8 @@ def _gpt_image_dual_edit_bytes(
         tier=tier,
         special_theme=special_theme,
         face_path=face_path,
+        vault_tier=vault_tier,
+        rarity_template=rarity_template,
     )
 
 
@@ -781,6 +817,8 @@ def _dalle3_generate_card_bytes(
     caption: str,
     tier: str,
     special_theme: str | None,
+    vault_tier: str | None = None,
+    rarity_template: int | None = None,
 ) -> bytes:
     """
     Full photorealistic trading card via DALL·E 3 text generation (fallback when template edit fails).
@@ -790,6 +828,8 @@ def _dalle3_generate_card_bytes(
         variant="text_generate",
         special_theme=special_theme,
         caption=caption,
+        vault_tier=vault_tier,
+        rarity_template=rarity_template,
     )
     resp = client.images.generate(
         model="dall-e-3",
@@ -808,14 +848,19 @@ def _dalle2_edit_card_bytes(
     team: str,
     tier: str,
     special_theme: str | None,
+    vault_tier: str | None = None,
+    rarity_template: int | None = None,
 ) -> bytes:
     """
     Fallback: DALL·E 2 image *edit* — often keeps most of the original photo pixels; use only if DALL·E 3 fails.
     """
+    _ = (name, team)
     prompt = _tier_player_portrait_prompt(
         tier,
         variant="single_edit",
         special_theme=special_theme,
+        vault_tier=vault_tier,
+        rarity_template=rarity_template,
     )
     png_bytes = _image_to_square_png_bytes(source_path)
     image_file = io.BytesIO(png_bytes)
@@ -1115,6 +1160,8 @@ def _generate_card_openai(
     tier: str = "base",
     special_theme: str | None = None,
     face_source_path: Path | None = None,
+    vault_tier: str | None = None,
+    rarity_template: int | None = None,
 ) -> dict:
     """
     1) Prefer GPT Image edit on the player photo only (portrait — UI renders card chrome).
@@ -1145,6 +1192,8 @@ def _generate_card_openai(
                 tier=tier_norm,
                 special_theme=special_theme,
                 face_path=face_source_path,
+                vault_tier=vault_tier,
+                rarity_template=rarity_template,
             )
             logger.info("Card generation succeeded via gpt-image model=%s player_id=%s", model, player_id)
             break
@@ -1165,6 +1214,8 @@ def _generate_card_openai(
                     tier=tier_norm,
                     special_theme=special_theme,
                     face_path=face_source_path,
+                    vault_tier=vault_tier,
+                    rarity_template=rarity_template,
                 )
                 generation = "gpt-image-template"
                 logger.info("Card generation succeeded via legacy path model=%s player_id=%s", model, player_id)
@@ -1182,7 +1233,14 @@ def _generate_card_openai(
             caption = "athletic portrait, confident sports pose"
         try:
             out_bytes = _dalle3_generate_card_bytes(
-                client, name, team, caption, tier_norm, special_theme
+                client,
+                name,
+                team,
+                caption,
+                tier_norm,
+                special_theme,
+                vault_tier=vault_tier,
+                rarity_template=rarity_template,
             )
             logger.info("Card generation succeeded via dall-e-3 player_id=%s", player_id)
         except Exception as exc:
@@ -1192,7 +1250,14 @@ def _generate_card_openai(
     if out_bytes is None:
         generation = "dall-e-2-edit"
         out_bytes = _dalle2_edit_card_bytes(
-            client, source_path, name, team, tier_norm, special_theme
+            client,
+            source_path,
+            name,
+            team,
+            tier_norm,
+            special_theme,
+            vault_tier=vault_tier,
+            rarity_template=rarity_template,
         )
         logger.info("Card generation succeeded via dall-e-2-edit player_id=%s", player_id)
 
@@ -1277,6 +1342,9 @@ class CardVaultSummary(BaseModel):
     tier: str
     theme: str
     rarity: str
+    rarity_template: int = Field(default=1, ge=1, le=5)
+    rarity_display_name: str = Field(default="Base")
+    template_name: str = Field(default="Classic")
     edition_number: int
     print_run: int
     created_at: str
@@ -1329,6 +1397,9 @@ class Card(BaseModel):
     tier: str = Field(..., min_length=1, max_length=40)
     theme: str = Field(default="none", max_length=120)
     rarity: str = Field(..., min_length=1, max_length=40)
+    rarity_template: int = Field(default=1, ge=1, le=5)
+    rarity_display_name: str = Field(default="Base")
+    template_name: str = Field(default="Classic")
     edition_number: int = Field(default=1, ge=1)
     print_run: int = Field(default=1, ge=1)
     created_at: str
@@ -1368,6 +1439,9 @@ class CardShareMeta(BaseModel):
     player_name: str
     tier: str
     rarity: str
+    rarity_template: int = Field(default=1, ge=1, le=5)
+    rarity_display_name: str = Field(default="Base")
+    template_name: str = Field(default="Classic")
     edition_number: int
     print_run: int
     image_url: str
@@ -1447,6 +1521,9 @@ class GeneratedOrderCard(BaseModel):
     team_name: str = Field(..., min_length=1, max_length=200)
     special_theme: str | None = Field(default=None, max_length=120)
     rarity: str = Field(..., min_length=1, max_length=40)
+    rarity_template: int = Field(default=1, ge=1, le=5)
+    rarity_display_name: str = Field(default="Base")
+    template_name: str = Field(default="Classic")
 
 
 class Order(OrderCreate):
@@ -2255,7 +2332,16 @@ def generate_card_for_order(
         "special_theme": order.get("special_theme"),
     }
     card_tier = _order_tier_to_card_tier(order["tier"])
+    vault_tier_val = _vault_tier_from_order_tier(str(order.get("tier", "rookie")))
     face_photo_raw = (order.get("face_photo_url") or "").strip() or None
+    new_card_id = next_collectible_card_id(db)
+    pulled_rarity, pulled_template = resolve_rarity_pull(
+        db,
+        card_id=new_card_id,
+        player_name=player_label,
+        tier=vault_tier_val,
+        logger=logger,
+    )
 
     if card_type == "highlight":
         result = _generate_highlight_placeholder(
@@ -2282,6 +2368,8 @@ def generate_card_for_order(
                     tier=card_tier,
                     special_theme=order.get("special_theme"),
                     face_source_path=face_path,
+                    vault_tier=vault_tier_val,
+                    rarity_template=pulled_template,
                 )
             except Exception as exc:
                 logger.exception(
@@ -2324,7 +2412,7 @@ def generate_card_for_order(
         player_row=player_row,
         special_theme=order.get("special_theme"),
         owner_name=order.get("customer_name") or "unassigned",
-        vault_tier=_vault_tier_from_order_tier(str(order.get("tier", "rookie"))),
+        vault_tier=vault_tier_val,
         owner_id=owner_id,
         predefined_card_id=new_card_id,
         status="preview",
@@ -2337,6 +2425,8 @@ def generate_card_for_order(
         action_category=action_category if card_type == "animated" else None,
         throwing_hand=throwing_hand if card_type == "animated" else None,
         batting_side=batting_side if card_type == "animated" else None,
+        pulled_rarity=pulled_rarity,
+        pulled_template=pulled_template,
     )
 
     generated = GeneratedOrderCard(
@@ -2350,7 +2440,10 @@ def generate_card_for_order(
         player_name=_player_display_name(player_row),
         team_name=_player_team_name(player_row),
         special_theme=order.get("special_theme"),
-        rarity=_normalize_rarity(card_tier),
+        rarity=vault_rec.get("rarity") or "standard",
+        rarity_template=int(vault_rec.get("rarity_template") or 1),
+        rarity_display_name=vault_rec.get("rarity_display_name") or "Base",
+        template_name=vault_rec.get("template_name") or "Classic",
     )
     order.setdefault("generated_cards", []).append(generated.model_dump())
     order["preview_count"] = preview_count + 1
@@ -2596,10 +2689,29 @@ def generate_card(
             detail="Insufficient credits. Please add credits to your account at /credits",
         ) from e
 
+    vault_tier_val = _vault_tier_from_gen_tier(tier)
+    card_id_pre = next_collectible_card_id(db)
+    player_name = _player_display_name(player_row)
+    pulled_rarity, pulled_template = resolve_rarity_pull(
+        db,
+        card_id=card_id_pre,
+        player_name=player_name,
+        tier=vault_tier_val,
+        logger=logger,
+    )
+
     try:
         if use_ai:
             try:
-                result = _generate_card_openai(player_row, player_id, source_path, tier=tier, special_theme=special_theme)
+                result = _generate_card_openai(
+                    player_row,
+                    player_id,
+                    source_path,
+                    tier=tier,
+                    special_theme=special_theme,
+                    vault_tier=vault_tier_val,
+                    rarity_template=pulled_template,
+                )
             except Exception as exc:
                 # Fallback: keep the app usable if the key is missing, quota fails, or the API errors.
                 result = _generate_card_pillow(player_row, player_id, source_path, tier=tier, special_theme=special_theme)
@@ -2620,6 +2732,10 @@ def generate_card(
         special_theme=special_theme,
         owner_name="unassigned",
         owner_id=current_user.id,
+        vault_tier=vault_tier_val,
+        predefined_card_id=card_id_pre,
+        pulled_rarity=pulled_rarity,
+        pulled_template=pulled_template,
     )
     result["card_id"] = card["card_id"]
     result["card_record_id"] = card["id"]
@@ -2663,7 +2779,25 @@ def generate_card_set(
     try:
         for tier in ("base", "rare", "legendary"):
             try:
-                result = _generate_card_openai(player_row, player_id, source_path, tier=tier, special_theme=None)
+                vault_tier_val = _vault_tier_from_gen_tier(tier)
+                card_id_pre = next_collectible_card_id(db)
+                player_name = _player_display_name(player_row)
+                pulled_rarity, pulled_template = resolve_rarity_pull(
+                    db,
+                    card_id=card_id_pre,
+                    player_name=player_name,
+                    tier=vault_tier_val,
+                    logger=logger,
+                )
+                result = _generate_card_openai(
+                    player_row,
+                    player_id,
+                    source_path,
+                    tier=tier,
+                    special_theme=None,
+                    vault_tier=vault_tier_val,
+                    rarity_template=pulled_template,
+                )
                 card = _store_generated_card(
                     db,
                     player_id,
@@ -2674,6 +2808,10 @@ def generate_card_set(
                     special_theme=None,
                     owner_name="unassigned",
                     owner_id=current_user.id,
+                    vault_tier=vault_tier_val,
+                    predefined_card_id=card_id_pre,
+                    pulled_rarity=pulled_rarity,
+                    pulled_template=pulled_template,
                 )
                 result["card_id"] = card["card_id"]
                 result["card_record_id"] = card["id"]

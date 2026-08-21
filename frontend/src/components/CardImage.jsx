@@ -128,6 +128,8 @@ export default function CardImage({
   forcePlay = false,
   showAnimatedBadge = true,
   showHighlightBadge = true,
+  showRarityBadge = true,
+  animateSignature = false,
   showInProgressOverlay = true,
   showInfoBanner,
   infoBannerVariant = "default",
@@ -641,6 +643,8 @@ export default function CardImage({
         className={frameClassName}
         showAnimatedBadge={showAnimatedBadge && animatedActive}
         showHighlightBadge={showBadge}
+        showRarityBadge={showRarityBadge}
+        animateSignature={animateSignature}
         isHighlight={useHighlightShell}
         inProgressOverlay={inProgress}
         inProgressLabel={progressLabel}

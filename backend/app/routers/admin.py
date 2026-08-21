@@ -31,6 +31,13 @@ from marketplace_repo import float_from_decimal, listing_active_filter
 from models import Card, CreditLedger, MarketplaceOffer, TradeOffer, User, utcnow
 from stripe_connect import configure_stripe_client, create_onboarding_link
 from utils.usage import get_generation_caps, get_platform_generation_count, get_user_generation_count
+from utils.rarity import (
+    RARE_PULL_TIERS,
+    RARITY_DISPLAY_NAMES,
+    empty_rarity_breakdown,
+    expected_pull_rates,
+    rarity_display_name,
+)
 
 router = APIRouter()
 admin_security = HTTPBearer(auto_error=False)
@@ -425,6 +432,41 @@ def admin_stats(
     for rar, cnt in db.query(Card.rarity, func.count(Card.id)).group_by(Card.rarity).all():
         cards_by_rarity[str(rar or "unknown")] = int(cnt)
 
+    rarity_breakdown = empty_rarity_breakdown()
+    for rar, cnt in db.query(Card.rarity, func.count(Card.id)).group_by(Card.rarity).all():
+        key = str(rar or "standard").lower()
+        if key in rarity_breakdown:
+            rarity_breakdown[key] += int(cnt)
+    rarity_pull_total = sum(rarity_breakdown.values())
+    rarity_actual_rates = {
+        key: round((count / rarity_pull_total), 6) if rarity_pull_total else 0.0
+        for key, count in rarity_breakdown.items()
+    }
+    rarity_expected_rates = expected_pull_rates()
+
+    recent_rare_pull_rows = (
+        db.query(Card)
+        .filter(
+            Card.rarity.in_(tuple(RARE_PULL_TIERS)),
+            Card.status.notin_(("deleted", "discarded", "preview")),
+        )
+        .order_by(Card.created_at.desc())
+        .limit(20)
+        .all()
+    )
+    recent_rare_pulls = [
+        {
+            "card_id": card.card_id,
+            "player_name": card.player_name,
+            "tier": card.tier,
+            "rarity": card.rarity,
+            "rarity_display_name": rarity_display_name(card.rarity),
+            "rarity_template": int(getattr(card, "rarity_template", None) or 1),
+            "created_at": _iso(card.created_at),
+        }
+        for card in recent_rare_pull_rows
+    ]
+
     now = datetime.now(timezone.utc)
     week_ago = now - timedelta(days=7)
     new_users_last_7_days = int(
@@ -587,6 +629,12 @@ def admin_stats(
         "trades_pending": trades_pending,
         "cards_by_tier": cards_by_tier,
         "cards_by_rarity": cards_by_rarity,
+        "rarity_breakdown": rarity_breakdown,
+        "rarity_pull_total": rarity_pull_total,
+        "rarity_actual_rates": rarity_actual_rates,
+        "rarity_expected_rates": rarity_expected_rates,
+        "rarity_display_names": RARITY_DISPLAY_NAMES,
+        "recent_rare_pulls": recent_rare_pulls,
         "new_users_last_7_days": new_users_last_7_days,
         "new_cards_last_7_days": new_cards_last_7_days,
         "top_creators": top_creators,

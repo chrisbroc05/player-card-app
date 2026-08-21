@@ -28,6 +28,9 @@ class PublicProfileCardOut(BaseModel):
     tier: str
     theme: str = ""
     rarity: str = ""
+    rarity_template: int = 1
+    rarity_display_name: str = "Base"
+    template_name: str = "Classic"
     edition_number: int = 1
     print_run: int = 1
     created_at: str
@@ -77,7 +80,10 @@ def _card_out(row: dict) -> PublicProfileCardOut:
         team_name=row.get("team_name") or "",
         tier=row.get("tier") or "rookie",
         theme=row.get("theme") or "",
-        rarity=row.get("rarity") or "",
+        rarity=row.get("rarity") or "standard",
+        rarity_template=int(row.get("rarity_template") or 1),
+        rarity_display_name=row.get("rarity_display_name") or "Base",
+        template_name=row.get("template_name") or "Classic",
         edition_number=int(row.get("edition_number") or 1),
         print_run=int(row.get("print_run") or 1),
         created_at=row.get("created_at") or "",

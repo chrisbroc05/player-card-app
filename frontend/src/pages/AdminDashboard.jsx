@@ -982,7 +982,58 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 <div>
-                  <h3 className="mb-3 text-sm font-semibold text-slate-300">Cards by rarity</h3>
+                  <h3 className="mb-3 text-sm font-semibold text-slate-300">Pull rarity breakdown</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(stats.rarity_breakdown || {}).length === 0 ? (
+                      <p className="text-sm text-slate-500">No pull data yet.</p>
+                    ) : (
+                      Object.entries(stats.rarity_breakdown).map(([k, v]) => (
+                        <span
+                          key={k}
+                          className="rounded-full border border-white/10 bg-cardBg2 px-3 py-1 text-xs text-slate-300"
+                        >
+                          {stats.rarity_display_names?.[k] || k}: <strong className="text-white">{v}</strong>
+                        </span>
+                      ))
+                    )}
+                  </div>
+                  {stats.rarity_pull_total > 0 ? (
+                    <p className="mt-2 text-xs text-slate-500">
+                      {stats.rarity_pull_total} cards with pull rarities tracked
+                    </p>
+                  ) : null}
+                </div>
+                {(stats.recent_rare_pulls || []).length > 0 ? (
+                  <div>
+                    <h3 className="mb-3 text-sm font-semibold text-slate-300">Recent rare pulls</h3>
+                    <div className="overflow-x-auto rounded-xl border border-amber-400/20 bg-amber-500/5">
+                      <table className="w-full min-w-[520px] text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-white/10 text-slate-500">
+                            <th className="p-3">Player</th>
+                            <th className="p-3">Rarity</th>
+                            <th className="p-3">Tier</th>
+                            <th className="p-3">Template</th>
+                            <th className="p-3">When</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {stats.recent_rare_pulls.map((row) => (
+                            <tr key={row.card_id} className="border-b border-white/5 text-slate-300">
+                              <td className="p-3 text-white">{row.player_name}</td>
+                              <td className="p-3 font-medium text-amber-100">{row.rarity_display_name}</td>
+                              <td className="p-3">{row.tier}</td>
+                              <td className="p-3">{row.rarity_template}</td>
+                              <td className="p-3 text-slate-500">{row.created_at}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : null}
+                <div>
+                  <h3 className="mb-3 text-sm font-semibold text-slate-300">Cards by rarity (all values)</h3>
                   <div className="flex flex-wrap gap-2">
                     {Object.entries(stats.cards_by_rarity || {}).length === 0 ? (
                       <p className="text-sm text-slate-500">No cards yet.</p>

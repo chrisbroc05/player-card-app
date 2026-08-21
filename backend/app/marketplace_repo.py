@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from card_repo import animation_fields_for_card, highlight_fields_for_card
 from models import Card, MarketplaceOffer, User, utcnow
+from utils.rarity import rarity_display_name, get_template_name, rarity_sort_weight
 
 
 def _parse_royalty_rate(raw: str | None, default: float = 0.08) -> Decimal:
@@ -196,6 +197,11 @@ def _sort_standard_listing_rows(
             dt = dt.replace(tzinfo=timezone.utc)
         return dt.timestamp()
 
+    def key_rarity(item: tuple[Card, str]) -> int:
+        return rarity_sort_weight(item[0].rarity)
+
+    if sort_key == "rarity":
+        return sorted(rows, key=key_rarity, reverse=order_desc)
     if sort_key == "asking_price":
         return sorted(rows, key=key_price, reverse=order_desc)
     if sort_key == "player_name":
@@ -278,7 +284,10 @@ def listing_dict(card: Card, owner_display_name: str, *, pending_offer_count: in
         "grad_year": _grad_year_int(card),
         "tier": card.tier,
         "theme": card.theme or "none",
-        "rarity": card.rarity,
+        "rarity": card.rarity or "standard",
+        "rarity_template": int(getattr(card, "rarity_template", None) or 1),
+        "rarity_display_name": rarity_display_name(card.rarity),
+        "template_name": get_template_name(card.tier, int(getattr(card, "rarity_template", None) or 1)),
         "edition_number": card.edition_number,
         "print_run": card.print_run,
         "image_url": card.image_url,
@@ -318,7 +327,10 @@ def buyer_offer_row_dict(
         "grad_year": _grad_year_int(card),
         "tier": card.tier,
         "theme": card.theme or "none",
-        "rarity": card.rarity,
+        "rarity": card.rarity or "standard",
+        "rarity_template": int(getattr(card, "rarity_template", None) or 1),
+        "rarity_display_name": rarity_display_name(card.rarity),
+        "template_name": get_template_name(card.tier, int(getattr(card, "rarity_template", None) or 1)),
         "edition_number": card.edition_number,
         "print_run": card.print_run,
         "image_url": card.image_url,

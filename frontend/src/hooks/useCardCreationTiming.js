@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { getRevealConfig } from "../utils/rarityStyles";
 
 export const MIN_DURATION_MS = 15000;
 export const REVEAL_ANIMATION_MS = 3200;
@@ -39,7 +40,8 @@ export function lastAnticipationPhase(cardType) {
  * Manages 15s minimum creation timing and reveal trigger.
  * Returns: mode ('creating' | 'reveal' | 'landed' | 'done'), phaseIndex, elapsedMs
  */
-export function useCardCreationTiming({ active, cardType, generationComplete }) {
+export function useCardCreationTiming({ active, cardType, generationComplete, rarity }) {
+  const revealConfig = useMemo(() => getRevealConfig(rarity), [rarity]);
   const [mode, setMode] = useState("creating");
   const [phaseIndex, setPhaseIndex] = useState(0);
   const [elapsedMs, setElapsedMs] = useState(0);
@@ -93,15 +95,34 @@ export function useCardCreationTiming({ active, cardType, generationComplete }) 
     const elapsed = Date.now() - (startRef.current || Date.now());
     const remaining = Math.max(0, MIN_DURATION_MS - elapsed);
 
-    const timer = window.setTimeout(() => setMode("reveal"), remaining);
+    const timer = window.setTimeout(() => {
+      if (revealConfig.preBlackoutMs > 0) {
+        setMode("pre_reveal");
+      } else {
+        setMode("reveal");
+      }
+    }, remaining);
     return () => window.clearTimeout(timer);
-  }, [active, generationComplete, mode, cardType]);
+  }, [active, generationComplete, mode, cardType, revealConfig.preBlackoutMs]);
+
+  useEffect(() => {
+    if (mode !== "pre_reveal") return undefined;
+    const timer = window.setTimeout(() => setMode("reveal"), revealConfig.preBlackoutMs);
+    return () => window.clearTimeout(timer);
+  }, [mode, revealConfig.preBlackoutMs]);
 
   useEffect(() => {
     if (mode !== "reveal") return undefined;
-    const timer = window.setTimeout(() => setMode("landed"), REVEAL_ANIMATION_MS);
+    const timer = window.setTimeout(() => setMode("landed"), revealConfig.revealMs);
     return () => window.clearTimeout(timer);
-  }, [mode]);
+  }, [mode, revealConfig.revealMs]);
 
-  return { mode, phaseIndex, elapsedMs, lastPhase: lastAnticipationPhase(cardType) };
+  return {
+    mode,
+    phaseIndex,
+    elapsedMs,
+    lastPhase: lastAnticipationPhase(cardType),
+    revealConfig,
+    postRevealDisplayMs: revealConfig.landedMs || POST_REVEAL_DISPLAY_MS,
+  };
 }

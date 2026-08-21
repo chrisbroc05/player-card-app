@@ -564,6 +564,10 @@ export default function StudioPage() {
       image_url: sel?.image_url || generatedCardUrl,
       edition_number: sel?.edition_number || 1,
       print_run: sel?.print_run || 1,
+      rarity: sel?.rarity || savedCardDetail?.rarity || "standard",
+      rarity_template: sel?.rarity_template ?? savedCardDetail?.rarity_template ?? 1,
+      rarity_display_name: sel?.rarity_display_name || savedCardDetail?.rarity_display_name || "",
+      template_name: sel?.template_name || savedCardDetail?.template_name || "",
       is_highlight: isHighlightCardType || Boolean(highlightVideoUrl),
       highlight_video_url: highlightVideoUrl,
       highlight_status:
@@ -1814,6 +1818,12 @@ export default function StudioPage() {
         card_id: data.card_id,
         image_url: data.image_url,
         tier: data.tier,
+        rarity: data.rarity || "standard",
+        rarity_template: data.rarity_template ?? 1,
+        rarity_display_name: data.rarity_display_name || "Base",
+        template_name: data.template_name || "Classic",
+        player_name: data.player_name,
+        team_name: data.team_name,
       };
       setLatestGeneratedPreview(preview.image_url ? preview : null);
       setPreviewPollCardId(data.card_id || "");

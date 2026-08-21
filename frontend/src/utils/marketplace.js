@@ -1,5 +1,7 @@
 /** Free Agency Marketplace helpers */
 
+import { raritySortWeight } from "./rarityStyles";
+
 export const PRIORITY_LISTING_FEE = 2;
 
 /** Marketplace platform royalty on completed cash sales (must match backend PLATFORM_ROYALTY_RATE). */
@@ -31,7 +33,10 @@ export function sortMarketplaceBrowseRows(rows, sortKey, sortOrder) {
   const cmp = (a, b) => {
     let va;
     let vb;
-    if (sortKey === "asking_price") {
+    if (sortKey === "rarity") {
+      va = raritySortWeight(a.rarity);
+      vb = raritySortWeight(b.rarity);
+    } else if (sortKey === "asking_price") {
       va = Number(a.asking_price) || 0;
       vb = Number(b.asking_price) || 0;
     } else if (sortKey === "player_name") {

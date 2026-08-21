@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from models import Card, User, utcnow
 from user_settings import user_has_public_collection
+from utils.rarity import rarity_display_name, get_template_name
 from utils.storage import app_data_root
 
 _CARD_ID_PATTERN = re.compile(r"^FL-\d{4}-\d{6}$", re.IGNORECASE)
@@ -118,6 +119,7 @@ def create_card_row(
     tier: str,
     theme: str,
     rarity: str,
+    rarity_template: int = 1,
     edition_number: int,
     print_run: int,
     image_url: str,
@@ -151,6 +153,7 @@ def create_card_row(
         tier=tier,
         theme=theme,
         rarity=rarity,
+        rarity_template=int(rarity_template or 1),
         edition_number=edition_number,
         print_run=print_run,
         image_url=image_url,
@@ -204,7 +207,10 @@ def card_to_dict(card: Card, db: Session | None = None) -> dict:
         "grad_year": grad_year_int,
         "tier": card.tier,
         "theme": card.theme,
-        "rarity": card.rarity,
+        "rarity": card.rarity or "standard",
+        "rarity_template": int(getattr(card, "rarity_template", None) or 1),
+        "rarity_display_name": rarity_display_name(card.rarity),
+        "template_name": get_template_name(card.tier, int(getattr(card, "rarity_template", None) or 1)),
         "edition_number": card.edition_number,
         "print_run": card.print_run,
         "created_at": created_iso,
@@ -506,6 +512,7 @@ def create_animated_upgrade_card(
         tier=source.tier,
         theme=source.theme or "none",
         rarity=source.rarity,
+        rarity_template=int(getattr(source, "rarity_template", None) or 1),
         edition_number=1,
         print_run=1,
         image_url=source.image_url,
@@ -595,6 +602,7 @@ def expand_print_run_for_owner_image(
             tier=template.tier,
             theme=template.theme or "none",
             rarity=template.rarity,
+            rarity_template=int(getattr(template, "rarity_template", None) or 1),
             edition_number=edition,
             print_run=target_quantity,
             image_url=template.image_url,
