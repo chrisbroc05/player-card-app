@@ -89,8 +89,8 @@ const CardDisplay = React.forwardRef(function CardDisplay(
         <div className={`pointer-events-none absolute inset-0 z-[4] ${meta.themeOverlay}`} aria-hidden />
       ) : null}
 
-      <div className={`card-shell__media relative z-[1] flex min-h-0 w-full flex-1 flex-col overflow-hidden ${tierMediaBg}`}>
-        <div className={`${mediaWrapperClass} h-full min-h-0 w-full flex-1`}>
+      <div className={`card-shell__media card-image-area ${tierMediaBg}`}>
+        <div className={`card-image-area__stack ${mediaWrapperClass}`}>
           {children}
           {!isHighlight && size === "detail" ? (
             <ThemeVideoIcon theme={theme} />

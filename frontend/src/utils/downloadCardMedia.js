@@ -3,10 +3,10 @@ import { isAnimatedCard } from "./animationCard";
 import { highlightVideoUrl, isHighlightCard } from "./highlightCard";
 import {
   formatBannerEdition,
-  themeDisplayLabel,
   tierPillLabel,
 } from "./cardBannerStyles";
 import { normalizeTierKey, resolveCardDisplayMeta } from "./cardTemplate";
+import { hasAutoSignature, normalizeRarityKey } from "./rarityStyles";
 
 const ALLOWED_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "gif", "mp4", "webm", "mov"]);
 
@@ -39,6 +39,28 @@ const TIER_COLORS = {
     text: "#f0d060",
     banner: ["#0d0900", "#1a1200"],
   },
+};
+
+const RARITY_BADGE_COLORS = {
+  foil: ["#E8C56A", "#C9A84C", "#0A0A0A"],
+  refractor: ["#85B7EB", "#4169E1", "#FFFFFF"],
+  gold_auto: ["#FFD700", "#FFA500", "#0A0A0A"],
+  one_of_one: ["#FF4444", "#CC0000", "#FFFFFF"],
+  black_label: ["#333333", "#000000", "#FFD700"],
+};
+
+const RARITY_BADGE_LABELS = {
+  foil: "FOIL",
+  refractor: "REFRACTOR",
+  gold_auto: "AUTO",
+  one_of_one: "1 OF 1",
+  black_label: "BLACK LABEL",
+};
+
+const TIER_IMAGE_BG = {
+  rookie: "#0d200d",
+  allstar: "#060d1a",
+  legends: "#0d0900",
 };
 
 function sanitizeFilenamePart(value) {
@@ -157,13 +179,91 @@ function drawBannerBackground(ctx, bannerY, colors) {
   ctx.fill();
 }
 
-function drawCoverImage(ctx, img, x, y, w, h) {
-  const scale = Math.max(w / img.width, h / img.height);
+function drawContainImage(ctx, img, x, y, w, h) {
+  const scale = Math.min(w / img.width, h / img.height);
   const sw = img.width * scale;
   const sh = img.height * scale;
   const sx = x + (w - sw) / 2;
   const sy = y + (h - sh) / 2;
   ctx.drawImage(img, sx, sy, sw, sh);
+}
+
+async function ensureSignatureFontFamily() {
+  if (typeof document === "undefined" || !document.fonts?.load) {
+    return "Georgia, serif";
+  }
+  try {
+    await document.fonts.load('36px "Dancing Script"');
+    if (document.fonts.check('36px "Dancing Script"')) {
+      return '"Dancing Script", cursive';
+    }
+  } catch {
+    // fall through to serif fallback
+  }
+  return "Georgia, serif";
+}
+
+function drawRarityBadgeOnCanvas(ctx, rarity) {
+  const key = normalizeRarityKey(rarity);
+  if (key === "standard") return;
+
+  const colors = RARITY_BADGE_COLORS[key];
+  const label = RARITY_BADGE_LABELS[key];
+  if (!colors || !label) return;
+
+  ctx.font = '700 11px "Barlow Condensed", sans-serif';
+  const badgeW = ctx.measureText(label).width + 16;
+  const badgeH = 22;
+  const badgeX = 8;
+  const badgeY = 8;
+
+  const badgeGrad = ctx.createLinearGradient(badgeX, badgeY, badgeX + badgeW, badgeY);
+  badgeGrad.addColorStop(0, colors[0]);
+  badgeGrad.addColorStop(1, colors[1]);
+
+  ctx.fillStyle = badgeGrad;
+  roundRect(ctx, badgeX, badgeY, badgeW, badgeH, 4);
+  ctx.fill();
+
+  ctx.fillStyle = colors[2];
+  ctx.textAlign = "left";
+  ctx.fillText(label, badgeX + 8, badgeY + 15);
+  ctx.textAlign = "center";
+}
+
+async function drawAutoSignatureOnCanvas(ctx, playerName) {
+  const signatureFontFamily = await ensureSignatureFontFamily();
+  const isDancingScript = signatureFontFamily.includes("Dancing Script");
+
+  const sigGradient = ctx.createLinearGradient(0, IMAGE_HEIGHT - 80, 0, IMAGE_HEIGHT);
+  sigGradient.addColorStop(0, "transparent");
+  sigGradient.addColorStop(1, "rgba(0,0,0,0.55)");
+  ctx.fillStyle = sigGradient;
+  ctx.fillRect(0, IMAGE_HEIGHT - 80, CARD_WIDTH, 80);
+
+  ctx.font = isDancingScript
+    ? `700 36px ${signatureFontFamily}`
+    : `italic 36px ${signatureFontFamily}`;
+  ctx.fillStyle = "rgba(255,215,0,0.92)";
+  ctx.textAlign = "right";
+  ctx.shadowColor = "rgba(0,0,0,0.8)";
+  ctx.shadowBlur = 4;
+
+  const name = playerName || "Player";
+  ctx.fillText(name, CARD_WIDTH - 20, IMAGE_HEIGHT - 24);
+
+  ctx.font = '700 11px "Barlow Condensed", sans-serif';
+  ctx.fillStyle = "rgba(201,168,76,0.9)";
+  if ("letterSpacing" in ctx) {
+    ctx.letterSpacing = "2px";
+  }
+  ctx.fillText("CERTIFIED AUTO", CARD_WIDTH - 20, IMAGE_HEIGHT - 8);
+  if ("letterSpacing" in ctx) {
+    ctx.letterSpacing = "0px";
+  }
+
+  ctx.shadowBlur = 0;
+  ctx.textAlign = "center";
 }
 
 async function loadImageFromBlob(blob) {
@@ -235,7 +335,7 @@ async function loadCardImageForDownload(card, token, captureRef) {
   return null;
 }
 
-function drawCardToCanvas(card, cardImage) {
+async function drawCardToCanvas(card, cardImage) {
   const meta = resolveCardDisplayMeta(card);
   if (!meta) {
     throw new Error("Card metadata unavailable");
@@ -243,10 +343,11 @@ function drawCardToCanvas(card, cardImage) {
 
   const tierKey = normalizeTierKey(meta.tier);
   const colors = TIER_COLORS[tierKey] || TIER_COLORS.rookie;
-  const theme = card.theme || card.special_theme || card.specialTheme || "";
-  const themeLabel = themeDisplayLabel(theme);
+  const imageBg = TIER_IMAGE_BG[tierKey] || TIER_IMAGE_BG.rookie;
+  const centerLabel = meta.templateName || "\u00A0";
   const tierLabel = tierPillLabel(tierKey);
   const edition = formatBannerEdition(card.edition_number ?? card.editionNumber, card.print_run ?? card.printRun);
+  const rarity = card.rarity || card.rarity_key || "standard";
 
   const canvas = document.createElement("canvas");
   canvas.width = CARD_WIDTH;
@@ -271,8 +372,11 @@ function drawCardToCanvas(card, cardImage) {
   );
   ctx.clip();
 
+  ctx.fillStyle = imageBg;
+  ctx.fillRect(0, 0, CARD_WIDTH, IMAGE_HEIGHT);
+
   if (cardImage) {
-    drawCoverImage(ctx, cardImage, 0, 0, CARD_WIDTH, IMAGE_HEIGHT);
+    drawContainImage(ctx, cardImage, 0, 0, CARD_WIDTH, IMAGE_HEIGHT);
   } else {
     const grad = ctx.createLinearGradient(0, 0, 0, IMAGE_HEIGHT);
     grad.addColorStop(0, colors.secondary);
@@ -280,6 +384,13 @@ function drawCardToCanvas(card, cardImage) {
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, CARD_WIDTH, IMAGE_HEIGHT);
   }
+
+  drawRarityBadgeOnCanvas(ctx, rarity);
+
+  if (hasAutoSignature(rarity)) {
+    await drawAutoSignatureOnCanvas(ctx, meta.playerName);
+  }
+
   ctx.restore();
 
   const bannerY = IMAGE_HEIGHT;
@@ -330,11 +441,11 @@ function drawCardToCanvas(card, cardImage) {
   ctx.textAlign = "center";
   ctx.fillText(tierLabel, pillX + pillW / 2, pillY + 19);
 
-  if (themeLabel) {
+  if (centerLabel.trim()) {
     ctx.textAlign = "center";
     ctx.fillStyle = colors.text;
     ctx.font = `500 13px "Barlow Condensed", sans-serif`;
-    ctx.fillText(themeLabel, CARD_WIDTH / 2, pillY + 19);
+    ctx.fillText(centerLabel, CARD_WIDTH / 2, pillY + 19);
   }
 
   ctx.textAlign = "right";
@@ -370,7 +481,7 @@ export async function downloadCardMedia(card, { captureRef, token } = {}) {
   }
 
   const cardImage = await loadCardImageForDownload(card, token, captureRef);
-  const canvas = drawCardToCanvas(card, cardImage);
+  const canvas = await drawCardToCanvas(card, cardImage);
   const filename = buildCardDownloadFilename(card, "png");
   const playerName = card?.player_name || card?.playerName || "Player";
 

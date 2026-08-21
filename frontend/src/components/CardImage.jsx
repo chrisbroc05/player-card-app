@@ -56,7 +56,7 @@ function ProtectedMediaShell({ protectMedia, children }) {
   if (!protectMedia) return children;
 
   return (
-    <div className="card-media-protected-wrap relative h-full w-full min-h-0 min-w-0">
+    <div className="card-media-protected-wrap absolute inset-0 min-h-0 min-w-0 overflow-hidden">
       {children}
       <div className="card-media-watermark" aria-hidden />
       <div
@@ -599,7 +599,7 @@ export default function CardImage({
   const mediaSlot = (
     <div
       ref={mediaContainerRef}
-      className="relative h-full w-full"
+      className="absolute inset-0"
       onMouseEnter={isGridBrowse && canHover ? () => setHovered(true) : undefined}
       onMouseLeave={
         isGridBrowse && canHover

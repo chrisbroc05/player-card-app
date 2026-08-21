@@ -1664,25 +1664,58 @@
   }
 }
 
-/* ── Card image (full photo, tier background) ── */
+/* ── Card image area (72% of card shell) ── */
 
-.card-image {
+.card-image-area {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.card-image-area__stack {
+  position: relative;
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  object-position: center top;
+  overflow: hidden;
 }
 
 .card-media-bg--rookie {
+  --tier-bg-color: #0d200d;
   background-color: #0d200d;
 }
 
 .card-media-bg--allstar {
+  --tier-bg-color: #060d1a;
   background-color: #060d1a;
 }
 
 .card-media-bg--legends {
+  --tier-bg-color: #0d0900;
   background-color: #0d0900;
+}
+
+.card-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  background-color: var(--tier-bg-color, #0d200d);
+}
+
+.card-image-area .card-media-protected-wrap,
+.card-image-area .card-animated-video-container,
+.card-image-area .card-video-area,
+.card-image-area .highlight-video-fill {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
 /* ── Auto signature overlay ── */
@@ -1691,11 +1724,19 @@
   position: absolute;
   bottom: 12px;
   right: 12px;
-  text-align: right;
   z-index: 5;
+  pointer-events: none;
+  text-align: right;
+}
+
+.auto-signature::before {
+  content: "";
+  position: absolute;
+  inset: -16px -12px -8px -24px;
   background: linear-gradient(to top, rgba(0, 0, 0, 0.5) 0%, transparent 100%);
-  padding: 16px 12px 8px 24px;
   border-radius: 4px;
+  z-index: -1;
+  pointer-events: none;
 }
 
 .signature-text {
@@ -1904,6 +1945,10 @@
   min-height: 0;
 }
 
+.card-shell__media.card-image-area {
+  display: block;
+}
+
 .card-shell__banner.card-banner--size-default,
 .card-shell__banner.card-banner--size-compact,
 .card-shell__banner.card-banner--size-thumb {
@@ -1932,10 +1977,13 @@
 .card-shell--detail .card-shell__media img,
 .card-shell--detail .card-shell__media .card-animated-video,
 .card-shell--detail .card-shell__media .card-image {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   object-fit: contain;
-  object-position: center top;
+  object-position: center;
 }
 
 .card-shell--detail .card-animated-video-container.card-media-fill {
