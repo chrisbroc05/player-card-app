@@ -18,6 +18,7 @@ export default function RarityBadge({ rarity, className = "", size = "default" }
   if (!shouldShowRarityBadge(rarity)) return null;
   const config = getRarityBadgeConfig(rarity);
   if (!config.show) return null;
+  const label = size === "thumb" && config.thumbText ? config.thumbText : config.text;
 
   return (
     <span
@@ -25,7 +26,7 @@ export default function RarityBadge({ rarity, className = "", size = "default" }
       aria-label={`${config.text} rarity`}
     >
       {config.icon === "pen" ? <PenIcon /> : null}
-      {config.text}
+      {label}
     </span>
   );
 }

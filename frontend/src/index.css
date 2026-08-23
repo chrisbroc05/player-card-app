@@ -1610,6 +1610,21 @@
   padding: 4px 9px;
 }
 
+.rarity-badge--thumb {
+  font-size: 7px;
+  padding: 2px 5px;
+  letter-spacing: 0.5px;
+}
+
+.rarity-badge--thumb.rarity-badge--refractor {
+  letter-spacing: 0.5px;
+}
+
+.card-banner__footer--no-center .card-banner__footer-col--end {
+  flex: 1;
+  justify-content: flex-end;
+}
+
 .rarity-badge__icon {
   width: 9px;
   height: 9px;
@@ -3962,6 +3977,7 @@
 .activity-row__thumb {
   grid-area: thumb;
   flex-shrink: 0;
+  min-width: 80px;
   width: 140px;
   height: 196px;
   margin-left: 12px;
@@ -4194,6 +4210,7 @@
   }
 
   .activity-row__thumb {
+    min-width: 80px;
     width: 110px;
     height: 154px;
   }
@@ -4349,7 +4366,8 @@
 
 .profile-rarity-breakdown {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
+  font-family: "Barlow Condensed", sans-serif;
   line-height: 1.5;
 }
 
@@ -4371,12 +4389,23 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 10px;
+  width: 100%;
   max-width: 180px;
+}
+
+.profile-rarest-pull__label {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
 }
 
 .profile-rarest-pull__thumb {
   position: relative;
   width: 100%;
+  min-width: 140px;
 }
 
 .profile-rarest-pull__badge {
@@ -4392,6 +4421,63 @@
   font-size: 13px;
   font-weight: 500;
   color: var(--text-primary);
+}
+
+/* Preview picker — horizontal scroll on mobile */
+.preview-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.preview-picker__hint {
+  margin: 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+@media (min-width: 640px) {
+  .preview-picker__hint {
+    display: none;
+  }
+}
+
+.preview-picker__scroll {
+  display: flex;
+  flex-direction: row;
+  overflow-x: auto;
+  gap: 12px;
+  padding-bottom: 8px;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+}
+
+@media (min-width: 640px) {
+  .preview-picker__scroll {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow-x: visible;
+    scroll-snap-type: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .preview-picker__scroll {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.preview-picker__item {
+  scroll-snap-align: start;
+  flex-shrink: 0;
+  width: 160px;
+}
+
+@media (min-width: 640px) {
+  .preview-picker__item {
+    width: auto;
+  }
 }
 
 .profile-page__highlights-section {

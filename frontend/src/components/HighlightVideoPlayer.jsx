@@ -63,6 +63,7 @@ function HighlightVideoPlayer({
   onToggleSound,
   objectFit = "contain",
   soundTogglePosition = "left",
+  showThemeIcon = true,
 }) {
   const foregroundRef = useRef(null);
 
@@ -154,7 +155,9 @@ function HighlightVideoPlayer({
         />
       ) : null}
 
-      <ThemeVideoIcon themeKey={themeKey} className="card-video-area__theme-icon--above-tint" />
+      {showThemeIcon ? (
+        <ThemeVideoIcon themeKey={themeKey} className="card-video-area__theme-icon--above-tint" />
+      ) : null}
 
       {showSoundToggle && onToggleSound ? (
         <HighlightSoundToggle

@@ -208,7 +208,12 @@ class ActivityHistoryTests(unittest.TestCase):
         items = gather_user_activity_items(self.db, self.user.id)
         created = {i["card"]["card_id"]: i for i in items if i["activity_type"] == "card_created"}
         self.assertEqual(created["FL-2026-000108"]["amount"], 0.0)
-        self.assertEqual(created["FL-2026-000109"]["amount"], tier_generation_price("rookie"))
+        self.assertEqual(created["FL-2026-000109"]["amount"], 0.0)
+
+        previews = [i for i in items if i["activity_type"] == "preview_generated"]
+        self.assertEqual(len(previews), 1)
+        self.assertEqual(previews[0]["card"]["card_id"], "FL-2026-000109")
+        self.assertEqual(previews[0]["amount"], tier_generation_price("rookie"))
 
 
 if __name__ == "__main__":

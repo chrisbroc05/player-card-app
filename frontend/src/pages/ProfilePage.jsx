@@ -214,6 +214,20 @@ function ProfileCollectionHighlights({ token }) {
   return (
     <section className="profile-page__collection-highlights">
       <h2 className="profile-page__section-title">Collection Highlights</h2>
+      {showRarest ? (
+        <div className="profile-rarest-pull">
+          <p className="profile-rarest-pull__label">Rarest Pull</p>
+          <div className="profile-rarest-pull__thumb">
+            <div className="profile-rarest-pull__badge">
+              <RarityBadge rarity={rarestCard.rarity} size="thumb" />
+            </div>
+            <ProfileCardThumb card={rarestCard} />
+          </div>
+          <p className="profile-rarest-pull__caption">
+            {rarityLabel} — {templateName}
+          </p>
+        </div>
+      ) : null}
       {breakdown ? (
         <p className="profile-rarity-breakdown" aria-label="Rarity breakdown">
           {breakdown.split(" · ").map((part, index, arr) => {
@@ -234,19 +248,6 @@ function ProfileCollectionHighlights({ token }) {
             );
           })}
         </p>
-      ) : null}
-      {showRarest ? (
-        <div className="profile-rarest-pull">
-          <div className="profile-rarest-pull__thumb">
-            <div className="profile-rarest-pull__badge">
-              <RarityBadge rarity={rarestCard.rarity} />
-            </div>
-            <ProfileCardThumb card={rarestCard} />
-          </div>
-          <p className="profile-rarest-pull__caption">
-            {rarityLabel} — {templateName}
-          </p>
-        </div>
       ) : null}
     </section>
   );

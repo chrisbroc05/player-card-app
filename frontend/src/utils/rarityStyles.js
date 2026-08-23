@@ -58,6 +58,10 @@ export function hasAutoSignature(rarity) {
   );
 }
 
+export function shouldShowThemeIcon(rarity) {
+  return !hasAutoSignature(rarity);
+}
+
 export function getRarityBadgeConfig(rarity) {
   const key = normalizeRarityKey(rarity);
   switch (key) {
@@ -70,6 +74,7 @@ export function getRarityBadgeConfig(rarity) {
     case RARITY_KEYS.REFRACTOR:
       return {
         text: "REFRACTOR",
+        thumbText: "REF",
         className: "rarity-badge rarity-badge--refractor",
         show: true,
       };

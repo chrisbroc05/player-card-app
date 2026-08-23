@@ -18,6 +18,7 @@ export default function ThemedStaticPoster({
   alt = "Player",
   onError,
   mediaProtectionProps = {},
+  showThemeIcon = true,
 }) {
   if (!src) return null;
 
@@ -86,7 +87,7 @@ export default function ThemedStaticPoster({
         />
       ) : null}
 
-      <ThemeVideoIcon themeKey={themeKey} />
+      {showThemeIcon ? <ThemeVideoIcon themeKey={themeKey} /> : null}
     </div>
   );
 }

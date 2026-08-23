@@ -71,6 +71,7 @@ class ActivityItemOut(BaseModel):
     amount: float | None = None
     royalty_amount: float | None = None
     status: str = "completed"
+    preview_label: str | None = None
 
 
 class ActivityHistoryResponse(BaseModel):

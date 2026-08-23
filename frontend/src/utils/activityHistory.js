@@ -62,6 +62,13 @@ export const ACTIVITY_META = {
     badgeClass: "border-[var(--color-border-gold)] bg-gold-subtle text-brand-gold",
     iconWrapClass: "border-[var(--color-border-gold)] bg-gold-subtle text-brand-gold",
   },
+  preview_generated: {
+    emoji: "🔄",
+    label: "Additional Preview",
+    shortLabel: "Preview",
+    badgeClass: "border-sky-400/40 bg-sky-500/15 text-sky-100",
+    iconWrapClass: "border-sky-400/35 bg-sky-500/15 text-sky-100",
+  },
 };
 
 export function activityMeta(item, tier) {
@@ -70,6 +77,7 @@ export function activityMeta(item, tier) {
     item?.activity_type !== "animated_upgrade"
     && item?.activity_type !== "highlight_upgrade"
     && item?.activity_type !== "card_created"
+    && item?.activity_type !== "preview_generated"
   ) {
     return base;
   }
@@ -128,10 +136,22 @@ const ACTIVITY_ROW_STYLES = {
     badgeStyle: { backgroundColor: "var(--color-gold-primary)", color: "#0a0a0a" },
     labelColor: "#E8C56A",
   },
+  preview_generated: {
+    label: "ADDITIONAL PREVIEW",
+    glyph: "↻",
+    badgeStyle: { backgroundColor: "#0ea5e9", color: "#ffffff" },
+    labelColor: "#7dd3fc",
+  },
 };
 
 export function activityRowStyle(item) {
   const base = ACTIVITY_ROW_STYLES[item?.activity_type] || ACTIVITY_ROW_STYLES.trade_sent;
+  if (item?.activity_type === "preview_generated" && item?.preview_label) {
+    return {
+      ...base,
+      label: String(item.preview_label).toUpperCase(),
+    };
+  }
   if (item?.activity_type !== "animated_upgrade" && item?.activity_type !== "card_created") return base;
   const accent = vaultTierBadge(item?.card?.tier).accent;
   return { ...base, badgeStyle: { backgroundColor: accent, color: "#ffffff" } };
@@ -175,7 +195,8 @@ export function counterpartyProfileName(item) {
   if (
     type === "animated_upgrade" ||
     type === "highlight_upgrade" ||
-    type === "card_created"
+    type === "card_created" ||
+    type === "preview_generated"
   ) {
     return null;
   }
@@ -187,7 +208,7 @@ export function counterpartyPrefix(item) {
   if (type === "animated_upgrade" || type === "highlight_upgrade") {
     return "Upgraded by you";
   }
-  if (type === "card_created") {
+  if (type === "card_created" || type === "preview_generated") {
     return "Created by you";
   }
   if (type === "trade_sent") return "Traded to";
@@ -238,6 +259,7 @@ export function activityAmountDisplay(item) {
 
   if (
     type === "card_created"
+    || type === "preview_generated"
     || type === "animated_upgrade"
     || type === "highlight_upgrade"
   ) {
@@ -245,17 +267,21 @@ export function activityAmountDisplay(item) {
       const subtext =
         type === "card_created"
           ? "Free preview"
-          : type === "animated_upgrade"
-            ? "Animation"
-            : "Highlight";
+          : type === "preview_generated"
+            ? item?.preview_label || "Preview"
+            : type === "animated_upgrade"
+              ? "Animation"
+              : "Highlight";
       return { text: "Free", tone: "success", subtext, small: true };
     }
     const subtext =
       type === "card_created"
         ? "Card creation"
-        : type === "animated_upgrade"
-          ? "Animation"
-          : "Highlight";
+        : type === "preview_generated"
+          ? item?.preview_label || "Additional Preview"
+          : type === "animated_upgrade"
+            ? "Animation"
+            : "Highlight";
     return { text: `−${formatMoney(Math.abs(raw))}`, tone: "danger", subtext, small: true };
   }
 
@@ -307,6 +333,7 @@ export function amountDisplay(item) {
 
   if (
     type === "card_created"
+    || type === "preview_generated"
     || type === "animated_upgrade"
     || type === "highlight_upgrade"
   ) {

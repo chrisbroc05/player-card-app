@@ -34,6 +34,7 @@ ACTIVITY_TYPES = frozenset(
         "animated_upgrade",
         "highlight_upgrade",
         "card_created",
+        "preview_generated",
     }
 )
 
@@ -162,7 +163,7 @@ def _card_creation_charge(
     session_id = (card.preview_session_id or "").strip()
     if session_id and card_ref:
         if preview_indexes.get(card_ref, 0) > 0:
-            return tier_generation_price(card.tier)
+            return 0.0
         return 0.0
 
     return 0.0
@@ -181,6 +182,163 @@ def _upgrade_charge(
     if card_ref and card_ref in ledger_by_ref:
         return ledger_by_ref[card_ref]
     return 0.0
+
+
+def _tier_label_from_preview_note(note: str | None) -> str:
+    n = (note or "").lower()
+    if "legends" in n:
+        return "Legends"
+    if "allstar" in n or "all-star" in n or "all_star" in n:
+        return "All-Star"
+    return "Rookie"
+
+
+def _tier_key_from_preview_note(note: str | None) -> str:
+    n = (note or "").lower()
+    if "legends" in n:
+        return "legends"
+    if "allstar" in n or "all-star" in n or "all_star" in n:
+        return "allstar"
+    return "rookie"
+
+
+def _placeholder_card_for_preview(*, tier: str, player_name: str = "Preview") -> dict:
+    return {
+        "card_id": "",
+        "player_name": player_name,
+        "team_name": "",
+        "position": "",
+        "jersey_number": "",
+        "grad_year": 0,
+        "tier": tier or "rookie",
+        "theme": "none",
+        "rarity": "standard",
+        "edition_number": 1,
+        "print_run": 1,
+        "image_url": "",
+    }
+
+
+def _find_preview_card_for_ledger(
+    db: Session,
+    user_id: int,
+    *,
+    created_at: datetime | None,
+    tier_key: str,
+) -> Card | None:
+    """Best-effort match a preview card row to a ledger debit."""
+    from sqlalchemy import and_, or_
+
+    q = (
+        db.query(Card)
+        .filter(
+            or_(
+                Card.creator_user_id == user_id,
+                and_(Card.creator_user_id.is_(None), Card.owner_id == user_id),
+            ),
+            Card.status == "preview",
+            Card.tier == tier_key,
+        )
+        .order_by(Card.created_at.desc())
+    )
+    if created_at is not None:
+        q = q.filter(Card.created_at <= created_at)
+    return q.first()
+
+
+def _gather_paid_preview_items(db: Session, user_id: int) -> list[dict]:
+    """Ledger-backed paid preview charges (additional previews only)."""
+    rows = (
+        db.query(CreditLedger)
+        .filter(
+            CreditLedger.user_id == user_id,
+            CreditLedger.transaction_type == TX_GENERATION,
+            CreditLedger.amount < 0,
+        )
+        .order_by(CreditLedger.created_at.desc())
+        .all()
+    )
+    items: list[dict] = []
+    for row in rows:
+        note = (row.note or "").strip()
+        if "preview" not in note.lower():
+            continue
+        amount = abs(float(row.amount))
+        if amount <= 0:
+            continue
+        tier_key = _tier_key_from_preview_note(note)
+        tier_label = _tier_label_from_preview_note(note)
+        card_row = _find_preview_card_for_ledger(
+            db,
+            user_id,
+            created_at=row.created_at,
+            tier_key=tier_key,
+        )
+        card_snapshot = _card_snapshot(card_row) if card_row else _placeholder_card_for_preview(tier=tier_key)
+        when = row.created_at
+        items.append(
+            {
+                "id": f"preview_generated-{row.id}",
+                "activity_type": "preview_generated",
+                "created_at": _iso(when),
+                "completed_at": _iso(when),
+                "card": card_snapshot,
+                "counterparty": None,
+                "amount": amount,
+                "status": "completed",
+                "preview_label": f"{tier_label} Preview",
+                "_sort_ts": _completed_ts(when),
+            }
+        )
+    return items
+
+
+def _gather_paid_preview_card_items(
+    db: Session,
+    user_id: int,
+    preview_indexes: dict[str, int],
+) -> list[dict]:
+    """Fallback paid preview rows from preview-status cards (when ledger keyed by order id)."""
+    from sqlalchemy import and_, or_
+
+    rows = (
+        db.query(Card)
+        .filter(
+            or_(
+                Card.creator_user_id == user_id,
+                and_(Card.creator_user_id.is_(None), Card.owner_id == user_id),
+            ),
+            Card.preview_session_id.isnot(None),
+            Card.is_animated.is_(False),
+            Card.is_highlight.is_(False),
+        )
+        .all()
+    )
+    items: list[dict] = []
+    for card in rows:
+        card_ref = (card.card_id or "").strip()
+        if preview_indexes.get(card_ref, 0) <= 0:
+            continue
+        amount = tier_generation_price(card.tier)
+        if amount <= 0:
+            continue
+        tier_label = _tier_label_from_preview_note(f"Card preview - {card.tier} tier")
+        when = card.created_at
+        items.append(
+            {
+                "id": f"preview_generated-card-{card.id}",
+                "activity_type": "preview_generated",
+                "created_at": _iso(when),
+                "completed_at": _iso(when),
+                "card": _card_snapshot(card),
+                "counterparty": None,
+                "amount": amount,
+                "status": "completed",
+                "preview_label": f"{tier_label} Preview",
+                "_sort_ts": _completed_ts(when),
+            }
+        )
+    return items
 
 
 def _build_item(
@@ -411,6 +569,19 @@ def gather_user_activity_items(db: Session, user_id: int) -> list[dict]:
                 ),
             )
         )
+
+    items.extend(_gather_paid_preview_items(db, user_id))
+
+    ledger_card_ids = {
+        (i.get("card") or {}).get("card_id")
+        for i in items
+        if i.get("activity_type") == "preview_generated"
+    }
+    for row in _gather_paid_preview_card_items(db, user_id, preview_indexes):
+        card_id = (row.get("card") or {}).get("card_id")
+        if card_id and card_id in ledger_card_ids:
+            continue
+        items.append(row)
 
     return items
 

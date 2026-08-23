@@ -17,6 +17,7 @@ import {
 import { usePrefersHover } from "../hooks/usePrefersReducedMotion";
 import { useSettings } from "../context/SettingsContext";
 import { normalizeCardForDisplay } from "../utils/cardDetailUtils";
+import { shouldShowThemeIcon } from "../utils/rarityStyles";
 import CardDisplay from "./CardDisplay";
 import HighlightVideoPlayer from "./HighlightVideoPlayer";
 import ThemedStaticPoster from "./ThemedStaticPoster";
@@ -438,6 +439,8 @@ export default function CardImage({
     cardForTypeChecks?.specialTheme ??
     "";
   const cardTier = cardForTypeChecks?.tier ?? cardForTypeChecks?.card_tier ?? "rookie";
+  const cardRarity = cardForTypeChecks?.rarity ?? "standard";
+  const showThemeIcon = shouldShowThemeIcon(cardRarity);
   const highlightTintScale = isDetail ? 1 : 0.7;
 
   const frameVideoSrc = animatedActive ? videoSrc : highlightSrc;
@@ -471,6 +474,7 @@ export default function CardImage({
           onToggleSound={animatedActive ? handleToggleAnimatedSound : handleToggleHighlightSound}
           objectFit="contain"
           soundTogglePosition={animatedActive ? "right" : "left"}
+          showThemeIcon={showThemeIcon}
         />
       </ProtectedMediaShell>
     );
@@ -482,6 +486,7 @@ export default function CardImage({
     frameVideoKey,
     cardTheme,
     cardTier,
+    showThemeIcon,
     highlightTintScale,
     frameVideoPlaying,
     trimStart,
@@ -513,6 +518,7 @@ export default function CardImage({
           alt={alt || "Animated card"}
           onError={handleImageError}
           mediaProtectionProps={mediaProtectionProps}
+          showThemeIcon={showThemeIcon}
         />
       </ProtectedMediaShell>
     );
@@ -521,6 +527,7 @@ export default function CardImage({
     imgSrc,
     cardTheme,
     cardTier,
+    showThemeIcon,
     highlightTintScale,
     isDetail,
     alt,

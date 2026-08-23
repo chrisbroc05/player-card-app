@@ -3080,11 +3080,18 @@ export default function StudioPage() {
 
                     {(!previewConfigureOpen || (isAnimatedCardType && !animatedSaveStaticFlow)) &&
                     (!isAnimatedCardType || previewCards.length > 1 || !animatedChoiceModalOpen) ? (
-                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      <div className="preview-picker">
+                        {previewCards.length > 1 ? (
+                          <p className="preview-picker__hint">Swipe to see all previews →</p>
+                        ) : null}
+                        <div className="preview-picker__scroll">
                         {previewCards.map((preview, idx) => (
                           <div
                             key={`${preview.image_url}-${idx}`}
-                            className={`overflow-hidden rounded-xl border transition-all duration-300 ${
+                            className="preview-picker__item"
+                          >
+                          <div
+                            className={`h-full overflow-hidden rounded-xl border transition-all duration-300 ${
                               selectedPreviewUrl === preview.image_url
                                 ? `${tierTheme.active} shadow-glowGold`
                                 : tierTheme.card
@@ -3171,7 +3178,9 @@ export default function StudioPage() {
                               )}
                             </div>
                           </div>
+                          </div>
                         ))}
+                        </div>
                       </div>
                     ) : null}
 

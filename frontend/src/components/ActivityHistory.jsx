@@ -150,6 +150,9 @@ function ActivityRow({ item }) {
             frameClassName="activity-row__frame"
             infoBannerVariant="thumb"
             showInfoBanner
+            showRarityBadge={false}
+            showAnimatedBadge={false}
+            showHighlightBadge={false}
             playOnHover
           />
         ) : null}

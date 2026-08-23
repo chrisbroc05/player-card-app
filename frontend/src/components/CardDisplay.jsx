@@ -11,6 +11,7 @@ import {
 } from "../utils/cardTemplate";
 import { bannerNameModifier, getCardBannerStyles } from "../utils/cardBannerStyles";
 import { getHighlightCardStyles } from "../utils/highlightCardStyles";
+import { shouldShowThemeIcon } from "../utils/rarityStyles";
 import ThemeVideoIcon from "./ThemeVideoIcon";
 
 /**
@@ -54,6 +55,9 @@ const CardDisplay = React.forwardRef(function CardDisplay(
   const { tier, theme, rarity, rarityTemplate, templateName, templateTierKey } = meta;
   const bannerStyles = getCardBannerStyles(tier, theme);
   const centerBannerLabel = templateName || "\u00A0";
+  const showTemplateInBanner = size === "detail";
+  const showThemeIcon = shouldShowThemeIcon(rarity);
+  const rarityBadgeSize = size === "detail" ? "detail" : "thumb";
   const highlightStyles = isHighlight ? getHighlightCardStyles(tier, theme) : null;
   const frame = tierFrameStyles(tier);
   const bannerSize = size === "detail" || size === "compact" || size === "thumb" ? size : "default";
@@ -92,7 +96,7 @@ const CardDisplay = React.forwardRef(function CardDisplay(
       <div className={`card-shell__media card-image-area ${tierMediaBg}`}>
         <div className={`card-image-area__stack ${mediaWrapperClass}`}>
           {children}
-          {!isHighlight && size === "detail" ? (
+          {!isHighlight && size === "detail" && showThemeIcon ? (
             <ThemeVideoIcon theme={theme} />
           ) : null}
           {!isHighlight ? (
@@ -105,7 +109,7 @@ const CardDisplay = React.forwardRef(function CardDisplay(
           />
           {showRarityBadge ? (
             <div className="card-rarity-badge-slot">
-              <RarityBadge rarity={rarity} />
+              <RarityBadge rarity={rarity} size={rarityBadgeSize} />
             </div>
           ) : null}
         </div>
@@ -146,17 +150,21 @@ const CardDisplay = React.forwardRef(function CardDisplay(
           <p className={`card-banner__stats ${bannerStyles.statsClass}`}>{meta.statsLine || "\u00A0"}</p>
         </div>
 
-        <div className="card-banner__footer shrink-0">
+        <div
+          className={`card-banner__footer shrink-0${showTemplateInBanner ? "" : " card-banner__footer--no-center"}`}
+        >
           <div className="card-banner__footer-col card-banner__footer-col--start banner-bottom-left">
             <span className={`card-banner__tier-pill ${bannerStyles.tierPillClass}`}>
               {bannerStyles.tierPillLabel}
             </span>
           </div>
-          <div className="card-banner__footer-col card-banner__footer-col--center banner-bottom-center">
-            <span className={`card-banner__theme ${bannerStyles.themeClass}`}>
-              {centerBannerLabel}
-            </span>
-          </div>
+          {showTemplateInBanner ? (
+            <div className="card-banner__footer-col card-banner__footer-col--center banner-bottom-center">
+              <span className={`card-banner__theme ${bannerStyles.themeClass}`}>
+                {centerBannerLabel}
+              </span>
+            </div>
+          ) : null}
           <div className="card-banner__footer-col card-banner__footer-col--end banner-bottom-right">
             <span className={`card-banner__edition ${bannerStyles.editionClass}`}>{meta.edition}</span>
           </div>
