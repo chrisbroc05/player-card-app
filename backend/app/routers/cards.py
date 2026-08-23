@@ -264,6 +264,67 @@ def get_generation_usage(
     return generation_usage_payload(db, current_user.id)
 
 
+class PreviewGroupCardOut(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    card_id: str = ""
+    image_url: str = ""
+    tier: str = "rookie"
+    player_name: str = ""
+    team_name: str = ""
+    rarity: str = "standard"
+    rarity_template: int = 1
+    rarity_display_name: str = "Base"
+    template_name: str = "Classic"
+    edition_number: int = 1
+    print_run: int = 1
+    special_theme: str | None = None
+    preview_session_id: str | None = None
+    preview_group_id: str | None = None
+    status: str = "preview"
+    created_at: str | None = None
+
+
+class PreviewGroupResponse(BaseModel):
+    preview_session_id: str
+    preview_group_id: str
+    previews: list[PreviewGroupCardOut]
+
+
+@router.get("/previews/{preview_group_id}", response_model=PreviewGroupResponse)
+def get_preview_group(
+    preview_group_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return all in-progress preview cards for a creation session (newest session group)."""
+    group_id = preview_group_id.strip()
+    if not group_id:
+        raise HTTPException(status_code=400, detail="preview_group_id is required")
+
+    rows = (
+        db.query(Card)
+        .filter(
+            Card.owner_id == current_user.id,
+            Card.preview_session_id == group_id,
+            Card.status == "preview",
+        )
+        .order_by(Card.created_at.asc(), Card.id.asc())
+        .all()
+    )
+    previews: list[dict] = []
+    for card in rows:
+        payload = card_to_dict(card, db)
+        payload["preview_group_id"] = group_id
+        previews.append(payload)
+
+    return PreviewGroupResponse(
+        preview_session_id=group_id,
+        preview_group_id=group_id,
+        previews=previews,
+    )
+
+
 def _enforce_generation_cap(db: Session, user_id: int):
     from utils.usage import require_generation_capacity
 

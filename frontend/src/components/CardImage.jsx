@@ -18,6 +18,7 @@ import { usePrefersHover } from "../hooks/usePrefersReducedMotion";
 import { useSettings } from "../context/SettingsContext";
 import { normalizeCardForDisplay } from "../utils/cardDetailUtils";
 import { shouldShowThemeIcon } from "../utils/rarityStyles";
+import { vaultTierBadge } from "../utils/tierStyles";
 import CardDisplay from "./CardDisplay";
 import HighlightVideoPlayer from "./HighlightVideoPlayer";
 import ThemedStaticPoster from "./ThemedStaticPoster";
@@ -542,7 +543,7 @@ export default function CardImage({
   } else if (highlightMissingVideo) {
     mediaInner = <HighlightProcessingPlaceholder />;
   } else if (!showStaticPoster && !hasVideo && !highlightActive && !animatedActive) {
-    mediaInner = <PlaceholderInner alt={alt} />;
+    mediaInner = <PlaceholderInner alt={alt} tier={cardTier} />;
   } else if (isDetail && animatedActive && showVideoLayer && videoSrc) {
     mediaInner = frameVideoElement;
   } else if (highlightActive && showHighlightVideoFrame) {
@@ -676,17 +677,20 @@ export default function CardImage({
   );
 }
 
-function PlaceholderInner({ alt }) {
+function PlaceholderInner({ alt, tier = "rookie" }) {
+  const badge = vaultTierBadge(tier);
   return (
     <div
-      className="flex h-full min-h-[80px] w-full flex-col items-center justify-center gap-2 bg-slate-900/90 p-4 text-center text-slate-400"
+      className="card-image-placeholder flex h-full min-h-[80px] w-full flex-col items-center justify-center gap-3 p-4 text-center"
+      style={{ backgroundColor: `${badge.accent}22` }}
       role="img"
       aria-label={alt || "Card preview unavailable"}
     >
-      <span className="text-2xl opacity-50" aria-hidden>
-        ?
+      <span
+        className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${badge.pill}`}
+      >
+        {badge.label}
       </span>
-      <p className="text-xs leading-snug">Image unavailable</p>
     </div>
   );
 }

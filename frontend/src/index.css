@@ -4423,7 +4423,172 @@
   color: var(--text-primary);
 }
 
-/* Preview picker — horizontal scroll on mobile */
+/* Preview comparison — multi-preview pick flow */
+.preview-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.preview-selection__header {
+  text-align: center;
+}
+
+.preview-selection__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.preview-selection__subtitle {
+  margin: 6px 0 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.preview-selection__hero {
+  max-width: 320px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.preview-selection__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.preview-comparison__swipe-hint {
+  margin: 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+@media (min-width: 640px) {
+  .preview-comparison__swipe-hint {
+    display: none;
+  }
+}
+
+.preview-comparison {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+}
+
+.preview-option {
+  position: relative;
+  flex: 0 0 200px;
+  width: 200px;
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background: var(--card-bg-2, rgba(15, 23, 42, 0.6));
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.preview-option--selected {
+  border-color: var(--color-gold-primary);
+  box-shadow: 0 0 0 1px var(--color-gold-primary), 0 0 24px rgba(232, 197, 106, 0.25);
+}
+
+.preview-option__media {
+  overflow: hidden;
+}
+
+.preview-number {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.free-badge,
+.paid-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.free-badge {
+  border: 1px solid rgba(74, 138, 26, 0.5);
+  background: rgba(74, 138, 26, 0.15);
+  color: var(--color-rookie, #8bc34a);
+}
+
+.paid-badge {
+  border: 1px solid rgba(232, 197, 106, 0.45);
+  background: rgba(232, 197, 106, 0.12);
+  color: var(--color-gold-primary);
+}
+
+.selected-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  color: var(--color-gold-primary);
+  font-size: 1rem;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.preview-comparison__dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.preview-comparison__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.preview-comparison__dot--active {
+  background: var(--color-gold-primary);
+}
+
+@media (min-width: 768px) {
+  .preview-comparison {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    scroll-snap-type: none;
+    justify-content: center;
+  }
+
+  .preview-option {
+    flex: 1 1 200px;
+    max-width: 240px;
+  }
+}
+
+/* Preview picker — horizontal scroll on mobile (legacy animated paths) */
 .preview-picker {
   display: flex;
   flex-direction: column;

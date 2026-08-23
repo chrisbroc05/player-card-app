@@ -28,6 +28,7 @@ import AnimateCardConfirmModal from "../components/AnimateCardConfirmModal";
 import AnimatedCardChoiceModal from "../components/AnimatedCardChoiceModal";
 import AnimatedQuantityModal from "../components/AnimatedQuantityModal";
 import CardCreationExperience from "../components/CardCreationExperience";
+import PreviewSelectionPanel from "../components/PreviewSelectionPanel";
 import StartOverConfirmModal, { StartOverButton } from "../components/StartOverConfirmModal";
 import AnimatedFlowExplainer from "../components/AnimatedFlowExplainer";
 import AnimatedAiDisclaimer from "../components/AnimatedAiDisclaimer";
@@ -321,6 +322,8 @@ export default function StudioPage() {
   const [generatedCardUrl, setGeneratedCardUrl] = useState("");
   const [generatedTier, setGeneratedTier] = useState("base");
   const [selectedPreviewUrl, setSelectedPreviewUrl] = useState("");
+  const [selectedPreviewId, setSelectedPreviewId] = useState("");
+  const [sessionPreviews, setSessionPreviews] = useState([]);
 
   const [cards, setCards] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -471,6 +474,14 @@ export default function StudioPage() {
     [orders, currentOrderId]
   );
   const previewCards = activeOrder?.generated_cards || [];
+  const previewSessionId = (activeOrder?.preview_session_id || "").trim();
+
+  const displayPreviews = useMemo(() => {
+    const fromOrder = Array.isArray(previewCards) ? previewCards : [];
+    const fromSession = Array.isArray(sessionPreviews) ? sessionPreviews : [];
+    if (fromSession.length >= fromOrder.length) return fromSession;
+    return fromOrder;
+  }, [previewCards, sessionPreviews]);
 
   const wizardPreviewCard = useMemo(() => {
     const imageUrl =
@@ -545,8 +556,9 @@ export default function StudioPage() {
       return savedCardDetail;
     }
     const sel =
-      previewCards.find((p) => p.image_url === (selectedPreviewUrl || generatedCardUrl)) ||
-      previewCards[previewCards.length - 1];
+      displayPreviews.find((p) => p.card_id === selectedPreviewId) ||
+      displayPreviews.find((p) => p.image_url === (selectedPreviewUrl || generatedCardUrl)) ||
+      displayPreviews[displayPreviews.length - 1];
     if (!sel && !generatedCardUrl) return null;
     const highlightVideoUrl =
       savedCardDetail?.highlight_video_url ||
@@ -581,6 +593,8 @@ export default function StudioPage() {
   }, [
     savedCardDetail,
     previewCards,
+    displayPreviews,
+    selectedPreviewId,
     selectedPreviewUrl,
     generatedCardUrl,
     playerDisplayName,
@@ -1143,12 +1157,45 @@ export default function StudioPage() {
   ]);
 
   useEffect(() => {
-    if (!previewCards.length) return;
-    const currentExists = previewCards.some((p) => p.image_url === selectedPreviewUrl);
-    if (!selectedPreviewUrl || !currentExists) {
-      setSelectedPreviewUrl(previewCards[previewCards.length - 1].image_url);
+    if (!token || !previewSessionId || !inCreationFlow) {
+      setSessionPreviews([]);
+      return undefined;
     }
-  }, [previewCards, selectedPreviewUrl]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `${API_BASE_URL}/cards/previews/${encodeURIComponent(previewSessionId)}`,
+          { headers: { ...authHeaders(token) } }
+        );
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data.previews)) {
+          setSessionPreviews(data.previews);
+        }
+      } catch {
+        /* best-effort sync from persisted previews */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token, previewSessionId, inCreationFlow, activePreviewCount, previewCards.length]);
+
+  useEffect(() => {
+    if (!displayPreviews.length) return;
+    if (displayPreviews.length === 1) {
+      const only = displayPreviews[0];
+      setSelectedPreviewId(only.card_id || "");
+      setSelectedPreviewUrl(only.image_url || "");
+      return;
+    }
+    const idExists = displayPreviews.some((p) => p.card_id && p.card_id === selectedPreviewId);
+    if (!idExists && selectedPreviewId) {
+      setSelectedPreviewId("");
+      setSelectedPreviewUrl("");
+    }
+  }, [displayPreviews, selectedPreviewId]);
 
   const dismissPendingPrompt = useCallback(() => {
     setShowPendingPrompt(false);
@@ -1825,10 +1872,18 @@ export default function StudioPage() {
         player_name: data.player_name,
         team_name: data.team_name,
       };
+      const priorPreviewCount = Number(activeOrder?.preview_count ?? 0);
+      const nextPreviewCount = priorPreviewCount + 1;
       setLatestGeneratedPreview(preview.image_url ? preview : null);
       setPreviewPollCardId(data.card_id || "");
       setGeneratedCardUrl(data.image_url || "");
-      setSelectedPreviewUrl(data.image_url || "");
+      if (nextPreviewCount > 1) {
+        setSelectedPreviewId("");
+        setSelectedPreviewUrl("");
+      } else {
+        setSelectedPreviewUrl(data.image_url || "");
+        setSelectedPreviewId(data.card_id || "");
+      }
       setGeneratedTier(data.tier || "base");
       setMessage(`Preview generated for order #${orderId}.`);
       await Promise.all([fetchMyCards(), fetchOrders(), refreshUser(token), loadGenerationUsage()]);
@@ -2962,7 +3017,13 @@ export default function StudioPage() {
                     showPrimaryAction
                     onPrimaryAction={() => {
                       setPackOpeningActive(false);
-                      setPreviewConfigureOpen(true);
+                      const previewTotal = Math.max(displayPreviews.length, activePreviewCount);
+                      if (previewTotal <= 1) {
+                        setPreviewConfigureOpen(true);
+                      } else {
+                        setSelectedPreviewId("");
+                        setSelectedPreviewUrl("");
+                      }
                     }}
                     onGenerateAnother={() => {
                       setPackOpeningActive(false);
@@ -3050,7 +3111,7 @@ export default function StudioPage() {
                   </>
                 ) : null}
 
-                {previewCards.length === 0 ? (
+                {displayPreviews.length === 0 ? (
                   generationCap.blocked ? (
                     <GenerationCapNotice usage={generationUsage} period={generationCap.period} />
                   ) : (
@@ -3068,120 +3129,54 @@ export default function StudioPage() {
                   )
                 ) : (
                   <>
-                    {previewCards.length > 1 ? (
-                      <div className="rounded-xl border border-white/10 bg-cardBg2 px-4 py-3 text-center">
-                        <p className="text-base font-semibold text-white">
-                          {isAnimatedCardType
-                            ? "Pick your favorite — we'll animate the one you choose"
-                            : "Pick your favorite — only the card you choose will be added to your collection"}
-                        </p>
-                      </div>
-                    ) : null}
-
                     {(!previewConfigureOpen || (isAnimatedCardType && !animatedSaveStaticFlow)) &&
-                    (!isAnimatedCardType || previewCards.length > 1 || !animatedChoiceModalOpen) ? (
-                      <div className="preview-picker">
-                        {previewCards.length > 1 ? (
-                          <p className="preview-picker__hint">Swipe to see all previews →</p>
-                        ) : null}
-                        <div className="preview-picker__scroll">
-                        {previewCards.map((preview, idx) => (
-                          <div
-                            key={`${preview.image_url}-${idx}`}
-                            className="preview-picker__item"
-                          >
-                          <div
-                            className={`h-full overflow-hidden rounded-xl border transition-all duration-300 ${
-                              selectedPreviewUrl === preview.image_url
-                                ? `${tierTheme.active} shadow-glowGold`
-                                : tierTheme.card
-                            }`}
-                          >
-                            {isHighlightCardType && highlightClipDraft?.confirmed ? (
-                              <ExpandableCardView
-                                showHint
-                                card={highlightPreviewExpandCard}
-                                alt={`Preview ${idx + 1}`}
-                                localHighlightVideoUrl={highlightClipDraft.objectUrl}
-                                highlightTrimStart={highlightClipDraft.trimStart ?? 0}
-                                highlightTrimEnd={highlightClipDraft.trimEnd ?? null}
-                              >
-                                <HighlightCardPreview
-                                  playerName={playerDisplayName}
-                                  teamName={teamName}
-                                  position={position}
-                                  jerseyNumber={jerseyNumber}
-                                  gradYear={gradYear}
-                                  tier={orderTier}
-                                  theme={specialTheme}
-                                  clipDraft={highlightClipDraft}
-                                  forcePlay
-                                />
-                              </ExpandableCardView>
-                            ) : (
-                              <ExpandableCardView
-                                showHint
-                                card={previewToDisplayCard(preview)}
-                                alt={`Preview ${idx + 1}`}
-                              >
-                                <CardImage
-                                  card={previewToDisplayCard(preview)}
-                                  alt={`Preview ${idx + 1}`}
-                                  showInfoBanner
-                                  playOnHover={isHighlightCardType}
-                                  forcePlay={isHighlightCardType}
-                                />
-                              </ExpandableCardView>
-                            )}
-                            <div className="space-y-2 bg-cardBg2 p-3">
-                              <p className="text-xs text-slate-400">
-                                <span className={`rounded-full border px-1.5 py-0.5 ${tierTheme.pill}`}>
-                                  {tierTheme.sub}
-                                </span>{" "}
-                                Preview {idx + 1}
-                              </p>
-                              {isAnimatedCardType ? (
-                                previewCards.length > 1 || !animatedChoiceModalOpen ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setSelectedPreviewUrl(preview.image_url);
-                                      setAnimatedFlowStage(ANIMATED_FLOW_STAGE.CHOICE);
-                                    }}
-                                    className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl btn-primary px-4 py-2 text-sm font-semibold text-slate-950"
-                                  >
-                                    Choose This Card
-                                  </button>
-                                ) : null
-                              ) : previewCards.length > 1 ? (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setSelectedPreviewUrl(preview.image_url);
-                                    setPreviewConfigureOpen(true);
-                                  }}
-                                  className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl btn-primary px-4 py-2 text-sm font-semibold text-slate-950"
-                                >
-                                  Choose This Card
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setSelectedPreviewUrl(preview.image_url);
-                                    setPreviewConfigureOpen(true);
-                                  }}
-                                  className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl btn-primary px-4 py-2.5 text-sm font-semibold text-slate-950"
-                                >
-                                  Add This Card to My Collection
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                          </div>
-                        ))}
-                        </div>
-                      </div>
+                    (!isAnimatedCardType || displayPreviews.length > 1 || !animatedChoiceModalOpen) ? (
+                      <PreviewSelectionPanel
+                        previews={displayPreviews}
+                        selectedPreviewId={selectedPreviewId}
+                        onSelectPreview={(preview) => {
+                          setSelectedPreviewId(preview.card_id || "");
+                          setSelectedPreviewUrl(preview.image_url || "");
+                        }}
+                        onAddToCollection={(preview) => {
+                          setSelectedPreviewId(preview.card_id || "");
+                          setSelectedPreviewUrl(preview.image_url || "");
+                          if (isAnimatedCardType) {
+                            setAnimatedFlowStage(ANIMATED_FLOW_STAGE.CHOICE);
+                          } else {
+                            setPreviewConfigureOpen(true);
+                          }
+                        }}
+                        onGenerateAnother={() => {
+                          if (!canAffordRegenerate) {
+                            setError(
+                              `You need ${formatMoney(additionalPreviewCost)} to generate another preview.`
+                            );
+                            return;
+                          }
+                          setShowRegenerateConfirm(true);
+                        }}
+                        onStartOver={() => setShowStartOverConfirm(true)}
+                        additionalPreviewCost={additionalPreviewCost}
+                        isPreviewLimitReached={isPreviewLimitReached}
+                        canAffordRegenerate={canAffordRegenerate}
+                        generationCap={generationCap}
+                        generationUsage={generationUsage}
+                        addCollectionLoading={addCollectionLoading}
+                        orderActionBusy={Boolean(orderActionKey)}
+                        isHighlightCardType={isHighlightCardType}
+                        highlightClipDraft={highlightClipDraft}
+                        highlightPreviewExpandCard={highlightPreviewExpandCard}
+                        playerDisplayName={playerDisplayName}
+                        teamName={teamName}
+                        position={position}
+                        jerseyNumber={jerseyNumber}
+                        gradYear={gradYear}
+                        orderTier={orderTier}
+                        specialTheme={specialTheme}
+                        previewToDisplayCard={previewToDisplayCard}
+                        isAnimatedCardType={isAnimatedCardType}
+                      />
                     ) : null}
 
                     {previewConfigureOpen && (!isAnimatedCardType || animatedSaveStaticFlow) ? (
@@ -3300,79 +3295,7 @@ export default function StudioPage() {
                       </div>
                     ) : null}
 
-                    {previewCards.length > 0 &&
-                    !packOpeningActive &&
-                    !isGenerating &&
-                    !previewConfigureOpen &&
-                    reviewSubPhase === "generate" ? (
-                      <div className="flex justify-center pt-1">
-                        <StartOverButton
-                          onClick={() => setShowStartOverConfirm(true)}
-                          disabled={startOverBusy || Boolean(orderActionKey)}
-                        />
-                      </div>
-                    ) : null}
-
-                    {!previewConfigureOpen && !animatedSaveStaticFlow && previewCards.length === 1 ? (
-                      <div className="text-center">
-                        {generationCap.blocked ? (
-                          <GenerationCapNotice usage={generationUsage} period={generationCap.period} className="text-left" />
-                        ) : (
-                          <>
-                            <p className="text-sm text-slate-400">
-                              Not happy with it? Generate another preview for {formatMoney(additionalPreviewCost)}
-                            </p>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (!canAffordRegenerate) {
-                                  setError(
-                                    `You need ${formatMoney(additionalPreviewCost)} to generate another preview.`
-                                  );
-                                  return;
-                                }
-                                setShowRegenerateConfirm(true);
-                              }}
-                              disabled={isPreviewLimitReached || Boolean(orderActionKey)}
-                              className="mt-3 inline-flex min-h-[44px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-5 py-2 text-sm font-medium text-slate-100 disabled:opacity-50"
-                            >
-                              Try Again — {formatMoney(additionalPreviewCost)}
-                            </button>
-                            <GenerationDailyUsageHint usage={generationUsage} className="mt-2" />
-                          </>
-                        )}
-                      </div>
-                    ) : null}
-
-                    {!previewConfigureOpen && !animatedSaveStaticFlow && previewCards.length > 1 && !isPreviewLimitReached ? (
-                      <div className="text-center">
-                        {generationCap.blocked ? (
-                          <GenerationCapNotice usage={generationUsage} period={generationCap.period} className="text-left" />
-                        ) : (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (!canAffordRegenerate) {
-                                  setError(
-                                    `You need ${formatMoney(additionalPreviewCost)} to generate another preview.`
-                                  );
-                                  return;
-                                }
-                                setShowRegenerateConfirm(true);
-                              }}
-                              disabled={Boolean(orderActionKey)}
-                              className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-5 py-2 text-sm font-medium text-slate-100 disabled:opacity-50"
-                            >
-                              Generate Another Preview — {formatMoney(additionalPreviewCost)}
-                            </button>
-                            <GenerationDailyUsageHint usage={generationUsage} className="mt-2" />
-                          </>
-                        )}
-                      </div>
-                    ) : null}
-
-                    {!canAffordRegenerate && activePreviewCount > 0 ? (
+                    {!canAffordRegenerate && activePreviewCount > 0 && !previewConfigureOpen ? (
                       <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-100">
                         <p>{creditTopUpShortfallMessage(Math.max(0, additionalPreviewCost - creditBalance))}</p>
                         <a

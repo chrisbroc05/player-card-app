@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session, joinedload
 
-from card_pricing import tier_generation_price
+from card_pricing import order_tier_from_card_tier, tier_generation_price
 from card_repo import (
     animation_fields_for_card,
     cards_created_by_user_filter,
@@ -147,26 +147,60 @@ def _preview_session_indexes(db: Session, user_id: int) -> dict[str, int]:
     return indexes
 
 
+def _session_card_ids(db: Session, user_id: int, session_id: str) -> list[str]:
+    rows = (
+        db.query(Card.card_id)
+        .filter(
+            Card.owner_id == user_id,
+            Card.preview_session_id == session_id,
+        )
+        .all()
+    )
+    return [str(row[0]).strip() for row in rows if row and row[0]]
+
+
+def _session_paid_preview_count(
+    *,
+    session_id: str,
+    preview_indexes: dict[str, int],
+    session_card_ids: list[str],
+) -> int:
+    if not session_id:
+        return 0
+    return sum(1 for cid in session_card_ids if preview_indexes.get(cid, 0) > 0)
+
+
 def _card_creation_charge(
     card: Card,
     *,
     ledger_by_ref: dict[str, float],
     preview_indexes: dict[str, int],
-) -> float:
+    db: Session,
+    user_id: int,
+) -> tuple[float, int]:
     """
-    Actual charge for a created card, or 0 when no credits were deducted (free preview).
+    Total charge for a finalized card: copy/ledger debits plus paid previews in the session.
+    Returns (amount, additional_preview_count).
     """
     card_ref = (card.card_id or "").strip()
-    if card_ref and card_ref in ledger_by_ref:
-        return ledger_by_ref[card_ref]
+    base = ledger_by_ref.get(card_ref, 0.0) if card_ref else 0.0
 
     session_id = (card.preview_session_id or "").strip()
-    if session_id and card_ref:
-        if preview_indexes.get(card_ref, 0) > 0:
-            return 0.0
-        return 0.0
+    additional = 0
+    preview_cost = 0.0
+    if session_id:
+        session_ids = _session_card_ids(db, user_id, session_id)
+        additional = _session_paid_preview_count(
+            session_id=session_id,
+            preview_indexes=preview_indexes,
+            session_card_ids=session_ids,
+        )
+        if additional > 0:
+            order_tier = order_tier_from_card_tier(card.tier)
+            preview_cost = round(additional * tier_generation_price(order_tier), 2)
 
-    return 0.0
+    total = round(base + preview_cost, 2)
+    return total, additional
 
 
 def _upgrade_charge(
@@ -351,6 +385,7 @@ def _build_item(
     counterparty: dict | None,
     amount: float | None,
     royalty_amount: float | None = None,
+    additional_preview_count: int | None = None,
 ) -> dict:
     when = completed_at or created_at
     row = {
@@ -366,6 +401,8 @@ def _build_item(
     }
     if royalty_amount is not None:
         row["royalty_amount"] = royalty_amount
+    if additional_preview_count is not None and additional_preview_count > 0:
+        row["additional_preview_count"] = additional_preview_count
     return row
 
 
@@ -554,6 +591,13 @@ def gather_user_activity_items(db: Session, user_id: int) -> list[dict]:
     )
     for card in standard_rows:
         when = card.created_at
+        amount, additional_previews = _card_creation_charge(
+            card,
+            ledger_by_ref=card_creation_ledger,
+            preview_indexes=preview_indexes,
+            db=db,
+            user_id=user_id,
+        )
         items.append(
             _build_item(
                 item_id=f"card_created-{card.id}",
@@ -562,26 +606,10 @@ def gather_user_activity_items(db: Session, user_id: int) -> list[dict]:
                 created_at=card.created_at,
                 card=card,
                 counterparty=None,
-                amount=_card_creation_charge(
-                    card,
-                    ledger_by_ref=card_creation_ledger,
-                    preview_indexes=preview_indexes,
-                ),
+                amount=amount,
+                additional_preview_count=additional_previews,
             )
         )
-
-    items.extend(_gather_paid_preview_items(db, user_id))
-
-    ledger_card_ids = {
-        (i.get("card") or {}).get("card_id")
-        for i in items
-        if i.get("activity_type") == "preview_generated"
-    }
-    for row in _gather_paid_preview_card_items(db, user_id, preview_indexes):
-        card_id = (row.get("card") or {}).get("card_id")
-        if card_id and card_id in ledger_card_ids:
-            continue
-        items.append(row)
 
     return items
 

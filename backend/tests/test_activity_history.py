@@ -191,29 +191,30 @@ class ActivityHistoryTests(unittest.TestCase):
         self.assertEqual(len(created), 1)
         self.assertEqual(created[0]["amount"], 2.0)
 
-    def test_paid_preview_in_session_uses_tier_price_without_ledger(self) -> None:
+    def test_paid_preview_charges_merged_into_card_created(self) -> None:
         now = datetime.now(timezone.utc)
         session_id = "preview-session-1"
         self._add_card(
             card_id="FL-2026-000108",
             preview_session_id=session_id,
+            status="active",
             created_at=now - timedelta(minutes=5),
         )
         self._add_card(
             card_id="FL-2026-000109",
             preview_session_id=session_id,
+            status="discarded",
             created_at=now,
         )
 
         items = gather_user_activity_items(self.db, self.user.id)
         created = {i["card"]["card_id"]: i for i in items if i["activity_type"] == "card_created"}
-        self.assertEqual(created["FL-2026-000108"]["amount"], 0.0)
-        self.assertEqual(created["FL-2026-000109"]["amount"], 0.0)
+        self.assertEqual(set(created.keys()), {"FL-2026-000108"})
+        self.assertEqual(created["FL-2026-000108"]["amount"], tier_generation_price("rookie"))
+        self.assertEqual(created["FL-2026-000108"]["additional_preview_count"], 1)
 
         previews = [i for i in items if i["activity_type"] == "preview_generated"]
-        self.assertEqual(len(previews), 1)
-        self.assertEqual(previews[0]["card"]["card_id"], "FL-2026-000109")
-        self.assertEqual(previews[0]["amount"], tier_generation_price("rookie"))
+        self.assertEqual(len(previews), 0)
 
 
 if __name__ == "__main__":

@@ -274,14 +274,17 @@ export function activityAmountDisplay(item) {
               : "Highlight";
       return { text: "Free", tone: "success", subtext, small: true };
     }
+    const previewCount = Number(item?.additional_preview_count);
     const subtext =
-      type === "card_created"
-        ? "Card creation"
-        : type === "preview_generated"
-          ? item?.preview_label || "Additional Preview"
-          : type === "animated_upgrade"
-            ? "Animation"
-            : "Highlight";
+      type === "card_created" && previewCount > 0
+        ? `Includes ${previewCount} additional preview${previewCount === 1 ? "" : "s"}`
+        : type === "card_created"
+          ? "Card creation"
+          : type === "preview_generated"
+            ? item?.preview_label || "Additional Preview"
+            : type === "animated_upgrade"
+              ? "Animation"
+              : "Highlight";
     return { text: `−${formatMoney(Math.abs(raw))}`, tone: "danger", subtext, small: true };
   }
 
@@ -340,7 +343,17 @@ export function amountDisplay(item) {
     if (!Number.isFinite(raw) || raw === 0) {
       return { text: "Free", className: "text-success" };
     }
-    return { text: `-${formatMoney(Math.abs(raw))}`, className: "text-rose-300" };
+    const previewCount = Number(item?.additional_preview_count);
+    const subtext =
+      type === "card_created" && previewCount > 0
+        ? `Includes ${previewCount} additional preview${previewCount === 1 ? "" : "s"}`
+        : undefined;
+    return {
+      text: `-${formatMoney(Math.abs(raw))}`,
+      className: "text-rose-300",
+      subtext,
+      subtextClassName: "text-[11px] leading-tight text-slate-500",
+    };
   }
 
   if (item?.amount == null || Number.isNaN(raw)) return null;
