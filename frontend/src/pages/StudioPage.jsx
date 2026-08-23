@@ -369,6 +369,7 @@ export default function StudioPage() {
   const [startOverBusy, setStartOverBusy] = useState(false);
   const [packOpeningActive, setPackOpeningActive] = useState(false);
   const [previewConfigureOpen, setPreviewConfigureOpen] = useState(false);
+  const [previewCompareOpen, setPreviewCompareOpen] = useState(false);
   const [animatedFlowStage, setAnimatedFlowStage] = useState(ANIMATED_FLOW_STAGE.IDLE);
   const [animatedSaveStaticFlow, setAnimatedSaveStaticFlow] = useState(false);
   const [latestGeneratedPreview, setLatestGeneratedPreview] = useState(null);
@@ -448,22 +449,39 @@ export default function StudioPage() {
       card_id: preview.card_id,
       player_name: preview.player_name || playerDisplayName,
       team_name: preview.team_name || teamName,
-      position,
-      jersey_number: jerseyNumber,
-      grad_year: gradYear,
+      position: preview.position || position,
+      jersey_number: preview.jersey_number || jerseyNumber,
+      grad_year: preview.grad_year || gradYear,
       tier: orderTier || preview.tier || "rookie",
-      theme: specialTheme,
-      special_theme: specialTheme,
+      theme: specialTheme || preview.theme || preview.special_theme,
+      special_theme: specialTheme || preview.special_theme,
       image_url: preview.image_url,
+      player_photo_url: preview.player_photo_url || preview.image_url,
       edition_number: preview.edition_number || 1,
       print_run: preview.print_run || 1,
+      rarity: preview.rarity || "standard",
+      rarity_template: preview.rarity_template ?? 1,
+      rarity_display_name: preview.rarity_display_name || "",
+      template_name: preview.template_name || "",
+      is_animated: isAnimatedCardType || preview.is_animated,
+      animated_video_url: preview.animated_video_url,
       is_highlight: isHighlightCardType || preview.is_highlight,
       highlight_video_url:
+        preview.highlight_video_url ||
         savedCardDetail?.highlight_video_url ||
         (isHighlightCardType && highlightClipDraft?.objectUrl ? highlightClipDraft.objectUrl : undefined),
-      highlight_trim_start: savedCardDetail?.highlight_trim_start ?? highlightClipDraft?.trimStart ?? 0,
-      highlight_trim_end: savedCardDetail?.highlight_trim_end ?? highlightClipDraft?.trimEnd ?? null,
+      highlight_trim_start:
+        preview.highlight_trim_start ??
+        savedCardDetail?.highlight_trim_start ??
+        highlightClipDraft?.trimStart ??
+        0,
+      highlight_trim_end:
+        preview.highlight_trim_end ??
+        savedCardDetail?.highlight_trim_end ??
+        highlightClipDraft?.trimEnd ??
+        null,
       highlight_status:
+        preview.highlight_status ||
         savedCardDetail?.highlight_status ||
         (isHighlightCardType && highlightClipDraft?.confirmed ? "preview" : undefined),
     };
@@ -1534,6 +1552,7 @@ export default function StudioPage() {
     setGeneratedCardUrl("");
     setGeneratedTier("base");
     setSelectedPreviewUrl("");
+    setSelectedPreviewId("");
     setSavedCardDetail(null);
     setOrderTier("");
     setSpecialTheme("");
@@ -1547,6 +1566,7 @@ export default function StudioPage() {
     setPhotoNotes("");
     setReviewSubPhase("setup");
     setPreviewConfigureOpen(false);
+    setPreviewCompareOpen(false);
     setPackOpeningActive(false);
     setIsGenerating(false);
     setOrderActionKey("");
@@ -3015,12 +3035,18 @@ export default function StudioPage() {
                     onHighlightVideoReady={handleHighlightVideoReady}
                     onRevealComplete={handlePackOpeningComplete}
                     showPrimaryAction
+                    primaryActionLabel={
+                      Math.max(displayPreviews.length, activePreviewCount) <= 1
+                        ? "Add to Collection"
+                        : "Compare & Choose Preview"
+                    }
                     onPrimaryAction={() => {
                       setPackOpeningActive(false);
                       const previewTotal = Math.max(displayPreviews.length, activePreviewCount);
                       if (previewTotal <= 1) {
                         setPreviewConfigureOpen(true);
                       } else {
+                        setPreviewCompareOpen(true);
                         setSelectedPreviewId("");
                         setSelectedPreviewUrl("");
                       }
@@ -3134,6 +3160,9 @@ export default function StudioPage() {
                       <PreviewSelectionPanel
                         previews={displayPreviews}
                         selectedPreviewId={selectedPreviewId}
+                        compareViewOpen={previewCompareOpen}
+                        onOpenCompare={() => setPreviewCompareOpen(true)}
+                        onCloseCompare={() => setPreviewCompareOpen(false)}
                         onSelectPreview={(preview) => {
                           setSelectedPreviewId(preview.card_id || "");
                           setSelectedPreviewUrl(preview.image_url || "");

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AnimatedCardReveal from "./AnimatedCardReveal";
+import PremiumRarityReveal from "./PremiumRarityReveal";
 import CardImage from "./CardImage";
 import { toApiUrl } from "../config/api";
 import {
@@ -19,7 +20,7 @@ import {
   normalizeExperienceTier,
   themeDisplayName,
 } from "../utils/cardCreationExperience";
-import { forgeLoadingMessage, getRevealConfig, getRevealCelebrationMessage } from "../utils/rarityStyles";
+import { forgeLoadingMessage, getRevealConfig, getRevealCelebrationMessage, isPremiumRarityReveal } from "../utils/rarityStyles";
 import "../styles/cardCreationExperience.css";
 
 const TEXT_FADE_MS = 500;
@@ -453,6 +454,23 @@ function RevealSection({
   const isBlackout = revealMode === "pre_reveal";
   const celebrationMessage = getRevealCelebrationMessage(rarity);
   const showActions = mediaReady && revealMode === "landed" && (showPrimaryAction || onPrimaryAction);
+  const usePremiumReveal = isPremiumRarityReveal(rarity);
+
+  if (usePremiumReveal && revealMode !== "creating") {
+    return (
+      <PremiumRarityReveal
+        rarity={rarity}
+        revealCard={revealCard}
+        playerName={playerName}
+        showActions={Boolean(showPrimaryAction || onPrimaryAction)}
+        primaryActionLabel={primaryActionLabel}
+        onPrimaryAction={onPrimaryAction}
+        onGenerateAnother={onGenerateAnother}
+        onStartOver={onStartOver}
+        celebrationMessage={celebrationMessage}
+      />
+    );
+  }
 
   return (
     <>
@@ -762,6 +780,9 @@ export default function CardCreationExperience({
   const revealVariant = cardType === "highlight" ? "rise" : "bounce";
   const showAnimatedActions =
     showPrimaryAction && (cardType === "animated" ? mode === "reveal" || mode === "landed" : mode === "landed");
+  const revealShowPrimaryAction = isPremiumRarityReveal(cardRarity)
+    ? showPrimaryAction
+    : showPrimaryAction && mode === "landed";
 
   return (
     <div
@@ -832,7 +853,7 @@ export default function CardCreationExperience({
           revealVariant={revealVariant}
           revealConfig={revealConfig}
           revealMode={mode}
-          showPrimaryAction={showPrimaryAction && mode === "landed"}
+          showPrimaryAction={revealShowPrimaryAction}
           primaryActionLabel={primaryActionLabel}
           onPrimaryAction={() => {
             onPrimaryAction?.();

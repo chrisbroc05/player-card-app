@@ -49,6 +49,15 @@ export function getRevealTier(rarity) {
   return normalizeRarityKey(rarity);
 }
 
+export function isPremiumRarityReveal(rarity) {
+  const key = normalizeRarityKey(rarity);
+  return (
+    key === RARITY_KEYS.GOLD_AUTO ||
+    key === RARITY_KEYS.ONE_OF_ONE ||
+    key === RARITY_KEYS.BLACK_LABEL
+  );
+}
+
 export function hasAutoSignature(rarity) {
   const key = normalizeRarityKey(rarity);
   return (
@@ -119,21 +128,22 @@ export function getRevealConfig(rarity) {
       };
     case RARITY_KEYS.GOLD_AUTO:
       return {
-        preBlackoutMs: 2000,
-        revealMs: 5200,
+        preBlackoutMs: 0,
+        revealMs: 6500,
         landedMs: 4200,
         confettiMs: 3500,
         sceneClass: "cce-scene--reveal-gold-auto",
         title: "🎉 Gold Auto Pull!",
-        subtitle: "",
+        subtitle: "This is your rarest card yet",
         variant: "flip",
         particleTheme: "gold",
         animateSignature: true,
+        premiumReveal: "gold-auto",
       };
     case RARITY_KEYS.ONE_OF_ONE:
       return {
-        preBlackoutMs: 3000,
-        revealMs: 6800,
+        preBlackoutMs: 0,
+        revealMs: 7000,
         landedMs: 5200,
         confettiMs: 5000,
         sceneClass: "cce-scene--reveal-one-of-one",
@@ -142,11 +152,12 @@ export function getRevealConfig(rarity) {
         variant: "slam",
         particleTheme: "legendary",
         screenShake: true,
+        premiumReveal: "one-of-one",
       };
     case RARITY_KEYS.BLACK_LABEL:
       return {
-        preBlackoutMs: 5000,
-        revealMs: 7200,
+        preBlackoutMs: 0,
+        revealMs: 7500,
         landedMs: 5800,
         confettiMs: 5000,
         sceneClass: "cce-scene--reveal-black-label",
@@ -156,6 +167,7 @@ export function getRevealConfig(rarity) {
         particleTheme: "black-label",
         permanentGlow: true,
         animateSignature: true,
+        premiumReveal: "black-label",
       };
     case RARITY_KEYS.FOIL:
       return {
