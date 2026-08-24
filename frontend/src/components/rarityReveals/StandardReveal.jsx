@@ -26,15 +26,17 @@ export default function StandardReveal({
       { at: 300, index: 1 },
       { at: 600, index: 2 },
       { at: 2100, index: 3 },
-      { at: 2800, index: 4 },
-      { at: 3600, index: 5 },
+      { at: 3600, index: 4 },
+      { at: 4200, index: 5 },
     ],
     resetKey
   );
 
+  const showStamp = phase >= 2 && phase < 4;
+
   return (
     <>
-      <RarityStamp active={phase === 2} rarity={rarity} />
+      <RarityStamp active={showStamp} rarity={rarity} />
       <RevealScene
         className="rre-scene--standard"
         backdrop={
@@ -58,7 +60,9 @@ export default function StandardReveal({
         >
           <RevealCardDisplay revealCard={revealCard} playerName={playerName} />
         </div>
-        {phase >= 4 ? <p className="rre-message rre-message--standard">Your card is ready!</p> : null}
+        {phase >= 4 ? (
+          <p className="rre-message reveal-message rre-message--standard">Your card is ready!</p>
+        ) : null}
       </RevealScene>
     </>
   );

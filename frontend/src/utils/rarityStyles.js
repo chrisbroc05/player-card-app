@@ -207,8 +207,8 @@ export function getRevealConfig(rarity) {
     default:
       return {
         preBlackoutMs: 0,
-        revealMs: 4000,
-        landedMs: 3400,
+        revealMs: 4800,
+        landedMs: 4200,
         confettiMs: 2000,
         sceneClass: "",
         title: "Your card is ready!",

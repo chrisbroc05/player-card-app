@@ -276,7 +276,7 @@ export default function PreviewSelectionPanel({
           })}
         </div>
 
-        <div className="preview-selection__actions preview-selection__actions--compare">
+        <div className="preview-selection__actions preview-selection__actions--compare comparison-actions">
           <button
             type="button"
             onClick={() => isSelected && selectedPreview && openAddConfirm(selectedPreview)}

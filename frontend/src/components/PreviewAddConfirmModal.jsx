@@ -26,7 +26,7 @@ export default function PreviewAddConfirmModal({
     >
       <div className="add-confirmation-box" onClick={(e) => e.stopPropagation()}>
         {card ? (
-          <div className="add-confirmation-box__thumb">
+          <div className="add-confirmation-box__thumb confirmation-card-thumbnail">
             <CardImage card={card} alt="Selected preview" showInfoBanner variant="grid" />
           </div>
         ) : null}

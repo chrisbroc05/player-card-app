@@ -574,6 +574,11 @@ export default function StudioPage() {
       }
       return savedCardDetail;
     }
+
+    if (latestGeneratedPreview?.image_url) {
+      return previewToDisplayCard(latestGeneratedPreview);
+    }
+
     const sel =
       displayPreviews.find((p) => p.card_id === selectedPreviewId) ||
       displayPreviews.find((p) => p.image_url === (selectedPreviewUrl || generatedCardUrl)) ||
@@ -625,6 +630,7 @@ export default function StudioPage() {
     generatedTier,
     specialTheme,
     isHighlightCardType,
+    latestGeneratedPreview,
     highlightClipDraft?.objectUrl,
     highlightClipDraft?.trimStart,
     highlightClipDraft?.trimEnd,

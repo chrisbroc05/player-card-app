@@ -45,8 +45,10 @@ export function RevealScene({ className = "", backdrop = null, children, actions
   return (
     <div className={`rre-scene ${className}`.trim()} aria-live="polite">
       {backdrop}
-      <div className="overlay-card-container">{children}</div>
-      {actions}
+      <div className="reveal-content">
+        <div className="reveal-card-wrapper overlay-card-container">{children}</div>
+        {actions}
+      </div>
     </div>
   );
 }
@@ -60,7 +62,7 @@ export function RevealActionButtons({
 }) {
   if (!show) return null;
   return (
-    <div className="overlay-actions rre-actions cce-reveal-actions">
+    <div className="reveal-actions overlay-actions rre-actions cce-reveal-actions">
       <button type="button" className="cce-reveal-btn cce-reveal-btn--primary" onClick={onPrimaryAction}>
         {primaryActionLabel || "Add to Collection"}
       </button>
@@ -92,7 +94,16 @@ export function useRevealPhases(phases, resetKey) {
   return phase;
 }
 
+function useEffectLayerCleanup() {
+  const [visible, setVisible] = useState(true);
+  useEffect(() => () => setVisible(false), []);
+  return visible;
+}
+
 export function FloatUpParticles({ count = 15 }) {
+  const visible = useEffectLayerCleanup();
+  if (!visible) return null;
+
   return (
     <div className="rre-particles rre-particles--float-up" aria-hidden>
       {Array.from({ length: count }, (_, i) => (
@@ -107,6 +118,9 @@ export function FloatUpParticles({ count = 15 }) {
 }
 
 export function RadialParticles({ count = 24, className = "", tone = "gold" }) {
+  const visible = useEffectLayerCleanup();
+  if (!visible) return null;
+
   const pieces = Array.from({ length: count }, (_, i) => {
     const angle = (i / count) * 360;
     return { id: i, angle, delay: (i % 12) * 0.04 };
@@ -125,6 +139,9 @@ export function RadialParticles({ count = 24, className = "", tone = "gold" }) {
 }
 
 export function ConvergeParticles({ count = 72, tone = "gold" }) {
+  const visible = useEffectLayerCleanup();
+  if (!visible) return null;
+
   const pieces = Array.from({ length: count }, (_, i) => {
     const angle = (i / count) * Math.PI * 2 + (i % 7) * 0.15;
     const dist = 55 + (i % 9) * 12;
@@ -156,6 +173,9 @@ export function ConvergeParticles({ count = 72, tone = "gold" }) {
 }
 
 export function ConfettiRain({ count = 40, durationClass = "" }) {
+  const visible = useEffectLayerCleanup();
+  if (!visible) return null;
+
   return (
     <div className={`rre-confetti ${durationClass}`.trim()} aria-hidden>
       {Array.from({ length: count }, (_, i) => (

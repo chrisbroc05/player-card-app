@@ -20,6 +20,7 @@ export default function RevealOrchestrator({
   celebrationMessage = "",
 }) {
   const key = normalizeRarityKey(rarity || revealCard?.rarity);
+  const resetKey = `${revealCard?.card_id}-${revealCard?.image_url}`;
   const shared = {
     revealCard,
     playerName,
@@ -32,7 +33,7 @@ export default function RevealOrchestrator({
   };
 
   return (
-    <div className="reveal-orchestrator">
+    <div className="reveal-orchestrator" key={resetKey}>
       {key === RARITY_KEYS.FOIL ? <FoilReveal {...shared} /> : null}
       {key === RARITY_KEYS.REFRACTOR ? <RefractorReveal {...shared} /> : null}
       {key === RARITY_KEYS.GOLD_AUTO ? <GoldAutoReveal {...shared} /> : null}

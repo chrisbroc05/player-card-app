@@ -4479,13 +4479,13 @@
   gap: 20px;
   width: 100%;
   max-height: none;
-  overflow-x: visible;
+  overflow-x: hidden;
   overflow-y: visible;
-  padding: 0 16px 120px;
+  padding: 0 16px 16px;
 }
 
 .preview-comparison--selectable {
-  padding-bottom: 160px;
+  padding-bottom: 16px;
 }
 
 .preview-card-option {
@@ -4605,7 +4605,17 @@
   gap: 10px;
   width: 100%;
   max-width: 320px;
-  margin: 1.25rem auto 0;
+  margin: 16px auto 0;
+}
+
+.comparison-actions {
+  margin-top: 16px;
+  padding: 0 16px;
+  padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
 }
 
 .add-confirmation-overlay {
@@ -4629,11 +4639,22 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  text-align: center;
   gap: 16px;
 }
 
-.add-confirmation-box__thumb {
+.add-confirmation-box__thumb,
+.confirmation-card-thumbnail {
   width: 120px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: center;
+}
+
+.confirmation-card-thumbnail .card-display-container,
+.confirmation-card-thumbnail .card-image-frame,
+.confirmation-card-thumbnail .card-image-wrap {
+  margin: 0 auto;
 }
 
 .add-confirmation-box__title {

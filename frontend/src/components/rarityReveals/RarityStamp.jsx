@@ -102,7 +102,7 @@ export default function RarityStamp({ active = false, rarity = "standard" }) {
 
   if (config.animation === "split-slam") {
     return (
-      <div className="rarity-stamp rarity-stamp--split-slam" aria-hidden style={style}>
+      <div className="rarity-stamp rarity-stamp-overlay rarity-stamp--split-slam" aria-hidden style={style}>
         <SplitSlamStamp color={config.color} shadowColor={config.shadowColor} fontSize={config.fontSize} />
       </div>
     );
@@ -111,7 +111,7 @@ export default function RarityStamp({ active = false, rarity = "standard" }) {
   const textClass = `rarity-stamp-text rarity-stamp-text--${config.animation}`;
 
   return (
-    <div className={`rarity-stamp rarity-stamp--${config.animation}`} aria-hidden style={style}>
+    <div className={`rarity-stamp rarity-stamp-overlay rarity-stamp--${config.animation}`} aria-hidden style={style}>
       {config.animation === "typewriter" ? (
         <TypewriterStamp text={config.text} className={`${textClass} rarity-stamp-text--shake`} style={{ fontSize: config.fontSize }} />
       ) : (

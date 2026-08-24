@@ -52,7 +52,7 @@ export default function GenerationOverlay({
       ) : null}
 
       <div
-        className={`generation-overlay__body${view === "compare" ? " generation-overlay__body--compare" : ""}`}
+        className={`generation-overlay__body${view === "compare" ? " generation-overlay__body--compare" : " reveal-content"}`}
       >
         {view === "experience" && cardCreationProps ? (
           <CardCreationExperience

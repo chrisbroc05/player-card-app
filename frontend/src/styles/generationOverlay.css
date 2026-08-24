@@ -8,11 +8,18 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 16px;
-  padding-top: calc(16px + env(safe-area-inset-top, 0px));
-  padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+  justify-content: flex-start;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 24px 16px;
+  padding-top: max(
+    calc(24px + env(safe-area-inset-top, 0px)),
+    calc(50vh - 300px)
+  );
+  padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px));
+  overflow-x: hidden;
   overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .generation-overlay__close {
@@ -42,11 +49,53 @@
 .generation-overlay__body {
   display: flex;
   width: 100%;
-  flex: 1;
+  flex: 0 0 auto;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: min(100%, 100%);
+  margin: auto 0;
+}
+
+.reveal-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  width: 100%;
+  max-width: 360px;
+  margin: auto;
+}
+
+.reveal-card-wrapper {
+  width: min(260px, calc(100vw - 48px));
+  aspect-ratio: 5 / 7;
+  margin: 0 auto;
+  flex-shrink: 0;
+}
+
+.reveal-message,
+.rre-message {
+  text-align: center;
+  margin: 0 auto;
+}
+
+.reveal-actions,
+.generation-overlay .overlay-actions.rre-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 360px;
+  margin-top: 0;
+}
+
+.reveal-actions .cce-reveal-btn,
+.reveal-actions button,
+.generation-overlay .overlay-actions .cce-reveal-btn,
+.generation-overlay .overlay-actions button {
+  width: 100%;
 }
 
 .generation-overlay__body--compare {
@@ -54,6 +103,12 @@
   justify-content: flex-start;
   padding-top: 2.5rem;
   padding-bottom: calc(var(--pill-nav-height, 100px) + 24px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  margin: 0;
 }
 
 .overlay-card-container {
@@ -83,29 +138,51 @@
 
 .generation-overlay .cce-scene {
   width: 100%;
-  max-width: 320px;
+  max-width: 360px;
   min-height: unset;
-  flex: 0 1 auto;
+  height: auto;
+  flex: 0 0 auto;
   border: none;
   border-radius: 0;
   background: transparent;
   padding: 0;
   margin: 0 auto;
   overflow: visible;
+  justify-content: center;
 }
 
 .generation-overlay .cce-scene--fullscreen {
   min-height: unset;
+  height: auto;
+}
+
+.generation-overlay .reveal-orchestrator {
+  width: 100%;
+  flex: 0 0 auto;
+  overflow: visible;
 }
 
 .generation-overlay .rre-scene {
   min-height: unset;
+  height: auto;
   width: 100%;
-  max-width: 320px;
+  max-width: 360px;
   padding: 0;
   margin: 0 auto;
   overflow: visible;
-  gap: 0.75rem;
+  gap: 0;
+  justify-content: center;
+}
+
+.generation-overlay .overlay-card-container,
+.generation-overlay .reveal-card-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: min(260px, calc(100vw - 48px));
+  max-width: min(260px, calc(100vw - 48px));
+  margin: 0 auto;
 }
 
 .generation-overlay .overlay-card-container .rre-card-stage,
@@ -113,16 +190,16 @@
 .generation-overlay .overlay-card-container .rre-card-frame,
 .generation-overlay .overlay-card-container .cce-reveal-card-wrap,
 .generation-overlay .overlay-card-container .card-display-container {
-  width: min(280px, calc(100vw - 48px));
-  max-width: min(280px, calc(100vw - 48px));
-  max-height: min(60vh, calc(min(280px, calc(100vw - 48px)) * 3.5 / 2.5));
+  width: min(260px, calc(100vw - 48px));
+  max-width: min(260px, calc(100vw - 48px));
+  max-height: min(60vh, calc(min(260px, calc(100vw - 48px)) * 7 / 5));
   margin: 0 auto;
 }
 
 .generation-overlay .overlay-card-container .rre-card-shell img,
 .generation-overlay .overlay-card-container .card-image-wrap,
 .generation-overlay .overlay-card-container .card-image {
-  max-height: min(60vh, calc(min(280px, calc(100vw - 48px)) * 3.5 / 2.5));
+  max-height: min(60vh, calc(min(260px, calc(100vw - 48px)) * 7 / 5));
   width: 100%;
   height: auto;
   object-fit: contain;
@@ -134,13 +211,13 @@
   .generation-overlay .overlay-card-container .rre-card-frame,
   .generation-overlay .overlay-card-container .cce-reveal-card-wrap,
   .generation-overlay .overlay-card-container .card-display-container {
-    max-height: min(55vh, calc(min(280px, calc(100vw - 48px)) * 3.5 / 2.5));
+    max-height: min(55vh, calc(min(260px, calc(100vw - 48px)) * 7 / 5));
   }
 
   .generation-overlay .overlay-card-container .rre-card-shell img,
   .generation-overlay .overlay-card-container .card-image-wrap,
   .generation-overlay .overlay-card-container .card-image {
-    max-height: min(55vh, calc(min(280px, calc(100vw - 48px)) * 3.5 / 2.5));
+    max-height: min(55vh, calc(min(260px, calc(100vw - 48px)) * 7 / 5));
   }
 }
 
