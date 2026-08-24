@@ -19,6 +19,15 @@
   isolation: isolate;
 }
 
+.cce-scene--reveal {
+  background: #050508;
+}
+
+.cce-scene--reveal .cce-bg-gradient,
+.cce-scene--reveal .cce-vignette {
+  display: none;
+}
+
 .cce-scene--fullscreen {
   min-height: min(85vh, 720px);
 }

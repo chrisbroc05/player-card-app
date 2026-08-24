@@ -29,11 +29,14 @@ export function RevealCardDisplay({
 }
 
 export function RevealPullMessage({ rarity, className = "" }) {
-  const title = getRevealPullMessage(rarity);
-  if (!title) return null;
+  const copy = getRevealPullMessage(rarity);
+  if (!copy) return null;
   return (
     <div className={`rre-settled-copy ${className}`.trim()}>
-      <p className="rre-title">{title}</p>
+      <p className="rre-title">
+        {copy.subtitle ? `${copy.title} — ${copy.subtitle}` : copy.title}
+      </p>
+      {copy.extra ? <p className="rre-subtitle">{copy.extra}</p> : null}
     </div>
   );
 }
@@ -87,6 +90,20 @@ export function useRevealPhases(phases, resetKey) {
   }, [resetKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return phase;
+}
+
+export function FloatUpParticles({ count = 15 }) {
+  return (
+    <div className="rre-particles rre-particles--float-up" aria-hidden>
+      {Array.from({ length: count }, (_, i) => (
+        <span
+          key={i}
+          className="rre-particle rre-particle--white rre-particle--float-up"
+          style={{ "--i": i, "--delay": `${(i % 10) * 0.08}s`, left: `${(i * 17) % 100}%` }}
+        />
+      ))}
+    </div>
+  );
 }
 
 export function RadialParticles({ count = 24, className = "", tone = "gold" }) {

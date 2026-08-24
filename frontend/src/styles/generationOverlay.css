@@ -155,27 +155,9 @@
 }
 
 .generation-overlay .preview-selection--compare {
-  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px));
 }
 
 .generation-overlay .comparison-action-bar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: calc(100px + env(safe-area-inset-bottom, 0px));
-  z-index: 1125;
-  padding-left: 16px;
-  padding-right: 16px;
-  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-  pointer-events: auto;
-}
-
-@media (min-width: 640px) {
-  .generation-overlay .comparison-action-bar {
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
-    max-width: 520px;
-    width: 100%;
-  }
+  display: none;
 }

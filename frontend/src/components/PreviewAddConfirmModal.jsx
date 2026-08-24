@@ -1,5 +1,7 @@
 import React from "react";
 import CardImage from "./CardImage";
+import RarityBadge from "./RarityBadge";
+import { rarityDisplayLabel } from "../utils/rarityStyles";
 
 export default function PreviewAddConfirmModal({
   open,
@@ -11,27 +13,33 @@ export default function PreviewAddConfirmModal({
 }) {
   if (!open) return null;
 
+  const rarityLabel = card?.rarity_display_name || rarityDisplayLabel(card?.rarity);
+  const templateName = card?.template_name || "";
+
   return (
     <div
-      className="preview-add-confirm fixed inset-0 z-[90] flex items-end justify-center bg-black/70 p-4 sm:items-center"
+      className="add-confirmation-overlay"
       role="dialog"
       aria-modal="true"
       aria-labelledby="preview-add-confirm-title"
       onClick={onCancel}
     >
-      <div
-        className="preview-add-confirm__panel w-full max-w-sm rounded-2xl border border-white/10 bg-cardBg2 p-5 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 id="preview-add-confirm-title" className="text-center text-lg font-semibold text-white">
-          Add {previewLabel} to your collection?
-        </h2>
+      <div className="add-confirmation-box" onClick={(e) => e.stopPropagation()}>
         {card ? (
-          <div className="preview-add-confirm__thumb mx-auto mt-4 max-w-[140px]">
+          <div className="add-confirmation-box__thumb">
             <CardImage card={card} alt="Selected preview" showInfoBanner variant="grid" />
           </div>
         ) : null}
-        <div className="mt-5 flex flex-col gap-2.5">
+        <h2 id="preview-add-confirm-title" className="add-confirmation-box__title">
+          Add this card to your collection?
+        </h2>
+        {card ? (
+          <div className="add-confirmation-box__meta">
+            {rarityLabel ? <RarityBadge rarity={card.rarity} size="default" /> : null}
+            {templateName ? <span className="add-confirmation-box__template">{templateName}</span> : null}
+          </div>
+        ) : null}
+        <div className="add-confirmation-box__actions">
           <button
             type="button"
             onClick={onConfirm}
@@ -44,7 +52,7 @@ export default function PreviewAddConfirmModal({
             type="button"
             onClick={onCancel}
             disabled={loading}
-            className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl border border-white/15 bg-transparent px-4 py-2 text-sm font-medium text-slate-300 disabled:opacity-50"
+            className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl border border-white/20 bg-transparent px-4 py-2 text-sm font-medium text-slate-300 disabled:opacity-50"
           >
             Cancel
           </button>

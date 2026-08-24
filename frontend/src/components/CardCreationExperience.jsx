@@ -825,6 +825,8 @@ export default function CardCreationExperience({
     showPrimaryAction && (cardType === "animated" ? mode === "reveal" || mode === "landed" : mode === "landed");
   const revealShowPrimaryAction = showPrimaryAction;
 
+  const showCceBackdrop = !isReveal || isAnimatedReveal;
+
   return (
     <div
       className={`cce-scene ${fullscreen ? "cce-scene--fullscreen" : ""} ${isAnimatedReveal ? "cce-scene--animated-reveal" : ""} ${isReveal && !isAnimatedReveal ? "cce-scene--reveal" : ""} ${isReveal && !isAnimatedReveal ? revealConfig.sceneClass : ""}`}
@@ -832,8 +834,12 @@ export default function CardCreationExperience({
       aria-live="polite"
       aria-busy={!revealReady}
     >
-      <div className="cce-bg-gradient" aria-hidden />
-      <div className="cce-vignette" aria-hidden />
+      {showCceBackdrop ? (
+        <>
+          <div className="cce-bg-gradient" aria-hidden />
+          <div className="cce-vignette" aria-hidden />
+        </>
+      ) : null}
 
       {!isReveal ? (
         <>

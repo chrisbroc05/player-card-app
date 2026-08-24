@@ -23,29 +23,26 @@ export default function RefractorReveal({
   const phase = useRevealPhases(
     [
       { at: 0, index: 0 },
-      { at: 120, index: 1 },
+      { at: 100, index: 1 },
       { at: 400, index: 2 },
-      { at: 1000, index: 3 },
-      { at: 2200, index: 4 },
-      { at: 4200, index: 5 },
+      { at: 1100, index: 3 },
+      { at: 2400, index: 4 },
+      { at: 3200, index: 5 },
+      { at: 5200, index: 6 },
     ],
     resetKey
   );
 
   return (
     <>
+      {phase === 1 ? <div className="rre-flash rre-flash--blue" aria-hidden /> : null}
       <RarityStamp active={phase === 3} rarity={rarity} />
       <RevealScene
         className="rre-scene--refractor"
-        backdrop={
-          <>
-            {phase >= 1 ? <div className="rre-flash rre-flash--silver" aria-hidden /> : null}
-            {phase >= 2 && phase < 4 ? <RadialParticles count={30} tone="silver" /> : null}
-          </>
-        }
+        backdrop={phase === 3 ? <RadialParticles count={35} tone="silver" /> : null}
         actions={
           <RevealActionButtons
-            show={showActions && phase >= 5}
+            show={showActions && phase >= 6}
             primaryActionLabel={primaryActionLabel}
             onPrimaryAction={onPrimaryAction}
             onGenerateAnother={onGenerateAnother}
@@ -56,12 +53,12 @@ export default function RefractorReveal({
         <div
           className={`rre-card-stage rre-card-stage--refractor-slide${phase >= 2 ? " rre-card-stage--visible" : ""}`}
         >
-          <div className={`rre-card-frame${phase >= 2 && phase < 4 ? " rre-card-frame--refractor-cycle" : ""}`}>
+          <div className={`rre-card-frame${phase === 4 ? " rre-card-frame--refractor-cycle" : ""}`}>
             <RevealCardDisplay revealCard={revealCard} playerName={playerName} />
-            {phase >= 2 && phase < 4 ? <div className="rre-rainbow-ray" aria-hidden /> : null}
+            {phase === 4 ? <div className="rre-rainbow-ray" aria-hidden /> : null}
           </div>
         </div>
-        {phase >= 4 ? <RevealPullMessage rarity={rarity} /> : null}
+        {phase >= 5 ? <RevealPullMessage rarity={rarity} /> : null}
       </RevealScene>
     </>
   );

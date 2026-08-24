@@ -276,26 +276,18 @@ export default function PreviewSelectionPanel({
           })}
         </div>
 
-        <div className="preview-selection__actions preview-selection__actions--compare-secondary">
+        <div className="preview-selection__actions preview-selection__actions--compare">
+          <button
+            type="button"
+            onClick={() => isSelected && selectedPreview && openAddConfirm(selectedPreview)}
+            disabled={!isSelected || addCollectionLoading || orderActionBusy}
+            className={`add-selected-button add-selected-btn${isSelected ? " enabled" : " disabled"}`}
+          >
+            {addSelectedLabel}
+          </button>
           {renderSecondaryActions()}
           <StartOverButton onClick={onStartOver} disabled={orderActionBusy || addCollectionLoading} />
         </div>
-      </div>
-
-      <div className="comparison-action-bar">
-        <button
-          type="button"
-          onClick={() => isSelected && selectedPreview && openAddConfirm(selectedPreview)}
-          disabled={!isSelected || addCollectionLoading || orderActionBusy}
-          className={`add-selected-button add-selected-btn${isSelected ? " enabled" : " disabled"}`}
-        >
-          {addSelectedLabel}
-        </button>
-        {!canAffordRegenerate ? (
-          <p className="text-center text-xs text-amber-200/90">
-            You need {formatMoney(additionalPreviewCost)} in credits to generate another preview.
-          </p>
-        ) : null}
       </div>
 
       <PreviewAddConfirmModal

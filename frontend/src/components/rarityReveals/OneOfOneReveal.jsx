@@ -3,7 +3,6 @@ import RarityStamp from "./RarityStamp";
 import {
   ConfettiRain,
   ConvergeParticles,
-  LetterReveal,
   RevealActionButtons,
   RevealCardDisplay,
   RevealPullMessage,
@@ -25,12 +24,12 @@ export default function OneOfOneReveal({
   const phase = useRevealPhases(
     [
       { at: 0, index: 0 },
-      { at: 400, index: 1 },
-      { at: 2200, index: 2 },
-      { at: 2800, index: 3 },
-      { at: 4000, index: 4 },
-      { at: 4800, index: 5 },
-      { at: 7200, index: 6 },
+      { at: 300, index: 1 },
+      { at: 1800, index: 2 },
+      { at: 3300, index: 3 },
+      { at: 4800, index: 4 },
+      { at: 5600, index: 5 },
+      { at: 8200, index: 6 },
     ],
     resetKey
   );
@@ -39,12 +38,12 @@ export default function OneOfOneReveal({
     <>
       <RarityStamp active={phase === 3} rarity={rarity} />
       <RevealScene
-        className={`rre-scene--one-of-one${phase >= 5 ? " rre-scene--shake" : ""}`}
+        className={`rre-scene--one-of-one${phase === 3 ? " rre-scene--shake" : ""}`}
         backdrop={
           <>
-            <div className="rre-bg rre-bg--one-of-one" aria-hidden />
-            {phase >= 1 && phase < 6 ? <ConvergeParticles count={80} tone="mixed" /> : null}
-            {phase >= 5 ? <ConfettiRain count={48} durationClass="rre-confetti--long" /> : null}
+            {phase >= 1 && phase < 6 ? <div className="rre-bg rre-bg--one-of-one" aria-hidden /> : null}
+            {phase === 4 ? <ConvergeParticles count={60} tone="mixed" /> : null}
+            {phase >= 5 && phase < 6 ? <ConfettiRain count={48} durationClass="rre-confetti--long" /> : null}
           </>
         }
         actions={
@@ -57,26 +56,18 @@ export default function OneOfOneReveal({
           />
         }
       >
-        {phase >= 1 && phase < 3 ? (
-          <LetterReveal
-            text="O N E    O F    O N E"
-            className="rre-letter-title rre-letter-title--one-of-one"
-            delayMs={100}
-          />
-        ) : null}
-
-        {phase >= 3 ? (
+        {phase >= 2 ? (
           <div className="rre-card-stage rre-card-stage--visible">
             <RevealCardDisplay
               revealCard={revealCard}
               playerName={playerName}
-              materialize={phase >= 3 && phase < 4}
+              materialize={phase >= 2 && phase < 4}
               animateSignature={phase >= 5}
             />
           </div>
         ) : null}
 
-        {phase >= 4 ? <RevealPullMessage rarity={rarity} /> : null}
+        {phase >= 5 ? <RevealPullMessage rarity={rarity} /> : null}
       </RevealScene>
     </>
   );

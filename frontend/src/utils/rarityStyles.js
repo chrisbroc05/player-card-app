@@ -143,8 +143,8 @@ export function getRevealConfig(rarity) {
     case RARITY_KEYS.REFRACTOR:
       return {
         preBlackoutMs: 0,
-        revealMs: 5000,
-        landedMs: 4200,
+        revealMs: 6000,
+        landedMs: 5200,
         confettiMs: 0,
         sceneClass: "cce-scene--reveal-refractor",
         title: "Refractor Pull!",
@@ -155,8 +155,8 @@ export function getRevealConfig(rarity) {
     case RARITY_KEYS.GOLD_AUTO:
       return {
         preBlackoutMs: 0,
-        revealMs: 6500,
-        landedMs: 4200,
+        revealMs: 8000,
+        landedMs: 6800,
         confettiMs: 0,
         sceneClass: "cce-scene--reveal-gold-auto",
         title: "Gold Auto Pull!",
@@ -168,9 +168,9 @@ export function getRevealConfig(rarity) {
     case RARITY_KEYS.ONE_OF_ONE:
       return {
         preBlackoutMs: 0,
-        revealMs: 8000,
-        landedMs: 5200,
-        confettiMs: 5000,
+        revealMs: 9000,
+        landedMs: 7800,
+        confettiMs: 4000,
         sceneClass: "cce-scene--reveal-one-of-one",
         title: "1 OF 1 PULL",
         subtitle: "This card will never be created again",
@@ -181,8 +181,8 @@ export function getRevealConfig(rarity) {
     case RARITY_KEYS.BLACK_LABEL:
       return {
         preBlackoutMs: 0,
-        revealMs: 10000,
-        landedMs: 5800,
+        revealMs: 12000,
+        landedMs: 10000,
         confettiMs: 0,
         sceneClass: "cce-scene--reveal-black-label",
         title: "BLACK LABEL",
@@ -195,8 +195,8 @@ export function getRevealConfig(rarity) {
     case RARITY_KEYS.FOIL:
       return {
         preBlackoutMs: 0,
-        revealMs: 3000,
-        landedMs: 2800,
+        revealMs: 5000,
+        landedMs: 4200,
         confettiMs: 0,
         sceneClass: "cce-scene--reveal-foil",
         title: "Foil Pull!",
@@ -207,9 +207,9 @@ export function getRevealConfig(rarity) {
     default:
       return {
         preBlackoutMs: 0,
-        revealMs: 3000,
-        landedMs: 2800,
-        confettiMs: 2800,
+        revealMs: 4000,
+        landedMs: 3400,
+        confettiMs: 2000,
         sceneClass: "",
         title: "Your card is ready!",
         subtitle: "",
@@ -264,11 +264,19 @@ export function getRevealCelebrationMessage(rarity) {
 }
 
 export const REVEAL_PULL_MESSAGES = {
-  [RARITY_KEYS.FOIL]: "Foil Pull!",
-  [RARITY_KEYS.REFRACTOR]: "Refractor Pull!",
-  [RARITY_KEYS.GOLD_AUTO]: "Gold Auto Pull!",
-  [RARITY_KEYS.ONE_OF_ONE]: "1 of 1 Pull!",
-  [RARITY_KEYS.BLACK_LABEL]: "Black Label",
+  [RARITY_KEYS.FOIL]: { title: "Foil Pull!" },
+  [RARITY_KEYS.REFRACTOR]: { title: "Refractor Pull!", subtitle: "1 in 14 cards" },
+  [RARITY_KEYS.GOLD_AUTO]: { title: "Gold Auto Pull!" },
+  [RARITY_KEYS.ONE_OF_ONE]: {
+    title: "1 OF 1 Pull!",
+    subtitle: "Incredibly rare",
+    extra: "This card will never be created again",
+  },
+  [RARITY_KEYS.BLACK_LABEL]: {
+    title: "BLACK LABEL",
+    subtitle: "The rarest card in existence",
+    extra: "Pull rate: 0.1% — rarer than a hole in one",
+  },
 };
 
 export function getRevealPullMessage(rarity) {
