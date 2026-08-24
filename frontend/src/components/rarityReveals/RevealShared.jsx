@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import CardImage from "../CardImage";
-import { hasAutoSignature } from "../../utils/rarityStyles";
+import { getRevealPullMessage, hasAutoSignature } from "../../utils/rarityStyles";
 
 export function RevealCardDisplay({
   revealCard,
@@ -28,6 +28,26 @@ export function RevealCardDisplay({
   );
 }
 
+export function RevealPullMessage({ rarity, className = "" }) {
+  const title = getRevealPullMessage(rarity);
+  if (!title) return null;
+  return (
+    <div className={`rre-settled-copy ${className}`.trim()}>
+      <p className="rre-title">{title}</p>
+    </div>
+  );
+}
+
+export function RevealScene({ className = "", backdrop = null, children, actions = null }) {
+  return (
+    <div className={`rre-scene ${className}`.trim()} aria-live="polite">
+      {backdrop}
+      <div className="overlay-card-container">{children}</div>
+      {actions}
+    </div>
+  );
+}
+
 export function RevealActionButtons({
   show,
   primaryActionLabel,
@@ -37,7 +57,7 @@ export function RevealActionButtons({
 }) {
   if (!show) return null;
   return (
-    <div className="rre-actions cce-reveal-actions">
+    <div className="overlay-actions rre-actions cce-reveal-actions">
       <button type="button" className="cce-reveal-btn cce-reveal-btn--primary" onClick={onPrimaryAction}>
         {primaryActionLabel || "Add to Collection"}
       </button>

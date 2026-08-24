@@ -3,19 +3,20 @@
 .generation-overlay {
   position: fixed;
   inset: 0;
-  background: var(--color-bg-primary);
   z-index: 1100;
+  background: var(--color-bg-primary);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 16px;
+  padding-top: calc(16px + env(safe-area-inset-top, 0px));
   padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 .generation-overlay__close {
-  position: absolute;
+  position: fixed;
   top: calc(12px + env(safe-area-inset-top, 0px));
   left: 12px;
   z-index: 4;
@@ -41,14 +42,11 @@
 .generation-overlay__body {
   display: flex;
   width: 100%;
-  max-width: 520px;
   flex: 1;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 0;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  min-height: min(100%, 100%);
 }
 
 .generation-overlay__body--compare {
@@ -58,23 +56,98 @@
   padding-bottom: calc(var(--pill-nav-height, 100px) + 24px);
 }
 
+.overlay-card-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+}
+
+.overlay-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 320px;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.overlay-actions .cce-reveal-btn,
+.overlay-actions button {
+  width: 100%;
+}
+
 .generation-overlay .cce-scene {
   width: 100%;
-  min-height: min(70vh, 620px);
-  flex: 1;
+  max-width: 320px;
+  min-height: unset;
+  flex: 0 1 auto;
   border: none;
   border-radius: 0;
   background: transparent;
-  padding: 0.5rem 0 0;
+  padding: 0;
+  margin: 0 auto;
+  overflow: visible;
 }
 
 .generation-overlay .cce-scene--fullscreen {
-  min-height: min(75vh, 680px);
+  min-height: unset;
 }
 
 .generation-overlay .rre-scene {
-  min-height: min(70vh, 620px);
-  padding-top: 0.5rem;
+  min-height: unset;
+  width: 100%;
+  max-width: 320px;
+  padding: 0;
+  margin: 0 auto;
+  overflow: visible;
+  gap: 0.75rem;
+}
+
+.generation-overlay .overlay-card-container .rre-card-stage,
+.generation-overlay .overlay-card-container .rre-card-shell,
+.generation-overlay .overlay-card-container .rre-card-frame,
+.generation-overlay .overlay-card-container .cce-reveal-card-wrap,
+.generation-overlay .overlay-card-container .card-display-container {
+  width: min(280px, calc(100vw - 48px));
+  max-width: min(280px, calc(100vw - 48px));
+  max-height: min(60vh, calc(min(280px, calc(100vw - 48px)) * 3.5 / 2.5));
+  margin: 0 auto;
+}
+
+.generation-overlay .overlay-card-container .rre-card-shell img,
+.generation-overlay .overlay-card-container .card-image-wrap,
+.generation-overlay .overlay-card-container .card-image {
+  max-height: min(60vh, calc(min(280px, calc(100vw - 48px)) * 3.5 / 2.5));
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+@media (max-width: 639px) {
+  .generation-overlay .overlay-card-container .rre-card-stage,
+  .generation-overlay .overlay-card-container .rre-card-shell,
+  .generation-overlay .overlay-card-container .rre-card-frame,
+  .generation-overlay .overlay-card-container .cce-reveal-card-wrap,
+  .generation-overlay .overlay-card-container .card-display-container {
+    max-height: min(55vh, calc(min(280px, calc(100vw - 48px)) * 3.5 / 2.5));
+  }
+
+  .generation-overlay .overlay-card-container .rre-card-shell img,
+  .generation-overlay .overlay-card-container .card-image-wrap,
+  .generation-overlay .overlay-card-container .card-image {
+    max-height: min(55vh, calc(min(280px, calc(100vw - 48px)) * 3.5 / 2.5));
+  }
+}
+
+.generation-overlay .cce-reveal-actions,
+.generation-overlay .rre-actions,
+.generation-overlay .overlay-actions {
+  padding-bottom: 0;
 }
 
 .generation-overlay .preview-selection {
@@ -89,11 +162,12 @@
   position: fixed;
   left: 0;
   right: 0;
-  bottom: calc(env(safe-area-inset-bottom, 0px));
-  z-index: 1110;
-  padding-left: 24px;
-  padding-right: 24px;
+  bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+  z-index: 1125;
+  padding-left: 16px;
+  padding-right: 16px;
   padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  pointer-events: auto;
 }
 
 @media (min-width: 640px) {

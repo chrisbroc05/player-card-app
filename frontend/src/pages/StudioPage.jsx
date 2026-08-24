@@ -3122,8 +3122,8 @@ export default function StudioPage() {
                         compareViewOpen={previewCompareOpen}
                         onOpenCompare={() => setPreviewCompareOpen(true)}
                         onCloseCompare={() => setPreviewCompareOpen(false)}
-                        onSelectPreview={(preview) => {
-                          setSelectedPreviewId(preview.card_id || "");
+                        onSelectPreview={(preview, selectionId) => {
+                          setSelectedPreviewId(selectionId || preview.card_id || preview.image_url || "");
                           setSelectedPreviewUrl(preview.image_url || "");
                         }}
                         onAddToCollection={(preview) => {
@@ -3419,8 +3419,8 @@ export default function StudioPage() {
             setPreviewCompareOpen(false);
             setGenerationOverlayOpen(false);
           },
-          onSelectPreview: (preview) => {
-            setSelectedPreviewId(preview.card_id || "");
+          onSelectPreview: (preview, selectionId) => {
+            setSelectedPreviewId(selectionId || preview.card_id || preview.image_url || "");
             setSelectedPreviewUrl(preview.image_url || "");
           },
           onAddToCollection: (preview) => {
@@ -3481,12 +3481,13 @@ export default function StudioPage() {
             ref={regenerateModalRef}
             className="scroll-focus-target w-full max-w-md rounded-2xl border border-white/10 bg-cardBg p-5 shadow-2xl shadow-black/50 sm:p-6"
           >
-            <h3 className="text-lg font-semibold text-white">Generate another preview?</h3>
+            <h3 className="text-lg font-semibold text-white">Generate Another Preview?</h3>
             <p className="mt-2 text-sm text-slate-300">
-              Generate another preview for {formatMoney(additionalPreviewCost)}?
+              This will deduct {formatMoney(additionalPreviewCost)} from your credit balance.
             </p>
-            <p className="mt-2 text-sm text-slate-400">
-              Your balance: <span className="font-semibold text-brand-gold">{formatMoney(creditBalance)}</span>
+            <p className="mt-3 text-xs leading-relaxed text-slate-500">
+              Additional previews are non-refundable — you keep access to all your previews to compare
+              and choose from.
             </p>
             {generationCap.blocked ? (
               <GenerationCapNotice
@@ -3495,11 +3496,11 @@ export default function StudioPage() {
                 className="mt-4"
               />
             ) : (
-              <div className="mt-5 flex justify-end gap-2">
+              <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={() => setShowRegenerateConfirm(false)}
-                  className="min-h-[42px] rounded-lg border border-white/15 px-4 py-2 text-sm text-slate-200"
+                  className="min-h-[44px] rounded-lg border border-white/15 px-4 py-2 text-sm text-slate-200"
                 >
                   Cancel
                 </button>
@@ -3507,9 +3508,9 @@ export default function StudioPage() {
                   type="button"
                   onClick={handleGeneratePreviewForCurrentOrder}
                   disabled={!canAffordRegenerate}
-                  className="min-h-[42px] rounded-lg btn-primary px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50"
+                  className="min-h-[44px] rounded-lg btn-primary px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50"
                 >
-                  {`Generate — ${formatMoney(additionalPreviewCost)}`}
+                  {`Generate Preview — ${formatMoney(additionalPreviewCost)}`}
                 </button>
               </div>
             )}

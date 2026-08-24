@@ -26,6 +26,36 @@ import "../styles/cardCreationExperience.css";
 const TEXT_FADE_MS = 500;
 const PHASE_CROSSFADE_MS = 500;
 
+const LOADING_FUN_FACTS = [
+  "Every card has a chance to pull a rare Foil or Refractor",
+  "Gold Autos are pulled by only 1 in 50 players",
+  "A 1 of 1 has never been pulled twice for the same player and tier",
+  "Your card rarity is determined the moment generation begins",
+  "Black Label cards have a 0.1% pull rate — rarer than a hole in one",
+];
+
+function LoadingFunFacts() {
+  const [index, setIndex] = useState(0);
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setVisible(false);
+      window.setTimeout(() => {
+        setIndex((prev) => (prev + 1) % LOADING_FUN_FACTS.length);
+        setVisible(true);
+      }, 280);
+    }, 3000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  return (
+    <p className={`cce-fun-fact${visible ? " cce-fun-fact--visible" : ""}`} aria-live="polite">
+      {LOADING_FUN_FACTS[index]}
+    </p>
+  );
+}
+
 function ExperienceText({ text, visible }) {
   return (
     <p
@@ -110,10 +140,13 @@ function ForgeExperience({
   rarity,
   elapsedMs,
   generationComplete,
+  templateName = "",
 }) {
   const theme = themeDisplayName(themeLabel);
   const phaseTexts = FORGE_PHASE_TEXT(theme, tierConfig.label);
   const rareLoadingHint = forgeLoadingMessage(rarity, elapsedMs, generationComplete);
+  const variantLabel = templateName || theme;
+  const tierThemeLine = variantLabel ? `${tierConfig.label} • ${variantLabel}` : tierConfig.label;
 
   const getTextForPhase = (phase) => {
     if (rareLoadingHint) return rareLoadingHint;
@@ -194,6 +227,10 @@ function ForgeExperience({
         </div>
       </div>
       <ExperienceText text={displayText} visible={textVisible} />
+      <div className="cce-loading-meta">
+        <p className="cce-loading-tier-theme">{tierThemeLine}</p>
+        <LoadingFunFacts />
+      </div>
     </>
   );
 }
@@ -811,6 +848,7 @@ export default function CardCreationExperience({
               rarity={cardRarity}
               elapsedMs={elapsedMs}
               generationComplete={revealReady}
+              templateName={card?.template_name || ""}
             />
           ) : null}
           {cardType === "highlight" ? (

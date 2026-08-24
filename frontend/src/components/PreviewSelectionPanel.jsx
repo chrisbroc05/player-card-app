@@ -17,8 +17,8 @@ function previewLabel(index, additionalPreviewCost) {
   return `Preview ${index + 1} (${formatMoney(additionalPreviewCost)})`;
 }
 
-function shortPreviewLabel(index) {
-  return `Preview ${index + 1}`;
+function previewSelectionId(preview, index) {
+  return preview?.card_id || preview?.image_url || previewKey(preview, index);
 }
 
 export default function PreviewSelectionPanel({
@@ -64,10 +64,12 @@ export default function PreviewSelectionPanel({
     }
   }, [hasMultiple, compareViewOpen, onCloseCompare]);
 
-  const selectedPreview = useMemo(
-    () => previews.find((p) => p.card_id === selectedPreviewId) || null,
-    [previews, selectedPreviewId]
-  );
+  const selectedPreview = useMemo(() => {
+    if (!selectedPreviewId) return null;
+    return (
+      previews.find((p, i) => previewSelectionId(p, i) === selectedPreviewId) || null
+    );
+  }, [previews, selectedPreviewId]);
 
   const selectedIndex = useMemo(() => {
     if (!selectedPreview) return -1;
@@ -145,8 +147,8 @@ export default function PreviewSelectionPanel({
     setConfirmIndex(-1);
   }
 
-  function selectPreview(preview) {
-    onSelectPreview?.(preview);
+  function selectPreview(preview, index) {
+    onSelectPreview?.(preview, previewSelectionId(preview, index));
   }
 
   function renderSecondaryActions() {
@@ -175,10 +177,10 @@ export default function PreviewSelectionPanel({
     );
   }
 
-  const addSelectedLabel =
-    selectedIndex >= 0
-      ? `Add ${shortPreviewLabel(selectedIndex)} to Collection`
-      : "Add Selected Card to Collection";
+  const isSelected = Boolean(selectedPreviewId && selectedPreview);
+  const addSelectedLabel = isSelected
+    ? `Add Preview ${selectedIndex + 1} to Collection`
+    : "Select a card above";
 
   if (!previews.length) return null;
 
@@ -248,22 +250,22 @@ export default function PreviewSelectionPanel({
 
         <div className="preview-comparison preview-comparison--selectable">
           {previews.map((preview, index) => {
-            const id = preview.card_id || previewKey(preview, index);
-            const isSelected = selectedPreviewId === id;
+            const id = previewSelectionId(preview, index);
+            const isCardSelected = selectedPreviewId === id;
             return (
               <div
                 key={previewKey(preview, index)}
-                className={`preview-card-option${isSelected ? " selected" : ""}`}
+                className={`preview-card-option${isCardSelected ? " selected" : ""}`}
                 role="button"
                 tabIndex={0}
-                onClick={() => selectPreview(preview)}
+                onClick={() => selectPreview(preview, index)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
-                    selectPreview(preview);
+                    selectPreview(preview, index);
                   }
                 }}
-                aria-pressed={isSelected}
+                aria-pressed={isCardSelected}
               >
                 <div className="preview-number">{previewLabel(index, additionalPreviewCost)}</div>
                 <div className="preview-card-option__media">
@@ -283,9 +285,9 @@ export default function PreviewSelectionPanel({
       <div className="comparison-action-bar">
         <button
           type="button"
-          onClick={() => selectedPreview && openAddConfirm(selectedPreview)}
-          disabled={!selectedPreview || addCollectionLoading || orderActionBusy}
-          className={`add-selected-button${selectedPreview ? " enabled" : ""}`}
+          onClick={() => isSelected && selectedPreview && openAddConfirm(selectedPreview)}
+          disabled={!isSelected || addCollectionLoading || orderActionBusy}
+          className={`add-selected-button add-selected-btn${isSelected ? " enabled" : " disabled"}`}
         >
           {addSelectedLabel}
         </button>

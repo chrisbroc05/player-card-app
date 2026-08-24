@@ -6,7 +6,7 @@ import {
   tierPillLabel,
 } from "./cardBannerStyles";
 import { normalizeTierKey, resolveCardDisplayMeta } from "./cardTemplate";
-import { hasAutoSignature, normalizeRarityKey } from "./rarityStyles";
+import { hasAutoSignature, normalizeRarityKey, getSignatureLabel, getSignatureLabelColor } from "./rarityStyles";
 
 const ALLOWED_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "gif", "mp4", "webm", "mov"]);
 
@@ -231,9 +231,11 @@ function drawRarityBadgeOnCanvas(ctx, rarity) {
   ctx.textAlign = "center";
 }
 
-async function drawAutoSignatureOnCanvas(ctx, playerName) {
+async function drawAutoSignatureOnCanvas(ctx, playerName, rarity) {
   const signatureFontFamily = await ensureSignatureFontFamily();
   const isDancingScript = signatureFontFamily.includes("Dancing Script");
+  const label = getSignatureLabel(rarity) || "CERTIFIED AUTO";
+  const labelColor = getSignatureLabelColor(rarity);
 
   const sigGradient = ctx.createLinearGradient(0, IMAGE_HEIGHT - 80, 0, IMAGE_HEIGHT);
   sigGradient.addColorStop(0, "transparent");
@@ -253,11 +255,11 @@ async function drawAutoSignatureOnCanvas(ctx, playerName) {
   ctx.fillText(name, CARD_WIDTH - 20, IMAGE_HEIGHT - 24);
 
   ctx.font = '700 11px "Barlow Condensed", sans-serif';
-  ctx.fillStyle = "rgba(201,168,76,0.9)";
+  ctx.fillStyle = labelColor;
   if ("letterSpacing" in ctx) {
     ctx.letterSpacing = "2px";
   }
-  ctx.fillText("CERTIFIED AUTO", CARD_WIDTH - 20, IMAGE_HEIGHT - 8);
+  ctx.fillText(label, CARD_WIDTH - 20, IMAGE_HEIGHT - 8);
   if ("letterSpacing" in ctx) {
     ctx.letterSpacing = "0px";
   }
@@ -388,7 +390,7 @@ async function drawCardToCanvas(card, cardImage) {
   drawRarityBadgeOnCanvas(ctx, rarity);
 
   if (hasAutoSignature(rarity)) {
-    await drawAutoSignatureOnCanvas(ctx, meta.playerName);
+    await drawAutoSignatureOnCanvas(ctx, meta.playerName, rarity);
   }
 
   ctx.restore();

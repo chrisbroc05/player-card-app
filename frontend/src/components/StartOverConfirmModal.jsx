@@ -66,7 +66,7 @@ export default function StartOverConfirmModal({ open, onClose, onConfirm, busy =
             onClick={onClose}
             className="inline-flex min-h-[44px] items-center justify-center rounded-xl btn-primary px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
           >
-            Keep This Card
+            Stay on this Page
           </button>
         </div>
       </div>

@@ -67,6 +67,32 @@ export function hasAutoSignature(rarity) {
   );
 }
 
+export function getSignatureLabel(rarity) {
+  const key = normalizeRarityKey(rarity);
+  switch (key) {
+    case RARITY_KEYS.GOLD_AUTO:
+      return "CERTIFIED AUTO";
+    case RARITY_KEYS.ONE_OF_ONE:
+      return "1 OF 1";
+    case RARITY_KEYS.BLACK_LABEL:
+      return "BLACK LABEL";
+    default:
+      return null;
+  }
+}
+
+export function getSignatureLabelColor(rarity) {
+  const key = normalizeRarityKey(rarity);
+  switch (key) {
+    case RARITY_KEYS.ONE_OF_ONE:
+      return "#FF4444";
+    case RARITY_KEYS.BLACK_LABEL:
+      return "#FFD700";
+    default:
+      return "#c9a84c";
+  }
+}
+
 export function shouldShowThemeIcon(rarity) {
   return !hasAutoSignature(rarity);
 }
@@ -235,6 +261,19 @@ export function getRevealCelebrationMessage(rarity) {
     default:
       return "";
   }
+}
+
+export const REVEAL_PULL_MESSAGES = {
+  [RARITY_KEYS.FOIL]: "Foil Pull!",
+  [RARITY_KEYS.REFRACTOR]: "Refractor Pull!",
+  [RARITY_KEYS.GOLD_AUTO]: "Gold Auto Pull!",
+  [RARITY_KEYS.ONE_OF_ONE]: "1 of 1 Pull!",
+  [RARITY_KEYS.BLACK_LABEL]: "Black Label",
+};
+
+export function getRevealPullMessage(rarity) {
+  const key = normalizeRarityKey(rarity);
+  return REVEAL_PULL_MESSAGES[key] || null;
 }
 
 export function formatRarityBreakdownLine(rarityCounts) {

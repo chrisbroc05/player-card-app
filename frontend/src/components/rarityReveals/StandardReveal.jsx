@@ -1,5 +1,11 @@
 import React from "react";
-import { ConfettiRain, RevealActionButtons, RevealCardDisplay, useRevealPhases } from "./RevealShared";
+import {
+  ConfettiRain,
+  RevealActionButtons,
+  RevealCardDisplay,
+  RevealScene,
+  useRevealPhases,
+} from "./RevealShared";
 
 export default function StandardReveal({
   revealCard,
@@ -21,21 +27,23 @@ export default function StandardReveal({
   );
 
   return (
-    <div className="rre-scene rre-scene--standard" aria-live="polite">
-      {phase >= 1 ? <ConfettiRain count={28} /> : null}
+    <RevealScene
+      className="rre-scene--standard"
+      backdrop={phase >= 1 ? <ConfettiRain count={28} /> : null}
+      actions={
+        <RevealActionButtons
+          show={showActions && phase >= 2}
+          primaryActionLabel={primaryActionLabel}
+          onPrimaryAction={onPrimaryAction}
+          onGenerateAnother={onGenerateAnother}
+          onStartOver={onStartOver}
+        />
+      }
+    >
       <div className={`rre-card-stage rre-card-stage--bounce${phase >= 1 ? " rre-card-stage--visible" : ""}`}>
         <RevealCardDisplay revealCard={revealCard} playerName={playerName} />
       </div>
-      {phase >= 1 ? (
-        <p className="rre-message rre-message--standard">Your card is ready!</p>
-      ) : null}
-      <RevealActionButtons
-        show={showActions && phase >= 2}
-        primaryActionLabel={primaryActionLabel}
-        onPrimaryAction={onPrimaryAction}
-        onGenerateAnother={onGenerateAnother}
-        onStartOver={onStartOver}
-      />
-    </div>
+      {phase >= 1 ? <p className="rre-message rre-message--standard">Your card is ready!</p> : null}
+    </RevealScene>
   );
 }

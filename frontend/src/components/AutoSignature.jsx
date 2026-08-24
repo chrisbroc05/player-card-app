@@ -1,5 +1,5 @@
 import React from "react";
-import { hasAutoSignature } from "../utils/rarityStyles";
+import { getSignatureLabel, getSignatureLabelColor, hasAutoSignature } from "../utils/rarityStyles";
 
 export default function AutoSignature({
   playerName,
@@ -7,14 +7,20 @@ export default function AutoSignature({
   animate = false,
   className = "",
 }) {
-  if (!hasAutoSignature(rarity) || !playerName) return null;
+  const label = getSignatureLabel(rarity);
+  if (!hasAutoSignature(rarity) || !playerName || !label) return null;
 
   return (
     <div className={`auto-signature pointer-events-none ${className}`.trim()} aria-hidden>
       <span className={`signature-text ${animate ? "signature-text--animate" : ""}`}>
         {playerName}
       </span>
-      <span className="certified-auto-text">CERTIFIED AUTO</span>
+      <span
+        className="certified-auto-text"
+        style={{ color: getSignatureLabelColor(rarity) }}
+      >
+        {label}
+      </span>
     </div>
   );
 }
