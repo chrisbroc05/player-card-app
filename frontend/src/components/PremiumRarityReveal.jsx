@@ -31,7 +31,7 @@ function variantMeta(rarityKey) {
         variant: "one-of-one",
         stamp: "1 OF 1",
         teaser: "Something incredible is happening...",
-        title: "🔥 YOU PULLED A 1 OF 1!",
+        title: "YOU PULLED A 1 OF 1!",
         subtitle: "This card will never be created again",
       };
     case RARITY_KEYS.BLACK_LABEL:
@@ -39,7 +39,7 @@ function variantMeta(rarityKey) {
         variant: "black-label",
         stamp: "BLACK LABEL",
         teaser: "A legend is being forged...",
-        title: "⚫ BLACK LABEL — THE RAREST PULL",
+        title: "BLACK LABEL — THE RAREST PULL",
         subtitle: "A legend has been born",
       };
     case RARITY_KEYS.GOLD_AUTO:
@@ -48,7 +48,7 @@ function variantMeta(rarityKey) {
         variant: "gold-auto",
         stamp: "AUTO",
         teaser: "Something rare is happening...",
-        title: "🎉 Gold Auto Pull!",
+        title: "Gold Auto Pull!",
         subtitle: "This is your rarest card yet",
       };
   }

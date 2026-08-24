@@ -116,12 +116,12 @@ export function getRevealConfig(rarity) {
   switch (key) {
     case RARITY_KEYS.REFRACTOR:
       return {
-        preBlackoutMs: 900,
-        revealMs: 4200,
-        landedMs: 3400,
-        confettiMs: 2800,
+        preBlackoutMs: 0,
+        revealMs: 5000,
+        landedMs: 4200,
+        confettiMs: 0,
         sceneClass: "cce-scene--reveal-refractor",
-        title: "You pulled a Refractor!",
+        title: "Refractor Pull!",
         subtitle: "",
         variant: "shimmer",
         particleTheme: "refractor",
@@ -131,60 +131,57 @@ export function getRevealConfig(rarity) {
         preBlackoutMs: 0,
         revealMs: 6500,
         landedMs: 4200,
-        confettiMs: 3500,
+        confettiMs: 0,
         sceneClass: "cce-scene--reveal-gold-auto",
-        title: "🎉 Gold Auto Pull!",
+        title: "Gold Auto Pull!",
         subtitle: "This is your rarest card yet",
         variant: "flip",
         particleTheme: "gold",
         animateSignature: true,
-        premiumReveal: "gold-auto",
       };
     case RARITY_KEYS.ONE_OF_ONE:
       return {
         preBlackoutMs: 0,
-        revealMs: 7000,
+        revealMs: 8000,
         landedMs: 5200,
         confettiMs: 5000,
         sceneClass: "cce-scene--reveal-one-of-one",
-        title: "🔥 YOU PULLED A 1 OF 1!",
+        title: "1 OF 1 PULL",
         subtitle: "This card will never be created again",
         variant: "slam",
         particleTheme: "legendary",
         screenShake: true,
-        premiumReveal: "one-of-one",
       };
     case RARITY_KEYS.BLACK_LABEL:
       return {
         preBlackoutMs: 0,
-        revealMs: 7500,
+        revealMs: 10000,
         landedMs: 5800,
-        confettiMs: 5000,
+        confettiMs: 0,
         sceneClass: "cce-scene--reveal-black-label",
-        title: "⚫ BLACK LABEL — THE RAREST PULL",
-        subtitle: "A legend has been born",
+        title: "BLACK LABEL",
+        subtitle: "The rarest card in existence",
         variant: "materialize",
         particleTheme: "black-label",
         permanentGlow: true,
         animateSignature: true,
-        premiumReveal: "black-label",
       };
     case RARITY_KEYS.FOIL:
       return {
         preBlackoutMs: 0,
-        revealMs: 3200,
+        revealMs: 3000,
         landedMs: 2800,
-        confettiMs: 2800,
+        confettiMs: 0,
         sceneClass: "cce-scene--reveal-foil",
-        title: "Your card is ready!",
+        title: "Foil Pull!",
         subtitle: "",
         variant: "bounce",
-        particleTheme: "standard",
+        particleTheme: "foil",
       };
     default:
       return {
         preBlackoutMs: 0,
-        revealMs: 3200,
+        revealMs: 3000,
         landedMs: 2800,
         confettiMs: 2800,
         sceneClass: "",
@@ -230,11 +227,11 @@ export function getRevealCelebrationMessage(rarity) {
   const key = normalizeRarityKey(rarity);
   switch (key) {
     case RARITY_KEYS.GOLD_AUTO:
-      return "🎉 Congratulations on your Gold Auto pull!";
+      return "Congratulations on your Gold Auto Pull!";
     case RARITY_KEYS.ONE_OF_ONE:
-      return "🔥 This card can never be created again.";
+      return "This card will never be created again";
     case RARITY_KEYS.BLACK_LABEL:
-      return "⚫ You pulled the rarest card in existence.";
+      return "You pulled the rarest card in existence.";
     default:
       return "";
   }

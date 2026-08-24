@@ -10,12 +10,12 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
 PULL_RATES = [
-    ("black_label", 0.0),
-    ("one_of_one", 0.0),
-    ("gold_auto", 0.99),
-    ("refractor", 0.0),
-    ("foil", 0.0),
-    ("standard", 0.01),
+    ("black_label", 0.001),
+    ("one_of_one", 0.005),
+    ("gold_auto", 0.02),
+    ("refractor", 0.07),
+    ("foil", 0.20),
+    ("standard", 0.704),
 ]
 
 RARITY_DISPLAY_NAMES = {

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AnimatedCardReveal from "./AnimatedCardReveal";
-import PremiumRarityReveal from "./PremiumRarityReveal";
+import RarityRevealExperience from "./RarityRevealExperience";
 import CardImage from "./CardImage";
 import { toApiUrl } from "../config/api";
 import {
@@ -20,7 +20,7 @@ import {
   normalizeExperienceTier,
   themeDisplayName,
 } from "../utils/cardCreationExperience";
-import { forgeLoadingMessage, getRevealConfig, getRevealCelebrationMessage, isPremiumRarityReveal } from "../utils/rarityStyles";
+import { forgeLoadingMessage, getRevealConfig, getRevealCelebrationMessage } from "../utils/rarityStyles";
 import "../styles/cardCreationExperience.css";
 
 const TEXT_FADE_MS = 500;
@@ -454,15 +454,14 @@ function RevealSection({
   const isBlackout = revealMode === "pre_reveal";
   const celebrationMessage = getRevealCelebrationMessage(rarity);
   const showActions = mediaReady && revealMode === "landed" && (showPrimaryAction || onPrimaryAction);
-  const usePremiumReveal = isPremiumRarityReveal(rarity);
 
-  if (usePremiumReveal && revealMode !== "creating") {
+  if (cardType === "standard" && revealMode !== "creating") {
     return (
-      <PremiumRarityReveal
+      <RarityRevealExperience
         rarity={rarity}
         revealCard={revealCard}
         playerName={playerName}
-        showActions={Boolean(showPrimaryAction || onPrimaryAction)}
+        showActions={showActions}
         primaryActionLabel={primaryActionLabel}
         onPrimaryAction={onPrimaryAction}
         onGenerateAnother={onGenerateAnother}
@@ -656,6 +655,7 @@ export default function CardCreationExperience({
   secondaryAction = null,
   onGenerateAnother,
   onStartOver,
+  onRevealLanded,
   revealTitle = "",
   fullscreen = false,
   hint = "This usually takes 30–60 seconds. Please keep this page open.",
@@ -773,6 +773,12 @@ export default function CardCreationExperience({
     return () => window.clearTimeout(timer);
   }, [active, mode, onRevealComplete, showPrimaryAction, onPrimaryAction, postRevealDisplayMs]);
 
+  useEffect(() => {
+    if (active && mode === "landed") {
+      onRevealLanded?.();
+    }
+  }, [active, mode, onRevealLanded]);
+
   if (!active) return null;
 
   const isReveal = mode === "pre_reveal" || mode === "reveal" || mode === "landed";
@@ -780,9 +786,7 @@ export default function CardCreationExperience({
   const revealVariant = cardType === "highlight" ? "rise" : "bounce";
   const showAnimatedActions =
     showPrimaryAction && (cardType === "animated" ? mode === "reveal" || mode === "landed" : mode === "landed");
-  const revealShowPrimaryAction = isPremiumRarityReveal(cardRarity)
-    ? showPrimaryAction
-    : showPrimaryAction && mode === "landed";
+  const revealShowPrimaryAction = showPrimaryAction;
 
   return (
     <div

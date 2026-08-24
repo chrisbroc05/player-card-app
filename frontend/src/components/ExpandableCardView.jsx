@@ -26,6 +26,7 @@ export default function ExpandableCardView({
   card,
   alt = "Card",
   showHint = false,
+  disableExpand = false,
   localHighlightVideoUrl = "",
   highlightTrimStart,
   highlightTrimEnd,
@@ -39,15 +40,21 @@ export default function ExpandableCardView({
   const [open, setOpen] = useState(false);
 
   function openModal(e) {
+    if (disableExpand) return;
     if (e.target.closest("button, a, input, textarea, select, label")) return;
     setOpen(true);
   }
 
   function onKeyDown(e) {
+    if (disableExpand) return;
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       setOpen(true);
     }
+  }
+
+  if (disableExpand) {
+    return <div className={className}>{children}</div>;
   }
 
   return (

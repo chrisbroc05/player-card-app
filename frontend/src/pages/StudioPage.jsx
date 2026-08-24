@@ -27,7 +27,7 @@ import PendingCardResumePrompt from "../components/PendingCardResumePrompt";
 import AnimateCardConfirmModal from "../components/AnimateCardConfirmModal";
 import AnimatedCardChoiceModal from "../components/AnimatedCardChoiceModal";
 import AnimatedQuantityModal from "../components/AnimatedQuantityModal";
-import CardCreationExperience from "../components/CardCreationExperience";
+import GenerationOverlay from "../components/GenerationOverlay";
 import PreviewSelectionPanel from "../components/PreviewSelectionPanel";
 import StartOverConfirmModal, { StartOverButton } from "../components/StartOverConfirmModal";
 import AnimatedFlowExplainer from "../components/AnimatedFlowExplainer";
@@ -368,6 +368,7 @@ export default function StudioPage() {
   const [showStartOverConfirm, setShowStartOverConfirm] = useState(false);
   const [startOverBusy, setStartOverBusy] = useState(false);
   const [packOpeningActive, setPackOpeningActive] = useState(false);
+  const [generationOverlayOpen, setGenerationOverlayOpen] = useState(false);
   const [previewConfigureOpen, setPreviewConfigureOpen] = useState(false);
   const [previewCompareOpen, setPreviewCompareOpen] = useState(false);
   const [animatedFlowStage, setAnimatedFlowStage] = useState(ANIMATED_FLOW_STAGE.IDLE);
@@ -1298,6 +1299,7 @@ export default function StudioPage() {
     setSelectedPreviewUrl(preview.image_url);
     setGeneratedCardUrl(preview.image_url);
     setPackOpeningActive(false);
+    setGenerationOverlayOpen(false);
     setAnimatedFlowStage(ANIMATED_FLOW_STAGE.CHOICE);
     console.log("[AnimatedFlow] choice modal state applied");
   }, [
@@ -1367,6 +1369,7 @@ export default function StudioPage() {
         setGeneratedCardUrl(card.image_url);
         if (animatedFlowStageRef.current === ANIMATED_FLOW_STAGE.GENERATING_STATIC) {
           setPackOpeningActive(false);
+          setGenerationOverlayOpen(false);
           setAnimatedFlowStage(ANIMATED_FLOW_STAGE.CHOICE);
           console.log("[AnimatedFlow] choice modal state update queued from poll completion");
         }
@@ -1568,6 +1571,7 @@ export default function StudioPage() {
     setPreviewConfigureOpen(false);
     setPreviewCompareOpen(false);
     setPackOpeningActive(false);
+    setGenerationOverlayOpen(false);
     setIsGenerating(false);
     setOrderActionKey("");
     setLatestGeneratedPreview(null);
@@ -1858,6 +1862,8 @@ export default function StudioPage() {
       setAnimatedFlowStage(ANIMATED_FLOW_STAGE.IDLE);
     }
     setPackOpeningActive(true);
+    setGenerationOverlayOpen(true);
+    setPreviewCompareOpen(false);
     setIsGenerating(true);
     setOrderActionKey(`generate-${orderId}`);
     setMessage("");
@@ -1877,6 +1883,7 @@ export default function StudioPage() {
         const usage = generationUsageFromPayload(data);
         if (usage) setGenerationUsage(usage);
         setPackOpeningActive(false);
+        setGenerationOverlayOpen(false);
         setAnimatedFlowStage(ANIMATED_FLOW_STAGE.IDLE);
         return;
       }
@@ -1914,6 +1921,7 @@ export default function StudioPage() {
       }
     } catch (err) {
       setPackOpeningActive(false);
+      setGenerationOverlayOpen(false);
       setAnimatedFlowStage(ANIMATED_FLOW_STAGE.IDLE);
       setError(err.message || "Failed to generate order card.");
     } finally {
@@ -1925,6 +1933,7 @@ export default function StudioPage() {
   function handlePackOpeningComplete() {
     setPackOpeningActive(false);
     if (!isAnimatedCardType) return;
+    setGenerationOverlayOpen(false);
     if (animatedFlowStageRef.current !== ANIMATED_FLOW_STAGE.GENERATING_STATIC) return;
     console.log("[AnimatedFlow] pack opening completed, checking for immediate choice modal");
     tryOpenAnimatedChoiceModal();
@@ -3017,56 +3026,6 @@ export default function StudioPage() {
                 {generationCap.blocked ? (
                   <GenerationCapNotice usage={generationUsage} period={generationCap.period} />
                 ) : null}
-                {packOpeningActive ? (
-                  <CardCreationExperience
-                    active={packOpeningActive}
-                    cardType={
-                      isHighlightCardType ? "highlight" : isAnimatedCardType ? "animated" : "standard"
-                    }
-                    tier={orderTier}
-                    theme={specialTheme ? selectedThemeLabel : "Default (no theme)"}
-                    playerName={playerDisplayName}
-                    teamName={teamName}
-                    generationComplete={!isGenerating && Boolean(generatedCardUrl || selectedPreviewUrl)}
-                    cardImageUrl={generatedCardUrl || selectedPreviewUrl}
-                    card={featuredDisplayCard}
-                    highlightCardId={highlightRevealCardId}
-                    token={token || ""}
-                    onHighlightVideoReady={handleHighlightVideoReady}
-                    onRevealComplete={handlePackOpeningComplete}
-                    showPrimaryAction
-                    primaryActionLabel={
-                      Math.max(displayPreviews.length, activePreviewCount) <= 1
-                        ? "Add to Collection"
-                        : "Compare & Choose Preview"
-                    }
-                    onPrimaryAction={() => {
-                      setPackOpeningActive(false);
-                      const previewTotal = Math.max(displayPreviews.length, activePreviewCount);
-                      if (previewTotal <= 1) {
-                        setPreviewConfigureOpen(true);
-                      } else {
-                        setPreviewCompareOpen(true);
-                        setSelectedPreviewId("");
-                        setSelectedPreviewUrl("");
-                      }
-                    }}
-                    onGenerateAnother={() => {
-                      setPackOpeningActive(false);
-                      if (!canAffordRegenerate) {
-                        setError(
-                          `You need ${formatMoney(additionalPreviewCost)} to generate another preview.`
-                        );
-                        return;
-                      }
-                      setShowRegenerateConfirm(true);
-                    }}
-                    onStartOver={() => {
-                      setPackOpeningActive(false);
-                      setShowStartOverConfirm(true);
-                    }}
-                  />
-                ) : null}
                 {isHighlightCardType && highlightUploadState !== "idle" ? (
                   <div className="rounded-xl border bg-gold-subtle px-4 py-3">
                     {highlightUploadState === "uploading" ? (
@@ -3104,7 +3063,7 @@ export default function StudioPage() {
                     ) : null}
                   </div>
                 ) : null}
-                {!packOpeningActive && (
+                {!generationOverlayOpen && (
                   <>
                 {!isGenerating ? (
                   <>
@@ -3399,10 +3358,115 @@ export default function StudioPage() {
 
         <FeaturedCard
           card={featuredDisplayCard}
-          loading={isGenerating && !packOpeningActive}
+          loading={isGenerating && !generationOverlayOpen}
         />
         {user && !inCreationFlow ? <CardGallery cards={cards} /> : null}
       </main>
+
+      <GenerationOverlay
+        open={generationOverlayOpen && reviewSubPhase === "generate"}
+        view={previewCompareOpen ? "compare" : "experience"}
+        showCloseButton
+        onCloseRequest={() => setShowStartOverConfirm(true)}
+        cardCreationProps={{
+          active: packOpeningActive,
+          cardType: isHighlightCardType ? "highlight" : isAnimatedCardType ? "animated" : "standard",
+          tier: orderTier,
+          theme: specialTheme ? selectedThemeLabel : "Default (no theme)",
+          playerName: playerDisplayName,
+          teamName: teamName,
+          generationComplete: !isGenerating && Boolean(generatedCardUrl || selectedPreviewUrl),
+          cardImageUrl: generatedCardUrl || selectedPreviewUrl,
+          card: featuredDisplayCard,
+          highlightCardId: highlightRevealCardId,
+          token: token || "",
+          onHighlightVideoReady: handleHighlightVideoReady,
+          onRevealComplete: handlePackOpeningComplete,
+          showPrimaryAction: true,
+          primaryActionLabel:
+            Math.max(displayPreviews.length, activePreviewCount) <= 1
+              ? "Add to Collection"
+              : "Compare & Choose Card",
+          onPrimaryAction: () => {
+            const previewTotal = Math.max(displayPreviews.length, activePreviewCount);
+            if (previewTotal <= 1) {
+              setGenerationOverlayOpen(false);
+              setPackOpeningActive(false);
+              setPreviewConfigureOpen(true);
+            } else {
+              setPackOpeningActive(false);
+              setPreviewCompareOpen(true);
+              setSelectedPreviewId("");
+              setSelectedPreviewUrl("");
+            }
+          },
+          onGenerateAnother: () => {
+            if (!canAffordRegenerate) {
+              setError(
+                `You need ${formatMoney(additionalPreviewCost)} to generate another preview.`
+              );
+              return;
+            }
+            setShowRegenerateConfirm(true);
+          },
+          onStartOver: () => setShowStartOverConfirm(true),
+        }}
+        compareProps={{
+          previews: displayPreviews,
+          selectedPreviewId,
+          compareViewOpen: true,
+          onCloseCompare: () => {
+            setPreviewCompareOpen(false);
+            setGenerationOverlayOpen(false);
+          },
+          onSelectPreview: (preview) => {
+            setSelectedPreviewId(preview.card_id || "");
+            setSelectedPreviewUrl(preview.image_url || "");
+          },
+          onAddToCollection: (preview) => {
+            setSelectedPreviewId(preview.card_id || "");
+            setSelectedPreviewUrl(preview.image_url || "");
+            if (isAnimatedCardType) {
+              setGenerationOverlayOpen(false);
+              setPreviewCompareOpen(false);
+              setAnimatedFlowStage(ANIMATED_FLOW_STAGE.CHOICE);
+            } else {
+              setGenerationOverlayOpen(false);
+              setPreviewCompareOpen(false);
+              setPreviewConfigureOpen(true);
+            }
+          },
+          onGenerateAnother: () => {
+            if (!canAffordRegenerate) {
+              setError(
+                `You need ${formatMoney(additionalPreviewCost)} to generate another preview.`
+              );
+              return;
+            }
+            setShowRegenerateConfirm(true);
+          },
+          onStartOver: () => setShowStartOverConfirm(true),
+          additionalPreviewCost,
+          isPreviewLimitReached,
+          canAffordRegenerate,
+          generationCap,
+          generationUsage,
+          addCollectionLoading,
+          orderActionBusy: Boolean(orderActionKey),
+          isHighlightCardType,
+          highlightClipDraft,
+          highlightPreviewExpandCard,
+          playerDisplayName,
+          teamName,
+          position,
+          jerseyNumber,
+          gradYear,
+          orderTier,
+          specialTheme,
+          previewToDisplayCard,
+          isAnimatedCardType,
+        }}
+      />
 
       <StartOverConfirmModal
         open={showStartOverConfirm}
@@ -3412,7 +3476,7 @@ export default function StudioPage() {
       />
 
       {showRegenerateConfirm ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-3 py-4 sm:px-4">
+        <div className="fixed inset-0 z-[1120] flex items-center justify-center bg-black/70 px-3 py-4 sm:px-4">
           <div
             ref={regenerateModalRef}
             className="scroll-focus-target w-full max-w-md rounded-2xl border border-white/10 bg-cardBg p-5 shadow-2xl shadow-black/50 sm:p-6"

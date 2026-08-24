@@ -17,6 +17,10 @@ function previewLabel(index, additionalPreviewCost) {
   return `Preview ${index + 1} (${formatMoney(additionalPreviewCost)})`;
 }
 
+function shortPreviewLabel(index) {
+  return `Preview ${index + 1}`;
+}
+
 export default function PreviewSelectionPanel({
   previews = [],
   selectedPreviewId = "",
@@ -46,6 +50,7 @@ export default function PreviewSelectionPanel({
   specialTheme = null,
   previewToDisplayCard,
   isAnimatedCardType = false,
+  overlayMode = false,
 }) {
   const [confirmPreview, setConfirmPreview] = useState(null);
   const [confirmIndex, setConfirmIndex] = useState(-1);
@@ -69,6 +74,40 @@ export default function PreviewSelectionPanel({
     return previews.findIndex((p) => p.card_id === selectedPreview.card_id);
   }, [previews, selectedPreview]);
 
+  function renderPreviewCardInner(preview, index, { animateSignature = false } = {}) {
+    if (isHighlightCardType && highlightClipDraft?.confirmed) {
+      return (
+        <HighlightCardPreview
+          playerName={playerDisplayName}
+          teamName={teamName}
+          position={position}
+          jerseyNumber={jerseyNumber}
+          gradYear={gradYear}
+          tier={orderTier}
+          theme={specialTheme}
+          clipDraft={highlightClipDraft}
+          forcePlay
+        />
+      );
+    }
+
+    const displayCard = previewToDisplayCard(preview);
+    const signature = animateSignature || hasAutoSignature(displayCard.rarity);
+
+    return (
+      <CardImage
+        card={displayCard}
+        alt={`Preview ${index + 1}`}
+        variant="detail"
+        showInfoBanner
+        showRarityBadge
+        animateSignature={signature}
+        playOnHover={isHighlightCardType}
+        forcePlay={isHighlightCardType}
+      />
+    );
+  }
+
   function renderPreviewCard(preview, index, { animateSignature = false } = {}) {
     if (isHighlightCardType && highlightClipDraft?.confirmed) {
       return (
@@ -80,36 +119,15 @@ export default function PreviewSelectionPanel({
           highlightTrimStart={highlightClipDraft.trimStart ?? 0}
           highlightTrimEnd={highlightClipDraft.trimEnd ?? null}
         >
-          <HighlightCardPreview
-            playerName={playerDisplayName}
-            teamName={teamName}
-            position={position}
-            jerseyNumber={jerseyNumber}
-            gradYear={gradYear}
-            tier={orderTier}
-            theme={specialTheme}
-            clipDraft={highlightClipDraft}
-            forcePlay
-          />
+          {renderPreviewCardInner(preview, index, { animateSignature })}
         </ExpandableCardView>
       );
     }
 
     const displayCard = previewToDisplayCard(preview);
-    const signature = animateSignature || hasAutoSignature(displayCard.rarity);
-
     return (
       <ExpandableCardView showHint card={displayCard} alt={`Preview ${index + 1}`}>
-        <CardImage
-          card={displayCard}
-          alt={`Preview ${index + 1}`}
-          variant="detail"
-          showInfoBanner
-          showRarityBadge
-          animateSignature={signature}
-          playOnHover={isHighlightCardType}
-          forcePlay={isHighlightCardType}
-        />
+        {renderPreviewCardInner(preview, index, { animateSignature })}
       </ExpandableCardView>
     );
   }
@@ -125,6 +143,10 @@ export default function PreviewSelectionPanel({
     onAddToCollection?.(confirmPreview);
     setConfirmPreview(null);
     setConfirmIndex(-1);
+  }
+
+  function selectPreview(preview) {
+    onSelectPreview?.(preview);
   }
 
   function renderSecondaryActions() {
@@ -153,28 +175,31 @@ export default function PreviewSelectionPanel({
     );
   }
 
+  const addSelectedLabel =
+    selectedIndex >= 0
+      ? `Add ${shortPreviewLabel(selectedIndex)} to Collection`
+      : "Add Selected Card to Collection";
+
   if (!previews.length) return null;
 
   if (!hasMultiple) {
     const preview = previews[0];
     return (
-      <>
-        <div className="preview-selection preview-selection--single">
-          <div className="preview-selection__hero">{renderPreviewCard(preview, 0, { animateSignature: true })}</div>
-          <div className="preview-selection__actions">
-            <button
-              type="button"
-              onClick={() => onAddToCollection?.(preview)}
-              disabled={addCollectionLoading || orderActionBusy}
-              className="inline-flex min-h-[52px] w-full items-center justify-center rounded-xl btn-primary px-6 py-3 text-base font-semibold text-slate-950 disabled:opacity-50"
-            >
-              Add to Collection
-            </button>
-            {renderSecondaryActions()}
-            <StartOverButton onClick={onStartOver} disabled={orderActionBusy || addCollectionLoading} />
-          </div>
+      <div className="preview-selection preview-selection--single">
+        <div className="preview-selection__hero">{renderPreviewCard(preview, 0, { animateSignature: true })}</div>
+        <div className="preview-selection__actions">
+          <button
+            type="button"
+            onClick={() => onAddToCollection?.(preview)}
+            disabled={addCollectionLoading || orderActionBusy}
+            className="inline-flex min-h-[52px] w-full items-center justify-center rounded-xl btn-primary px-6 py-3 text-base font-semibold text-slate-950 disabled:opacity-50"
+          >
+            Add to Collection
+          </button>
+          {renderSecondaryActions()}
+          <StartOverButton onClick={onStartOver} disabled={orderActionBusy || addCollectionLoading} />
         </div>
-      </>
+      </div>
     );
   }
 
@@ -191,7 +216,7 @@ export default function PreviewSelectionPanel({
             disabled={orderActionBusy}
             className="inline-flex min-h-[52px] w-full items-center justify-center rounded-xl btn-primary px-6 py-3 text-base font-semibold text-slate-950 disabled:opacity-50"
           >
-            Compare &amp; Choose Preview
+            Compare &amp; Choose Card
           </button>
           {renderSecondaryActions()}
           <StartOverButton onClick={onStartOver} disabled={orderActionBusy || addCollectionLoading} />
@@ -204,13 +229,15 @@ export default function PreviewSelectionPanel({
     <>
       <div className="preview-selection preview-selection--compare">
         <div className="preview-selection__header">
-          <button
-            type="button"
-            onClick={onCloseCompare}
-            className="mb-2 text-sm text-slate-400 hover:text-slate-200"
-          >
-            ← Back to latest preview
-          </button>
+          {!overlayMode ? (
+            <button
+              type="button"
+              onClick={onCloseCompare}
+              className="mb-2 text-sm text-slate-400 hover:text-slate-200"
+            >
+              ← Back to latest preview
+            </button>
+          ) : null}
           <h3 className="preview-selection__title">Pick Your Favorite</h3>
           <p className="preview-selection__subtitle">
             {isAnimatedCardType
@@ -219,64 +246,54 @@ export default function PreviewSelectionPanel({
           </p>
         </div>
 
-        <div className="preview-comparison">
+        <div className="preview-comparison preview-comparison--selectable">
           {previews.map((preview, index) => {
             const id = preview.card_id || previewKey(preview, index);
             const isSelected = selectedPreviewId === id;
             return (
               <div
                 key={previewKey(preview, index)}
-                className={`preview-option${isSelected ? " preview-option--selected" : ""}`}
+                className={`preview-card-option${isSelected ? " selected" : ""}`}
                 role="button"
                 tabIndex={0}
-                onClick={() => onSelectPreview?.(preview)}
+                onClick={() => selectPreview(preview)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
-                    onSelectPreview?.(preview);
+                    selectPreview(preview);
                   }
                 }}
                 aria-pressed={isSelected}
               >
                 <div className="preview-number">{previewLabel(index, additionalPreviewCost)}</div>
-                <div
-                  className="preview-option__media"
-                  onClick={(e) => e.stopPropagation()}
-                  onKeyDown={(e) => e.stopPropagation()}
-                  role="presentation"
-                >
-                  {renderPreviewCard(preview, index)}
+                <div className="preview-card-option__media">
+                  {renderPreviewCardInner(preview, index)}
                 </div>
-                {isSelected ? (
-                  <div className="selected-overlay" aria-hidden>
-                    ✓ Selected
-                  </div>
-                ) : null}
               </div>
             );
           })}
-        </div>
-
-        <div className="preview-selection__sticky-footer">
-          <button
-            type="button"
-            onClick={() => selectedPreview && openAddConfirm(selectedPreview)}
-            disabled={!selectedPreview || addCollectionLoading || orderActionBusy}
-            className="inline-flex min-h-[52px] w-full items-center justify-center rounded-xl btn-primary px-6 py-3 text-base font-semibold text-slate-950 disabled:opacity-50"
-          >
-            Add Selected to Collection
-          </button>
-          {!canAffordRegenerate ? (
-            <p className="text-center text-xs text-amber-200/90">
-              You need {formatMoney(additionalPreviewCost)} in credits to generate another preview.
-            </p>
-          ) : null}
         </div>
 
         <div className="preview-selection__actions preview-selection__actions--compare-secondary">
           {renderSecondaryActions()}
           <StartOverButton onClick={onStartOver} disabled={orderActionBusy || addCollectionLoading} />
         </div>
+      </div>
+
+      <div className="comparison-action-bar">
+        <button
+          type="button"
+          onClick={() => selectedPreview && openAddConfirm(selectedPreview)}
+          disabled={!selectedPreview || addCollectionLoading || orderActionBusy}
+          className={`add-selected-button${selectedPreview ? " enabled" : ""}`}
+        >
+          {addSelectedLabel}
+        </button>
+        {!canAffordRegenerate ? (
+          <p className="text-center text-xs text-amber-200/90">
+            You need {formatMoney(additionalPreviewCost)} in credits to generate another preview.
+          </p>
+        ) : null}
       </div>
 
       <PreviewAddConfirmModal
