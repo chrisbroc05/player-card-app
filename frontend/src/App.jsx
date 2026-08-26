@@ -19,11 +19,13 @@ import SettingsPage from "./pages/SettingsPage";
 import ContactPage from "./pages/ContactPage";
 import HelpPage from "./pages/HelpPage";
 import PublicProfilePage from "./pages/PublicProfilePage";
+import { InstallPrompt } from "./components/InstallPrompt";
 
 export default function App() {
   const location = useLocation();
 
   return (
+    <>
     <div key={location.pathname} className="page-content">
       <Routes location={location}>
       <Route path="/index.html" element={<Navigate to="/" replace />} />
@@ -56,5 +58,7 @@ export default function App() {
       <Route path="/credits" element={<CreditsPage />} />
       </Routes>
     </div>
+    <InstallPrompt />
+    </>
   );
 }
