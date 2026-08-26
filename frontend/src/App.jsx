@@ -1,4 +1,4 @@
-import React, { lazy, Suspense } from "react";
+import React from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import StudioPage from "./pages/StudioPage";
 import CardDetailPage from "./pages/CardDetailPage";
@@ -20,17 +20,10 @@ import ContactPage from "./pages/ContactPage";
 import HelpPage from "./pages/HelpPage";
 import PublicProfilePage from "./pages/PublicProfilePage";
 
-const InstallPrompt = lazy(() =>
-  import("./components/InstallPrompt")
-    .then((m) => ({ default: m.InstallPrompt }))
-    .catch(() => ({ default: () => null }))
-);
-
 export default function App() {
   const location = useLocation();
 
   return (
-    <>
     <div key={location.pathname} className="page-content">
       <Routes location={location}>
       <Route path="/index.html" element={<Navigate to="/" replace />} />
@@ -63,9 +56,5 @@ export default function App() {
       <Route path="/credits" element={<CreditsPage />} />
       </Routes>
     </div>
-    <Suspense fallback={null}>
-      <InstallPrompt />
-    </Suspense>
-    </>
   );
 }
