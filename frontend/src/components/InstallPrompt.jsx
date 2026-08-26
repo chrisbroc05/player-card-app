@@ -2,75 +2,100 @@ import { useState, useEffect } from "react";
 import "../styles/installPrompt.css";
 
 export function InstallPrompt() {
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showBanner, setShowBanner] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isIOS, setIsIOS] = useState(false);
-  const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
-    const isStandalone =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      window.navigator.standalone === true;
+    try {
+      const isStandalone =
+        window.matchMedia("(display-mode: standalone)").matches ||
+        window.navigator.standalone === true;
 
-    if (isStandalone) {
-      setIsInstalled(true);
+      if (isStandalone) return undefined;
+
+      const iOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+      setIsIOS(iOS);
+
+      let iosTimer;
+      if (iOS) {
+        try {
+          const dismissed = localStorage.getItem("pwa-banner-dismissed");
+          if (!dismissed) {
+            iosTimer = window.setTimeout(() => setShowBanner(true), 5000);
+          }
+        } catch {
+          // localStorage not available on some iOS browsers
+        }
+      }
+
+      const handler = (e) => {
+        try {
+          e.preventDefault();
+          setDeferredPrompt(e);
+          setShowBanner(true);
+        } catch {
+          // ignore
+        }
+      };
+
+      window.addEventListener("beforeinstallprompt", handler);
+
+      return () => {
+        window.removeEventListener("beforeinstallprompt", handler);
+        if (iosTimer) window.clearTimeout(iosTimer);
+      };
+    } catch (e) {
+      console.warn("InstallPrompt error:", e);
       return undefined;
     }
-
-    const iOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-    setIsIOS(iOS);
-
-    function handleBeforeInstallPrompt(e) {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setShowBanner(true);
-    }
-
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-
-    let iosTimer;
-    if (iOS) {
-      const dismissed = localStorage.getItem("pwa-banner-dismissed");
-      if (!dismissed) {
-        iosTimer = window.setTimeout(() => setShowBanner(true), 3000);
-      }
-    }
-
-    return () => {
-      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-      if (iosTimer) window.clearTimeout(iosTimer);
-    };
   }, []);
 
-  async function handleInstall() {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const result = await deferredPrompt.userChoice;
-    if (result.outcome === "accepted") {
+  function handleDismiss() {
+    try {
+      setShowBanner(false);
+      localStorage.setItem("pwa-banner-dismissed", "true");
+    } catch {
       setShowBanner(false);
     }
-    setDeferredPrompt(null);
   }
 
-  function handleDismiss() {
-    setShowBanner(false);
-    localStorage.setItem("pwa-banner-dismissed", "true");
+  async function handleInstall() {
+    try {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const result = await deferredPrompt.userChoice;
+        if (result.outcome === "accepted") {
+          setShowBanner(false);
+        }
+        setDeferredPrompt(null);
+      }
+    } catch {
+      setShowBanner(false);
+    }
   }
 
-  if (!showBanner || isInstalled) return null;
+  if (!showBanner) return null;
 
   return (
     <div className="install-prompt">
-      <img src="/icons/icon-72x72.png" alt="PL" className="install-icon" />
+      <img
+        src="/icons/icon-72x72.png"
+        alt="PL"
+        className="install-icon"
+        onError={(e) => {
+          e.currentTarget.style.display = "none";
+        }}
+      />
       <div className="install-text">
         <strong>Add to Home Screen</strong>
         {isIOS ? (
-          <span>Tap the Share button then &quot;Add to Home Screen&quot;</span>
+          <span>Tap Share then &quot;Add to Home Screen&quot;</span>
         ) : (
-          <span>Install Prospect Legends for the best experience</span>
+          <span>Install for the best experience</span>
         )}
       </div>
-      {!isIOS ? (
+      {!isIOS && deferredPrompt ? (
         <button type="button" onClick={handleInstall} className="install-button">
           Install
         </button>

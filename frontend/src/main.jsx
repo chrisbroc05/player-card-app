@@ -87,18 +87,12 @@ createRoot(document.getElementById("root")).render(
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .getRegistrations()
-      .then((registrations) => {
-        registrations.forEach((registration) => {
-          registration.unregister();
-        });
+      .register("/sw.js")
+      .then(() => {
+        console.log("SW registered");
       })
-      .then(() => navigator.serviceWorker.register("/sw.js"))
-      .then((registration) => {
-        console.log("SW registered:", registration.scope);
-      })
-      .catch((error) => {
-        console.log("SW error:", error);
+      .catch((err) => {
+        console.warn("SW failed:", err);
       });
   });
 }
