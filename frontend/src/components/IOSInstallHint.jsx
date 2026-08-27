@@ -28,25 +28,40 @@ export function IOSInstallHint() {
         bottom: "100px",
         left: "16px",
         right: "16px",
-        background: "#1C1C1C",
+        background: "linear-gradient(145deg, #1C1A12, #2A2410)",
         border: "1px solid rgba(201,168,76,0.4)",
-        borderRadius: "14px",
+        borderRadius: "16px",
         padding: "14px 16px",
         display: "flex",
         alignItems: "center",
         gap: "12px",
         zIndex: 300,
-        boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
+        boxShadow: "0 0 0 1px rgba(201,168,76,0.1), 0 8px 32px rgba(0,0,0,0.6)",
       }}
     >
-      <span style={{ fontSize: "24px" }}>⬆️</span>
-      <div style={{ flex: 1 }}>
+      <img
+        src="/prospect-legends-logo.png"
+        alt="PL"
+        style={{
+          width: "38px",
+          height: "38px",
+          borderRadius: "10px",
+          flexShrink: 0,
+          objectFit: "contain",
+        }}
+        onError={(e) => {
+          e.currentTarget.style.display = "none";
+        }}
+      />
+      <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
-            fontSize: "13px",
-            fontWeight: "700",
-            color: "#FFFFFF",
+            fontSize: "14px",
+            fontWeight: "800",
+            color: "#C9A84C",
             fontFamily: "Barlow Condensed, sans-serif",
+            letterSpacing: "0.5px",
+            textTransform: "uppercase",
           }}
         >
           Add to Home Screen
@@ -56,9 +71,11 @@ export function IOSInstallHint() {
             fontSize: "11px",
             color: "#888888",
             marginTop: "2px",
+            lineHeight: "1.4",
+            fontFamily: "sans-serif",
           }}
         >
-          Tap the Share button then &quot;Add to Home Screen&quot;
+          Tap Share then &quot;Add to Home Screen&quot; for the full app experience
         </div>
       </div>
       <button
@@ -74,11 +91,12 @@ export function IOSInstallHint() {
         style={{
           background: "transparent",
           border: "none",
-          color: "#888",
-          fontSize: "18px",
+          color: "rgba(201,168,76,0.6)",
+          fontSize: "20px",
           cursor: "pointer",
           padding: "4px",
           lineHeight: 1,
+          flexShrink: 0,
         }}
         aria-label="Dismiss"
       >
