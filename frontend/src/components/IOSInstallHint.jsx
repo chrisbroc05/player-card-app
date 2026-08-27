@@ -92,7 +92,7 @@ export function IOSInstallHint() {
               >
                 three dots ( ... )
               </span>{" "}
-              at the bottom right of Safari, tap{" "}
+              at the bottom right, tap{" "}
               <span
                 style={{
                   fontWeight: "700",
@@ -109,15 +109,6 @@ export function IOSInstallHint() {
                 }}
               >
                 &quot;Add to Home Screen&quot;
-              </span>{" "}
-              and tap{" "}
-              <span
-                style={{
-                  fontWeight: "700",
-                  color: "#CCCCCC",
-                }}
-              >
-                Add
               </span>
             </>
           )}

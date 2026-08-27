@@ -38,9 +38,16 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
-        navigateFallback: "index.html",
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,webp}"],
+        navigateFallback: "/offline.html",
         navigateFallbackDenylist: [/^\/api/],
+        additionalManifestEntries: [
+          { url: "/offline.html", revision: "1" },
+          {
+            url: "/prospect-legends-logo.png",
+            revision: "1",
+          },
+        ],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/player-card-backend\.onrender\.com\/.*/i,
