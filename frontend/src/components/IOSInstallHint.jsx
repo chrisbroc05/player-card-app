@@ -21,6 +21,8 @@ export function IOSInstallHint() {
 
   if (!show) return null;
 
+  const isAndroid = /Android/i.test(navigator.userAgent);
+
   return (
     <div
       style={{
@@ -75,7 +77,50 @@ export function IOSInstallHint() {
             fontFamily: "sans-serif",
           }}
         >
-          Tap Share then &quot;Add to Home Screen&quot; for the full app experience
+          {isAndroid ? (
+            <>
+              Tap Share then &quot;Add to Home Screen&quot; for the full app experience
+            </>
+          ) : (
+            <>
+              Tap the{" "}
+              <span
+                style={{
+                  fontWeight: "700",
+                  color: "#CCCCCC",
+                }}
+              >
+                three dots ( ... )
+              </span>{" "}
+              at the bottom right of Safari, tap{" "}
+              <span
+                style={{
+                  fontWeight: "700",
+                  color: "#CCCCCC",
+                }}
+              >
+                Share
+              </span>
+              , then tap{" "}
+              <span
+                style={{
+                  fontWeight: "700",
+                  color: "#CCCCCC",
+                }}
+              >
+                &quot;Add to Home Screen&quot;
+              </span>{" "}
+              and tap{" "}
+              <span
+                style={{
+                  fontWeight: "700",
+                  color: "#CCCCCC",
+                }}
+              >
+                Add
+              </span>
+            </>
+          )}
         </div>
       </div>
       <button
