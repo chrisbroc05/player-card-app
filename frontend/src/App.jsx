@@ -22,6 +22,8 @@ import CreditsPage from "./pages/CreditsPage";
 import SettingsPage from "./pages/SettingsPage";
 import ContactPage from "./pages/ContactPage";
 import HelpPage from "./pages/HelpPage";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
 import PublicProfilePage from "./pages/PublicProfilePage";
 import { IOSInstallHint } from "./components/IOSInstallHint";
 import { BiometricGate } from "./components/BiometricGate";
@@ -122,6 +124,8 @@ export default function App() {
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/help" element={<HelpPage />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsOfService />} />
           <Route path="/credits" element={<CreditsPage />} />
         </Routes>
       </div>

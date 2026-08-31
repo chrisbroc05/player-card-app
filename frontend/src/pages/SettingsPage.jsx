@@ -460,6 +460,10 @@ export default function SettingsPage() {
                 <SettingsLinkRow label="Help Center" description="Browse FAQs and guides" to="/help" />
                 <SettingsLinkRow label="Contact Us" description="Get in touch with our team" to="/contact" />
               </div>
+              <div className="settings-legal-links">
+                <Link to="/privacy">Privacy Policy</Link>
+                <Link to="/terms">Terms of Service</Link>
+              </div>
             </section>
           </>
         )}
