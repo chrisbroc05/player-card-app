@@ -20,6 +20,8 @@ from models import User
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_GOOGLE_REDIRECT_URI = "https://prospectlegends.com/auth/google/callback"
+
 GOOGLE_SCOPES = [
     "openid",
     "https://www.googleapis.com/auth/userinfo.email",
@@ -34,8 +36,8 @@ _PENDING_TTL_SECONDS = 900
 def _google_client_config() -> dict[str, Any]:
     client_id = (os.environ.get("GOOGLE_CLIENT_ID") or "").strip()
     client_secret = (os.environ.get("GOOGLE_CLIENT_SECRET") or "").strip()
-    redirect_uri = (os.environ.get("GOOGLE_REDIRECT_URI") or "").strip()
-    if not client_id or not client_secret or not redirect_uri:
+    redirect_uri = google_redirect_uri()
+    if not client_id or not client_secret:
         raise RuntimeError("Google OAuth is not configured")
     return {
         "web": {
@@ -49,13 +51,13 @@ def _google_client_config() -> dict[str, Any]:
 
 
 def google_redirect_uri() -> str:
-    return (os.environ.get("GOOGLE_REDIRECT_URI") or "").strip()
+    return (os.environ.get("GOOGLE_REDIRECT_URI") or DEFAULT_GOOGLE_REDIRECT_URI).strip()
 
 
 def google_oauth_configured() -> bool:
     return all(
         (os.environ.get(key) or "").strip()
-        for key in ("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REDIRECT_URI")
+        for key in ("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET")
     )
 
 
