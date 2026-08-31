@@ -1151,6 +1151,31 @@ def _numbered_steps(steps: list[str]) -> str:
     return _content_row(inner)
 
 
+def send_google_signin_email(
+    user_email: str,
+    display_name: str,
+) -> None:
+    """Tell Google-only users to sign in with Google instead of resetting a password."""
+    try:
+        name = html_module.escape((display_name or "Legend").strip() or "Legend")
+        login_url = f"{frontend_url()}/login"
+        parts = [
+            _heading("Sign in with Google"),
+            _subtext_html(f"Hi {name},"),
+            _subtext_plain(
+                "Your Prospect Legends account uses Google sign in. "
+                "Visit prospectlegends.com and click \"Continue with Google\" to access your account."
+            ),
+            _cta_button(login_url, "Go to Login"),
+            _muted_center("If you did not request this email, you can safely ignore it."),
+        ]
+        html = _email_shell("".join(parts))
+        subject = "Sign in with Google — Prospect Legends"
+        _send_resend_html(user_email, subject, html, 0, "google_signin")
+    except Exception as e:
+        logger.error("Google sign-in email failed for %s: %s", user_email, e)
+
+
 def send_password_reset_email(
     user_email: str,
     display_name: str,

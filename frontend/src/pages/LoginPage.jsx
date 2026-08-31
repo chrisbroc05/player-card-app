@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import BrandLogo from "../components/BrandLogo";
 import { EnableBiometricPrompt } from "../components/EnableBiometricPrompt";
+import { GoogleLoginButton } from "../components/GoogleLoginButton";
 import { API_BASE_URL, ADMIN_TOKEN_STORAGE_KEY } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import { clearBiometricRequired } from "../utils/activityTracker";
@@ -33,6 +34,8 @@ function formatApiError(detail, fallback) {
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const googleError = searchParams.get("error");
   const { login, user, initializing, applyAuthSession } = useAuth();
   const redirectTo = location.state?.from || "/my-collection";
   const [email, setEmail] = useState("");
@@ -185,6 +188,21 @@ export default function LoginPage() {
           </p>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+            {!adminMode && googleError === "google_failed" ? (
+              <div
+                className="rounded-lg border px-3.5 py-2.5 text-center text-[13px]"
+                style={{
+                  background: "rgba(239,83,80,0.1)",
+                  borderColor: "rgba(239,83,80,0.3)",
+                  color: "#EF5350",
+                }}
+              >
+                Google sign in failed. Please try again or use email.
+              </div>
+            ) : null}
+
+            {!adminMode ? <GoogleLoginButton /> : null}
+
             {!adminMode && showBiometric ? (
               <button
                 type="button"

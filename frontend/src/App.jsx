@@ -6,6 +6,8 @@ import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import GoogleAuthSuccess from "./pages/GoogleAuthSuccess";
+import GoogleInvitePage from "./pages/GoogleInvitePage";
 import MyCollectionPage from "./pages/MyCollectionPage";
 import TradesPage from "./pages/TradesPage";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -97,6 +99,8 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/auth/google/success" element={<GoogleAuthSuccess />} />
+          <Route path="/google-invite" element={<GoogleInvitePage />} />
           <Route
             path="/admin"
             element={

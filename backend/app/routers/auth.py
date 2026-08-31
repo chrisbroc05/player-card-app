@@ -6,9 +6,15 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 import json
+import logging
+import os
+
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token
 
 from card_repo import animation_fields_for_card, highlight_fields_for_card
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -22,7 +28,7 @@ from credit_service import (
     TX_WITHDRAWAL,
 )
 from database import get_db
-from email_service import frontend_url, send_password_reset_email
+from email_service import frontend_url, send_google_signin_email, send_password_reset_email
 from models import Card, CreditLedger, MarketplaceOffer, User
 from parent_email_utils import normalize_optional_parent_email
 from profile_stats import compute_profile_kpis, compute_rarity_collection_stats
@@ -46,6 +52,22 @@ from webauthn.helpers.structs import (
 from webauthn.helpers.options_to_json import options_to_json
 from marketplace_repo import float_from_decimal
 from stripe_connect import sync_connect_account_status
+from beta_config import get_beta_invite_code
+from google_oauth import (
+    build_google_flow,
+    consume_oauth_state,
+    create_google_user,
+    google_error_redirect,
+    google_invite_redirect,
+    google_oauth_configured,
+    google_success_redirect,
+    pop_pending_google_signup,
+    store_oauth_state,
+    store_pending_google_signup,
+    validate_beta_invite_code,
+)
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -87,6 +109,13 @@ class WebAuthnLoginOptionsBody(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     credential_id: str | None = Field(default=None, max_length=512)
+
+
+class GoogleCompleteBody(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    pending: str = Field(..., min_length=1, max_length=256)
+    invite_code: str | None = Field(default=None, max_length=200)
 
 
 FORGOT_PASSWORD_MESSAGE = "If an account exists with that email, a reset link has been sent."
@@ -474,12 +503,15 @@ def forgot_password(body: ForgotPasswordBody, db: Session = Depends(get_db)):
     email = str(body.email).strip().lower()
     user = db.query(User).filter(User.email == email).first()
     if user is not None:
-        token = secrets.token_urlsafe(32)
-        user.reset_token = token
-        user.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=1)
-        db.commit()
-        reset_url = f"{frontend_url()}/reset-password?token={token}"
-        send_password_reset_email(user.email, user.display_name, reset_url)
+        if user.google_id and not user.hashed_password:
+            send_google_signin_email(user.email, user.display_name)
+        else:
+            token = secrets.token_urlsafe(32)
+            user.reset_token = token
+            user.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=1)
+            db.commit()
+            reset_url = f"{frontend_url()}/reset-password?token={token}"
+            send_password_reset_email(user.email, user.display_name, reset_url)
     return {"message": FORGOT_PASSWORD_MESSAGE}
 
 
@@ -632,4 +664,115 @@ def webauthn_login_verify(
         "access_token": token,
         "token_type": "bearer",
         "user": auth_user_payload(user),
+    }
+
+
+@router.get("/google")
+def google_login():
+    if not google_oauth_configured():
+        raise HTTPException(status_code=503, detail="Google sign in is not configured")
+    flow = build_google_flow()
+    authorization_url, state = flow.authorization_url(
+        access_type="offline",
+        include_granted_scopes="true",
+    )
+    store_oauth_state(state)
+    return RedirectResponse(authorization_url)
+
+
+@router.get("/google/callback")
+def google_callback(
+    code: str,
+    state: str | None = None,
+    db: Session = Depends(get_db),
+):
+    if not consume_oauth_state(state):
+        return google_error_redirect()
+    try:
+        flow = build_google_flow()
+        flow.fetch_token(code=code)
+        client_id = (os.environ.get("GOOGLE_CLIENT_ID") or "").strip()
+        id_info = id_token.verify_oauth2_token(
+            flow.credentials.id_token,
+            google_requests.Request(),
+            client_id,
+        )
+        google_email = (id_info.get("email") or "").strip().lower()
+        google_name = id_info.get("name")
+        google_id = id_info.get("sub")
+        if not google_email or not google_id:
+            raise HTTPException(status_code=400, detail="Could not get email from Google")
+
+        user = db.query(User).filter(User.email == google_email).first()
+        if user:
+            if not user.google_id:
+                user.google_id = google_id
+                db.commit()
+            token = create_access_token({"sub": user.email})
+            return google_success_redirect(token=token, user=user, is_new=False)
+
+        if get_beta_invite_code() is not None:
+            pending_token = secrets.token_urlsafe(32)
+            store_pending_google_signup(
+                pending_token,
+                {
+                    "email": google_email,
+                    "name": google_name or "",
+                    "google_id": google_id,
+                },
+            )
+            return google_invite_redirect(
+                pending_token=pending_token,
+                email=google_email,
+                name=google_name or "",
+            )
+
+        user = create_google_user(
+            db,
+            email=google_email,
+            google_name=google_name,
+            google_id=google_id,
+        )
+        token = create_access_token({"sub": user.email})
+        return google_success_redirect(token=token, user=user, is_new=True)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Google OAuth error: %s", exc)
+        return google_error_redirect()
+
+
+@router.post("/google/complete")
+def google_complete(body: GoogleCompleteBody, db: Session = Depends(get_db)):
+    pending = pop_pending_google_signup(body.pending.strip())
+    if not pending:
+        raise HTTPException(
+            status_code=400,
+            detail="Signup session expired. Please try Google sign in again.",
+        )
+    if not validate_beta_invite_code(body.invite_code):
+        raise HTTPException(status_code=400, detail="Invalid invite code")
+
+    email = pending["email"]
+    google_id = pending["google_id"]
+    google_name = pending.get("name")
+
+    if db.query(User).filter(User.email == email).first():
+        raise HTTPException(
+            status_code=400,
+            detail="Account already exists. Please sign in with Google.",
+        )
+
+    user = create_google_user(
+        db,
+        email=email,
+        google_name=google_name,
+        google_id=google_id,
+    )
+    token = create_access_token({"sub": user.email})
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": auth_user_payload(user),
+        "is_new": True,
     }

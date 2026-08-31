@@ -643,6 +643,20 @@ def run_schema_migrations_after_models(engine: Engine) -> None:
                         )
                     )
                     conn.execute(text("ALTER TABLE users ADD COLUMN webauthn_challenge TEXT"))
+            if "google_id" not in ucols:
+                if dialect == "postgresql":
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(100)"
+                        )
+                    )
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ALTER COLUMN hashed_password DROP NOT NULL"
+                        )
+                    )
+                else:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN google_id VARCHAR(100)"))
 
         tables = set(insp.get_table_names())
         if "credit_ledger" not in tables:

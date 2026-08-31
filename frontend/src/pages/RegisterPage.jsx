@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import BrandLogo from "../components/BrandLogo";
+import { GoogleLoginButton } from "../components/GoogleLoginButton";
 import { useAuth } from "../context/AuthContext";
 import { API_BASE_URL } from "../config/api";
 
@@ -110,6 +111,7 @@ export default function RegisterPage() {
           ) : null}
 
           <form onSubmit={handleSubmit} className={betaMode ? "space-y-4" : "mt-8 space-y-4"}>
+            <GoogleLoginButton />
             <div>
               <label className="text-xs font-medium uppercase tracking-wide text-slate-400">Display Name</label>
               <input
