@@ -29,6 +29,8 @@ class User(Base):
     stripe_onboarding_complete: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     stripe_payouts_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     settings: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    reset_token: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    reset_token_expires: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     cards: Mapped[list["Card"]] = relationship(

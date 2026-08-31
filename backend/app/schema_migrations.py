@@ -595,6 +595,22 @@ def run_schema_migrations_after_models(engine: Engine) -> None:
                             "ALTER TABLE users ADD COLUMN settings TEXT NOT NULL DEFAULT '{}'"
                         )
                     )
+            if "reset_token" not in ucols:
+                if dialect == "postgresql":
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token VARCHAR(100)"
+                        )
+                    )
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS "
+                            "reset_token_expires TIMESTAMP WITH TIME ZONE"
+                        )
+                    )
+                else:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN reset_token VARCHAR(100)"))
+                    conn.execute(text("ALTER TABLE users ADD COLUMN reset_token_expires DATETIME"))
 
         tables = set(insp.get_table_names())
         if "credit_ledger" not in tables:

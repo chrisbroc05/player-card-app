@@ -5241,6 +5241,26 @@
   justify-content: center;
 }
 
+.profile-page__logout-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 32px 16px 8px;
+}
+
+.profile-page__logout-btn {
+  border: none;
+  background: transparent;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.profile-page__logout-btn:hover {
+  color: var(--color-text-secondary, #aaaaaa);
+}
+
 .profile-page__banner {
   margin-bottom: 16px;
   border-radius: 12px;
@@ -6186,6 +6206,38 @@
   margin-top: 24px;
   padding-top: 8px;
   border-top: 1px solid var(--color-border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+.settings-section--account-actions {
+  margin-top: 24px;
+  padding: 0 16px 8px;
+}
+
+.settings-logout-btn {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--color-border-gold);
+  color: var(--color-text-gold);
+  background: transparent;
+  border-radius: 10px;
+  padding: 14px;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.settings-logout-btn:hover {
+  background: rgba(201, 168, 76, 0.08);
+}
+
+.settings-account-divider {
+  height: 1px;
+  margin: 16px 0;
+  background: var(--color-border-subtle, rgba(255, 255, 255, 0.08));
 }
 
 .settings-section__label {

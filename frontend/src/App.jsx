@@ -4,6 +4,8 @@ import StudioPage from "./pages/StudioPage";
 import CardDetailPage from "./pages/CardDetailPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import MyCollectionPage from "./pages/MyCollectionPage";
 import TradesPage from "./pages/TradesPage";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -34,6 +36,8 @@ export default function App() {
       <Route path="/vault" element={<MyCollectionPage vaultView />} />
       <Route path="/card/:cardId" element={<CardDetailPage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route
         path="/admin"
         element={

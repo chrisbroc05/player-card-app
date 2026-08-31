@@ -9,10 +9,12 @@ import {
 } from "lucide-react";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
+import LogoutConfirmModal from "../components/LogoutConfirmModal";
 import SettingsToggle from "../components/SettingsToggle";
 import { API_BASE_URL, authHeaders } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import { useSettings, DEFAULT_SETTINGS, settingsFormatApiError } from "../context/SettingsContext";
+import { performLogout } from "../utils/logout";
 import { themeDisplayLabel } from "../utils/cardBannerStyles";
 
 const TIER_OPTIONS = [
@@ -287,8 +289,7 @@ export default function SettingsPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(settingsFormatApiError(data?.detail, "Could not delete account."));
-      logout();
-      navigate("/login", { replace: true });
+      performLogout(logout);
     } catch (e) {
       setModalError(e.message || "Delete failed.");
     } finally {
@@ -437,7 +438,15 @@ export default function SettingsPage() {
               />
             </SettingsSection>
 
-            <section className="settings-section settings-section--danger">
+            <section className="settings-section settings-section--account-actions">
+              <button
+                type="button"
+                className="settings-logout-btn"
+                onClick={() => setModal("logout")}
+              >
+                Log Out
+              </button>
+              <div className="settings-account-divider" aria-hidden />
               <SettingsLinkRow
                 label="Delete Account"
                 danger
@@ -570,6 +579,13 @@ export default function SettingsPage() {
             </button>
           </div>
         </SimpleModal>
+      ) : null}
+
+      {modal === "logout" ? (
+        <LogoutConfirmModal
+          onClose={closeModal}
+          onConfirm={() => performLogout(logout)}
+        />
       ) : null}
 
       {modal === "delete" ? (

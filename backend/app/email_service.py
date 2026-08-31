@@ -1151,6 +1151,35 @@ def _numbered_steps(steps: list[str]) -> str:
     return _content_row(inner)
 
 
+def send_password_reset_email(
+    user_email: str,
+    display_name: str,
+    reset_url: str,
+) -> None:
+    """Send password reset link to the user."""
+    try:
+        name = html_module.escape((display_name or "Legend").strip() or "Legend")
+        parts = [
+            _heading("Reset your password"),
+            _subtext_html(f"Hi {name},"),
+            _subtext_plain(
+                "We received a request to reset your password. "
+                "Click the button below to reset it. This link expires in 1 hour."
+            ),
+            _cta_button(reset_url, "Reset Password"),
+            _divider(),
+            _muted_center(
+                "If you did not request this, you can safely ignore this email. "
+                "Your password will not be changed."
+            ),
+        ]
+        html = _email_shell("".join(parts))
+        subject = "Reset your Prospect Legends password"
+        _send_resend_html(user_email, subject, html, 0, "password_reset")
+    except Exception as e:
+        logger.error("Password reset email failed for %s: %s", user_email, e)
+
+
 def send_welcome_email(
     user_email: str,
     display_name: str,

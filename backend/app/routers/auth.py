@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import secrets
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from card_repo import animation_fields_for_card, highlight_fields_for_card
-from fastapi import APIRouter, Body, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict, Field
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -20,6 +21,7 @@ from credit_service import (
     TX_WITHDRAWAL,
 )
 from database import get_db
+from email_service import frontend_url, send_password_reset_email
 from models import Card, CreditLedger, MarketplaceOffer, User
 from parent_email_utils import normalize_optional_parent_email
 from profile_stats import compute_profile_kpis, compute_rarity_collection_stats
@@ -48,6 +50,31 @@ class DeleteAccountBody(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     confirmation: str = Field(..., min_length=1)
+
+
+class ForgotPasswordBody(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    email: EmailStr
+
+
+class ResetPasswordBody(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    token: str = Field(..., min_length=1, max_length=200)
+    password: str = Field(..., min_length=8, max_length=128)
+
+
+FORGOT_PASSWORD_MESSAGE = "If an account exists with that email, a reset link has been sent."
+
+
+def _reset_token_is_valid(user: User | None) -> bool:
+    if user is None or not user.reset_token or not user.reset_token_expires:
+        return False
+    expires = user.reset_token_expires
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    return expires >= datetime.now(timezone.utc)
 
 
 class ProfileFinancialsResponse(BaseModel):
@@ -416,3 +443,45 @@ def get_profile_financials(
         total_animated_cards_cost=float_from_decimal(_sum_abs_ledger(db, user.id, TX_ANIMATION)),
         total_highlight_cards_cost=float_from_decimal(_sum_abs_ledger(db, user.id, TX_HIGHLIGHT)),
     )
+
+
+@router.post("/forgot-password")
+def forgot_password(body: ForgotPasswordBody, db: Session = Depends(get_db)):
+    email = str(body.email).strip().lower()
+    user = db.query(User).filter(User.email == email).first()
+    if user is not None:
+        token = secrets.token_urlsafe(32)
+        user.reset_token = token
+        user.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=1)
+        db.commit()
+        reset_url = f"{frontend_url()}/reset-password?token={token}"
+        send_password_reset_email(user.email, user.display_name, reset_url)
+    return {"message": FORGOT_PASSWORD_MESSAGE}
+
+
+@router.get("/verify-reset-token")
+def verify_reset_token(token: str = Query(..., min_length=1, max_length=200), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.reset_token == token.strip()).first()
+    if not _reset_token_is_valid(user):
+        raise HTTPException(status_code=400, detail="Reset link has expired or is invalid.")
+    return {"valid": True}
+
+
+@router.post("/reset-password")
+def reset_password(body: ResetPasswordBody, db: Session = Depends(get_db)):
+    token = body.token.strip()
+    user = db.query(User).filter(User.reset_token == token).first()
+    if user is None:
+        raise HTTPException(status_code=400, detail="Reset link has expired or is invalid.")
+    expires = user.reset_token_expires
+    if expires is None:
+        raise HTTPException(status_code=400, detail="Reset link has expired")
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    if expires < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Reset link has expired")
+    user.hashed_password = hash_password(body.password)
+    user.reset_token = None
+    user.reset_token_expires = None
+    db.commit()
+    return {"success": True, "message": "Password reset successfully."}

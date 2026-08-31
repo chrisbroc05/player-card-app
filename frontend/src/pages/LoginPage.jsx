@@ -114,13 +114,12 @@ export default function LoginPage() {
               />
             </div>
             {!adminMode ? (
-              <button
-                type="button"
+              <Link
+                to="/forgot-password"
                 className="text-xs text-slate-500 underline decoration-white/20 underline-offset-2 hover:text-slate-300"
-                disabled
               >
                 Forgot password?
-              </button>
+              </Link>
             ) : null}
 
             {!adminMode && error ? (

@@ -90,6 +90,9 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(() => {
     localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    sessionStorage.clear();
     setToken("");
     setUser(null);
     setPendingIncomingTradesCount(0);

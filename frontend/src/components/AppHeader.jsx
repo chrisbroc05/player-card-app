@@ -1,8 +1,9 @@
 import React from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Bell, Coins, Settings } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { formatMoney } from "../utils/marketplace";
+import { performLogout } from "../utils/logout";
 import MobileBottomNav from "./MobileBottomNav";
 
 /** Set to false to hide the logo mark and show text-only branding on all screen sizes. */
@@ -15,7 +16,6 @@ function useHideMobileChrome() {
 
 export default function AppHeader() {
   const location = useLocation();
-  const navigate = useNavigate();
   const { user, logout, initializing, pendingIncomingTradesCount, pendingIncomingMarketplaceCount } =
     useAuth();
   const hideMobileChrome = useHideMobileChrome();
@@ -34,8 +34,7 @@ export default function AppHeader() {
   const hasNotifications = pendingIncomingTradesCount + pendingIncomingMarketplaceCount > 0;
 
   function handleLogout() {
-    logout();
-    navigate("/login", { replace: true });
+    performLogout(logout);
   }
 
   function navClass(active) {

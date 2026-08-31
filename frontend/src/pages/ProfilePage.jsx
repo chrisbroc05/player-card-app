@@ -3,12 +3,14 @@ import { Link, Navigate, useLocation, useSearchParams } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
+import LogoutConfirmModal from "../components/LogoutConfirmModal";
 import CardImage from "../components/CardImage";
 import RarityBadge from "../components/RarityBadge";
 import { ProfileActivityCompactList } from "../components/ActivityHistory";
 import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY, authHeaders } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import { useSettings } from "../context/SettingsContext";
+import { performLogout } from "../utils/logout";
 import { formatMoney } from "../utils/marketplace";
 import { formatEditionShort } from "../utils/tierStyles";
 import {
@@ -306,12 +308,13 @@ function ProfileRecentActivity({ token }) {
 }
 
 export default function ProfilePage() {
-  const { token, user, initializing } = useAuth();
+  const { token, user, initializing, logout } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [connectBanner, setConnectBanner] = useState("");
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const loadProfile = useCallback(async () => {
     if (!token) return;
@@ -528,11 +531,28 @@ export default function ProfilePage() {
                 onProfileUpdate={updateProfileFields}
               />
             </section>
+
+            <div className="profile-page__logout-wrap">
+              <button
+                type="button"
+                className="profile-page__logout-btn"
+                onClick={() => setShowLogoutConfirm(true)}
+              >
+                Log Out
+              </button>
+            </div>
           </div>
         )}
       </main>
 
       <AppFooter />
+
+      {showLogoutConfirm ? (
+        <LogoutConfirmModal
+          onClose={() => setShowLogoutConfirm(false)}
+          onConfirm={() => performLogout(logout)}
+        />
+      ) : null}
     </div>
   );
 }
