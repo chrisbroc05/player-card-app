@@ -31,6 +31,10 @@ class User(Base):
     settings: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     reset_token: Mapped[str | None] = mapped_column(String(100), nullable=True)
     reset_token_expires: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    webauthn_credential_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    webauthn_public_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    webauthn_sign_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    webauthn_challenge: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     cards: Mapped[list["Card"]] = relationship(

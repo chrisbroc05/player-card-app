@@ -5,14 +5,15 @@ from __future__ import annotations
 import secrets
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+import json
 
 from card_repo import animation_fields_for_card, highlight_fields_for_card
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from auth import get_current_user, hash_password, verify_password
+from auth import create_access_token, get_current_user, hash_password, verify_password
 from credit_service import (
     TX_ANIMATION,
     TX_CARD_SALE,
@@ -26,6 +27,23 @@ from models import Card, CreditLedger, MarketplaceOffer, User
 from parent_email_utils import normalize_optional_parent_email
 from profile_stats import compute_profile_kpis, compute_rarity_collection_stats
 from utils.rarity import get_template_name, rarity_display_name
+from webauthn_helpers import (
+    auth_user_payload,
+    consume_login_challenge,
+    resolve_webauthn_origin,
+    store_login_challenge,
+)
+from webauthn import generate_authentication_options, generate_registration_options
+from webauthn import verify_authentication_response, verify_registration_response
+from webauthn.helpers.bytes_to_base64url import bytes_to_base64url
+from webauthn.helpers.base64url_to_bytes import base64url_to_bytes
+from webauthn.helpers.structs import (
+    AuthenticatorSelectionCriteria,
+    PublicKeyCredentialDescriptor,
+    ResidentKeyRequirement,
+    UserVerificationRequirement,
+)
+from webauthn.helpers.options_to_json import options_to_json
 from marketplace_repo import float_from_decimal
 from stripe_connect import sync_connect_account_status
 
@@ -63,6 +81,12 @@ class ResetPasswordBody(BaseModel):
 
     token: str = Field(..., min_length=1, max_length=200)
     password: str = Field(..., min_length=8, max_length=128)
+
+
+class WebAuthnLoginOptionsBody(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    credential_id: str | None = Field(default=None, max_length=512)
 
 
 FORGOT_PASSWORD_MESSAGE = "If an account exists with that email, a reset link has been sent."
@@ -485,3 +509,127 @@ def reset_password(body: ResetPasswordBody, db: Session = Depends(get_db)):
     user.reset_token_expires = None
     db.commit()
     return {"success": True, "message": "Password reset successfully."}
+
+
+@router.post("/webauthn/register-options")
+def webauthn_register_options(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    expected_origin, rp_id = resolve_webauthn_origin(request.headers.get("origin"))
+    options = generate_registration_options(
+        rp_id=rp_id,
+        rp_name="Prospect Legends",
+        user_id=str(current_user.id).encode("utf-8"),
+        user_name=current_user.email,
+        user_display_name=current_user.display_name,
+        authenticator_selection=AuthenticatorSelectionCriteria(
+            user_verification=UserVerificationRequirement.REQUIRED,
+            resident_key=ResidentKeyRequirement.PREFERRED,
+        ),
+    )
+    current_user.webauthn_challenge = bytes_to_base64url(options.challenge)
+    db.commit()
+    return json.loads(options_to_json(options))
+
+
+@router.post("/webauthn/register-verify")
+def webauthn_register_verify(
+    request: Request,
+    credential: dict = Body(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not current_user.webauthn_challenge:
+        raise HTTPException(status_code=400, detail="Registration challenge expired. Please try again.")
+    expected_origin, rp_id = resolve_webauthn_origin(request.headers.get("origin"))
+    try:
+        verification = verify_registration_response(
+            credential=credential,
+            expected_challenge=base64url_to_bytes(current_user.webauthn_challenge),
+            expected_rp_id=rp_id,
+            expected_origin=expected_origin,
+            require_user_verification=True,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    current_user.webauthn_credential_id = bytes_to_base64url(verification.credential_id)
+    current_user.webauthn_public_key = verification.credential_public_key.hex()
+    current_user.webauthn_sign_count = verification.sign_count
+    current_user.webauthn_challenge = None
+    db.commit()
+    return {"success": True, "credential_id": current_user.webauthn_credential_id}
+
+
+@router.post("/webauthn/login-options")
+def webauthn_login_options(
+    request: Request,
+    body: WebAuthnLoginOptionsBody | None = Body(default=None),
+    db: Session = Depends(get_db),
+):
+    _, rp_id = resolve_webauthn_origin(request.headers.get("origin"))
+    allow_credentials = None
+    credential_id = (body.credential_id if body else None) or None
+    if credential_id:
+        allow_credentials = [
+            PublicKeyCredentialDescriptor(id=base64url_to_bytes(credential_id.strip()))
+        ]
+    options = generate_authentication_options(
+        rp_id=rp_id,
+        user_verification=UserVerificationRequirement.REQUIRED,
+        allow_credentials=allow_credentials,
+    )
+    store_login_challenge(bytes_to_base64url(options.challenge))
+    return json.loads(options_to_json(options))
+
+
+@router.post("/webauthn/login-verify")
+def webauthn_login_verify(
+    request: Request,
+    credential: dict = Body(...),
+    db: Session = Depends(get_db),
+):
+    credential_id = str(credential.get("id") or "").strip()
+    if not credential_id:
+        raise HTTPException(status_code=400, detail="Credential not found")
+
+    user = db.query(User).filter(User.webauthn_credential_id == credential_id).first()
+    if user is None or not user.webauthn_public_key:
+        raise HTTPException(status_code=400, detail="Credential not found")
+
+    expected_origin, rp_id = resolve_webauthn_origin(request.headers.get("origin"))
+
+    try:
+        client_data_b64 = credential.get("response", {}).get("clientDataJSON")
+        if not client_data_b64:
+            raise HTTPException(status_code=400, detail="Invalid credential payload")
+        client_data = json.loads(base64url_to_bytes(client_data_b64).decode("utf-8"))
+        challenge_b64 = client_data.get("challenge")
+        if not challenge_b64 or not consume_login_challenge(challenge_b64):
+            raise HTTPException(status_code=400, detail="Authentication challenge expired. Please try again.")
+
+        verification = verify_authentication_response(
+            credential=credential,
+            expected_challenge=base64url_to_bytes(challenge_b64),
+            expected_rp_id=rp_id,
+            expected_origin=expected_origin,
+            credential_public_key=bytes.fromhex(user.webauthn_public_key),
+            credential_current_sign_count=user.webauthn_sign_count or 0,
+            require_user_verification=True,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    user.webauthn_sign_count = verification.new_sign_count
+    db.commit()
+
+    token = create_access_token({"sub": user.email})
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": auth_user_payload(user),
+    }

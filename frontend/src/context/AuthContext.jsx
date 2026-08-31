@@ -155,6 +155,16 @@ export function AuthProvider({ children }) {
     return () => window.clearInterval(id);
   }, [token, initializing, refreshNavBadges]);
 
+  const applyAuthSession = useCallback(
+    (accessToken, userData) => {
+      localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, accessToken);
+      setToken(accessToken);
+      setUser(userData);
+      refreshNavBadges(accessToken);
+    },
+    [refreshNavBadges]
+  );
+
   const login = useCallback(
     async (email, password) => {
       const res = await fetch(`${API_BASE_URL}/auth/login`, {
@@ -164,12 +174,9 @@ export function AuthProvider({ children }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(formatApiError(data?.detail, "Invalid email or password"));
-      localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, data.access_token);
-      setToken(data.access_token);
-      setUser(data.user);
-      refreshNavBadges(data.access_token);
+      applyAuthSession(data.access_token, data.user);
     },
-    [refreshNavBadges]
+    [applyAuthSession]
   );
 
   const register = useCallback(
@@ -192,12 +199,9 @@ export function AuthProvider({ children }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(formatApiError(data?.detail, "Registration failed"));
-      localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, data.access_token);
-      setToken(data.access_token);
-      setUser(data.user);
-      refreshNavBadges(data.access_token);
+      applyAuthSession(data.access_token, data.user);
     },
-    [refreshNavBadges]
+    [applyAuthSession]
   );
 
   const value = useMemo(
@@ -214,6 +218,7 @@ export function AuthProvider({ children }) {
       login,
       logout,
       register,
+      applyAuthSession,
     }),
     [
       token,
@@ -228,6 +233,7 @@ export function AuthProvider({ children }) {
       login,
       logout,
       register,
+      applyAuthSession,
     ]
   );
 

@@ -611,6 +611,38 @@ def run_schema_migrations_after_models(engine: Engine) -> None:
                 else:
                     conn.execute(text("ALTER TABLE users ADD COLUMN reset_token VARCHAR(100)"))
                     conn.execute(text("ALTER TABLE users ADD COLUMN reset_token_expires DATETIME"))
+            if "webauthn_credential_id" not in ucols:
+                if dialect == "postgresql":
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS webauthn_credential_id TEXT"
+                        )
+                    )
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS webauthn_public_key TEXT"
+                        )
+                    )
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS "
+                            "webauthn_sign_count INTEGER DEFAULT 0"
+                        )
+                    )
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS webauthn_challenge TEXT"
+                        )
+                    )
+                else:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN webauthn_credential_id TEXT"))
+                    conn.execute(text("ALTER TABLE users ADD COLUMN webauthn_public_key TEXT"))
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ADD COLUMN webauthn_sign_count INTEGER DEFAULT 0"
+                        )
+                    )
+                    conn.execute(text("ALTER TABLE users ADD COLUMN webauthn_challenge TEXT"))
 
         tables = set(insp.get_table_names())
         if "credit_ledger" not in tables:
