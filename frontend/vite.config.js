@@ -16,8 +16,8 @@ export default defineConfig({
         background_color: "#0A0A0A",
         display: "standalone",
         orientation: "portrait",
-        start_url: "/",
-        scope: "/",
+        start_url: "https://prospectlegends.com/",
+        scope: "https://prospectlegends.com/",
         icons: [
           {
             src: "pwa-192.png",
