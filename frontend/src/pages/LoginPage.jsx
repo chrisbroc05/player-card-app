@@ -6,6 +6,7 @@ import BrandLogo from "../components/BrandLogo";
 import { EnableBiometricPrompt } from "../components/EnableBiometricPrompt";
 import { API_BASE_URL, ADMIN_TOKEN_STORAGE_KEY } from "../config/api";
 import { useAuth } from "../context/AuthContext";
+import { clearBiometricRequired } from "../utils/activityTracker";
 import {
   BIOMETRIC_CREDENTIAL_ID_KEY,
   BIOMETRIC_DISMISSED_KEY,
@@ -63,6 +64,7 @@ export default function LoginPage() {
   }, [adminMode]);
 
   function finishLoginNavigation() {
+    clearBiometricRequired();
     navigate(redirectTo, { replace: true });
   }
 

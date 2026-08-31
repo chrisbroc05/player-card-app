@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { API_BASE_URL, authHeaders } from "../config/api";
 import { useAuth } from "../context/AuthContext";
+import { clearBiometricRequired } from "../utils/activityTracker";
 import {
   BIOMETRIC_CREDENTIAL_ID_KEY,
   BIOMETRIC_ENABLED_KEY,
@@ -61,6 +62,7 @@ export function EnableBiometricPrompt({ onDismiss, onEnabled }) {
         BIOMETRIC_CREDENTIAL_ID_KEY,
         verifyData.credential_id || credential.id
       );
+      clearBiometricRequired();
       setEnabled(true);
       onEnabled?.();
     } catch (err) {

@@ -1,5 +1,11 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY, authHeaders } from "../config/api";
+import { clearActivityTracking } from "../utils/activityTracker";
+import {
+  BIOMETRIC_CREDENTIAL_ID_KEY,
+  BIOMETRIC_DISMISSED_KEY,
+  BIOMETRIC_ENABLED_KEY,
+} from "../utils/webauthn";
 
 function formatApiError(detail, fallback) {
   if (!detail) return fallback;
@@ -92,6 +98,10 @@ export function AuthProvider({ children }) {
     localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    clearActivityTracking();
+    localStorage.removeItem(BIOMETRIC_ENABLED_KEY);
+    localStorage.removeItem(BIOMETRIC_CREDENTIAL_ID_KEY);
+    localStorage.removeItem(BIOMETRIC_DISMISSED_KEY);
     sessionStorage.clear();
     setToken("");
     setUser(null);
