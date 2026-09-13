@@ -8,6 +8,7 @@ import CardDetailHero from "../components/CardDetailHero";
 import ShareCard from "../components/ShareCard";
 import SendCard from "../components/SendCard";
 import ProfileLink from "../components/ProfileLink";
+import BulkMarketplaceListingSheet from "../components/BulkMarketplaceListingSheet";
 import MarketplaceListingActions from "../components/MarketplaceListingActions";
 import { useAuth } from "../context/AuthContext";
 import CardHistoryTimeline from "../components/CardHistoryTimeline";
@@ -52,6 +53,7 @@ export default function CardDetailPage() {
   const [card, setCard] = useState(null);
   const [copies, setCopies] = useState([]);
   const [listingInfo, setListingInfo] = useState(null);
+  const [listingSheetOpen, setListingSheetOpen] = useState(false);
   const [marketplaceBusy, setMarketplaceBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -189,6 +191,33 @@ export default function CardDetailPage() {
     }
   }
 
+  async function bulkListOnMarketplace(cardId, quantity, askingPrice) {
+    if (!token) return;
+    setMarketplaceBusy(true);
+    setError("");
+    try {
+      const { res, unauthorized } = await authFetch(token, "/marketplace/bulk-list", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          card_id: cardId,
+          quantity,
+          asking_price: askingPrice,
+        }),
+      });
+      if (unauthorized) throw new Error("Session expired.");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not list copies."));
+      refreshNavBadges?.();
+      await Promise.all([refetchCard(), loadListingStatus()]);
+    } catch (e) {
+      setError(e.message || "Could not list copies.");
+      throw e;
+    } finally {
+      setMarketplaceBusy(false);
+    }
+  }
+
   async function unlistCardFromMarketplace() {
     if (!token || !card?.card_id) return;
     setMarketplaceBusy(true);
@@ -308,6 +337,18 @@ export default function CardDetailPage() {
                       This is card #{displayCard?.edition_number ?? 1} of{" "}
                       {displayCard?.print_run ?? 1}
                     </p>
+                    {isOwner && Number(displayCard?.copies_owned) > 1 ? (
+                      <p className="mt-1 text-xs text-[var(--color-gold-primary)] opacity-80">
+                        You own {displayCard.copies_owned} copies —{" "}
+                        {Number.isFinite(Number(displayCard?.copies_available))
+                          ? displayCard.copies_available
+                          : Math.max(
+                              0,
+                              Number(displayCard.copies_owned) - Number(displayCard.copies_listed || 0)
+                            )}{" "}
+                        available to list
+                      </p>
+                    ) : null}
                     <div className="mt-4 flex flex-wrap gap-2">
                       {copies.map((c) => {
                         const isCurrent =
@@ -353,10 +394,30 @@ export default function CardDetailPage() {
                     </p>
                     <MarketplaceListingActions
                       card={displayCard}
-                      listingInfo={listingInfo}
+                      listingInfo={
+                        (Number.isFinite(Number(displayCard?.copies_available))
+                          ? Number(displayCard.copies_available)
+                          : Math.max(
+                              0,
+                              Number(displayCard?.copies_owned || 1) -
+                                Number(displayCard?.copies_listed || 0)
+                            )) <= 0 && Number(displayCard?.copies_listed) > 0
+                          ? listingInfo
+                          : null
+                      }
+                      copiesAvailable={
+                        Number.isFinite(Number(displayCard?.copies_available))
+                          ? Number(displayCard.copies_available)
+                          : Math.max(
+                              0,
+                              Number(displayCard?.copies_owned || 1) -
+                                Number(displayCard?.copies_listed || 0)
+                            )
+                      }
                       busy={marketplaceBusy}
                       onList={listCardOnMarketplace}
                       onUnlist={unlistCardFromMarketplace}
+                      onOpenBulkList={() => setListingSheetOpen(true)}
                       showContainerDivider={false}
                       className="mt-3"
                       listButtonLabel="List on Marketplace"
@@ -383,6 +444,26 @@ export default function CardDetailPage() {
           </ErrorBoundary>
         )}
       </main>
+
+      <BulkMarketplaceListingSheet
+        open={listingSheetOpen}
+        source="detail"
+        card={displayCard}
+        copiesOwned={displayCard?.copies_owned || 1}
+        copiesAvailable={
+          Number.isFinite(Number(displayCard?.copies_available))
+            ? Number(displayCard.copies_available)
+            : Math.max(
+                0,
+                Number(displayCard?.copies_owned || 1) - Number(displayCard?.copies_listed || 0)
+              )
+        }
+        busy={marketplaceBusy}
+        onClose={() => setListingSheetOpen(false)}
+        onConfirm={async ({ quantity, askingPrice }) => {
+          await bulkListOnMarketplace(displayCard.card_id, quantity, askingPrice);
+        }}
+      />
 
       <AppFooter />
     </div>

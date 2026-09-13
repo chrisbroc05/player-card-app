@@ -5,6 +5,7 @@ import { vaultTierBadge, rarityDisplay } from "../utils/tierStyles";
 import CardImage from "./CardImage";
 import ShareCard from "./ShareCard";
 import QuantitySelector from "./QuantitySelector";
+import { parseCopyLimitError } from "../utils/copyPricing";
 import { isAnimatedCard, hasAnimatedVideo } from "../utils/animationCard";
 import { isHighlightCard } from "../utils/highlightCard";
 import { downloadCardMedia, isMobileDownloadDevice } from "../utils/downloadCardMedia";
@@ -25,6 +26,7 @@ export default function PostGenerationPanel({
   const [completedQty, setCompletedQty] = useState(1);
   const [qtyLoading, setQtyLoading] = useState(false);
   const [qtyError, setQtyError] = useState("");
+  const [qtyValue, setQtyValue] = useState(1);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState("");
 
@@ -79,6 +81,13 @@ export default function PostGenerationPanel({
             : Array.isArray(data?.detail)
               ? data.detail.map((x) => x?.msg || x).join(" ")
               : "Could not create copies.";
+        const currentRun = Number(detail?.print_run) || 1;
+        const limit = parseCopyLimitError(msg, currentRun);
+        if (limit) {
+          setQtyValue(limit.correctedQuantity);
+          setQtyError(limit.warning);
+          return;
+        }
         throw new Error(msg);
       }
       await onRefreshDetail?.();
@@ -144,7 +153,7 @@ export default function PostGenerationPanel({
       {showQty && phase === "select" ? (
         <>
           {qtyError ? (
-            <p className="mt-4 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-center text-sm text-rose-100">
+            <p className="mt-4 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-center text-sm text-amber-100">
               {qtyError}
             </p>
           ) : null}
@@ -154,6 +163,8 @@ export default function PostGenerationPanel({
             onConfirm={handleQuantityConfirm}
             copyPricingTiers={copyPricingTiers}
             currentRun={Number(detail.print_run) || 1}
+            value={qtyValue}
+            onChange={setQtyValue}
           />
         </>
       ) : null}

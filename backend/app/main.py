@@ -58,6 +58,7 @@ from card_pricing import (  # noqa: E402
     highlight_card_price,
     tier_generation_price,
 )
+from copy_limits import validate_copy_order_quantity  # noqa: E402
 from card_history import build_card_history  # noqa: E402
 from card_cleanup import run_deleted_cards_cleanup_pass
 from card_repo import (  # noqa: E402
@@ -1383,10 +1384,10 @@ class CardVaultSummary(BaseModel):
 
 
 class CardDuplicateBody(BaseModel):
-    """Request body for expanding a print run (target total: 1–100)."""
+    """Request body for expanding a print run (target total: 1–200)."""
 
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
-    quantity: int = Field(..., ge=1, le=100)
+    quantity: int = Field(..., ge=1, le=200)
 
 
 class Card(BaseModel):
@@ -2151,8 +2152,12 @@ def duplicate_cards(
         raise HTTPException(status_code=400, detail="Only active cards can be duplicated")
     if not isinstance(body.quantity, int):
         raise HTTPException(status_code=400, detail="Quantity must be a whole number.")
-    if body.quantity < 1 or body.quantity > 100:
-        raise HTTPException(status_code=400, detail="Quantity must be between 1 and 100.")
+    validate_copy_order_quantity(
+        db,
+        owner_id=current_user.id,
+        anchor=orm,
+        target_quantity=body.quantity,
+    )
     current_run = int(orm.print_run or 1)
     copy_charge = copy_charge_for_quantity(body.quantity, current_run=current_run)
     if copy_charge["total"] > 0:

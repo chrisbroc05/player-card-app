@@ -1,8 +1,10 @@
 import { formatMoney } from "./marketplace";
 
+export const ANIMATED_COPY_QUANTITY_MAX = 10;
+
 /** Mirror backend animated_studio_total_price. */
 export function animatedStudioTotalPrice(quantity, pricing = {}) {
-  const q = Math.max(1, Math.min(100, Number(quantity) || 1));
+  const q = Math.max(1, Math.min(ANIMATED_COPY_QUANTITY_MAX, Number(quantity) || 1));
   const base = Number(pricing.animated_upgrade_price ?? pricing.base_price ?? 10);
   const extra = Math.max(0, q - 1);
   if (extra === 0) {

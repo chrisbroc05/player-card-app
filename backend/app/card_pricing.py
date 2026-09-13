@@ -55,21 +55,40 @@ def tier_generation_price(tier: str | None) -> float:
 
 
 def _copy_tier_defaults() -> list[dict]:
+    tier_2_4 = _parse_price(
+        os.environ.get("COPY_PRICE_TIER_2_4") or os.environ.get("COPY_PRICE_TIER_1_4"),
+        0.50,
+    )
+    tier_5_9 = _parse_price(os.environ.get("COPY_PRICE_TIER_5_9"), 0.40)
+    tier_10_49 = _parse_price(
+        os.environ.get("COPY_PRICE_TIER_10_49") or os.environ.get("COPY_PRICE_TIER_10_PLUS"),
+        0.30,
+    )
+    tier_50_100 = _parse_price(os.environ.get("COPY_PRICE_TIER_50_100"), 0.25)
     return [
         {
-            "min_copies": 1,
+            "min_copies": 2,
             "max_copies": 4,
-            "price_per_copy": _parse_price(os.environ.get("COPY_PRICE_TIER_1_4"), 0.50),
+            "price_per_copy": tier_2_4,
+            "label": "Small Bundle",
         },
         {
             "min_copies": 5,
             "max_copies": 9,
-            "price_per_copy": _parse_price(os.environ.get("COPY_PRICE_TIER_5_9"), 0.40),
+            "price_per_copy": tier_5_9,
+            "label": "Bundle",
         },
         {
             "min_copies": 10,
-            "max_copies": None,
-            "price_per_copy": _parse_price(os.environ.get("COPY_PRICE_TIER_10_PLUS"), 0.30),
+            "max_copies": 49,
+            "price_per_copy": tier_10_49,
+            "label": "Large Bundle",
+        },
+        {
+            "min_copies": 50,
+            "max_copies": 100,
+            "price_per_copy": tier_50_100,
+            "label": "Collector Pack",
         },
     ]
 
@@ -79,15 +98,53 @@ def copy_pricing_tiers() -> list[dict]:
     return _copy_tier_defaults()
 
 
-def copy_unit_price_for_quantity(quantity: int) -> float:
-    """Unit copy price based on target total quantity tier."""
+def get_copy_tier_label(quantity: int) -> str:
     q = max(1, int(quantity))
+    if q <= 1:
+        return "Single"
+    if q <= 4:
+        return "Small Bundle"
+    if q <= 9:
+        return "Bundle"
+    if q <= 49:
+        return "Large Bundle"
+    return "Collector Pack"
+
+
+def copy_unit_price_for_quantity(quantity: int) -> float:
+    """Unit copy price based on target total quantity tier (additional copies only)."""
+    q = max(1, int(quantity))
+    if q <= 1:
+        return 0.0
     for tier in copy_pricing_tiers():
         lo = int(tier["min_copies"])
         hi = tier["max_copies"]
         if q >= lo and (hi is None or q <= int(hi)):
             return float(tier["price_per_copy"])
     return 0.50
+
+
+def calculate_total_copy_cost(quantity: int, tier: str | None = None) -> dict:
+    """Total cost for additional copies with breakdown for display."""
+    q = max(1, int(quantity))
+    if q <= 1:
+        return {
+            "quantity": q,
+            "price_per_copy": 0.0,
+            "additional_copies": 0,
+            "total_cost": 0.0,
+            "tier_label": get_copy_tier_label(q),
+        }
+    price_per = copy_unit_price_for_quantity(q)
+    additional = q - 1
+    total = round(additional * price_per, 2)
+    return {
+        "quantity": q,
+        "additional_copies": additional,
+        "price_per_copy": price_per,
+        "total_cost": total,
+        "tier_label": get_copy_tier_label(q),
+    }
 
 
 def copy_charge_for_quantity(target_quantity: int, *, current_run: int = 1) -> dict:

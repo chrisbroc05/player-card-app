@@ -20,7 +20,7 @@ _CARD_ID_PATTERN = re.compile(r"^FL-\d{4}-\d{6}$", re.IGNORECASE)
 
 PRINT_RUN_ALLOWED_QUANTITIES = frozenset({1, 2, 5, 10})  # legacy presets; validation uses range below
 COPY_QUANTITY_MIN = 1
-COPY_QUANTITY_MAX = 100
+COPY_QUANTITY_MAX = 200
 
 
 def validate_print_run_quantity(quantity: int) -> None:

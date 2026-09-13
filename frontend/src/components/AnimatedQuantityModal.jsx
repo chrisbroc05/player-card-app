@@ -3,18 +3,24 @@ import { Link } from "react-router-dom";
 import CardImage from "./CardImage";
 import { formatMoney } from "../utils/marketplace";
 import { creditTopUpShortfallMessage } from "../utils/credits";
+import { animatedStudioBreakdown, animatedStudioPriceLine } from "../utils/animatedCopyPricing";
+import { bulkDiscountMessage, COPY_QUANTITY_MIN } from "../utils/copyPricing";
 import {
-  animatedStudioBreakdown,
-  animatedStudioPriceLine,
+  ANIMATED_COPY_QUANTITY_MAX,
   animatedStudioTotalPrice,
 } from "../utils/animatedCopyPricing";
-import {
-  bulkDiscountMessage,
-  clampCopyQuantity,
-  isValidCopyQuantity,
-  COPY_QUANTITY_MAX,
-  COPY_QUANTITY_MIN,
-} from "../utils/copyPricing";
+
+function clampAnimatedQty(value) {
+  const n = Math.floor(Number(value));
+  if (!Number.isFinite(n)) return COPY_QUANTITY_MIN;
+  return Math.min(ANIMATED_COPY_QUANTITY_MAX, Math.max(COPY_QUANTITY_MIN, n));
+}
+
+function isValidAnimatedQty(value) {
+  if (value === "" || value == null) return false;
+  const n = Number(value);
+  return Number.isInteger(n) && n >= COPY_QUANTITY_MIN && n <= ANIMATED_COPY_QUANTITY_MAX;
+}
 import { useScrollModalIntoView } from "../hooks/useScrollIntoViewOnChange";
 
 const PRESET_OPTIONS = [1, 2, 3, 4, 5, 10];
@@ -56,8 +62,8 @@ export default function AnimatedQuantityModal({
   if (!open) return null;
 
   const effectiveQty =
-    mode === "custom" && isValidCopyQuantity(customInput)
-      ? clampCopyQuantity(customInput)
+    mode === "custom" && isValidAnimatedQty(customInput)
+      ? clampAnimatedQty(customInput)
       : mode === "custom"
         ? null
         : selected;
@@ -68,10 +74,10 @@ export default function AnimatedQuantityModal({
   const shortfall = pricing ? Math.max(0, pricing.total - creditBalance) : 0;
 
   const customError =
-    mode === "custom" && customInput !== "" && !isValidCopyQuantity(customInput)
-      ? `Please enter a valid quantity (${COPY_QUANTITY_MIN}-${COPY_QUANTITY_MAX})`
+    mode === "custom" && customInput !== "" && !isValidAnimatedQty(customInput)
+      ? `Please enter a valid quantity (${COPY_QUANTITY_MIN}-${ANIMATED_COPY_QUANTITY_MAX})`
       : mode === "custom" && customInput === ""
-        ? "Please enter a valid quantity (1-100)"
+        ? `Please enter a valid quantity (1-${ANIMATED_COPY_QUANTITY_MAX})`
         : null;
 
   const canProceedToConfirm = effectiveQty !== null && !customError;
@@ -91,16 +97,16 @@ export default function AnimatedQuantityModal({
 
   function selectCustomMode() {
     setMode("custom");
-    if (isValidCopyQuantity(customInput)) {
-      setSelected(clampCopyQuantity(customInput));
+    if (isValidAnimatedQty(customInput)) {
+      setSelected(clampAnimatedQty(customInput));
     }
   }
 
   function handleCustomInputChange(raw) {
     const digits = raw.replace(/\D/g, "");
     setCustomInput(digits);
-    if (isValidCopyQuantity(digits)) {
-      setSelected(clampCopyQuantity(digits));
+    if (isValidAnimatedQty(digits)) {
+      setSelected(clampAnimatedQty(digits));
     }
   }
 
@@ -164,7 +170,7 @@ export default function AnimatedQuantityModal({
                   }`}
                 >
                   <span className="text-sm font-bold">Custom</span>
-                  <span className="mt-0.5 text-[10px] uppercase tracking-wide">1–{COPY_QUANTITY_MAX}</span>
+                  <span className="mt-0.5 text-[10px] uppercase tracking-wide">1–{ANIMATED_COPY_QUANTITY_MAX}</span>
                 </button>
               </div>
 

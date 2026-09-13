@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from auth import get_current_user, get_optional_current_user
 from card_repo import get_card_by_card_id
+from copy_limits import validate_bulk_list_quantity
 from credit_service import (
     InsufficientCreditsError,
     TX_ROYALTY,
@@ -439,6 +440,7 @@ def marketplace_bulk_list(
         raise HTTPException(status_code=400, detail="Only active cards can be listed")
     if body.asking_price < 1.0:
         raise HTTPException(status_code=400, detail="Asking price must be at least $1.00")
+    validate_bulk_list_quantity(body.quantity)
 
     available = list_unlisted_copy_cards(
         db,

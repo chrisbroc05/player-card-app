@@ -45,7 +45,7 @@ import { useSettings } from "../context/SettingsContext";
 import { useFeatures } from "../context/FeatureContext";
 import { useNewCardCelebration } from "../context/NewCardCelebrationContext";
 import { fetchGenerationPrice } from "../utils/cardPricing";
-import { copyChargeForQuantity, normalizeCopyTiers } from "../utils/copyPricing";
+import { copyChargeForQuantity, normalizeCopyTiers, parseCopyLimitError } from "../utils/copyPricing";
 import { formatMoney } from "../utils/marketplace";
 import { creditTopUpShortfallMessage } from "../utils/credits";
 import {
@@ -2187,7 +2187,14 @@ export default function StudioPage() {
         });
         const dupData = await dupRes.json().catch(() => ({}));
         if (!dupRes.ok) {
-          throw new Error(formatApiError(dupData?.detail, "Could not create additional copies."));
+          const dupMsg = formatApiError(dupData?.detail, "Could not create additional copies.");
+          const limit = parseCopyLimitError(dupMsg, 1);
+          if (limit) {
+            setCopyQuantity(limit.correctedQuantity);
+            setError(limit.warning);
+            return;
+          }
+          throw new Error(dupMsg);
         }
         if (cardId) await fetchCardDetailById(cardId);
       }
@@ -3259,6 +3266,7 @@ export default function StudioPage() {
                           disabled={addCollectionLoading}
                           loading={addCollectionLoading}
                           copyPricingTiers={copyPricingTiers}
+                          tierBasePrice={additionalPreviewCost}
                           value={copyQuantity}
                           onChange={setCopyQuantity}
                           onConfirm={handleConfirmAddToCollection}

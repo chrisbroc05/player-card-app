@@ -27,10 +27,15 @@ Backend on Render should also set:
     Animated card upgrade on first preview (Studio flow).
   HIGHLIGHT_CARD_PRICE=5.00
     Highlight video upgrade when user uploads a clip to their card.
-  COPY_PRICE_TIER_1_4=0.50
+  COPY_PRICE_TIER_2_4=0.50
   COPY_PRICE_TIER_5_9=0.40
-  COPY_PRICE_TIER_10_PLUS=0.30
+  COPY_PRICE_TIER_10_49=0.30
+  COPY_PRICE_TIER_50_100=0.25
     Bulk pricing for additional card copies (not preview regeneration).
+  MAX_COPIES_PER_ORDER=100
+  MAX_COPIES_PER_USER_PER_CARD=200
+  MAX_COPIES_LISTED_AT_ONCE=50
+    Copy order and bulk listing limits (adjust without redeploying code).
   PLATFORM_ROYALTY_RATE=0.08
     Marketplace platform fee on completed cash sales (seller net = sale − royalty).
     Override without redeploying code; must match frontend PLATFORM_ROYALTY_RATE for previews.
