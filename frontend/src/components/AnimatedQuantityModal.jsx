@@ -3,12 +3,14 @@ import { Link } from "react-router-dom";
 import CardImage from "./CardImage";
 import { formatMoney } from "../utils/marketplace";
 import { creditTopUpShortfallMessage } from "../utils/credits";
-import { animatedStudioBreakdown, animatedStudioPriceLine } from "../utils/animatedCopyPricing";
-import { bulkDiscountMessage, COPY_QUANTITY_MIN } from "../utils/copyPricing";
 import {
   ANIMATED_COPY_QUANTITY_MAX,
+  animatedStudioBreakdown,
+  animatedStudioPriceLine,
   animatedStudioTotalPrice,
 } from "../utils/animatedCopyPricing";
+import { bulkDiscountMessage, COPY_QUANTITY_MIN } from "../utils/copyPricing";
+import Modal from "./Modal";
 
 function clampAnimatedQty(value) {
   const n = Math.floor(Number(value));
@@ -21,7 +23,6 @@ function isValidAnimatedQty(value) {
   const n = Number(value);
   return Number.isInteger(n) && n >= COPY_QUANTITY_MIN && n <= ANIMATED_COPY_QUANTITY_MAX;
 }
-import { useScrollModalIntoView } from "../hooks/useScrollIntoViewOnChange";
 
 const PRESET_OPTIONS = [1, 2, 3, 4, 5, 10];
 
@@ -40,8 +41,6 @@ export default function AnimatedQuantityModal({
   const [mode, setMode] = useState("preset");
   const [customInput, setCustomInput] = useState("");
   const [step, setStep] = useState("quantity");
-  const dialogRef = React.useRef(null);
-  useScrollModalIntoView(open, dialogRef);
 
   useEffect(() => {
     if (open) {
@@ -58,8 +57,6 @@ export default function AnimatedQuantityModal({
     const theme = previewCard?.theme ?? previewCard?.special_theme ?? "missing";
     console.log("[AnimatedQuantityModal] preview card tier/theme", { tier, theme, previewCard });
   }, [open, previewCard]);
-
-  if (!open) return null;
 
   const effectiveQty =
     mode === "custom" && isValidAnimatedQty(customInput)
@@ -111,14 +108,14 @@ export default function AnimatedQuantityModal({
   }
 
   return (
-    <div className="mobile-bottom-sheet-overlay fixed inset-0 z-[59] flex items-end justify-center bg-black/75 p-3 sm:items-center sm:p-4">
-      <div
-        ref={dialogRef}
-        className="scroll-focus-target max-h-[90vh] w-full min-w-0 overflow-y-auto rounded-2xl border border-violet-400/30 bg-cardBg shadow-2xl sm:min-w-[480px] sm:max-w-lg"
-        role="dialog"
-        aria-labelledby="animated-qty-title"
-        aria-modal="true"
-      >
+    <Modal
+      isOpen={open}
+      onClose={onClose}
+      maxWidth="520px"
+      ariaLabelledby="animated-qty-title"
+      contentClassName="modal-portal-content--animate !p-0 overflow-hidden"
+    >
+      <div className="min-w-0">
         {step === "quantity" ? (
           <>
             <div className="border-b border-white/10 bg-gradient-to-r from-violet-500/15 via-cardBg2 to-[rgba(201,168,76,0.1)] px-6 py-5">
@@ -132,10 +129,8 @@ export default function AnimatedQuantityModal({
 
             <div className="px-6 py-6">
               {displayCard ? (
-                <div className="mx-auto mb-5 flex justify-center" style={{ width: 220, height: 308 }}>
-                  <div className="h-full w-full">
-                    <CardImage card={displayCard} alt={previewAlt} showInfoBanner variant="detail" />
-                  </div>
+                <div className="animate-modal-card-preview mb-5">
+                  <CardImage card={displayCard} alt={previewAlt} showInfoBanner variant="detail" playOnHover={false} />
                 </div>
               ) : null}
 
@@ -294,6 +289,6 @@ export default function AnimatedQuantityModal({
           </>
         )}
       </div>
-    </div>
+    </Modal>
   );
 }

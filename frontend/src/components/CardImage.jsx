@@ -141,6 +141,7 @@ export default function CardImage({
   token = "",
   captureRef = null,
   onMediaReady,
+  disableMobileMediaToggle = false,
 }) {
   const { settings } = useSettings();
   const autoplayEnabled = settings.autoplay_videos !== false;
@@ -426,7 +427,7 @@ export default function CardImage({
     (showInfoBanner === true || syntheticCard.player_name || syntheticCard.playerName);
 
   const handleMobileToggle = (event) => {
-    if (!isGridBrowse || canHover || useViewportAutoplay) return;
+    if (!isGridBrowse || canHover || useViewportAutoplay || disableMobileMediaToggle) return;
     event.preventDefault();
     event.stopPropagation();
     setMobileActive((prev) => !prev);
@@ -616,7 +617,11 @@ export default function CardImage({
             }
           : undefined
       }
-      onClick={isGridBrowse && !canHover && !useViewportAutoplay ? handleMobileToggle : undefined}
+      onClick={
+        isGridBrowse && !canHover && !useViewportAutoplay && !disableMobileMediaToggle
+          ? handleMobileToggle
+          : undefined
+      }
     >
       {mediaInner}
     </div>

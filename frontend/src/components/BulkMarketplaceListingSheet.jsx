@@ -1,10 +1,58 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import CardImage from "./CardImage";
+import Modal from "./Modal";
+import { toApiUrl } from "../config/api";
 import { formatMoney, PLATFORM_ROYALTY_RATE } from "../utils/marketplace";
 import { MAX_COPIES_LISTED_AT_ONCE, parseCopyLimitError } from "../utils/copyPricing";
-import { themeDisplayLabel } from "../utils/cardBannerStyles";
 import { cardMediaFrameClass } from "../utils/highlightCard";
+import { rarityDisplay } from "../utils/tierStyles";
+
+function SelectedCardsPreview({ cards }) {
+  if (!cards?.length) return null;
+
+  const count = cards.length;
+  const isSingle = count === 1;
+  const showScrollFade = count > 3;
+
+  return (
+    <div className="bulk-list-selected-preview">
+      <p className="bulk-list-selected-summary">
+        {count} card{count === 1 ? "" : "s"} selected
+      </p>
+      <div
+        className={`cards-scroll-container${isSingle ? " cards-scroll-container--single" : ""}${showScrollFade ? " cards-scroll-container--fade" : ""}`}
+        aria-label="Selected cards"
+      >
+        {cards.map((card) => {
+          const rarityLabel = card.rarity_display_name || rarityDisplay(card.rarity);
+          const showRarity = card.rarity && card.rarity !== "standard" && rarityLabel;
+          return (
+            <div
+              key={card.card_id}
+              className={`bulk-list-selected-thumb-item${isSingle ? " bulk-list-selected-thumb-item--single" : ""}`}
+            >
+              <div
+                className={`bulk-list-selected-thumb-frame${isSingle ? " bulk-list-selected-thumb-frame--single" : ""}`}
+              >
+                {card.image_url ? (
+                  <img src={toApiUrl(card.image_url)} alt={card.player_name || "Card"} loading="lazy" />
+                ) : (
+                  <div className="bulk-list-selected-thumb-placeholder" aria-hidden />
+                )}
+                {showRarity ? (
+                  <div className="bulk-list-selected-thumb-rarity">{rarityLabel}</div>
+                ) : null}
+              </div>
+              <div className="bulk-list-selected-thumb-name">{card.player_name}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function ListingConfirmationModal({
   open,
@@ -19,14 +67,8 @@ function ListingConfirmationModal({
   if (!open || !card) return null;
 
   return (
-    <div className="listing-confirmation-modal" role="presentation" onClick={onCancel}>
-      <div
-        className="listing-confirmation-content"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="listing-confirm-title"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Modal isOpen={open} onClose={onCancel} maxWidth="340px" ariaLabelledby="listing-confirm-title">
+      <div className="listing-confirmation-content">
         <div className="listing-confirmation-thumb">
           <CardImage
             card={card}
@@ -41,14 +83,19 @@ function ListingConfirmationModal({
         </h2>
         <p className="listing-confirmation-line">Listed at {formatMoney(priceNum)} each</p>
         <p className="listing-confirmation-earnings">Potential earnings: {formatMoney(netEarnings)}</p>
-        <button type="button" className="bulk-list-sheet__primary-btn" disabled={busy} onClick={onConfirm}>
+        <button
+          type="button"
+          className="bulk-list-sheet__primary-btn modal-portal-action"
+          disabled={busy}
+          onClick={onConfirm}
+        >
           {busy ? "Listing…" : "List on Marketplace"}
         </button>
-        <button type="button" className="bulk-list-sheet__secondary-btn" disabled={busy} onClick={onCancel}>
+        <button type="button" className="bulk-list-sheet__secondary-btn modal-portal-action" disabled={busy} onClick={onCancel}>
           Cancel
         </button>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -147,32 +194,26 @@ export default function BulkMarketplaceListingSheet({
 
   if (successCount != null) {
     return (
-      <div className="listing-confirmation-modal" role="presentation" onClick={resetAndClose}>
-        <div
-          className="listing-confirmation-content"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="bulk-list-success-title"
-          onClick={(e) => e.stopPropagation()}
-        >
+      <Modal isOpen onClose={resetAndClose} maxWidth="340px" ariaLabelledby="bulk-list-success-title">
+        <div className="listing-confirmation-content">
           <div className="bulk-list-sheet__success-icon" aria-hidden>
             ✓
           </div>
           <h2 id="bulk-list-success-title" className="listing-confirmation-title">
             {successCount} {successCount === 1 ? "copy" : "copies"} listed on marketplace!
           </h2>
-          <Link to="/marketplace/my-listings" className="bulk-list-sheet__primary-btn" onClick={resetAndClose}>
+          <Link to="/marketplace/my-listings" className="bulk-list-sheet__primary-btn modal-portal-action" onClick={resetAndClose}>
             View Listings
           </Link>
-          <button type="button" className="bulk-list-sheet__secondary-btn" onClick={resetAndClose}>
+          <button type="button" className="bulk-list-sheet__secondary-btn modal-portal-action" onClick={resetAndClose}>
             Done
           </button>
         </div>
-      </div>
+      </Modal>
     );
   }
 
-  return (
+  const sheet = (
     <>
       <div className="bulk-list-sheet__backdrop bulk-list-sheet__backdrop--sheet" role="presentation" onClick={resetAndClose}>
         <div
@@ -190,26 +231,7 @@ export default function BulkMarketplaceListingSheet({
           </h2>
 
           {isSelectMode ? (
-            <>
-              <p className="bulk-list-sheet__subtext">
-                You have selected {listableSelected.length} card{listableSelected.length === 1 ? "" : "s"} to list
-              </p>
-              {listableSelected.length > 1 ? (
-                <div className="bulk-list-selected-thumbs" aria-label="Selected cards">
-                  {listableSelected.map((c) => (
-                    <div key={c.card_id} className="bulk-list-selected-thumb">
-                      <CardImage
-                        card={c}
-                        alt={c.player_name}
-                        cacheBust={c.created_at}
-                        frameClassName={`${cardMediaFrameClass(c)} w-full`}
-                        playOnHover={false}
-                      />
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </>
+            <SelectedCardsPreview cards={listableSelected} />
           ) : (
             <p className="bulk-list-sheet__subtext">
               You own {owned} {owned === 1 ? "copy" : "copies"} of this card
@@ -312,7 +334,7 @@ export default function BulkMarketplaceListingSheet({
 
           <button
             type="button"
-            className="bulk-list-sheet__primary-btn"
+            className="bulk-list-sheet__primary-btn modal-portal-action"
             disabled={!priceValid || busy || (isSelectMode && listableSelected.length === 0)}
             onClick={() => setConfirmOpen(true)}
           >
@@ -334,4 +356,6 @@ export default function BulkMarketplaceListingSheet({
       />
     </>
   );
+
+  return createPortal(sheet, document.body);
 }

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import Modal from "./Modal";
 import PriorityBadge, { isPriorityListing } from "./PriorityBadge";
 import { formatMoney, PRIORITY_LISTING_FEE } from "../utils/marketplace";
 
@@ -164,53 +165,42 @@ export default function MarketplaceListingActions({
 }
 
 export function ListedSuccessModal({ open, onClose, variant = "default", onViewMarketplace }) {
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 px-3 py-4 sm:px-4">
-      <div
-        className="w-full max-w-sm rounded-2xl border border-[var(--color-success)]/30 bg-cardBg p-5 shadow-2xl shadow-black/50 sm:p-6"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="listed-success-title"
-      >
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border bg-success-subtle text-2xl text-success">
-          ✓
-        </div>
-        <h3 id="listed-success-title" className="mt-3 text-center text-xl font-semibold text-white">
-          Card Listed!
-        </h3>
-        <p className="mt-2 text-center text-sm text-slate-300">
-          Your card is now live on the marketplace.
-        </p>
-        {variant === "my-collection" ? (
-          <div className="mt-5 space-y-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg border border-white/20 bg-white/5 px-4 text-sm font-semibold text-slate-100 transition hover:border-white/30 hover:bg-white/10"
-            >
-              Go to My Collection
-            </button>
-            <button
-              type="button"
-              onClick={onViewMarketplace}
-              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950 transition hover:opacity-90"
-            >
-              View on Marketplace
-            </button>
-          </div>
-        ) : (
+    <Modal isOpen={open} onClose={onClose} maxWidth="384px" ariaLabelledby="listed-success-title">
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border bg-success-subtle text-2xl text-success">
+        ✓
+      </div>
+      <h3 id="listed-success-title" className="mt-3 text-center text-xl font-semibold text-white">
+        Card Listed!
+      </h3>
+      <p className="mt-2 text-center text-sm text-slate-300">Your card is now live on the marketplace.</p>
+      {variant === "my-collection" ? (
+        <div className="mt-5 space-y-2">
           <button
             type="button"
             onClick={onClose}
-            className="mt-5 inline-flex min-h-[44px] w-full items-center justify-center rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950 transition hover:opacity-90"
+            className="modal-portal-action inline-flex min-h-[44px] w-full items-center justify-center rounded-lg border border-white/20 bg-white/5 px-4 text-sm font-semibold text-slate-100 transition hover:border-white/30 hover:bg-white/10"
           >
-            OK
+            Go to My Collection
           </button>
-        )}
-      </div>
-    </div>
+          <button
+            type="button"
+            onClick={onViewMarketplace}
+            className="modal-portal-action inline-flex min-h-[44px] w-full items-center justify-center rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950 transition hover:opacity-90"
+          >
+            View on Marketplace
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={onClose}
+          className="modal-portal-action mt-5 inline-flex min-h-[44px] w-full items-center justify-center rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950 transition hover:opacity-90"
+        >
+          OK
+        </button>
+      )}
+    </Modal>
   );
 }
 

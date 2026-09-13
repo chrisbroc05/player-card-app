@@ -1,5 +1,5 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import CardImage from "./CardImage";
 import AnimatedBadge from "./AnimatedBadge";
 import HighlightBadge from "./HighlightBadge";
@@ -13,6 +13,7 @@ import ProfileLink from "./ProfileLink";
 
 /** @param {"list" | "compact"} [variant] — list = current marketplace cards; compact = thumbnail grid */
 export default function MarketplaceCardGridItem({ listing, variant = "list", currentUserId = null }) {
+  const navigate = useNavigate();
   const badge = vaultTierBadge(listing.tier);
   const cardPath = `/marketplace/${encodeURIComponent(listing.card_id)}`;
   const animated = isAnimatedCard(listing);
@@ -20,18 +21,31 @@ export default function MarketplaceCardGridItem({ listing, variant = "list", cur
   const mediaCard = cardPlaysVideoOnHover(listing);
   const priority = isPriorityListing(listing);
 
+  function openCardDetail() {
+    navigate(cardPath);
+  }
+
   if (variant === "compact") {
     return (
-      <Link
-        to={cardPath}
-        className={`group flex flex-col rounded-xl border border-white/10 bg-cardBg p-2 shadow-md transition duration-200 hover:border-white/20 ${mediaCard ? "" : "hover:scale-[1.02]"} ${badge.glow}`}
+      <div
+        role="link"
+        tabIndex={0}
+        onClick={openCardDetail}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            openCardDetail();
+          }
+        }}
+        className={`marketplace-card-wrapper group flex flex-col rounded-xl border border-white/10 bg-cardBg p-2 shadow-md transition duration-200 hover:border-white/20 ${mediaCard ? "" : "hover:scale-[1.02]"} ${badge.glow}`}
       >
-        <div className="relative">
+        <div className="card-image-area relative">
           <CardImage
             card={listing}
             alt={listing.player_name}
             frameClassName={cardMediaFrameClass(listing, { thumb: true })}
             playOnHover
+            disableMobileMediaToggle
             showAnimatedBadge={false}
             showHighlightBadge={false}
             showInfoBanner
@@ -53,7 +67,7 @@ export default function MarketplaceCardGridItem({ listing, variant = "list", cur
           ) : null}
         </div>
         <p className="mt-2 px-0.5 text-center text-xs font-bold text-brand-gold">{formatMoney(listing.asking_price)}</p>
-      </Link>
+      </div>
     );
   }
 

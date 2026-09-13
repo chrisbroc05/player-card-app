@@ -9,6 +9,7 @@ import { CardSharePopover } from "../components/ShareCard";
 import { useAuth } from "../context/AuthContext";
 import { useSettings } from "../context/SettingsContext";
 import BulkMarketplaceListingSheet from "../components/BulkMarketplaceListingSheet";
+import Modal from "../components/Modal";
 import LazyCollectionCard from "../components/LazyCollectionCard";
 import { getCollectionCache, invalidateCollectionCache, setCollectionCache } from "../utils/collectionCache";
 import MarketplaceListingActions, { ListedSuccessModal } from "../components/MarketplaceListingActions";
@@ -1074,22 +1075,30 @@ export default function MyCollectionPage({ vaultView = false }) {
         </div>
       ) : null}
 
-      {bulkDeleteConfirm ? (
-        <div className="bulk-list-sheet__backdrop" role="presentation" onClick={() => setBulkDeleteConfirm(false)}>
-          <div className="bulk-list-sheet" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-            <h2 className="bulk-list-sheet__title">Move to Recently Deleted?</h2>
-            <p className="bulk-list-sheet__subtext">
-              Move {selectedCards.length} card{selectedCards.length === 1 ? "" : "s"} to Recently Deleted?
-            </p>
-            <button type="button" className="bulk-list-sheet__primary-btn" disabled={Boolean(deleteBusyId)} onClick={confirmBulkDeleteSelected}>
-              {deleteBusyId ? "Deleting…" : "Confirm"}
-            </button>
-            <button type="button" className="bulk-list-sheet__secondary-btn" onClick={() => setBulkDeleteConfirm(false)}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : null}
+      <Modal
+        isOpen={bulkDeleteConfirm}
+        onClose={() => setBulkDeleteConfirm(false)}
+        maxWidth="420px"
+        ariaLabelledby="bulk-delete-title"
+      >
+        <h2 id="bulk-delete-title" className="bulk-list-sheet__title">
+          Move to Recently Deleted?
+        </h2>
+        <p className="bulk-list-sheet__subtext">
+          Move {selectedCards.length} card{selectedCards.length === 1 ? "" : "s"} to Recently Deleted?
+        </p>
+        <button
+          type="button"
+          className="bulk-list-sheet__primary-btn modal-portal-action"
+          disabled={Boolean(deleteBusyId)}
+          onClick={confirmBulkDeleteSelected}
+        >
+          {deleteBusyId ? "Deleting…" : "Confirm"}
+        </button>
+        <button type="button" className="bulk-list-sheet__secondary-btn modal-portal-action" onClick={() => setBulkDeleteConfirm(false)}>
+          Cancel
+        </button>
+      </Modal>
 
       <CollectionToast message={toast.message} variant={toast.variant} />
 

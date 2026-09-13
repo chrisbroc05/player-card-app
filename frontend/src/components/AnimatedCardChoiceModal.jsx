@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect } from "react";
 import CardImage from "./CardImage";
-import { useScrollModalIntoView } from "../hooks/useScrollIntoViewOnChange";
+import Modal from "./Modal";
 import { themeDisplayLabel } from "../utils/cardBannerStyles";
 import { normalizeHighlightThemeKey } from "../utils/highlightCardStyles";
 
@@ -13,9 +13,6 @@ export default function AnimatedCardChoiceModal({
   onSaveStatic,
   busy = false,
 }) {
-  const dialogRef = useRef(null);
-  useScrollModalIntoView(open, dialogRef);
-
   useEffect(() => {
     if (!open) return;
     const tier = previewCard?.tier ?? "missing";
@@ -23,7 +20,7 @@ export default function AnimatedCardChoiceModal({
     console.log("[AnimatedCardChoiceModal] preview card tier/theme", { tier, theme, previewCard });
   }, [open, previewCard]);
 
-  if (!open || !previewImageUrl) return null;
+  if (!previewImageUrl) return null;
 
   const displayCard =
     previewCard ||
@@ -39,53 +36,51 @@ export default function AnimatedCardChoiceModal({
   const showThemeDisclaimer = themeKey !== "default" && Boolean(themeLabel);
 
   return (
-    <div className="animated-popup-overlay fixed inset-0 z-[58] flex items-end justify-center bg-black/75 p-4 sm:items-center sm:p-4">
-      <div
-        ref={dialogRef}
-        className="animated-popup-dialog scroll-focus-target w-full min-w-0 overflow-hidden rounded-2xl border border-violet-400/30 bg-cardBg shadow-2xl sm:min-w-[500px] sm:max-w-lg"
-        role="dialog"
-        aria-labelledby="animated-choice-title"
-        aria-modal="true"
-      >
-        <h2 id="animated-choice-title" className="text-center text-lg font-semibold text-white sm:text-xl">
-          Your card is ready — want to animate it?
-        </h2>
+    <Modal
+      isOpen={open}
+      onClose={() => {}}
+      maxWidth="512px"
+      ariaLabelledby="animated-choice-title"
+      contentClassName="modal-portal-content--animate"
+    >
+      <h2 id="animated-choice-title" className="text-center text-lg font-semibold text-white sm:text-xl">
+        Your card is ready — want to animate it?
+      </h2>
 
-        <div className="animated-popup-card-wrap mt-5">
-          <CardImage card={displayCard} alt={previewAlt} showInfoBanner variant="detail" />
-        </div>
-
-        {showThemeDisclaimer ? (
-          <div className="animated-theme-disclaimer mt-4" role="note">
-            <span className="animated-theme-disclaimer__icon" aria-hidden>
-              ℹ️
-            </span>
-            <p className="animated-theme-disclaimer__text">
-              Note: Your {themeLabel} theme styling appears on the card frame and banner. The animation shows your
-              player photo in motion — the theme is applied as a visual overlay when viewing the card.
-            </p>
-          </div>
-        ) : null}
-
-        <div className="mt-4 flex flex-col gap-3">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onAnimate}
-            className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-violet-500 px-4 text-sm font-semibold text-white transition hover:bg-violet-400 disabled:opacity-50"
-          >
-            Animate This Card
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onSaveStatic}
-            className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl border border-white/25 bg-transparent px-4 text-sm font-medium text-slate-200 transition hover:border-white/40 hover:bg-white/5 disabled:opacity-50"
-          >
-            Save as Static Card Instead
-          </button>
-        </div>
+      <div className="animate-modal-card-preview mt-5">
+        <CardImage card={displayCard} alt={previewAlt} showInfoBanner variant="detail" playOnHover={false} />
       </div>
-    </div>
+
+      {showThemeDisclaimer ? (
+        <div className="animated-theme-disclaimer mt-4" role="note">
+          <span className="animated-theme-disclaimer__icon" aria-hidden>
+            ℹ️
+          </span>
+          <p className="animated-theme-disclaimer__text">
+            Note: Your {themeLabel} theme styling appears on the card frame and banner. The animation shows your player
+            photo in motion — the theme is applied as a visual overlay when viewing the card.
+          </p>
+        </div>
+      ) : null}
+
+      <div className="mt-4 flex flex-col gap-3">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onAnimate}
+          className="modal-portal-action inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-violet-500 px-4 text-sm font-semibold text-white transition hover:bg-violet-400 disabled:opacity-50"
+        >
+          Animate This Card
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onSaveStatic}
+          className="modal-portal-action inline-flex min-h-[48px] w-full items-center justify-center rounded-xl border border-white/25 bg-transparent px-4 text-sm font-medium text-slate-200 transition hover:border-white/40 hover:bg-white/5 disabled:opacity-50"
+        >
+          Save as Static Card Instead
+        </button>
+      </div>
+    </Modal>
   );
 }
