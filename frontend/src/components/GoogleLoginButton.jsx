@@ -12,7 +12,6 @@ export function GoogleLoginButton() {
         type="button"
         onClick={handleGoogleLogin}
         className="mb-4 flex w-full items-center justify-center gap-2.5 rounded-xl border border-[#E0E0E0] bg-white px-4 py-3.5 text-[15px] font-semibold text-[#1a1a1a]"
-        style={{ fontFamily: "system-ui, sans-serif" }}
       >
         <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
           <path

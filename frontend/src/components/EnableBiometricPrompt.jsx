@@ -170,7 +170,6 @@ export function EnableBiometricPrompt({ onDismiss, onEnabled }) {
             borderRadius: "12px",
             fontSize: "15px",
             fontWeight: "700",
-            fontFamily: "Barlow Condensed, sans-serif",
             letterSpacing: "0.5px",
             cursor: enabling || enabled ? "wait" : "pointer",
             marginBottom: "10px",

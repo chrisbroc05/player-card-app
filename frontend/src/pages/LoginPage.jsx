@@ -209,7 +209,6 @@ export default function LoginPage() {
                 onClick={loginWithBiometric}
                 disabled={biometricBusy || submitting}
                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-[rgba(201,168,76,0.4)] px-4 py-3.5 text-[15px] font-bold text-[#C9A84C]"
-                style={{ fontFamily: "Barlow Condensed, sans-serif" }}
               >
                 <span aria-hidden style={{ fontSize: "18px" }}>
                   👤

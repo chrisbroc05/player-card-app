@@ -35,7 +35,6 @@ export default function ActionCategoryStep({
                 borderColor: selected ? tierConfig.color : "rgba(255, 255, 255, 0.12)",
                 backgroundColor: selected ? `${tierConfig.color}18` : "rgba(15, 15, 20, 0.85)",
                 boxShadow: selected ? `0 0 24px ${tierConfig.color}33` : "none",
-                fontFamily: tierConfig.font,
               }}
             >
               <p

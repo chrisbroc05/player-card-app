@@ -124,7 +124,6 @@
     outline: none;
   }
 
-  button,
   textarea {
     font: inherit;
   }
@@ -159,55 +158,74 @@
 }
 
 @layer components {
-  .btn-primary {
-    background: var(--gradient-gold);
-    color: #0A0A0A;
+  .btn-primary,
+  button.primary {
+    background: linear-gradient(135deg, #c9a84c, #e8c56a);
+    color: #0a0a0a;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
+    padding: 12px 20px;
+    font-size: 15px;
     font-weight: 700;
     letter-spacing: 0.5px;
     box-shadow: 0 2px 12px rgba(201, 168, 76, 0.3);
-    transition: filter 0.15s ease, box-shadow 0.15s ease;
+    transition: filter 0.2s ease, box-shadow 0.2s ease;
   }
 
-  .btn-primary:hover:not(:disabled) {
+  .btn-primary:hover:not(:disabled),
+  button.primary:hover:not(:disabled) {
     filter: brightness(1.1);
     box-shadow: 0 4px 16px rgba(201, 168, 76, 0.45);
   }
 
-  .btn-secondary {
+  .btn-secondary,
+  button.secondary {
     background: transparent;
-    border: 1px solid var(--color-border-gold);
-    color: var(--color-text-gold);
-    border-radius: 8px;
-    transition: background 0.15s ease;
+    border: 1px solid rgba(201, 168, 76, 0.4);
+    color: #c9a84c;
+    border-radius: 10px;
+    padding: 11px 20px;
+    font-size: 14px;
+    font-weight: 700;
+    transition: background 0.2s ease;
   }
 
-  .btn-secondary:hover:not(:disabled) {
+  .btn-secondary:hover:not(:disabled),
+  button.secondary:hover:not(:disabled) {
     background: rgba(201, 168, 76, 0.1);
   }
 
-  .btn-ghost {
+  .btn-ghost,
+  button.ghost {
     background: transparent;
-    color: var(--color-text-secondary);
     border: none;
-    transition: color 0.15s ease;
+    color: var(--color-text-secondary);
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 700;
+    transition: color 0.2s ease;
   }
 
-  .btn-ghost:hover:not(:disabled) {
+  .btn-ghost:hover:not(:disabled),
+  button.ghost:hover:not(:disabled) {
     color: var(--color-text-primary);
   }
 
-  .btn-danger {
+  .btn-danger,
+  button.danger {
     background: transparent;
-    border: 1px solid var(--color-error);
-    color: var(--color-error);
-    border-radius: 8px;
-    transition: background 0.15s ease;
+    border: 1px solid rgba(239, 83, 80, 0.4);
+    color: #ef5350;
+    border-radius: 10px;
+    padding: 11px 20px;
+    font-size: 14px;
+    font-weight: 700;
+    transition: background 0.2s ease;
   }
 
-  .btn-danger:hover:not(:disabled) {
-    background: var(--color-error-bg);
+  .btn-danger:hover:not(:disabled),
+  button.danger:hover:not(:disabled) {
+    background: rgba(239, 83, 80, 0.1);
   }
 
   .surface-card {
@@ -7800,73 +7818,107 @@
   color: var(--color-text-muted);
 }
 
-.my-listings-v2__group-actions {
+.bulk-listing-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
   gap: 8px;
+  width: 100%;
+  margin-top: 12px;
+  flex-wrap: wrap;
 }
 
-.my-listings-v2__group-actions .my-listings-v2__btn {
+.bulk-listing-actions button {
+  flex: 1 1 calc(50% - 4px);
+  min-width: 80px;
+  max-width: 110px;
   width: auto;
   height: auto;
   min-height: 36px;
-  padding: 8px 16px;
-  font-family: "Barlow Condensed", sans-serif;
+  text-align: center;
+  white-space: nowrap;
+  font-size: 12px;
+  padding: 8px 10px;
 }
 
-.my-listings-v2__group-actions .my-listings-v2__btn--bulk-primary {
-  flex: 1 1 calc(50% - 4px);
-  border: 1px solid var(--color-border-gold);
-  background: transparent;
-  color: var(--color-text-gold, var(--color-gold-primary));
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  transition: background 0.2s ease;
-}
-
-.my-listings-v2__group-actions .my-listings-v2__btn--bulk-primary:hover:not(:disabled),
-.my-listings-v2__group-actions .my-listings-v2__btn--bulk-primary:active:not(:disabled) {
-  background: rgba(201, 168, 76, 0.1);
-}
-
-.my-listings-v2__group-actions .my-listings-v2__btn--bulk-secondary {
-  flex: 1 1 calc(50% - 4px);
-  border: 1px solid var(--color-border-subtle, rgba(255, 255, 255, 0.12));
-  background: transparent;
-  color: var(--color-text-secondary);
-  font-size: 13px;
-  font-weight: 600;
-  transition: all 0.2s ease;
-}
-
-.my-listings-v2__group-actions .my-listings-v2__btn--bulk-secondary:hover:not(:disabled),
-.my-listings-v2__group-actions .my-listings-v2__btn--bulk-secondary:active:not(:disabled) {
-  border-color: rgba(201, 168, 76, 0.3);
-  color: var(--color-text-primary);
-}
-
-.my-listings-v2__group-actions .my-listings-v2__btn--bulk-danger {
-  flex: 1 1 100%;
-  border: 1px solid rgba(239, 83, 80, 0.3);
-  background: transparent;
-  color: #ef5350;
-  font-size: 13px;
-  font-weight: 600;
-  transition: all 0.2s ease;
-}
-
-.my-listings-v2__group-actions .my-listings-v2__btn--bulk-danger:hover:not(:disabled),
-.my-listings-v2__group-actions .my-listings-v2__btn--bulk-danger:active:not(:disabled) {
-  background: rgba(239, 83, 80, 0.1);
+.bulk-listing-actions .btn-danger {
+  flex-basis: 100%;
+  max-width: none;
 }
 
 @media (min-width: 520px) {
-  .my-listings-v2__group-actions .my-listings-v2__btn--bulk-primary,
-  .my-listings-v2__group-actions .my-listings-v2__btn--bulk-secondary,
-  .my-listings-v2__group-actions .my-listings-v2__btn--bulk-danger {
-    flex: 0 1 auto;
+  .bulk-listing-actions button {
+    flex: 1 1 auto;
+    max-width: 110px;
   }
+
+  .bulk-listing-actions .btn-danger {
+    flex-basis: auto;
+    max-width: 110px;
+  }
+}
+
+.unlist-all-confirm-thumb {
+  width: 80px;
+  height: 112px;
+  margin: 0 auto 16px;
+  border-radius: 8px;
+}
+
+.unlist-all-confirm-body {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.unlist-all-confirm-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0 0 6px;
+}
+
+.unlist-all-confirm-text {
+  font-size: 13px;
+  color: #888888;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.unlist-all-confirm-copies {
+  color: #c9a84c;
+  font-weight: 700;
+}
+
+.unlist-all-confirm-name {
+  color: #ffffff;
+}
+
+.unlist-all-confirm-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.unlist-all-confirm-btn {
+  width: 100%;
+  padding: 13px;
+  border-radius: 10px;
+  font-size: 15px;
+}
+
+.unlist-all-confirm-btn--danger {
+  background: rgba(239, 83, 80, 0.15);
+  border: 1px solid rgba(239, 83, 80, 0.5);
+  color: #ef5350;
+}
+
+.unlist-all-confirm-btn--cancel {
+  padding: 12px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #888888;
+  font-size: 14px;
 }
 
 .copy-quantity-cap-note {
@@ -7980,3 +8032,25 @@
   min-width: 0;
 }
 
+/* Global button reset and base style */
+button,
+.btn,
+[role="button"] {
+  font-family: "Barlow Condensed", system-ui, sans-serif !important;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}

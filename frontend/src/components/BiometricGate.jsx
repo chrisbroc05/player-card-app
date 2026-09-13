@@ -175,7 +175,6 @@ export function BiometricGate({ onSuccess, onFallback }) {
           padding: "14px 40px",
           fontSize: "15px",
           fontWeight: "700",
-          fontFamily: "Barlow Condensed, sans-serif",
           cursor: authenticating ? "wait" : "pointer",
           marginBottom: "16px",
         }}

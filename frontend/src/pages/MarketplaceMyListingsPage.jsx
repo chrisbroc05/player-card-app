@@ -3,6 +3,8 @@ import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import ListingModal from "../components/ListingModal";
+import Modal from "../components/Modal";
+import ConfirmationCardThumbnail from "../components/ConfirmationCardThumbnail";
 import MarketplaceSubNav from "../components/MarketplaceSubNav";
 import CardImage from "../components/CardImage";
 import TradeCardPicker from "../components/TradeCardPicker";
@@ -77,6 +79,8 @@ export default function MarketplaceMyListingsPage() {
   const [unlistSomeGroup, setUnlistSomeGroup] = useState(null);
   const [unlistSomeQty, setUnlistSomeQty] = useState(1);
   const [bulkActionBusy, setBulkActionBusy] = useState(false);
+  const [showUnlistConfirm, setShowUnlistConfirm] = useState(false);
+  const [cardToUnlist, setCardToUnlist] = useState(null);
 
   const load = useCallback(async ({ silent = false } = {}) => {
     if (!token) return;
@@ -231,17 +235,33 @@ export default function MarketplaceMyListingsPage() {
       });
       if (unauthorized) {
         setError("Session expired. Please sign in again.");
-        return;
+        return false;
       }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not unlist copies."));
       setUnlistSomeGroup(null);
       await load({ silent: true });
       refreshNavBadges?.();
+      return true;
     } catch (e) {
       setError(e.message || "Could not unlist copies.");
+      return false;
     } finally {
       setBulkActionBusy(false);
+    }
+  }
+
+  function handleUnlistAllClick(group) {
+    setCardToUnlist(group);
+    setShowUnlistConfirm(true);
+  }
+
+  async function confirmUnlistAll() {
+    if (!cardToUnlist) return;
+    const ok = await bulkUnlist(cardToUnlist.card_id, cardToUnlist.quantity);
+    if (ok) {
+      setShowUnlistConfirm(false);
+      setCardToUnlist(null);
     }
   }
 
@@ -429,7 +449,7 @@ export default function MarketplaceMyListingsPage() {
                     setEditPriceGroup(g);
                     setEditPriceValue(String(g.asking_price ?? ""));
                   }}
-                  onUnlistAll={(cardId) => bulkUnlist(cardId, group.quantity)}
+                  onUnlistAll={handleUnlistAllClick}
                   onUnlistSome={(g) => {
                     setUnlistSomeGroup(g);
                     setUnlistSomeQty(1);
@@ -590,6 +610,17 @@ export default function MarketplaceMyListingsPage() {
         </div>
       </ListingModal>
 
+      <UnlistAllConfirmModal
+        open={showUnlistConfirm}
+        group={cardToUnlist}
+        busy={bulkActionBusy}
+        onClose={() => {
+          setShowUnlistConfirm(false);
+          setCardToUnlist(null);
+        }}
+        onConfirm={confirmUnlistAll}
+      />
+
       <AppFooter />
     </div>
   );
@@ -644,26 +675,18 @@ function GroupedMyListingRow({ group, onReviewOffers, onEditPrice, onUnlistAll, 
               {offerCount} offer{offerCount === 1 ? "" : "s"}
             </button>
           ) : null}
-          <div className="my-listings-v2__group-actions">
-            <button
-              type="button"
-              className="my-listings-v2__btn my-listings-v2__btn--bulk-primary"
-              onClick={() => onEditPrice(group)}
-            >
+          <div className="bulk-listing-actions">
+            <button type="button" className="btn-secondary" onClick={() => onEditPrice(group)}>
               Edit Price
             </button>
-            <button
-              type="button"
-              className="my-listings-v2__btn my-listings-v2__btn--bulk-secondary"
-              onClick={() => onUnlistSome(group)}
-            >
+            <button type="button" className="btn-ghost" onClick={() => onUnlistSome(group)}>
               Unlist Some
             </button>
             <button
               type="button"
-              className="my-listings-v2__btn my-listings-v2__btn--bulk-danger"
+              className="btn-danger"
               disabled={bulkBusy}
-              onClick={() => onUnlistAll(group.card_id)}
+              onClick={() => onUnlistAll(group)}
             >
               Unlist All
             </button>
@@ -1022,6 +1045,53 @@ function OfferReviewModal({
         </ul>
       </MarketplaceModalContent>
     </MarketplaceModalShell>
+  );
+}
+
+function UnlistAllConfirmModal({ open, group, busy, onClose, onConfirm }) {
+  if (!open || !group) return null;
+  const copies = Number(group.quantity) || 0;
+
+  return (
+    <Modal
+      isOpen={open}
+      onClose={onClose}
+      ariaLabelledby="unlist-all-confirm-title"
+      maxWidth="340px"
+    >
+      <ConfirmationCardThumbnail card={group} className="unlist-all-confirm-thumb" />
+      <div className="unlist-all-confirm-body">
+        <div id="unlist-all-confirm-title" className="unlist-all-confirm-title">
+          Unlist All Copies?
+        </div>
+        <p className="unlist-all-confirm-text">
+          This will remove all{" "}
+          <span className="unlist-all-confirm-copies">
+            {copies} cop{copies === 1 ? "y" : "ies"}
+          </span>{" "}
+          of <span className="unlist-all-confirm-name">{group.player_name}</span> from the marketplace.
+          You can relist them anytime.
+        </p>
+      </div>
+      <div className="unlist-all-confirm-actions">
+        <button
+          type="button"
+          className="unlist-all-confirm-btn unlist-all-confirm-btn--danger"
+          disabled={busy}
+          onClick={onConfirm}
+        >
+          {busy ? "Unlisting…" : `Yes, Unlist All ${copies} Cop${copies === 1 ? "y" : "ies"}`}
+        </button>
+        <button
+          type="button"
+          className="unlist-all-confirm-btn unlist-all-confirm-btn--cancel"
+          disabled={busy}
+          onClick={onClose}
+        >
+          Cancel — Keep Listed
+        </button>
+      </div>
+    </Modal>
   );
 }
 
