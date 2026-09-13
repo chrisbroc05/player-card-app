@@ -1,11 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import CardImage from "./CardImage";
+import ConfirmationCardThumbnail from "./ConfirmationCardThumbnail";
 import ListingModal from "./ListingModal";
 import { toApiUrl } from "../config/api";
 import { formatMoney, PLATFORM_ROYALTY_RATE } from "../utils/marketplace";
 import { MAX_COPIES_LISTED_AT_ONCE, parseCopyLimitError } from "../utils/copyPricing";
-import { cardMediaFrameClass } from "../utils/highlightCard";
 import { rarityDisplay } from "../utils/tierStyles";
 
 function SelectedCardsPreview({ cards }) {
@@ -73,15 +72,7 @@ function ListingConfirmationModal({
       debugLabel="listing-confirmation"
     >
       <div className="listing-confirmation-content">
-        <div className="listing-confirmation-thumb">
-          <CardImage
-            card={card}
-            alt={card.player_name}
-            cacheBust={card.created_at}
-            frameClassName={`${cardMediaFrameClass(card)} w-full`}
-            playOnHover={false}
-          />
-        </div>
+        <ConfirmationCardThumbnail card={card} />
         <h2 id="listing-confirm-title" className="listing-confirmation-title">
           {quantity} {quantity === 1 ? "copy" : "copies"} of {card.player_name}
         </h2>

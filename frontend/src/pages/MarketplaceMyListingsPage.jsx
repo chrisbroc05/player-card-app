@@ -595,15 +595,18 @@ export default function MarketplaceMyListingsPage() {
   );
 }
 
+function netSellerProceeds(askingPrice) {
+  const price = Number(askingPrice) || 0;
+  return Math.round((price - computeRoyaltyPreview(price)) * 100) / 100;
+}
+
 function GroupedMyListingRow({ group, onReviewOffers, onEditPrice, onUnlistAll, onUnlistSome, bulkBusy }) {
   const badge = vaultTierBadge(group.tier);
   const tierKey = normalizeTierKey(group.tier);
   const bannerStyles = getCardBannerStyles(group.tier, group.theme || group.special_theme);
   const themeLabel = themeDisplayLabel(group.theme || group.special_theme);
   const offerCount = Number(group.pending_offer_count) || 0;
-  const gross = group.quantity * Number(group.asking_price || 0);
-  const fee = computeRoyaltyPreview(gross);
-  const net = Math.max(0, Math.round((gross - fee) * 100) / 100);
+  const netEach = netSellerProceeds(group.asking_price);
 
   return (
     <article className={`my-listings-v2__item my-listings-v2__item--grouped ${badge.glow}`}>
@@ -627,10 +630,10 @@ function GroupedMyListingRow({ group, onReviewOffers, onEditPrice, onUnlistAll, 
             {themeLabel ? <span className="my-listings-v2__theme-pill">{themeLabel}</span> : null}
           </div>
           <p className="my-listings-v2__group-qty">
-            x{group.quantity} listed at {formatMoney(group.asking_price)} each
+            {formatMoney(group.asking_price)} each · {group.quantity} cop{group.quantity === 1 ? "y" : "ies"} listed
           </p>
-          <p className="my-listings-v2__group-earnings">
-            Potential earnings: {formatMoney(net)} (after {platformRoyaltyPercentLabel()} fee)
+          <p className="my-listings-v2__earn-line">
+            You&apos;d earn {formatMoney(netEach)} each
           </p>
           {offerCount > 0 ? (
             <button
@@ -642,19 +645,27 @@ function GroupedMyListingRow({ group, onReviewOffers, onEditPrice, onUnlistAll, 
             </button>
           ) : null}
           <div className="my-listings-v2__group-actions">
-            <button type="button" className="my-listings-v2__btn" onClick={() => onEditPrice(group)}>
+            <button
+              type="button"
+              className="my-listings-v2__btn my-listings-v2__btn--bulk-primary"
+              onClick={() => onEditPrice(group)}
+            >
               Edit Price
             </button>
             <button
               type="button"
-              className="my-listings-v2__btn"
+              className="my-listings-v2__btn my-listings-v2__btn--bulk-secondary"
+              onClick={() => onUnlistSome(group)}
+            >
+              Unlist Some
+            </button>
+            <button
+              type="button"
+              className="my-listings-v2__btn my-listings-v2__btn--bulk-danger"
               disabled={bulkBusy}
               onClick={() => onUnlistAll(group.card_id)}
             >
               Unlist All
-            </button>
-            <button type="button" className="my-listings-v2__btn" onClick={() => onUnlistSome(group)}>
-              Unlist Some
             </button>
           </div>
         </div>
@@ -677,6 +688,7 @@ function MyListingRow({ listing, onReviewOffers, onRelist, onUnlist, relistBusyI
   const isPriority = isActivePriorityListing(listing);
   const edition = formatEditionShort(listing.edition_number, listing.print_run);
   const cardDetailPath = `/marketplace/${encodeURIComponent(listing.card_id)}`;
+  const netEach = netSellerProceeds(listing.asking_price);
 
   return (
     <article className={`my-listings-v2__item ${badge.glow}`}>
@@ -714,6 +726,7 @@ function MyListingRow({ listing, onReviewOffers, onRelist, onUnlist, relistBusyI
             <span className="my-listings-v2__price-label">Listed at</span>
             <span className="my-listings-v2__price">{formatMoney(listing.asking_price)}</span>
           </div>
+          <p className="my-listings-v2__earn-line">You&apos;d earn {formatMoney(netEach)}</p>
 
           <div className="my-listings-v2__meta">
             {listing.listed_at ? (
