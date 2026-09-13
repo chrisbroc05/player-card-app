@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import Modal from "./Modal";
+import ListingModal from "./ListingModal";
 import PriorityBadge, { isPriorityListing } from "./PriorityBadge";
 import { formatMoney, PRIORITY_LISTING_FEE } from "../utils/marketplace";
 
@@ -166,7 +166,7 @@ export default function MarketplaceListingActions({
 
 export function ListedSuccessModal({ open, onClose, variant = "default", onViewMarketplace }) {
   return (
-    <Modal isOpen={open} onClose={onClose} maxWidth="384px" ariaLabelledby="listed-success-title">
+    <ListingModal isOpen={open} onClose={onClose} ariaLabelledby="listed-success-title" debugLabel="listed-success">
       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border bg-success-subtle text-2xl text-success">
         ✓
       </div>
@@ -179,14 +179,14 @@ export function ListedSuccessModal({ open, onClose, variant = "default", onViewM
           <button
             type="button"
             onClick={onClose}
-            className="modal-portal-action inline-flex min-h-[44px] w-full items-center justify-center rounded-lg border border-white/20 bg-white/5 px-4 text-sm font-semibold text-slate-100 transition hover:border-white/30 hover:bg-white/10"
+            className="listing-modal-action inline-flex min-h-[44px] w-full items-center justify-center rounded-lg border border-white/20 bg-white/5 px-4 text-sm font-semibold text-slate-100 transition hover:border-white/30 hover:bg-white/10"
           >
             Go to My Collection
           </button>
           <button
             type="button"
             onClick={onViewMarketplace}
-            className="modal-portal-action inline-flex min-h-[44px] w-full items-center justify-center rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950 transition hover:opacity-90"
+            className="listing-modal-action inline-flex min-h-[44px] w-full items-center justify-center rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950 transition hover:opacity-90"
           >
             View on Marketplace
           </button>
@@ -195,12 +195,12 @@ export function ListedSuccessModal({ open, onClose, variant = "default", onViewM
         <button
           type="button"
           onClick={onClose}
-          className="modal-portal-action mt-5 inline-flex min-h-[44px] w-full items-center justify-center rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950 transition hover:opacity-90"
+          className="listing-modal-action mt-5 inline-flex min-h-[44px] w-full items-center justify-center rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950 transition hover:opacity-90"
         >
           OK
         </button>
       )}
-    </Modal>
+    </ListingModal>
   );
 }
 

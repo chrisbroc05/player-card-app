@@ -7196,41 +7196,33 @@
   color: var(--color-text-secondary);
 }
 
-/* ——— Bulk marketplace listing ——— */
-.bulk-list-sheet__backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 99998;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.72);
-  padding: 16px;
+/* ——— Bulk marketplace listing (content inside ListingModal portal) ——— */
+.listing-modal-body {
+  position: relative;
+  width: 100%;
 }
 
-@media (min-width: 640px) {
-  .bulk-list-sheet__backdrop {
-    align-items: center;
-  }
+.listing-modal-action {
+  position: relative;
+  z-index: 1000001;
+}
+
+/* Legacy bottom-sheet backdrop — do not use for listing popups */
+.bulk-list-sheet__backdrop {
+  display: none !important;
 }
 
 .bulk-list-sheet {
   position: relative;
   width: 100%;
-  max-width: 420px;
-  max-height: 90vh;
-  overflow-y: auto;
-  border-radius: 20px 20px 0 0;
-  border: 1px solid rgba(201, 168, 76, 0.25);
-  background: #121212;
-  padding: 24px 20px calc(20px + env(safe-area-inset-bottom, 0px));
-  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.45);
-}
-
-@media (min-width: 640px) {
-  .bulk-list-sheet {
-    border-radius: 20px;
-  }
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
 }
 
 .bulk-list-sheet__close {
@@ -7547,7 +7539,7 @@
   top: 0;
   bottom: 8px;
   width: 24px;
-  background: linear-gradient(to right, transparent, var(--color-bg-card, #161616));
+  background: linear-gradient(to right, transparent, #161616);
   pointer-events: none;
 }
 
@@ -7696,9 +7688,6 @@
   font-weight: 600;
 }
 
-.bulk-list-sheet__backdrop--sheet {
-  z-index: 500;
-}
 
 .collection-select-check {
   position: absolute;

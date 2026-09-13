@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
+import ListingModal from "../components/ListingModal";
 import MarketplaceSubNav from "../components/MarketplaceSubNav";
 import CardImage from "../components/CardImage";
 import TradeCardPicker from "../components/TradeCardPicker";
@@ -505,79 +506,89 @@ export default function MarketplaceMyListingsPage() {
         }}
       />
 
-      {editPriceGroup ? (
-        <div className="bulk-list-sheet__backdrop" role="presentation" onClick={() => setEditPriceGroup(null)}>
-          <div className="bulk-list-sheet" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-            <h2 className="bulk-list-sheet__title">Edit price on all copies</h2>
-            <p className="bulk-list-sheet__subtext">
-              Updates {editPriceGroup.quantity} listed copies of {editPriceGroup.player_name}
-            </p>
-            <div className="bulk-list-sheet__price-wrap">
-              <span className="bulk-list-sheet__price-prefix">$</span>
-              <input
-                type="number"
-                min="1"
-                step="0.01"
-                value={editPriceValue}
-                onChange={(e) => setEditPriceValue(e.target.value)}
-                className="bulk-list-sheet__price-input"
-              />
-            </div>
-            <button
-              type="button"
-              className="bulk-list-sheet__primary-btn"
-              disabled={editPriceBusy}
-              onClick={() => bulkUpdatePrice(editPriceGroup.card_id, Number(editPriceValue))}
-            >
-              {editPriceBusy ? "Saving…" : "Update Price"}
-            </button>
-            <button type="button" className="bulk-list-sheet__secondary-btn" onClick={() => setEditPriceGroup(null)}>
-              Cancel
-            </button>
+      <ListingModal
+        isOpen={Boolean(editPriceGroup)}
+        onClose={() => setEditPriceGroup(null)}
+        ariaLabelledby="edit-price-title"
+        debugLabel="edit-listing-price"
+      >
+        <div className="listing-modal-body">
+          <h2 id="edit-price-title" className="bulk-list-sheet__title">
+            Edit price on all copies
+          </h2>
+          <p className="bulk-list-sheet__subtext">
+            Updates {editPriceGroup?.quantity} listed copies of {editPriceGroup?.player_name}
+          </p>
+          <div className="bulk-list-sheet__price-wrap">
+            <span className="bulk-list-sheet__price-prefix">$</span>
+            <input
+              type="number"
+              min="1"
+              step="0.01"
+              value={editPriceValue}
+              onChange={(e) => setEditPriceValue(e.target.value)}
+              className="bulk-list-sheet__price-input"
+            />
           </div>
+          <button
+            type="button"
+            className="bulk-list-sheet__primary-btn listing-modal-action"
+            disabled={editPriceBusy}
+            onClick={() => bulkUpdatePrice(editPriceGroup.card_id, Number(editPriceValue))}
+          >
+            {editPriceBusy ? "Saving…" : "Update Price"}
+          </button>
+          <button type="button" className="bulk-list-sheet__secondary-btn listing-modal-action" onClick={() => setEditPriceGroup(null)}>
+            Cancel
+          </button>
         </div>
-      ) : null}
+      </ListingModal>
 
-      {unlistSomeGroup ? (
-        <div className="bulk-list-sheet__backdrop" role="presentation" onClick={() => setUnlistSomeGroup(null)}>
-          <div className="bulk-list-sheet" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-            <h2 className="bulk-list-sheet__title">Unlist some copies</h2>
-            <p className="bulk-list-sheet__subtext">
-              {unlistSomeGroup.quantity} copies listed at {formatMoney(unlistSomeGroup.asking_price)} each
-            </p>
-            <div className="bulk-list-sheet__qty-row">
-              <button
-                type="button"
-                className="bulk-list-sheet__qty-btn"
-                disabled={unlistSomeQty <= 1 || bulkActionBusy}
-                onClick={() => setUnlistSomeQty((q) => Math.max(1, q - 1))}
-              >
-                −
-              </button>
-              <span className="bulk-list-sheet__qty-value">{unlistSomeQty}</span>
-              <button
-                type="button"
-                className="bulk-list-sheet__qty-btn"
-                disabled={unlistSomeQty >= unlistSomeGroup.quantity || bulkActionBusy}
-                onClick={() => setUnlistSomeQty((q) => Math.min(unlistSomeGroup.quantity, q + 1))}
-              >
-                +
-              </button>
-            </div>
+      <ListingModal
+        isOpen={Boolean(unlistSomeGroup)}
+        onClose={() => setUnlistSomeGroup(null)}
+        ariaLabelledby="unlist-some-title"
+        debugLabel="unlist-some-copies"
+      >
+        <div className="listing-modal-body">
+          <h2 id="unlist-some-title" className="bulk-list-sheet__title">
+            Unlist some copies
+          </h2>
+          <p className="bulk-list-sheet__subtext">
+            {unlistSomeGroup?.quantity} copies listed at {formatMoney(unlistSomeGroup?.asking_price)} each
+          </p>
+          <div className="bulk-list-sheet__qty-row">
             <button
               type="button"
-              className="bulk-list-sheet__primary-btn"
-              disabled={bulkActionBusy}
-              onClick={() => bulkUnlist(unlistSomeGroup.card_id, unlistSomeQty)}
+              className="bulk-list-sheet__qty-btn"
+              disabled={unlistSomeQty <= 1 || bulkActionBusy}
+              onClick={() => setUnlistSomeQty((q) => Math.max(1, q - 1))}
             >
-              {bulkActionBusy ? "Unlisting…" : `Unlist ${unlistSomeQty}`}
+              −
             </button>
-            <button type="button" className="bulk-list-sheet__secondary-btn" onClick={() => setUnlistSomeGroup(null)}>
-              Cancel
+            <span className="bulk-list-sheet__qty-value">{unlistSomeQty}</span>
+            <button
+              type="button"
+              className="bulk-list-sheet__qty-btn"
+              disabled={unlistSomeQty >= (unlistSomeGroup?.quantity || 1) || bulkActionBusy}
+              onClick={() => setUnlistSomeQty((q) => Math.min(unlistSomeGroup.quantity, q + 1))}
+            >
+              +
             </button>
           </div>
+          <button
+            type="button"
+            className="bulk-list-sheet__primary-btn listing-modal-action"
+            disabled={bulkActionBusy}
+            onClick={() => bulkUnlist(unlistSomeGroup.card_id, unlistSomeQty)}
+          >
+            {bulkActionBusy ? "Unlisting…" : `Unlist ${unlistSomeQty}`}
+          </button>
+          <button type="button" className="bulk-list-sheet__secondary-btn listing-modal-action" onClick={() => setUnlistSomeGroup(null)}>
+            Cancel
+          </button>
         </div>
-      ) : null}
+      </ListingModal>
 
       <AppFooter />
     </div>

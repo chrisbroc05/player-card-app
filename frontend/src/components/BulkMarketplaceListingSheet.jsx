@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import CardImage from "./CardImage";
-import Modal from "./Modal";
+import ListingModal from "./ListingModal";
 import { toApiUrl } from "../config/api";
 import { formatMoney, PLATFORM_ROYALTY_RATE } from "../utils/marketplace";
 import { MAX_COPIES_LISTED_AT_ONCE, parseCopyLimitError } from "../utils/copyPricing";
@@ -67,7 +66,12 @@ function ListingConfirmationModal({
   if (!open || !card) return null;
 
   return (
-    <Modal isOpen={open} onClose={onCancel} maxWidth="340px" ariaLabelledby="listing-confirm-title">
+    <ListingModal
+      isOpen={open}
+      onClose={onCancel}
+      ariaLabelledby="listing-confirm-title"
+      debugLabel="listing-confirmation"
+    >
       <div className="listing-confirmation-content">
         <div className="listing-confirmation-thumb">
           <CardImage
@@ -85,17 +89,160 @@ function ListingConfirmationModal({
         <p className="listing-confirmation-earnings">Potential earnings: {formatMoney(netEarnings)}</p>
         <button
           type="button"
-          className="bulk-list-sheet__primary-btn modal-portal-action"
+          className="bulk-list-sheet__primary-btn listing-modal-action"
           disabled={busy}
           onClick={onConfirm}
         >
           {busy ? "Listing…" : "List on Marketplace"}
         </button>
-        <button type="button" className="bulk-list-sheet__secondary-btn modal-portal-action" disabled={busy} onClick={onCancel}>
+        <button type="button" className="bulk-list-sheet__secondary-btn listing-modal-action" disabled={busy} onClick={onCancel}>
           Cancel
         </button>
       </div>
-    </Modal>
+    </ListingModal>
+  );
+}
+
+function ListingFormBody({
+  isSelectMode,
+  listableSelected,
+  owned,
+  copiesAvailable,
+  maxQty,
+  quantity,
+  setQuantity,
+  clampQty,
+  price,
+  setPrice,
+  priceValid,
+  totals,
+  effectiveQty,
+  error,
+  busy,
+  onClose,
+  onOpenConfirm,
+}) {
+  return (
+    <div className="listing-modal-body">
+      <button type="button" className="bulk-list-sheet__close" onClick={onClose} aria-label="Close">
+        ×
+      </button>
+      <h2 id="bulk-list-title" className="bulk-list-sheet__title">
+        List on Marketplace
+      </h2>
+
+      {isSelectMode ? (
+        <SelectedCardsPreview cards={listableSelected} />
+      ) : (
+        <p className="bulk-list-sheet__subtext">
+          You own {owned} {owned === 1 ? "copy" : "copies"} of this card
+          {maxQty < (Number(copiesAvailable) || 1)
+            ? ` · list up to ${maxQty} at once`
+            : maxQty < owned
+              ? ` · ${maxQty} available to list`
+              : ""}
+        </p>
+      )}
+
+      {!isSelectMode ? (
+        <div className="bulk-list-sheet__section">
+          <p className="bulk-list-sheet__label">How many to list</p>
+          <div className="bulk-list-sheet__qty-row">
+            <button
+              type="button"
+              className="bulk-list-sheet__qty-btn"
+              disabled={quantity <= 1 || busy}
+              onClick={() => setQuantity((q) => clampQty(q - 1))}
+              aria-label="Decrease quantity"
+            >
+              −
+            </button>
+            <span className="bulk-list-sheet__qty-value">{quantity}</span>
+            <button
+              type="button"
+              className="bulk-list-sheet__qty-btn"
+              disabled={quantity >= maxQty || busy}
+              onClick={() => setQuantity((q) => clampQty(q + 1))}
+              aria-label="Increase quantity"
+            >
+              +
+            </button>
+          </div>
+          <input
+            type="range"
+            min={1}
+            max={maxQty}
+            value={quantity}
+            onChange={(e) => setQuantity(clampQty(Number(e.target.value)))}
+            className="bulk-list-sheet__slider"
+            disabled={busy}
+          />
+          <div className="bulk-list-sheet__quick-row">
+            {[1, 5, 10].filter((n) => n <= maxQty).map((n) => (
+              <button
+                key={n}
+                type="button"
+                className={`bulk-list-sheet__quick-btn${quantity === n ? " bulk-list-sheet__quick-btn--active" : ""}`}
+                onClick={() => setQuantity(n)}
+                disabled={busy}
+              >
+                {n}
+              </button>
+            ))}
+            <button
+              type="button"
+              className={`bulk-list-sheet__quick-btn${quantity === maxQty ? " bulk-list-sheet__quick-btn--active" : ""}`}
+              onClick={() => setQuantity(maxQty)}
+              disabled={busy}
+            >
+              All ({maxQty})
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="bulk-list-sheet__section">
+        <label className="bulk-list-sheet__label" htmlFor="bulk-list-price">
+          Price per card
+        </label>
+        <div className="bulk-list-sheet__price-wrap">
+          <span className="bulk-list-sheet__price-prefix">$</span>
+          <input
+            id="bulk-list-price"
+            type="number"
+            min="1"
+            step="0.01"
+            inputMode="decimal"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            className="bulk-list-sheet__price-input"
+            placeholder="0.00"
+            disabled={busy}
+          />
+        </div>
+        {priceValid ? (
+          <div className="bulk-list-sheet__calc">
+            <p>Total if all sell: {formatMoney(totals.gross)}</p>
+            <p>Platform fee (8%): {formatMoney(totals.fee)}</p>
+            <p className="bulk-list-sheet__calc-net">You receive: {formatMoney(totals.net)}</p>
+          </div>
+        ) : (
+          <p className="bulk-list-sheet__hint">Minimum $1.00 per card</p>
+        )}
+      </div>
+
+      {error ? <p className="bulk-list-sheet__error">{error}</p> : null}
+
+      <button
+        type="button"
+        className="bulk-list-sheet__primary-btn listing-modal-action"
+        disabled={!priceValid || busy || (isSelectMode && listableSelected.length === 0)}
+        onClick={onOpenConfirm}
+      >
+        List {effectiveQty} {effectiveQty === 1 ? "Card" : "Cards"}
+        {priceValid ? ` for ${formatMoney(Number(price))} each` : ""}
+      </button>
+    </div>
   );
 }
 
@@ -118,10 +265,7 @@ export default function BulkMarketplaceListingSheet({
 
   const maxQty = isSelectMode
     ? Math.max(1, listableSelected.length)
-    : Math.min(
-        MAX_COPIES_LISTED_AT_ONCE,
-        Math.max(1, Number(copiesAvailable) || 1)
-      );
+    : Math.min(MAX_COPIES_LISTED_AT_ONCE, Math.max(1, Number(copiesAvailable) || 1));
   const owned = Math.max(1, Number(copiesOwned) || 1);
   const anchorCard = isSelectMode ? listableSelected[0] || card : card;
 
@@ -192,9 +336,12 @@ export default function BulkMarketplaceListingSheet({
     }
   }
 
+  const debugSource =
+    source === "select_mode" ? "bulk-list-select-mode" : source === "detail" ? "bulk-list-detail" : "bulk-list-collection";
+
   if (successCount != null) {
     return (
-      <Modal isOpen onClose={resetAndClose} maxWidth="340px" ariaLabelledby="bulk-list-success-title">
+      <ListingModal isOpen onClose={resetAndClose} ariaLabelledby="bulk-list-success-title" debugLabel="listing-success">
         <div className="listing-confirmation-content">
           <div className="bulk-list-sheet__success-icon" aria-hidden>
             ✓
@@ -202,147 +349,45 @@ export default function BulkMarketplaceListingSheet({
           <h2 id="bulk-list-success-title" className="listing-confirmation-title">
             {successCount} {successCount === 1 ? "copy" : "copies"} listed on marketplace!
           </h2>
-          <Link to="/marketplace/my-listings" className="bulk-list-sheet__primary-btn modal-portal-action" onClick={resetAndClose}>
+          <Link to="/marketplace/my-listings" className="bulk-list-sheet__primary-btn listing-modal-action" onClick={resetAndClose}>
             View Listings
           </Link>
-          <button type="button" className="bulk-list-sheet__secondary-btn modal-portal-action" onClick={resetAndClose}>
+          <button type="button" className="bulk-list-sheet__secondary-btn listing-modal-action" onClick={resetAndClose}>
             Done
           </button>
         </div>
-      </Modal>
+      </ListingModal>
     );
   }
 
-  const sheet = (
+  return (
     <>
-      <div className="bulk-list-sheet__backdrop bulk-list-sheet__backdrop--sheet" role="presentation" onClick={resetAndClose}>
-        <div
-          className="bulk-list-sheet"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="bulk-list-title"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button type="button" className="bulk-list-sheet__close" onClick={resetAndClose} aria-label="Close">
-            ×
-          </button>
-          <h2 id="bulk-list-title" className="bulk-list-sheet__title">
-            List on Marketplace
-          </h2>
-
-          {isSelectMode ? (
-            <SelectedCardsPreview cards={listableSelected} />
-          ) : (
-            <p className="bulk-list-sheet__subtext">
-              You own {owned} {owned === 1 ? "copy" : "copies"} of this card
-              {maxQty < (Number(copiesAvailable) || 1)
-                ? ` · list up to ${maxQty} at once`
-                : maxQty < owned
-                  ? ` · ${maxQty} available to list`
-                  : ""}
-            </p>
-          )}
-
-          {!isSelectMode ? (
-            <div className="bulk-list-sheet__section">
-              <p className="bulk-list-sheet__label">How many to list</p>
-              <div className="bulk-list-sheet__qty-row">
-                <button
-                  type="button"
-                  className="bulk-list-sheet__qty-btn"
-                  disabled={quantity <= 1 || busy}
-                  onClick={() => setQuantity((q) => clampQty(q - 1))}
-                  aria-label="Decrease quantity"
-                >
-                  −
-                </button>
-                <span className="bulk-list-sheet__qty-value">{quantity}</span>
-                <button
-                  type="button"
-                  className="bulk-list-sheet__qty-btn"
-                  disabled={quantity >= maxQty || busy}
-                  onClick={() => setQuantity((q) => clampQty(q + 1))}
-                  aria-label="Increase quantity"
-                >
-                  +
-                </button>
-              </div>
-              <input
-                type="range"
-                min={1}
-                max={maxQty}
-                value={quantity}
-                onChange={(e) => setQuantity(clampQty(Number(e.target.value)))}
-                className="bulk-list-sheet__slider"
-                disabled={busy}
-              />
-              <div className="bulk-list-sheet__quick-row">
-                {[1, 5, 10].filter((n) => n <= maxQty).map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    className={`bulk-list-sheet__quick-btn${quantity === n ? " bulk-list-sheet__quick-btn--active" : ""}`}
-                    onClick={() => setQuantity(n)}
-                    disabled={busy}
-                  >
-                    {n}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  className={`bulk-list-sheet__quick-btn${quantity === maxQty ? " bulk-list-sheet__quick-btn--active" : ""}`}
-                  onClick={() => setQuantity(maxQty)}
-                  disabled={busy}
-                >
-                  All ({maxQty})
-                </button>
-              </div>
-            </div>
-          ) : null}
-
-          <div className="bulk-list-sheet__section">
-            <label className="bulk-list-sheet__label" htmlFor="bulk-list-price">
-              Price per card
-            </label>
-            <div className="bulk-list-sheet__price-wrap">
-              <span className="bulk-list-sheet__price-prefix">$</span>
-              <input
-                id="bulk-list-price"
-                type="number"
-                min="1"
-                step="0.01"
-                inputMode="decimal"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                className="bulk-list-sheet__price-input"
-                placeholder="0.00"
-                disabled={busy}
-              />
-            </div>
-            {priceValid ? (
-              <div className="bulk-list-sheet__calc">
-                <p>Total if all sell: {formatMoney(totals.gross)}</p>
-                <p>Platform fee (8%): {formatMoney(totals.fee)}</p>
-                <p className="bulk-list-sheet__calc-net">You receive: {formatMoney(totals.net)}</p>
-              </div>
-            ) : (
-              <p className="bulk-list-sheet__hint">Minimum $1.00 per card</p>
-            )}
-          </div>
-
-          {error ? <p className="bulk-list-sheet__error">{error}</p> : null}
-
-          <button
-            type="button"
-            className="bulk-list-sheet__primary-btn modal-portal-action"
-            disabled={!priceValid || busy || (isSelectMode && listableSelected.length === 0)}
-            onClick={() => setConfirmOpen(true)}
-          >
-            List {effectiveQty} {effectiveQty === 1 ? "Card" : "Cards"}
-            {priceValid ? ` for ${formatMoney(priceNum)} each` : ""}
-          </button>
-        </div>
-      </div>
+      <ListingModal
+        isOpen={open && !confirmOpen}
+        onClose={resetAndClose}
+        ariaLabelledby="bulk-list-title"
+        debugLabel={debugSource}
+      >
+        <ListingFormBody
+          isSelectMode={isSelectMode}
+          listableSelected={listableSelected}
+          owned={owned}
+          copiesAvailable={copiesAvailable}
+          maxQty={maxQty}
+          quantity={quantity}
+          setQuantity={setQuantity}
+          clampQty={clampQty}
+          price={price}
+          setPrice={setPrice}
+          priceValid={priceValid}
+          totals={totals}
+          effectiveQty={effectiveQty}
+          error={error}
+          busy={busy}
+          onClose={resetAndClose}
+          onOpenConfirm={() => setConfirmOpen(true)}
+        />
+      </ListingModal>
 
       <ListingConfirmationModal
         open={confirmOpen}
@@ -356,6 +401,4 @@ export default function BulkMarketplaceListingSheet({
       />
     </>
   );
-
-  return createPortal(sheet, document.body);
 }
