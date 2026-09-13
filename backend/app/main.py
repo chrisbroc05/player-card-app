@@ -85,7 +85,7 @@ from marketplace_scheduler import (
     shutdown_marketplace_scheduler,
     start_marketplace_scheduler,
 )  # noqa: E402
-from marketplace_repo import float_from_decimal  # noqa: E402
+from marketplace_repo import attach_copy_stats_to_card_dicts, copy_stats_for_card, float_from_decimal  # noqa: E402
 from parent_email_utils import normalize_optional_parent_email  # noqa: E402
 from email_service import send_welcome_email  # noqa: E402
 from schema_migrations import run_schema_migrations_after_models  # noqa: E402
@@ -1377,6 +1377,9 @@ class CardVaultSummary(BaseModel):
     is_public: bool = Field(default=True)
     listed_on_marketplace: bool = Field(default=False)
     asking_price: float | None = Field(default=None)
+    copies_owned: int | None = Field(default=None)
+    copies_listed: int | None = Field(default=None)
+    copies_available: int | None = Field(default=None)
 
 
 class CardDuplicateBody(BaseModel):
@@ -1433,6 +1436,11 @@ class Card(BaseModel):
     highlight_status: str | None = Field(default=None)
     highlight_trim_start: float | None = Field(default=None)
     highlight_trim_end: float | None = Field(default=None)
+    listed_on_marketplace: bool = Field(default=False)
+    asking_price: float | None = Field(default=None)
+    copies_owned: int | None = Field(default=None)
+    copies_listed: int | None = Field(default=None)
+    copies_available: int | None = Field(default=None)
 
 
 class CardShareMeta(BaseModel):
@@ -1883,7 +1891,7 @@ def list_my_cards(
     current_user: User = Depends(get_current_user),
 ):
     """Authenticated user's cards only."""
-    rows = list_my_cards_dicts(db, current_user.id)
+    rows = attach_copy_stats_to_card_dicts(db, current_user.id, list_my_cards_dicts(db, current_user.id))
     return [CardVaultSummary.model_validate(r) for r in rows]
 
 
@@ -2081,6 +2089,8 @@ def get_card(
     is_owner = current_user is not None and orm.owner_id == current_user.id
     if not is_owner:
         data["animated_video_url"] = None
+    else:
+        data.update(copy_stats_for_card(db, current_user.id, orm))
     return Card.model_validate(data)
 
 

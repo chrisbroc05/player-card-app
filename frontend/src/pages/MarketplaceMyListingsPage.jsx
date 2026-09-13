@@ -70,6 +70,12 @@ export default function MarketplaceMyListingsPage() {
   const [acceptSuccess, setAcceptSuccess] = useState(null);
   const [declineNoticeOfferId, setDeclineNoticeOfferId] = useState(null);
   const [sellerBalance, setSellerBalance] = useState(null);
+  const [editPriceGroup, setEditPriceGroup] = useState(null);
+  const [editPriceValue, setEditPriceValue] = useState("");
+  const [editPriceBusy, setEditPriceBusy] = useState(false);
+  const [unlistSomeGroup, setUnlistSomeGroup] = useState(null);
+  const [unlistSomeQty, setUnlistSomeQty] = useState(1);
+  const [bulkActionBusy, setBulkActionBusy] = useState(false);
 
   const load = useCallback(async ({ silent = false } = {}) => {
     if (!token) return;
@@ -212,6 +218,57 @@ export default function MarketplaceMyListingsPage() {
     }
   }
 
+  async function bulkUnlist(cardId, quantity) {
+    if (!token) return;
+    setBulkActionBusy(true);
+    setError("");
+    try {
+      const { res, unauthorized } = await authFetch(token, "/marketplace/bulk-unlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ card_id: cardId, quantity }),
+      });
+      if (unauthorized) {
+        setError("Session expired. Please sign in again.");
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not unlist copies."));
+      setUnlistSomeGroup(null);
+      await load({ silent: true });
+      refreshNavBadges?.();
+    } catch (e) {
+      setError(e.message || "Could not unlist copies.");
+    } finally {
+      setBulkActionBusy(false);
+    }
+  }
+
+  async function bulkUpdatePrice(cardId, askingPrice) {
+    if (!token) return;
+    setEditPriceBusy(true);
+    setError("");
+    try {
+      const { res, unauthorized } = await authFetch(token, "/marketplace/bulk-update-price", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ card_id: cardId, asking_price: askingPrice }),
+      });
+      if (unauthorized) {
+        setError("Session expired. Please sign in again.");
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not update price."));
+      setEditPriceGroup(null);
+      await load({ silent: true });
+    } catch (e) {
+      setError(e.message || "Could not update price.");
+    } finally {
+      setEditPriceBusy(false);
+    }
+  }
+
   async function relist(cardId, askingPrice) {
     if (!token) return;
     setRelistBusyId(cardId);
@@ -251,6 +308,27 @@ export default function MarketplaceMyListingsPage() {
     const map = {};
     for (const row of listings) map[row.card_id] = row;
     return map;
+  }, [listings]);
+
+  const groupedListings = useMemo(() => {
+    const map = new Map();
+    for (const listing of listings) {
+      const key = `${listing.image_url}|${listing.asking_price}|${listing.player_name}|${listing.tier}`;
+      const existing = map.get(key);
+      if (!existing) {
+        map.set(key, {
+          ...listing,
+          quantity: 1,
+          card_ids: [listing.card_id],
+          pending_offer_count: Number(listing.pending_offer_count) || 0,
+        });
+      } else {
+        existing.quantity += 1;
+        existing.card_ids.push(listing.card_id);
+        existing.pending_offer_count += Number(listing.pending_offer_count) || 0;
+      }
+    }
+    return Array.from(map.values());
   }, [listings]);
 
   function sortedOffersForCard(cardId) {
@@ -340,17 +418,35 @@ export default function MarketplaceMyListingsPage() {
           </div>
         ) : (
           <div className="my-listings-v2__list">
-            {listings.map((listing) => (
-              <MyListingRow
-                key={listing.card_id}
-                listing={listing}
-                onReviewOffers={setReviewCardId}
-                onRelist={relist}
-                onUnlist={unlistListing}
-                relistBusyId={relistBusyId}
-                unlistBusyId={unlistBusyId}
-              />
-            ))}
+            {groupedListings.map((group) =>
+              group.quantity > 1 ? (
+                <GroupedMyListingRow
+                  key={`${group.image_url}-${group.asking_price}-${group.card_id}`}
+                  group={group}
+                  onReviewOffers={setReviewCardId}
+                  onEditPrice={(g) => {
+                    setEditPriceGroup(g);
+                    setEditPriceValue(String(g.asking_price ?? ""));
+                  }}
+                  onUnlistAll={(cardId) => bulkUnlist(cardId, group.quantity)}
+                  onUnlistSome={(g) => {
+                    setUnlistSomeGroup(g);
+                    setUnlistSomeQty(1);
+                  }}
+                  bulkBusy={bulkActionBusy}
+                />
+              ) : (
+                <MyListingRow
+                  key={group.card_id}
+                  listing={group}
+                  onReviewOffers={setReviewCardId}
+                  onRelist={relist}
+                  onUnlist={unlistListing}
+                  relistBusyId={relistBusyId}
+                  unlistBusyId={unlistBusyId}
+                />
+              )
+            )}
           </div>
         )}
       </main>
@@ -408,8 +504,151 @@ export default function MarketplaceMyListingsPage() {
           setAcceptSuccess(null);
         }}
       />
+
+      {editPriceGroup ? (
+        <div className="bulk-list-sheet__backdrop" role="presentation" onClick={() => setEditPriceGroup(null)}>
+          <div className="bulk-list-sheet" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <h2 className="bulk-list-sheet__title">Edit price on all copies</h2>
+            <p className="bulk-list-sheet__subtext">
+              Updates {editPriceGroup.quantity} listed copies of {editPriceGroup.player_name}
+            </p>
+            <div className="bulk-list-sheet__price-wrap">
+              <span className="bulk-list-sheet__price-prefix">$</span>
+              <input
+                type="number"
+                min="1"
+                step="0.01"
+                value={editPriceValue}
+                onChange={(e) => setEditPriceValue(e.target.value)}
+                className="bulk-list-sheet__price-input"
+              />
+            </div>
+            <button
+              type="button"
+              className="bulk-list-sheet__primary-btn"
+              disabled={editPriceBusy}
+              onClick={() => bulkUpdatePrice(editPriceGroup.card_id, Number(editPriceValue))}
+            >
+              {editPriceBusy ? "Saving…" : "Update Price"}
+            </button>
+            <button type="button" className="bulk-list-sheet__secondary-btn" onClick={() => setEditPriceGroup(null)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {unlistSomeGroup ? (
+        <div className="bulk-list-sheet__backdrop" role="presentation" onClick={() => setUnlistSomeGroup(null)}>
+          <div className="bulk-list-sheet" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <h2 className="bulk-list-sheet__title">Unlist some copies</h2>
+            <p className="bulk-list-sheet__subtext">
+              {unlistSomeGroup.quantity} copies listed at {formatMoney(unlistSomeGroup.asking_price)} each
+            </p>
+            <div className="bulk-list-sheet__qty-row">
+              <button
+                type="button"
+                className="bulk-list-sheet__qty-btn"
+                disabled={unlistSomeQty <= 1 || bulkActionBusy}
+                onClick={() => setUnlistSomeQty((q) => Math.max(1, q - 1))}
+              >
+                −
+              </button>
+              <span className="bulk-list-sheet__qty-value">{unlistSomeQty}</span>
+              <button
+                type="button"
+                className="bulk-list-sheet__qty-btn"
+                disabled={unlistSomeQty >= unlistSomeGroup.quantity || bulkActionBusy}
+                onClick={() => setUnlistSomeQty((q) => Math.min(unlistSomeGroup.quantity, q + 1))}
+              >
+                +
+              </button>
+            </div>
+            <button
+              type="button"
+              className="bulk-list-sheet__primary-btn"
+              disabled={bulkActionBusy}
+              onClick={() => bulkUnlist(unlistSomeGroup.card_id, unlistSomeQty)}
+            >
+              {bulkActionBusy ? "Unlisting…" : `Unlist ${unlistSomeQty}`}
+            </button>
+            <button type="button" className="bulk-list-sheet__secondary-btn" onClick={() => setUnlistSomeGroup(null)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <AppFooter />
     </div>
+  );
+}
+
+function GroupedMyListingRow({ group, onReviewOffers, onEditPrice, onUnlistAll, onUnlistSome, bulkBusy }) {
+  const badge = vaultTierBadge(group.tier);
+  const tierKey = normalizeTierKey(group.tier);
+  const bannerStyles = getCardBannerStyles(group.tier, group.theme || group.special_theme);
+  const themeLabel = themeDisplayLabel(group.theme || group.special_theme);
+  const offerCount = Number(group.pending_offer_count) || 0;
+  const gross = group.quantity * Number(group.asking_price || 0);
+  const fee = computeRoyaltyPreview(gross);
+  const net = Math.max(0, Math.round((gross - fee) * 100) / 100);
+
+  return (
+    <article className={`my-listings-v2__item my-listings-v2__item--grouped ${badge.glow}`}>
+      <div className="my-listings-v2__row">
+        <div className="my-listings-v2__thumb">
+          <CardImage
+            card={group}
+            alt={group.player_name}
+            frameClassName={CARD_IMAGE_FRAME_LISTING_ROW}
+            playOnHover
+          />
+        </div>
+        <div className="my-listings-v2__details">
+          <h2 className={`my-listings-v2__name my-listings-v2__name--${tierKey}`}>
+            {group.player_name}
+          </h2>
+          <div className="my-listings-v2__badges">
+            <span className={`my-listings-v2__tier-pill ${bannerStyles.tierPillClass}`}>
+              {bannerStyles.tierPillLabel}
+            </span>
+            {themeLabel ? <span className="my-listings-v2__theme-pill">{themeLabel}</span> : null}
+          </div>
+          <p className="my-listings-v2__group-qty">
+            x{group.quantity} listed at {formatMoney(group.asking_price)} each
+          </p>
+          <p className="my-listings-v2__group-earnings">
+            Potential earnings: {formatMoney(net)} (after {platformRoyaltyPercentLabel()} fee)
+          </p>
+          {offerCount > 0 ? (
+            <button
+              type="button"
+              className="my-listings-v2__btn my-listings-v2__btn--primary"
+              onClick={() => onReviewOffers(group.card_id)}
+            >
+              {offerCount} offer{offerCount === 1 ? "" : "s"}
+            </button>
+          ) : null}
+          <div className="my-listings-v2__group-actions">
+            <button type="button" className="my-listings-v2__btn" onClick={() => onEditPrice(group)}>
+              Edit Price
+            </button>
+            <button
+              type="button"
+              className="my-listings-v2__btn"
+              disabled={bulkBusy}
+              onClick={() => onUnlistAll(group.card_id)}
+            >
+              Unlist All
+            </button>
+            <button type="button" className="my-listings-v2__btn" onClick={() => onUnlistSome(group)}>
+              Unlist Some
+            </button>
+          </div>
+        </div>
+      </div>
+    </article>
   );
 }
 

@@ -37,15 +37,19 @@ from email_service import (
 )
 from marketplace_repo import (
     PRIORITY_LISTING_FEE,
+    apply_marketplace_listing,
     apply_priority_listing,
     cancel_pending_marketplace_offers_for_card,
     clear_marketplace_listing,
     compute_royalty_amount,
+    copy_stats_for_card,
     count_pending_offers_for_card,
     days_remaining_calendar,
     decimal_from_float,
     float_from_decimal,
     get_listed_card_or_none,
+    list_listed_copy_cards,
+    list_unlisted_copy_cards,
     listing_active_filter,
     listing_dict,
     royalty_rate_percent_label,
@@ -215,6 +219,28 @@ class UnlistCardBody(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     card_id: str = Field(..., min_length=12, max_length=40)
+
+
+class BulkListBody(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    card_id: str = Field(..., min_length=12, max_length=40)
+    quantity: int = Field(..., ge=1, le=100)
+    asking_price: float = Field(..., gt=0)
+
+
+class BulkUnlistBody(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    card_id: str = Field(..., min_length=12, max_length=40)
+    quantity: int = Field(..., ge=1, le=100)
+
+
+class BulkUpdatePriceBody(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    card_id: str = Field(..., min_length=12, max_length=40)
+    asking_price: float = Field(..., gt=0)
 
 
 class SubmitOfferBody(BaseModel):
@@ -398,6 +424,127 @@ def marketplace_unlist(
     clear_marketplace_listing(card)
     db.commit()
     return {"success": True, "card_id": card.card_id}
+
+
+@router.post("/bulk-list")
+def marketplace_bulk_list(
+    body: BulkListBody,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    anchor = _resolve_card(db, body.card_id)
+    if anchor.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not own this card")
+    if (anchor.status or "active") != "active":
+        raise HTTPException(status_code=400, detail="Only active cards can be listed")
+    if body.asking_price < 1.0:
+        raise HTTPException(status_code=400, detail="Asking price must be at least $1.00")
+
+    available = list_unlisted_copy_cards(
+        db,
+        current_user.id,
+        anchor,
+        limit=body.quantity,
+    )
+    if len(available) < body.quantity:
+        raise HTTPException(
+            status_code=400,
+            detail=f"You only have {len(available)} copies available to list",
+        )
+
+    price = decimal_from_float(body.asking_price)
+    now = utcnow()
+    for card in available:
+        apply_marketplace_listing(card, asking_price=price, now=now)
+    db.commit()
+
+    return {
+        "listed_count": len(available),
+        "asking_price": float_from_decimal(price),
+        "message": f"{len(available)} copies listed on marketplace",
+    }
+
+
+@router.post("/bulk-unlist")
+def marketplace_bulk_unlist(
+    body: BulkUnlistBody,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    anchor = _resolve_card(db, body.card_id)
+    if anchor.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not own this card")
+
+    listed = list_listed_copy_cards(
+        db,
+        current_user.id,
+        anchor,
+        limit=body.quantity,
+    )
+    if len(listed) < body.quantity:
+        raise HTTPException(
+            status_code=400,
+            detail=f"You only have {len(listed)} listed copies to unlist",
+        )
+
+    for card in listed:
+        cancel_pending_marketplace_offers_for_card(db, card.card_id)
+        clear_marketplace_listing(card)
+    db.commit()
+
+    return {
+        "unlisted_count": len(listed),
+        "message": f"{len(listed)} copies removed from marketplace",
+    }
+
+
+@router.post("/bulk-update-price")
+def marketplace_bulk_update_price(
+    body: BulkUpdatePriceBody,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    anchor = _resolve_card(db, body.card_id)
+    if anchor.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not own this card")
+    if body.asking_price < 1.0:
+        raise HTTPException(status_code=400, detail="Asking price must be at least $1.00")
+
+    listed = list_listed_copy_cards(db, current_user.id, anchor)
+    if not listed:
+        raise HTTPException(status_code=400, detail="No listed copies found for this card")
+
+    price = decimal_from_float(body.asking_price)
+    now = utcnow()
+    for card in listed:
+        card.asking_price = price
+        card.listed_at = now
+        card.listing_expires_at = now + timedelta(days=30)
+    db.commit()
+
+    return {
+        "updated_count": len(listed),
+        "asking_price": float_from_decimal(price),
+        "message": f"Updated price on {len(listed)} listed copies",
+    }
+
+
+@router.get("/copy-stats/{card_id}")
+def marketplace_copy_stats(
+    card_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    card = _resolve_card(db, card_id)
+    if card.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not own this card")
+    stats = copy_stats_for_card(db, current_user.id, card)
+    return {
+        "card_id": card.card_id,
+        "edition_number": card.edition_number,
+        "print_run": card.print_run,
+        **stats,
+    }
 
 
 @router.get("/listings")

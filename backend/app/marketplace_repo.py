@@ -359,3 +359,130 @@ def get_listed_card_or_none(db: Session, card_id: str) -> Card | None:
         )
         .first()
     )
+
+
+def copy_family_key(card: Card) -> str:
+    """Stable key for cards that are copies of the same generated card."""
+    image_url = (card.image_url or "").strip()
+    if image_url:
+        return f"img:{image_url}"
+    session_id = (getattr(card, "preview_session_id", None) or "").strip()
+    base = "|".join(
+        [
+            (card.player_name or "").strip().lower(),
+            (card.tier or "").strip().lower(),
+            (card.theme or "none").strip().lower(),
+            (card.rarity or "").strip().lower(),
+            str(int(getattr(card, "rarity_template", None) or 1)),
+        ]
+    )
+    if session_id:
+        return f"sess:{session_id}|{base}"
+    return f"solo:{card.card_id}|{base}"
+
+
+def copy_family_query(db: Session, owner_id: int, anchor: Card):
+    """Query all active copies owned by user matching the anchor card's identity."""
+    q = db.query(Card).filter(
+        Card.owner_id == owner_id,
+        Card.status == "active",
+        Card.player_name == anchor.player_name,
+        Card.tier == anchor.tier,
+        Card.theme == (anchor.theme or "none"),
+        Card.rarity == anchor.rarity,
+        Card.rarity_template == int(getattr(anchor, "rarity_template", None) or 1),
+    )
+    image_url = (anchor.image_url or "").strip()
+    if image_url:
+        return q.filter(Card.image_url == image_url)
+    session_id = (getattr(anchor, "preview_session_id", None) or "").strip()
+    if session_id:
+        return q.filter(Card.preview_session_id == session_id)
+    return q.filter(Card.card_id == anchor.card_id)
+
+
+def copy_stats_for_card(db: Session, owner_id: int, anchor: Card) -> dict[str, int]:
+    rows = copy_family_query(db, owner_id, anchor).all()
+    owned = len(rows)
+    listed = sum(1 for c in rows if c.listed_on_marketplace)
+    return {
+        "copies_owned": owned,
+        "copies_listed": listed,
+        "copies_available": max(0, owned - listed),
+    }
+
+
+def attach_copy_stats_to_card_dicts(db: Session, owner_id: int, card_dicts: list[dict]) -> list[dict]:
+    if not card_dicts:
+        return card_dicts
+    rows = (
+        db.query(Card)
+        .filter(
+            Card.owner_id == owner_id,
+            Card.status == "active",
+        )
+        .all()
+    )
+    families: dict[str, dict[str, int]] = {}
+    for card in rows:
+        key = copy_family_key(card)
+        bucket = families.setdefault(key, {"copies_owned": 0, "copies_listed": 0})
+        bucket["copies_owned"] += 1
+        if card.listed_on_marketplace:
+            bucket["copies_listed"] += 1
+
+    card_id_to_key = {c.card_id: copy_family_key(c) for c in rows}
+    for row in card_dicts:
+        key = card_id_to_key.get(row.get("card_id") or "")
+        if not key:
+            row["copies_owned"] = 1
+            row["copies_listed"] = 1 if row.get("listed_on_marketplace") else 0
+        else:
+            stats = families.get(key, {"copies_owned": 1, "copies_listed": 0})
+            row["copies_owned"] = stats["copies_owned"]
+            row["copies_listed"] = stats["copies_listed"]
+        row["copies_available"] = max(0, int(row["copies_owned"]) - int(row["copies_listed"]))
+    return card_dicts
+
+
+def list_unlisted_copy_cards(
+    db: Session,
+    owner_id: int,
+    anchor: Card,
+    *,
+    limit: int,
+) -> list[Card]:
+    return (
+        copy_family_query(db, owner_id, anchor)
+        .filter(Card.listed_on_marketplace.is_(False))
+        .order_by(Card.edition_number.asc(), Card.id.asc())
+        .limit(limit)
+        .all()
+    )
+
+
+def list_listed_copy_cards(
+    db: Session,
+    owner_id: int,
+    anchor: Card,
+    *,
+    limit: int | None = None,
+) -> list[Card]:
+    q = (
+        copy_family_query(db, owner_id, anchor)
+        .filter(Card.listed_on_marketplace.is_(True))
+        .order_by(Card.listed_at.asc(), Card.id.asc())
+    )
+    if limit is not None:
+        q = q.limit(limit)
+    return q.all()
+
+
+def apply_marketplace_listing(card: Card, *, asking_price: Decimal, now: datetime | None = None) -> None:
+    if now is None:
+        now = utcnow()
+    if not card.listed_on_marketplace:
+        card.listed_on_marketplace = True
+    card.asking_price = asking_price
+    card.listed_at = now
+    card.listing_expires_at = now + timedelta(days=30)

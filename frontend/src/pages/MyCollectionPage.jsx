@@ -8,6 +8,7 @@ import CardImage from "../components/CardImage";
 import { CardSharePopover } from "../components/ShareCard";
 import { useAuth } from "../context/AuthContext";
 import { useSettings } from "../context/SettingsContext";
+import BulkMarketplaceListingSheet from "../components/BulkMarketplaceListingSheet";
 import MarketplaceListingActions, { ListedSuccessModal } from "../components/MarketplaceListingActions";
 import AnimateCardModal from "../components/AnimateCardModal";
 import AnimationLoadingScreen from "../components/AnimationLoadingScreen";
@@ -51,6 +52,12 @@ export default function MyCollectionPage({ vaultView = false }) {
   const [permanentDeleteBusyId, setPermanentDeleteBusyId] = useState("");
   const [toast, setToast] = useState({ message: "", variant: "success" });
   const [listSuccessOpen, setListSuccessOpen] = useState(false);
+  const [bulkListCard, setBulkListCard] = useState(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedCardIds, setSelectedCardIds] = useState(() => new Set());
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [mixedListOpen, setMixedListOpen] = useState(false);
+  const [mixedListPrice, setMixedListPrice] = useState("");
   const [pendingOffersByCardId, setPendingOffersByCardId] = useState({});
   const animationFocusRef = useRef(null);
 
@@ -141,6 +148,34 @@ export default function MyCollectionPage({ vaultView = false }) {
     }
   }
 
+  async function bulkListOnMarketplace(cardId, quantity, askingPrice) {
+    if (!token) return;
+    setMarketplaceBusyId(cardId);
+    setError("");
+    try {
+      const { res, unauthorized } = await authFetch(token, "/marketplace/bulk-list", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          card_id: cardId,
+          quantity,
+          asking_price: askingPrice,
+        }),
+      });
+      if (unauthorized) throw new Error("Session expired.");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not list copies."));
+      await loadCards();
+      refreshNavBadges?.();
+      return data;
+    } catch (e) {
+      setError(e.message || "Could not list copies.");
+      throw e;
+    } finally {
+      setMarketplaceBusyId("");
+    }
+  }
+
   async function unlistCardFromMarketplace(cardId) {
     if (!token) return;
     setMarketplaceBusyId(cardId);
@@ -175,20 +210,106 @@ export default function MyCollectionPage({ vaultView = false }) {
       if (ia !== ib) return ia.localeCompare(ib);
       return (Number(a.edition_number) || 0) - (Number(b.edition_number) || 0);
     });
-    const counts = {};
-    for (const c of arr) {
-      const k = String(c.image_url || c.card_id);
-      counts[k] = (counts[k] || 0) + 1;
+    const seen = new Set();
+    const rows = [];
+    for (const card of arr) {
+      const key = String(card.image_url || card.card_id);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rows.push({ card });
     }
-    return arr.map((card, idx) => {
-      const k = String(card.image_url || card.card_id);
-      const prev = idx > 0 ? arr[idx - 1] : null;
-      const prevK = prev ? String(prev.image_url || prev.card_id) : null;
-      const isFirstInGroup = prevK !== k;
-      const groupSize = counts[k] || 1;
-      return { card, stackCount: isFirstInGroup && groupSize > 1 ? groupSize : null };
-    });
+    return rows;
   }, [cards]);
+
+  const selectedCards = useMemo(
+    () => cards.filter((c) => selectedCardIds.has(c.card_id)),
+    [cards, selectedCardIds]
+  );
+
+  function cardFamilyKey(card) {
+    return String(card?.image_url || card?.card_id || "");
+  }
+
+  function getFamilyListingInfo(card) {
+    if (listingByCardId[card.card_id]) return listingByCardId[card.card_id];
+    const key = cardFamilyKey(card);
+    for (const c of cards) {
+      if (cardFamilyKey(c) === key && listingByCardId[c.card_id]) {
+        return listingByCardId[c.card_id];
+      }
+    }
+    return null;
+  }
+
+  function toggleCardSelected(cardId) {
+    setSelectedCardIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(cardId)) next.delete(cardId);
+      else next.add(cardId);
+      return next;
+    });
+  }
+
+  function exitSelectMode() {
+    setSelectMode(false);
+    setSelectedCardIds(new Set());
+    setBulkDeleteConfirm(false);
+    setMixedListOpen(false);
+    setMixedListPrice("");
+  }
+
+  async function listSelectedCardsMixed(price) {
+    const n = Number(price);
+    if (!Number.isFinite(n) || n < 1) {
+      setError("Asking price must be at least $1.00");
+      return;
+    }
+    for (const card of selectedCards) {
+      if (listingByCardId[card.card_id]) continue;
+      await listCardOnMarketplace(card.card_id, n, false);
+    }
+    exitSelectMode();
+    setListSuccessOpen(true);
+  }
+
+  function handleSelectModeList() {
+    if (selectedCards.length === 0) return;
+    const keys = new Set(selectedCards.map(cardFamilyKey));
+    if (keys.size === 1) {
+      const card = selectedCards[0];
+      setBulkListCard(card);
+      return;
+    }
+    setMixedListOpen(true);
+  }
+
+  async function confirmBulkDeleteSelected() {
+    if (!token) return;
+    for (const card of selectedCards) {
+      if (!canDeleteCard(card)) continue;
+      setDeleteBusyId(card.card_id);
+      try {
+        const { res, unauthorized } = await authFetch(token, `/cards/${encodeURIComponent(card.card_id)}/delete`, {
+          method: "POST",
+        });
+        if (unauthorized) throw new Error("Session expired.");
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(formatApiError(data?.detail, "Could not delete card."));
+        }
+      } catch (e) {
+        setError(e.message || "Could not delete selected cards.");
+        setDeleteBusyId("");
+        setBulkDeleteConfirm(false);
+        return;
+      }
+    }
+    setDeleteBusyId("");
+    setBulkDeleteConfirm(false);
+    exitSelectMode();
+    await loadCards();
+    showToast(`${selectedCards.length} card${selectedCards.length === 1 ? "" : "s"} moved to Recently Deleted.`);
+  }
 
   useEffect(() => {
     if (initializing) return;
@@ -467,22 +588,33 @@ export default function MyCollectionPage({ vaultView = false }) {
       <AppHeader />
 
       <main className="collection-page mx-auto w-full max-w-6xl py-8 sm:px-6 lg:px-8">
-        <div className="mb-8 text-center sm:text-left">
-          <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-            {vaultView ? "Vault" : "My Collection"}
-          </h2>
-          {user ? (
-            <p className="mt-2 text-sm text-slate-400">
-              {vaultView ? (
-                <>Browse public collections from across the platform</>
-              ) : (
-                <>
-                  Signed in as <span className="font-medium text-slate-200">{user.display_name}</span>
-                </>
-              )}
-            </p>
-          ) : vaultView ? (
-            <p className="mt-2 text-sm text-slate-400">Browse public card collections</p>
+        <div className="mb-8 flex flex-wrap items-start justify-between gap-3 text-center sm:text-left">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+              {vaultView ? "Vault" : "My Collection"}
+            </h2>
+            {user ? (
+              <p className="mt-2 text-sm text-slate-400">
+                {vaultView ? (
+                  <>Browse public collections from across the platform</>
+                ) : (
+                  <>
+                    Signed in as <span className="font-medium text-slate-200">{user.display_name}</span>
+                  </>
+                )}
+              </p>
+            ) : vaultView ? (
+              <p className="mt-2 text-sm text-slate-400">Browse public card collections</p>
+            ) : null}
+          </div>
+          {!vaultView && cards.length > 0 ? (
+            <button
+              type="button"
+              className={`collection-select-btn${selectMode ? " collection-select-btn--active" : ""}`}
+              onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+            >
+              {selectMode ? "Cancel" : "Select"}
+            </button>
           ) : null}
         </div>
 
@@ -531,19 +663,48 @@ export default function MyCollectionPage({ vaultView = false }) {
           </div>
         ) : (
           <div className={collectionGridClass}>
-            {displayRows.map(({ card, stackCount }) => {
+            {(selectMode ? cards : displayRows.map(({ card }) => card)).map((card) => {
               const badge = vaultTierBadge(card.tier);
               const pending = (card.status || "active") === "pending_trade";
               const showDelete = canDeleteCard(card);
               const videoCard = cardPlaysVideoOnHover(card);
               const pendingOfferCount = pendingOffersByCardId[card.card_id] || 0;
-              const listingPrice = listingByCardId[card.card_id]?.asking_price;
+              const familyListing = getFamilyListingInfo(card);
+              const listingPrice = familyListing?.asking_price;
+              const copiesOwned = Number(card.copies_owned) || 1;
+              const copiesListed = Number(card.copies_listed) || 0;
+              const copiesAvailable = Number(card.copies_available);
+              const availableToList = Number.isFinite(copiesAvailable)
+                ? copiesAvailable
+                : Math.max(0, copiesOwned - copiesListed);
+              const allListed = copiesOwned > 1 && copiesListed >= copiesOwned;
+              const isSelected = selectedCardIds.has(card.card_id);
               return (
                 <article
                   key={card.card_id}
-                  className={`group rounded-2xl border border-white/10 bg-cardBg p-3 shadow-lg transition duration-300 hover:border-white/20 ${badge.glow} ${
-                    pending ? "opacity-70" : videoCard ? "" : "hover:scale-[1.02]"
-                  }`}
+                  className={`group rounded-2xl border bg-cardBg p-3 shadow-lg transition duration-300 ${
+                    isSelected ? "border-[var(--color-gold-primary)] ring-1 ring-[var(--color-gold-primary)]/40" : "border-white/10 hover:border-white/20"
+                  } ${badge.glow} ${pending ? "opacity-70" : videoCard ? "" : "hover:scale-[1.02]"}`}
+                  onClick={
+                    selectMode
+                      ? (e) => {
+                          if (e.target.closest("button, a, input, label")) return;
+                          toggleCardSelected(card.card_id);
+                        }
+                      : undefined
+                  }
+                  role={selectMode ? "button" : undefined}
+                  tabIndex={selectMode ? 0 : undefined}
+                  onKeyDown={
+                    selectMode
+                      ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            toggleCardSelected(card.card_id);
+                          }
+                        }
+                      : undefined
+                  }
                 >
                   <div className={`relative ${cardStageClass}`}>
                     <CardImage
@@ -570,9 +731,12 @@ export default function MyCollectionPage({ vaultView = false }) {
                           )}
                         </button>
                       ) : null}
-                      {stackCount ? (
-                        <span className="rounded-md border border-white/15 bg-black/70 px-2 py-0.5 text-[11px] font-semibold text-slate-200 backdrop-blur-sm">
-                          x{stackCount}
+                      {selectMode ? (
+                        <span
+                          className={`collection-select-check${isSelected ? " collection-select-check--on" : ""}`}
+                          aria-hidden
+                        >
+                          {isSelected ? "✓" : ""}
                         </span>
                       ) : null}
                       {pendingOfferCount > 0 ? (
@@ -592,6 +756,14 @@ export default function MyCollectionPage({ vaultView = false }) {
                     <div className="absolute right-2 top-2 z-10">
                       <CardSharePopover card={card} />
                     </div>
+                    {!selectMode && copiesOwned > 1 ? (
+                      <span
+                        className={`collection-copy-badge${allListed ? " collection-copy-badge--listed" : ""}`}
+                      >
+                        x{copiesOwned}
+                        {allListed ? " Listed" : ""}
+                      </span>
+                    ) : null}
                   </div>
                   <div className="mt-3 space-y-2 px-1">
                     {showPrices && !vaultView && listingPrice != null ? (
@@ -630,14 +802,16 @@ export default function MyCollectionPage({ vaultView = false }) {
                         Animate This Card
                       </button>
                     ) : null}
-                    {!vaultView ? (
+                    {!vaultView && !selectMode ? (
                       <MarketplaceListingActions
                         card={card}
-                        listingInfo={listingByCardId[card.card_id]}
+                        listingInfo={availableToList <= 0 && copiesListed > 0 ? familyListing : null}
+                        copiesAvailable={availableToList}
                         busy={marketplaceBusyId === card.card_id}
                         onList={(price, isPriority) => listCardOnMarketplace(card.card_id, price, isPriority)}
                         onUnlist={() => unlistCardFromMarketplace(card.card_id)}
                         onListSuccess={() => setListSuccessOpen(true)}
+                        onOpenBulkList={(c) => setBulkListCard(c)}
                       />
                     ) : null}
                     {!vaultView && showDelete ? (
@@ -767,6 +941,90 @@ export default function MyCollectionPage({ vaultView = false }) {
           navigate("/marketplace");
         }}
       />
+
+      <BulkMarketplaceListingSheet
+        open={Boolean(bulkListCard)}
+        card={bulkListCard}
+        copiesOwned={bulkListCard?.copies_owned || 1}
+        copiesAvailable={bulkListCard?.copies_available ?? 1}
+        busy={Boolean(marketplaceBusyId)}
+        onClose={() => {
+          setBulkListCard(null);
+          setListSuccessOpen(false);
+        }}
+        onConfirm={async ({ quantity, askingPrice }) => {
+          await bulkListOnMarketplace(bulkListCard.card_id, quantity, askingPrice);
+        }}
+      />
+
+      {selectMode && selectedCardIds.size > 0 ? (
+        <div className="collection-select-bar">
+          <span className="collection-select-bar__count">
+            {selectedCardIds.size} card{selectedCardIds.size === 1 ? "" : "s"} selected
+          </span>
+          <button type="button" className="collection-select-bar__action" onClick={handleSelectModeList}>
+            List on Marketplace
+          </button>
+          <button type="button" className="collection-select-bar__action collection-select-bar__action--danger" onClick={() => setBulkDeleteConfirm(true)}>
+            Delete Selected
+          </button>
+          <button type="button" className="collection-select-bar__cancel" onClick={exitSelectMode}>
+            Cancel
+          </button>
+        </div>
+      ) : null}
+
+      {mixedListOpen ? (
+        <div className="bulk-list-sheet__backdrop" role="presentation" onClick={() => setMixedListOpen(false)}>
+          <div className="bulk-list-sheet" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <h2 className="bulk-list-sheet__title">Set asking price for each card</h2>
+            <p className="bulk-list-sheet__subtext">
+              One price will be applied to all {selectedCards.length} selected cards.
+            </p>
+            <div className="bulk-list-sheet__price-wrap">
+              <span className="bulk-list-sheet__price-prefix">$</span>
+              <input
+                type="number"
+                min="1"
+                step="0.01"
+                inputMode="decimal"
+                value={mixedListPrice}
+                onChange={(e) => setMixedListPrice(e.target.value)}
+                className="bulk-list-sheet__price-input"
+                placeholder="0.00"
+              />
+            </div>
+            <button
+              type="button"
+              className="bulk-list-sheet__primary-btn"
+              disabled={Boolean(marketplaceBusyId)}
+              onClick={() => listSelectedCardsMixed(mixedListPrice)}
+            >
+              List {selectedCards.length} Cards
+            </button>
+            <button type="button" className="bulk-list-sheet__secondary-btn" onClick={() => setMixedListOpen(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {bulkDeleteConfirm ? (
+        <div className="bulk-list-sheet__backdrop" role="presentation" onClick={() => setBulkDeleteConfirm(false)}>
+          <div className="bulk-list-sheet" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <h2 className="bulk-list-sheet__title">Move to Recently Deleted?</h2>
+            <p className="bulk-list-sheet__subtext">
+              Move {selectedCards.length} card{selectedCards.length === 1 ? "" : "s"} to Recently Deleted?
+            </p>
+            <button type="button" className="bulk-list-sheet__primary-btn" disabled={Boolean(deleteBusyId)} onClick={confirmBulkDeleteSelected}>
+              {deleteBusyId ? "Deleting…" : "Confirm"}
+            </button>
+            <button type="button" className="bulk-list-sheet__secondary-btn" onClick={() => setBulkDeleteConfirm(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <CollectionToast message={toast.message} variant={toast.variant} />
 

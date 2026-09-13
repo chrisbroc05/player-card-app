@@ -9,6 +9,8 @@ export default function MarketplaceListingActions({
   onList,
   onUnlist,
   onListSuccess,
+  onOpenBulkList,
+  copiesAvailable = 1,
   className = "",
   showContainerDivider = true,
   listButtonLabel = "List on Marketplace",
@@ -30,6 +32,8 @@ export default function MarketplaceListingActions({
   const isListed = Boolean(listingInfo);
   const isPendingTrade = (card?.status || "active") === "pending_trade";
   const isActive = (card?.status || "active") === "active";
+  const availableCopies = Math.max(0, Number(copiesAvailable) || 0);
+  const useBulkFlow = availableCopies > 1 && typeof onOpenBulkList === "function";
 
   if (isPendingTrade || !isActive) return null;
 
@@ -95,6 +99,10 @@ export default function MarketplaceListingActions({
               type="button"
               disabled={busy}
               onClick={() => {
+                if (useBulkFlow) {
+                  onOpenBulkList(card);
+                  return;
+                }
                 setOpen(true);
                 setLocalError("");
                 setPriorityBoost(false);
