@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import CardImage from "./CardImage";
 import Modal from "./Modal";
+import JerseyAnimationTip from "./JerseyAnimationTip";
 import { themeDisplayLabel } from "../utils/cardBannerStyles";
 import { normalizeHighlightThemeKey } from "../utils/highlightCardStyles";
 
@@ -62,6 +63,8 @@ export default function AnimatedCardChoiceModal({
           </p>
         </div>
       ) : null}
+
+      <JerseyAnimationTip className="mt-4" />
 
       <div className="mt-4 flex flex-col gap-3">
         <button

@@ -73,6 +73,7 @@ class ActivityItemOut(BaseModel):
     status: str = "completed"
     preview_label: str | None = None
     additional_preview_count: int | None = None
+    quantity: int | None = None
 
 
 class ActivityHistoryResponse(BaseModel):

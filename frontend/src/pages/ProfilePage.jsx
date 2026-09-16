@@ -5,20 +5,13 @@ import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import LogoutConfirmModal from "../components/LogoutConfirmModal";
 import CardImage from "../components/CardImage";
-import RarityBadge from "../components/RarityBadge";
 import { ProfileActivityCompactList } from "../components/ActivityHistory";
+import { getCardBannerStyles } from "../utils/cardBannerStyles";
 import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY, authHeaders } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import { useSettings } from "../context/SettingsContext";
 import { performLogout } from "../utils/logout";
 import { formatMoney } from "../utils/marketplace";
-import { formatEditionShort } from "../utils/tierStyles";
-import {
-  formatRarityBreakdownLine,
-  isPremiumRarity,
-  rarityDisplayLabel,
-} from "../utils/rarityStyles";
-
 function formatApiError(detail, fallback) {
   if (!detail) return fallback;
   if (typeof detail === "string") return detail;
@@ -40,16 +33,6 @@ function formatProfileDate(iso) {
   } catch {
     return "";
   }
-}
-
-function rarityEditionDisplay(editionNumber, printRun) {
-  const e = Number(editionNumber) || 1;
-  const p = Number(printRun) || 1;
-  const text = formatEditionShort(e, p);
-  if (p === 1) return { text, tone: "gold" };
-  if (p <= 5) return { text, tone: "silver" };
-  if (p <= 10) return { text, tone: "bronze" };
-  return { text, tone: "default" };
 }
 
 function ProfileFinancials({ token }) {
@@ -174,87 +157,6 @@ function CardPlaceholder({ icon, message, linkTo, linkLabel }) {
   );
 }
 
-function ProfileCollectionHighlights({ token }) {
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!token) return undefined;
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(`${API_BASE_URL}/auth/profile/rarity-stats`, {
-          headers: { ...authHeaders(token) },
-          cache: "no-store",
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!cancelled && res.ok) setStats(data);
-        else if (!cancelled) setStats(null);
-      } catch {
-        if (!cancelled) setStats(null);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [token]);
-
-  if (loading || !stats || Number(stats.total_rare_cards || 0) <= 0) return null;
-
-  const breakdown = formatRarityBreakdownLine(stats.rarity_counts);
-  const rarestCard = stats.rarest_card;
-  const showRarest = rarestCard && isPremiumRarity(stats.rarest_pull || rarestCard.rarity);
-  const rarityLabel = rarityDisplayLabel(
-    stats.rarest_pull || rarestCard?.rarity,
-    rarestCard?.rarity_display_name
-  );
-  const templateName = rarestCard?.template_name || "Classic";
-
-  return (
-    <section className="profile-page__collection-highlights">
-      <h2 className="profile-page__section-title">Collection Highlights</h2>
-      {showRarest ? (
-        <div className="profile-rarest-pull">
-          <p className="profile-rarest-pull__label">Rarest Pull</p>
-          <div className="profile-rarest-pull__thumb">
-            <div className="profile-rarest-pull__badge">
-              <RarityBadge rarity={rarestCard.rarity} size="thumb" />
-            </div>
-            <ProfileCardThumb card={rarestCard} />
-          </div>
-          <p className="profile-rarest-pull__caption">
-            {rarityLabel} — {templateName}
-          </p>
-        </div>
-      ) : null}
-      {breakdown ? (
-        <p className="profile-rarity-breakdown" aria-label="Rarity breakdown">
-          {breakdown.split(" · ").map((part, index, arr) => {
-            const isPremium = /Auto|1 of 1|Black Label/i.test(part);
-            const toneClass = isPremium
-              ? "profile-rarity-breakdown__pill profile-rarity-breakdown__pill--premium"
-              : "profile-rarity-breakdown__pill profile-rarity-breakdown__pill--standard";
-            return (
-              <React.Fragment key={part}>
-                <span className={toneClass}>{part}</span>
-                {index < arr.length - 1 ? (
-                  <span className="profile-rarity-breakdown__sep" aria-hidden>
-                    {" "}
-                    ·{" "}
-                  </span>
-                ) : null}
-              </React.Fragment>
-            );
-          })}
-        </p>
-      ) : null}
-    </section>
-  );
-}
-
 function ProfileRecentActivity({ token }) {
   const location = useLocation();
   const [items, setItems] = useState([]);
@@ -365,9 +267,9 @@ export default function ProfilePage() {
   const mp = profile?.marketplace_stats;
   const biggestSale = mp?.highest_sale ?? null;
   const rarestCard = profile?.rarest_card ?? null;
-  const rarity = rarestCard
-    ? rarityEditionDisplay(rarestCard.edition_number, rarestCard.print_run)
-    : null;
+  const rarestTierLabel = rarestCard
+    ? getCardBannerStyles(rarestCard.tier, rarestCard.theme || rarestCard.special_theme).tierPillLabel
+    : "";
 
   return (
     <div className="min-h-screen bg-appBg text-slate-100">
@@ -443,7 +345,35 @@ export default function ProfilePage() {
               </div>
             </section>
 
-            {token ? <ProfileCollectionHighlights token={token} /> : null}
+            <section className="profile-page__collection-highlights">
+              <h2 className="profile-page__section-title">Collection Highlights</h2>
+              <div className="profile-page__highlights profile-page__highlights--solo">
+                <ProfileHighlightCard
+                  label="Rarest Card Owned"
+                  footer={
+                    rarestCard ? (
+                      <>
+                        <p className="profile-highlight__card-name">{rarestCard.player_name}</p>
+                        {rarestTierLabel ? (
+                          <p className="profile-highlight__meta">{rarestTierLabel}</p>
+                        ) : null}
+                      </>
+                    ) : null
+                  }
+                >
+                  {rarestCard ? (
+                    <ProfileCardThumb card={rarestCard} />
+                  ) : (
+                    <CardPlaceholder
+                      icon="🃏"
+                      message="Create your first card"
+                      linkTo="/"
+                      linkLabel="Go to Card Studio"
+                    />
+                  )}
+                </ProfileHighlightCard>
+              </div>
+            </section>
 
             <hr className="profile-page__divider" />
 
@@ -453,7 +383,7 @@ export default function ProfilePage() {
 
             {/* Section 3 — Highlight cards */}
             <section className="profile-page__highlights-section">
-              <div className="profile-page__highlights">
+              <div className="profile-page__highlights profile-page__highlights--solo">
                 <ProfileHighlightCard
                   label="Biggest Sale"
                   footer={
@@ -480,30 +410,6 @@ export default function ProfilePage() {
                     <ProfileCardThumb card={biggestSale.card} />
                   ) : (
                     <CardPlaceholder icon="💰" message="No sales yet" />
-                  )}
-                </ProfileHighlightCard>
-
-                <ProfileHighlightCard
-                  label="Rarest Card Owned"
-                  footer={
-                    rarestCard && rarity ? (
-                      <p
-                        className={`profile-highlight__rarity profile-highlight__rarity--${rarity.tone}`}
-                      >
-                        {rarity.text}
-                      </p>
-                    ) : null
-                  }
-                >
-                  {rarestCard ? (
-                    <ProfileCardThumb card={rarestCard} />
-                  ) : (
-                    <CardPlaceholder
-                      icon="🃏"
-                      message="Create your first card"
-                      linkTo="/"
-                      linkLabel="Go to Card Studio"
-                    />
                   )}
                 </ProfileHighlightCard>
               </div>

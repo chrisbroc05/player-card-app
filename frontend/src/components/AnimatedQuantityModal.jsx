@@ -10,6 +10,7 @@ import {
   animatedStudioTotalPrice,
 } from "../utils/animatedCopyPricing";
 import { bulkDiscountMessage, COPY_QUANTITY_MIN } from "../utils/copyPricing";
+import JerseyAnimationTip from "./JerseyAnimationTip";
 import Modal from "./Modal";
 
 function clampAnimatedQty(value) {
@@ -264,7 +265,9 @@ export default function AnimatedQuantityModal({
                 Your balance: <span className="font-semibold text-brand-gold">{formatMoney(creditBalance)}</span>
               </p>
 
-              <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row">
+              <JerseyAnimationTip className="mt-5" />
+
+              <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row">
                 <button
                   type="button"
                   disabled={busy}

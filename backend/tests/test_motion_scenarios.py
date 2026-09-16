@@ -17,7 +17,7 @@ from config.motion_scenarios import (
     list_action_categories,
     list_scenarios_for_category,
 )
-from config.prompt_constraints import UNIVERSAL_KLING_CONSTRAINTS
+from config.prompt_constraints import JERSEY_TEXT_KLING_CONSTRAINTS, UNIVERSAL_KLING_CONSTRAINTS
 from data.animation_motions import build_runway_prompt, get_motion_prompt
 
 
@@ -88,7 +88,9 @@ class RunwayPromptScenarioTests(unittest.TestCase):
         )
         self.assertIn("Cinematic slow motion sports video.", prompt)
         self.assertIn("Only one baseball may appear in any scene at any time", prompt)
-        self.assertIn("Blank jerseys only.", prompt)
+        self.assertIn(JERSEY_TEXT_KLING_CONSTRAINTS, prompt)
+        self.assertIn("Do not add, invent, or generate any text, letters, numbers, logos", prompt)
+        self.assertIn("Preserve only what is actually shown in the original photo.", prompt)
         self.assertIn("Animate only the identified athlete.", prompt)
         self.assertIn("figures not clearly visible in the original photo", prompt)
 

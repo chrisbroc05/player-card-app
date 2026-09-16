@@ -20,12 +20,18 @@ THROWING_HAND_CATEGORIES = frozenset(
 # Categories that use batting_side for prompt injection.
 BATTING_SIDE_CATEGORIES = frozenset({"hitting"})
 
+JERSEY_TEXT_KLING_CONSTRAINTS = (
+    "Do not add, invent, or generate any text, letters, numbers, logos, or "
+    "brand marks that are not clearly visible in the original image. "
+    "If no team name, logo, or jersey text is visible in the source image, "
+    "leave that area as a natural, generic athletic uniform with no text. "
+    "Preserve only what is actually shown in the original photo."
+)
+
 UNIVERSAL_KLING_CONSTRAINTS = (
     "Only one baseball may appear in any scene at any time. "
     "Never show multiple baseballs or duplicate any sports equipment. "
-    "No text, numbers, names, or lettering anywhere on clothing or uniforms. "
-    "Blank jerseys only. No player name on back of jersey. "
-    "No jersey number on front or back. "
+    f"{JERSEY_TEXT_KLING_CONSTRAINTS} "
     "The background must remain static and faithful to the original image. "
     "Do not add, generate, or animate any other people, players, coaches, umpires, "
     "or figures not clearly visible in the original photo. "

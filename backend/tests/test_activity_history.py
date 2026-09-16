@@ -216,6 +216,31 @@ class ActivityHistoryTests(unittest.TestCase):
         previews = [i for i in items if i["activity_type"] == "preview_generated"]
         self.assertEqual(len(previews), 0)
 
+    def test_bulk_copy_creation_logs_single_activity_entry(self) -> None:
+        now = datetime.now(timezone.utc)
+        image_url = "https://example.com/shared-art.png"
+        cards = []
+        for i in range(5):
+            cards.append(
+                self._add_card(
+                    card_id=f"FL-2026-00020{i}",
+                    created_at=now + timedelta(seconds=i),
+                )
+            )
+        for card in cards:
+            card.image_url = image_url
+            card.player_name = "Bulk Player"
+            card.tier = "allstar"
+        self.db.commit()
+
+        items = gather_user_activity_items(self.db, self.user.id)
+        bulk = [i for i in items if i["activity_type"] == "bulk_card_created"]
+        created = [i for i in items if i["activity_type"] == "card_created"]
+        self.assertEqual(len(bulk), 1)
+        self.assertEqual(bulk[0]["quantity"], 5)
+        self.assertEqual(bulk[0]["card"]["player_name"], "Bulk Player")
+        self.assertEqual(len(created), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

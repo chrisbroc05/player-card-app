@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import CardImage from "./CardImage";
 import AnimatedAiDisclaimer from "./AnimatedAiDisclaimer";
+import JerseyAnimationTip from "./JerseyAnimationTip";
 import Modal from "./Modal";
 import { formatMoney } from "../utils/marketplace";
 import { creditTopUpShortfallMessage } from "../utils/credits";
@@ -122,6 +123,8 @@ export default function AnimateCardConfirmModal({
       </div>
 
       {showAiDisclaimer ? <AnimatedAiDisclaimer className="mt-3 px-1" /> : null}
+
+      {!intentOnly ? <JerseyAnimationTip className="mt-4" /> : null}
 
       <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap">
         <button

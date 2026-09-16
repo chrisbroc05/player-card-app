@@ -5,6 +5,7 @@ import { API_BASE_URL, authHeaders } from "../config/api";
 import {
   ACTIVITY_FILTERS,
   activityAmountDisplay,
+  activityCreationSummaryWithEmoji,
   activityMeta,
   activityRowStyle,
   amountDisplay,
@@ -13,6 +14,7 @@ import {
   counterpartyProfileName,
   filterActivityItems,
   formatActivityFullTimestamp,
+  groupActivityItems,
   relativeTimeAgo,
 } from "../utils/activityHistory";
 import { getCardBannerStyles, themeDisplayLabel } from "../utils/cardBannerStyles";
@@ -135,6 +137,7 @@ function ActivityRow({ item }) {
   const counterpartyLead = counterpartyPrefix(item);
   const amount = activityAmountDisplay(item);
   const timestamp = formatActivityFullTimestamp(item?.completed_at || item?.created_at);
+  const creationSummary = activityCreationSummaryWithEmoji(item);
 
   return (
     <li className="activity-row">
@@ -159,11 +162,13 @@ function ActivityRow({ item }) {
       </div>
 
       <div className="activity-row__details">
-        <p className="activity-row__label" style={{ color: style.labelColor }}>
-          {style.label}
-        </p>
+        {!creationSummary ? (
+          <p className="activity-row__label" style={{ color: style.labelColor }}>
+            {style.label}
+          </p>
+        ) : null}
         <h3 className={`activity-row__name activity-row__name--${tierKey}`}>
-          {card?.player_name || "Card"}
+          {creationSummary || card?.player_name || "Card"}
         </h3>
 
         <div className="activity-row__meta">
@@ -212,12 +217,13 @@ export function ActivityHistorySection({
   showFilters = true,
   emptyMessage = "No activity yet — start by creating your first card!",
 }) {
+  const displayItems = groupActivityItems(items);
   const [page, setPage] = React.useState(0);
 
-  const filtered = React.useMemo(
-    () => (showFilters ? filterActivityItems(items || [], filter) : items || []),
-    [items, filter, showFilters]
-  );
+  const filtered = React.useMemo(() => {
+    const grouped = groupActivityItems(items || []);
+    return showFilters ? filterActivityItems(grouped, filter) : grouped;
+  }, [items, filter, showFilters]);
 
   React.useEffect(() => {
     setPage(0);
@@ -302,6 +308,7 @@ export function ActivityHistorySection({
 }
 
 export function ProfileActivityCompactList({ items, loading }) {
+  const displayItems = groupActivityItems(items || []);
   if (loading) {
     return (
       <div className="profile-page__loading">
@@ -310,7 +317,7 @@ export function ProfileActivityCompactList({ items, loading }) {
     );
   }
 
-  if (!items?.length) {
+  if (!displayItems.length) {
     return (
       <p className="rounded-xl border border-dashed border-white/15 bg-cardBg2/40 px-4 py-8 text-center text-sm text-slate-500">
         No activity yet. Start by creating your first card!
@@ -320,9 +327,10 @@ export function ProfileActivityCompactList({ items, loading }) {
 
   return (
     <ul className="profile-activity-list">
-      {items.map((item) => {
+      {displayItems.map((item) => {
         const style = activityRowStyle(item);
         const amount = activityAmountDisplay(item);
+        const creationSummary = activityCreationSummaryWithEmoji(item);
         const meta = activityMeta(item, item?.card?.tier);
         return (
           <li key={item.id} className="profile-activity-row">
@@ -330,8 +338,16 @@ export function ProfileActivityCompactList({ items, loading }) {
               {style.glyph}
             </span>
             <div className="profile-activity-row__main">
-              <p className="profile-activity-row__name">{item.card?.player_name || "Card"}</p>
-              <p className="profile-activity-row__type">{meta.label}</p>
+              <p className="profile-activity-row__name">
+                {creationSummary || item.card?.player_name || "Card"}
+              </p>
+              {!creationSummary ? (
+                <p className="profile-activity-row__type">{meta.label}</p>
+              ) : (
+                <p className="profile-activity-row__type profile-activity-row__type--muted">
+                  {relativeTimeAgo(item.completed_at || item.created_at)}
+                </p>
+              )}
             </div>
             <span
               className={`profile-activity-row__amount profile-activity-row__amount--${amount.tone}`}
@@ -345,9 +361,11 @@ export function ProfileActivityCompactList({ items, loading }) {
             >
               {amount.text}
             </span>
-            <span className="profile-activity-row__time">
-              {relativeTimeAgo(item.completed_at || item.created_at)}
-            </span>
+            {!creationSummary ? (
+              <span className="profile-activity-row__time">
+                {relativeTimeAgo(item.completed_at || item.created_at)}
+              </span>
+            ) : null}
           </li>
         );
       })}

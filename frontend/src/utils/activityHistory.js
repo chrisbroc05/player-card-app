@@ -1,7 +1,10 @@
 /** Shared activity history display helpers */
 
 import { formatMoney, PLATFORM_ROYALTY_RATE, platformRoyaltyPercentLabel } from "./marketplace";
+import { normalizeTierKey } from "./cardTemplate";
 import { vaultTierBadge } from "./tierStyles";
+
+const CARD_CREATED_GROUP_WINDOW_MS = 60 * 1000;
 
 export const ACTIVITY_FILTERS = [
   { id: "all", label: "All", type: null },
@@ -62,6 +65,13 @@ export const ACTIVITY_META = {
     badgeClass: "border-[var(--color-border-gold)] bg-gold-subtle text-brand-gold",
     iconWrapClass: "border-[var(--color-border-gold)] bg-gold-subtle text-brand-gold",
   },
+  bulk_card_created: {
+    emoji: "🃏",
+    label: "Cards Created",
+    shortLabel: "Created",
+    badgeClass: "border-[var(--color-border-gold)] bg-gold-subtle text-brand-gold",
+    iconWrapClass: "border-[var(--color-border-gold)] bg-gold-subtle text-brand-gold",
+  },
   preview_generated: {
     emoji: "🔄",
     label: "Additional Preview",
@@ -76,7 +86,8 @@ export function activityMeta(item, tier) {
   if (
     item?.activity_type !== "animated_upgrade"
     && item?.activity_type !== "highlight_upgrade"
-    && item?.activity_type !== "card_created"
+    &&     item?.activity_type !== "card_created"
+    && item?.activity_type !== "bulk_card_created"
     && item?.activity_type !== "preview_generated"
   ) {
     return base;
@@ -136,6 +147,12 @@ const ACTIVITY_ROW_STYLES = {
     badgeStyle: { backgroundColor: "var(--color-gold-primary)", color: "#0a0a0a" },
     labelColor: "#E8C56A",
   },
+  bulk_card_created: {
+    label: "CARDS CREATED",
+    glyph: "★",
+    badgeStyle: { backgroundColor: "var(--color-gold-primary)", color: "#0a0a0a" },
+    labelColor: "#E8C56A",
+  },
   preview_generated: {
     label: "ADDITIONAL PREVIEW",
     glyph: "↻",
@@ -152,9 +169,105 @@ export function activityRowStyle(item) {
       label: String(item.preview_label).toUpperCase(),
     };
   }
-  if (item?.activity_type !== "animated_upgrade" && item?.activity_type !== "card_created") return base;
+  if (
+    item?.activity_type !== "animated_upgrade"
+    && item?.activity_type !== "card_created"
+    && item?.activity_type !== "bulk_card_created"
+  ) {
+    return base;
+  }
   const accent = vaultTierBadge(item?.card?.tier).accent;
   return { ...base, badgeStyle: { backgroundColor: accent, color: "#ffffff" } };
+}
+
+export function activityTierLabel(tier) {
+  const key = normalizeTierKey(tier);
+  if (key === "legends") return "Legends";
+  if (key === "allstar") return "All-Star";
+  return "Rookie";
+}
+
+export function activityCreationSummary(item) {
+  const name = item?.card?.player_name || "Card";
+  const tier = activityTierLabel(item?.card?.tier);
+  const qty = Number(item?.quantity) || 1;
+  if (item?.activity_type === "bulk_card_created" || qty > 1) {
+    return `Created ${qty} copies of ${name} — ${tier}`;
+  }
+  if (item?.activity_type === "card_created") {
+    return `${name} card created — ${tier}`;
+  }
+  return null;
+}
+
+export function activityCreationSummaryWithEmoji(item) {
+  const summary = activityCreationSummary(item);
+  return summary ? `🃏 ${summary}` : null;
+}
+
+function cardCreationGroupKey(item) {
+  return [
+    (item?.card?.player_name || "").trim().toLowerCase(),
+    normalizeTierKey(item?.card?.tier),
+  ].join("\0");
+}
+
+function itemTimestampMs(item) {
+  const iso = item?.completed_at || item?.created_at;
+  if (!iso) return 0;
+  const t = new Date(iso).getTime();
+  return Number.isFinite(t) ? t : 0;
+}
+
+/** Collapse historical duplicate card_created rows (same card batch within 60s). */
+export function groupActivityItems(items) {
+  if (!Array.isArray(items) || items.length === 0) return [];
+
+  const result = [];
+  const consumed = new Set();
+
+  for (let i = 0; i < items.length; i += 1) {
+    if (consumed.has(i)) continue;
+    const item = items[i];
+    if (item?.activity_type !== "card_created") {
+      result.push(item);
+      continue;
+    }
+
+    const cluster = [item];
+    consumed.add(i);
+    const key = cardCreationGroupKey(item);
+
+    for (let j = 0; j < items.length; j += 1) {
+      if (j === i || consumed.has(j)) continue;
+      const other = items[j];
+      if (other?.activity_type !== "card_created") continue;
+      if (cardCreationGroupKey(other) !== key) continue;
+      const clusterTimes = cluster.map(itemTimestampMs);
+      const otherTime = itemTimestampMs(other);
+      const withinWindow = clusterTimes.some(
+        (t) => Math.abs(otherTime - t) <= CARD_CREATED_GROUP_WINDOW_MS
+      );
+      if (!withinWindow) continue;
+      cluster.push(other);
+      consumed.add(j);
+    }
+
+    if (cluster.length > 1) {
+      const sorted = [...cluster].sort((a, b) => itemTimestampMs(b) - itemTimestampMs(a));
+      const anchor = sorted[0];
+      result.push({
+        ...anchor,
+        id: `grouped-bulk-${anchor.id}-${cluster.length}`,
+        activity_type: "bulk_card_created",
+        quantity: cluster.length,
+      });
+    } else {
+      result.push(item);
+    }
+  }
+
+  return result.sort((a, b) => itemTimestampMs(b) - itemTimestampMs(a));
 }
 
 export function relativeTimeAgo(iso) {
@@ -196,6 +309,7 @@ export function counterpartyProfileName(item) {
     type === "animated_upgrade" ||
     type === "highlight_upgrade" ||
     type === "card_created" ||
+    type === "bulk_card_created" ||
     type === "preview_generated"
   ) {
     return null;
@@ -208,7 +322,7 @@ export function counterpartyPrefix(item) {
   if (type === "animated_upgrade" || type === "highlight_upgrade") {
     return "Upgraded by you";
   }
-  if (type === "card_created" || type === "preview_generated") {
+  if (type === "card_created" || type === "bulk_card_created" || type === "preview_generated") {
     return "Created by you";
   }
   if (type === "trade_sent") return "Traded to";
@@ -259,13 +373,14 @@ export function activityAmountDisplay(item) {
 
   if (
     type === "card_created"
+    || type === "bulk_card_created"
     || type === "preview_generated"
     || type === "animated_upgrade"
     || type === "highlight_upgrade"
   ) {
     if (!Number.isFinite(raw) || raw === 0) {
       const subtext =
-        type === "card_created"
+        type === "card_created" || type === "bulk_card_created"
           ? "Free preview"
           : type === "preview_generated"
             ? item?.preview_label || "Preview"
@@ -276,9 +391,9 @@ export function activityAmountDisplay(item) {
     }
     const previewCount = Number(item?.additional_preview_count);
     const subtext =
-      type === "card_created" && previewCount > 0
+      (type === "card_created" || type === "bulk_card_created") && previewCount > 0
         ? `Includes ${previewCount} additional preview${previewCount === 1 ? "" : "s"}`
-        : type === "card_created"
+        : type === "card_created" || type === "bulk_card_created"
           ? "Card creation"
           : type === "preview_generated"
             ? item?.preview_label || "Additional Preview"
@@ -336,6 +451,7 @@ export function amountDisplay(item) {
 
   if (
     type === "card_created"
+    || type === "bulk_card_created"
     || type === "preview_generated"
     || type === "animated_upgrade"
     || type === "highlight_upgrade"
@@ -345,7 +461,7 @@ export function amountDisplay(item) {
     }
     const previewCount = Number(item?.additional_preview_count);
     const subtext =
-      type === "card_created" && previewCount > 0
+      (type === "card_created" || type === "bulk_card_created") && previewCount > 0
         ? `Includes ${previewCount} additional preview${previewCount === 1 ? "" : "s"}`
         : undefined;
     return {

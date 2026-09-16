@@ -34,9 +34,12 @@ ACTIVITY_TYPES = frozenset(
         "animated_upgrade",
         "highlight_upgrade",
         "card_created",
+        "bulk_card_created",
         "preview_generated",
     }
 )
+
+BULK_CARD_GROUP_WINDOW_SECONDS = 60
 
 
 def _iso(dt: datetime | None) -> str:
@@ -218,6 +221,50 @@ def _upgrade_charge(
     return 0.0
 
 
+def _tier_display_label(tier: str | None) -> str:
+    t = (tier or "").strip().lower().replace("-", "_")
+    if t in ("allstar", "all_star", "rare"):
+        return "All-Star"
+    if t == "legends":
+        return "Legends"
+    return "Rookie"
+
+
+def _card_creation_group_key(card: Card) -> tuple[str, str, str]:
+    return (
+        (card.player_name or "").strip().lower(),
+        (card.tier or "").strip().lower(),
+        (card.image_url or "").strip(),
+    )
+
+
+def _group_cards_for_creation_activity(cards: list[Card]) -> list[list[Card]]:
+    """Cluster standard card rows created together (same art, tier, player, within 60s)."""
+    sorted_cards = sorted(
+        cards,
+        key=lambda c: (_completed_ts(c.created_at), int(c.id or 0)),
+    )
+    groups: list[list[Card]] = []
+    for card in sorted_cards:
+        placed = False
+        card_key = _card_creation_group_key(card)
+        card_time = _completed_ts(card.created_at)
+        for group in reversed(groups):
+            if _card_creation_group_key(group[0]) != card_key:
+                continue
+            group_times = [_completed_ts(c.created_at) for c in group]
+            if any(
+                abs((card_time - group_time).total_seconds()) <= BULK_CARD_GROUP_WINDOW_SECONDS
+                for group_time in group_times
+            ):
+                group.append(card)
+                placed = True
+                break
+        if not placed:
+            groups.append([card])
+    return groups
+
+
 def _tier_label_from_preview_note(note: str | None) -> str:
     n = (note or "").lower()
     if "legends" in n:
@@ -386,6 +433,7 @@ def _build_item(
     amount: float | None,
     royalty_amount: float | None = None,
     additional_preview_count: int | None = None,
+    quantity: int | None = None,
 ) -> dict:
     when = completed_at or created_at
     row = {
@@ -403,7 +451,62 @@ def _build_item(
         row["royalty_amount"] = royalty_amount
     if additional_preview_count is not None and additional_preview_count > 0:
         row["additional_preview_count"] = additional_preview_count
+    if quantity is not None and quantity > 0:
+        row["quantity"] = quantity
     return row
+
+
+def _build_card_creation_activity_items(
+    cards: list[Card],
+    *,
+    ledger_by_ref: dict[str, float],
+    preview_indexes: dict[str, int],
+    db: Session,
+    user_id: int,
+) -> list[dict]:
+    """One card_created or bulk_card_created row per creation batch."""
+    items: list[dict] = []
+    for group in _group_cards_for_creation_activity(cards):
+        representative = min(group, key=lambda c: (int(c.edition_number or 1), int(c.id or 0)))
+        amount, additional_previews = _card_creation_charge(
+            representative,
+            ledger_by_ref=ledger_by_ref,
+            preview_indexes=preview_indexes,
+            db=db,
+            user_id=user_id,
+        )
+        quantity = len(group)
+        when = max((c.created_at for c in group if c.created_at), default=representative.created_at)
+        if quantity > 1:
+            card_ids = "-".join(str(c.id) for c in group[:5])
+            items.append(
+                _build_item(
+                    item_id=f"bulk_card_created-{card_ids}-{quantity}",
+                    activity_type="bulk_card_created",
+                    completed_at=when,
+                    created_at=representative.created_at,
+                    card=representative,
+                    counterparty=None,
+                    amount=amount,
+                    additional_preview_count=additional_previews,
+                    quantity=quantity,
+                )
+            )
+        else:
+            items.append(
+                _build_item(
+                    item_id=f"card_created-{representative.id}",
+                    activity_type="card_created",
+                    completed_at=when,
+                    created_at=representative.created_at,
+                    card=representative,
+                    counterparty=None,
+                    amount=amount,
+                    additional_preview_count=additional_previews,
+                    quantity=1,
+                )
+            )
+    return items
 
 
 def gather_user_activity_items(db: Session, user_id: int) -> list[dict]:
@@ -589,27 +692,15 @@ def gather_user_activity_items(db: Session, user_id: int) -> list[dict]:
         )
         .all()
     )
-    for card in standard_rows:
-        when = card.created_at
-        amount, additional_previews = _card_creation_charge(
-            card,
+    items.extend(
+        _build_card_creation_activity_items(
+            standard_rows,
             ledger_by_ref=card_creation_ledger,
             preview_indexes=preview_indexes,
             db=db,
             user_id=user_id,
         )
-        items.append(
-            _build_item(
-                item_id=f"card_created-{card.id}",
-                activity_type="card_created",
-                completed_at=when,
-                created_at=card.created_at,
-                card=card,
-                counterparty=None,
-                amount=amount,
-                additional_preview_count=additional_previews,
-            )
-        )
+    )
 
     return items
 

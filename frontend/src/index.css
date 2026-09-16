@@ -4382,65 +4382,6 @@
   gap: 16px;
 }
 
-.profile-rarity-breakdown {
-  margin: 0;
-  font-size: 12px;
-  font-family: "Barlow Condensed", sans-serif;
-  line-height: 1.5;
-}
-
-.profile-rarity-breakdown__pill--premium {
-  color: var(--color-gold-primary);
-  font-weight: 600;
-}
-
-.profile-rarity-breakdown__pill--standard {
-  color: var(--text-secondary);
-}
-
-.profile-rarity-breakdown__sep {
-  color: var(--text-secondary);
-}
-
-.profile-rarest-pull {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-  width: 100%;
-  max-width: 180px;
-}
-
-.profile-rarest-pull__label {
-  margin: 0;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}
-
-.profile-rarest-pull__thumb {
-  position: relative;
-  width: 100%;
-  min-width: 140px;
-}
-
-.profile-rarest-pull__badge {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  z-index: 4;
-  pointer-events: none;
-}
-
-.profile-rarest-pull__caption {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
 /* Preview comparison — multi-preview pick flow */
 .preview-selection {
   display: flex;
@@ -4909,6 +4850,14 @@
   }
 }
 
+.profile-page__highlights--solo {
+  align-items: center;
+}
+
+.profile-page__highlights--solo .profile-highlight {
+  max-width: 320px;
+}
+
 .profile-highlight {
   flex: 1;
   min-width: 260px;
@@ -5025,6 +4974,13 @@
   font-size: 18px;
   font-weight: 700;
   color: var(--text-success);
+}
+
+.profile-highlight__card-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .profile-highlight__meta {
@@ -5737,6 +5693,33 @@
 .animated-popup-card-wrap > * {
   width: 100%;
   height: 100%;
+}
+
+.jersey-animation-tip {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid rgba(201, 168, 76, 0.2);
+  border-radius: 8px;
+  background: rgba(201, 168, 76, 0.08);
+}
+
+.jersey-animation-tip__icon {
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.jersey-animation-tip__text {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(201, 168, 76, 0.8);
+}
+
+.jersey-animation-tip__text strong {
+  font-weight: 700;
 }
 
 .animated-theme-disclaimer {
