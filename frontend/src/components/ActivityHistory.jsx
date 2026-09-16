@@ -5,7 +5,7 @@ import { API_BASE_URL, authHeaders } from "../config/api";
 import {
   ACTIVITY_FILTERS,
   activityAmountDisplay,
-  activityCreationSummaryWithEmoji,
+  activityCreationSummary,
   activityMeta,
   activityRowStyle,
   amountDisplay,
@@ -137,7 +137,7 @@ function ActivityRow({ item }) {
   const counterpartyLead = counterpartyPrefix(item);
   const amount = activityAmountDisplay(item);
   const timestamp = formatActivityFullTimestamp(item?.completed_at || item?.created_at);
-  const creationSummary = activityCreationSummaryWithEmoji(item);
+  const creationSummary = activityCreationSummary(item);
 
   return (
     <li className="activity-row">
@@ -330,7 +330,7 @@ export function ProfileActivityCompactList({ items, loading }) {
       {displayItems.map((item) => {
         const style = activityRowStyle(item);
         const amount = activityAmountDisplay(item);
-        const creationSummary = activityCreationSummaryWithEmoji(item);
+        const creationSummary = activityCreationSummary(item);
         const meta = activityMeta(item, item?.card?.tier);
         return (
           <li key={item.id} className="profile-activity-row">

@@ -59,14 +59,14 @@ export const ACTIVITY_META = {
     iconWrapClass: "border-[#D85A30]/35 bg-[#D85A30]/15 text-orange-100",
   },
   card_created: {
-    emoji: "🃏",
+    emoji: "★",
     label: "Card Created",
     shortLabel: "Created",
     badgeClass: "border-[var(--color-border-gold)] bg-gold-subtle text-brand-gold",
     iconWrapClass: "border-[var(--color-border-gold)] bg-gold-subtle text-brand-gold",
   },
   bulk_card_created: {
-    emoji: "🃏",
+    emoji: "★",
     label: "Cards Created",
     shortLabel: "Created",
     badgeClass: "border-[var(--color-border-gold)] bg-gold-subtle text-brand-gold",
@@ -198,11 +198,6 @@ export function activityCreationSummary(item) {
     return `${name} card created — ${tier}`;
   }
   return null;
-}
-
-export function activityCreationSummaryWithEmoji(item) {
-  const summary = activityCreationSummary(item);
-  return summary ? `🃏 ${summary}` : null;
 }
 
 function cardCreationGroupKey(item) {
