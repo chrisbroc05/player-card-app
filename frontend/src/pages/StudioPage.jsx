@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import BrandLogo from "../components/BrandLogo";
 import AppFooter from "../components/AppFooter";
-import FeaturedCard from "../components/FeaturedCard";
 import CardImage from "../components/CardImage";
 import CardGallery from "../components/CardGallery";
 import PostGenerationPanel from "../components/PostGenerationPanel";
@@ -3370,10 +3369,6 @@ export default function StudioPage() {
           </section>
         )}
 
-        <FeaturedCard
-          card={featuredDisplayCard}
-          loading={isGenerating && !generationOverlayOpen}
-        />
         {user && !inCreationFlow ? <CardGallery cards={cards} /> : null}
       </main>
 

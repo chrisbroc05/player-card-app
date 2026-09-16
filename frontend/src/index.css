@@ -6562,6 +6562,57 @@
   color: var(--color-text-muted);
 }
 
+.collection-filter-bar {
+  margin-bottom: 16px;
+}
+
+.collection-filter-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-bottom: 2px;
+}
+
+.collection-filter-row::-webkit-scrollbar {
+  display: none;
+}
+
+.collection-filter-row + .collection-filter-row {
+  margin-top: 8px;
+}
+
+.collection-filter-pill {
+  flex: 0 0 auto;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--color-text-secondary);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.collection-filter-pill--active {
+  background: rgba(201, 168, 76, 0.15);
+  border-color: rgba(201, 168, 76, 0.5);
+  color: #c9a84c;
+}
+
+.collection-filter-pill:active:not(:disabled) {
+  transform: none;
+}
+
+.collection-filter-count {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
 /* Collection grid — 2 cols mobile/tablet, 3 desktop */
 .collection-page {
   padding: 8px;

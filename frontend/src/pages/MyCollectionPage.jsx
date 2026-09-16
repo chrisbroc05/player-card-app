@@ -23,12 +23,28 @@ import PermanentDeleteCardModal from "../components/PermanentDeleteCardModal";
 import { authFetch, formatApiError } from "../utils/authFetch";
 import { formatMoney } from "../utils/marketplace";
 import { canAnimateCard, isAnimatedCard, isAnimationInProgress } from "../utils/animationCard";
+import { normalizeTierKey } from "../utils/cardTemplate";
 import { cardMediaFrameClass, cardPlaysVideoOnHover } from "../utils/highlightCard";
 import { vaultTierBadge } from "../utils/tierStyles";
 import { scrollAfterPaint } from "../utils/smoothScroll";
 import { generationUsageFromPayload } from "../utils/generationUsage";
 
 const COLLECTION_PAGE_SIZE = 12;
+
+const COLLECTION_TIER_FILTERS = [
+  { id: "all", label: "All" },
+  { id: "rookie", label: "Rookie" },
+  { id: "allstar", label: "All-Star" },
+  { id: "legends", label: "Legends" },
+];
+
+const COLLECTION_STATUS_FILTERS = [
+  { id: "all", label: "All" },
+  { id: "animated", label: "Animated" },
+  { id: "static", label: "Static" },
+  { id: "listed", label: "Listed" },
+  { id: "unlisted", label: "Unlisted" },
+];
 
 export default function MyCollectionPage({ vaultView = false }) {
   const { token, user, initializing, refreshIncomingTradeCount, refreshNavBadges } = useAuth();
@@ -64,6 +80,8 @@ export default function MyCollectionPage({ vaultView = false }) {
   const [selectedCardIds, setSelectedCardIds] = useState(() => new Set());
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [visibleCount, setVisibleCount] = useState(COLLECTION_PAGE_SIZE);
+  const [tierFilter, setTierFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [loadingMore, setLoadingMore] = useState(false);
   const [pendingOffersByCardId, setPendingOffersByCardId] = useState({});
   const animationFocusRef = useRef(null);
@@ -278,21 +296,44 @@ export default function MyCollectionPage({ vaultView = false }) {
     [selectMode, sortedAllCards, displayRows]
   );
 
-  const visibleGridCards = useMemo(
-    () => gridCards.slice(0, visibleCount),
-    [gridCards, visibleCount]
+  function cardFamilyKey(card) {
+    return String(card?.image_url || card?.card_id || "");
+  }
+
+  const isCardListed = useCallback(
+    (card) => {
+      if ((Number(card.copies_listed) || 0) > 0) return true;
+      if (listingByCardId[card.card_id]) return true;
+      const key = cardFamilyKey(card);
+      return cards.some((c) => cardFamilyKey(c) === key && listingByCardId[c.card_id]);
+    },
+    [listingByCardId, cards]
   );
 
-  const hasMoreCards = visibleCount < gridCards.length;
+  const filteredGridCards = useMemo(() => {
+    return gridCards.filter((card) => {
+      if (tierFilter !== "all" && normalizeTierKey(card.tier) !== tierFilter) {
+        return false;
+      }
+      if (statusFilter === "animated") return isAnimatedCard(card);
+      if (statusFilter === "static") return !isAnimatedCard(card);
+      if (statusFilter === "listed") return isCardListed(card);
+      if (statusFilter === "unlisted") return !isCardListed(card);
+      return true;
+    });
+  }, [gridCards, tierFilter, statusFilter, isCardListed]);
+
+  const visibleGridCards = useMemo(
+    () => filteredGridCards.slice(0, visibleCount),
+    [filteredGridCards, visibleCount]
+  );
+
+  const hasMoreCards = visibleCount < filteredGridCards.length;
 
   const selectedCards = useMemo(
     () => cards.filter((c) => selectedCardIds.has(c.card_id)),
     [cards, selectedCardIds]
   );
-
-  function cardFamilyKey(card) {
-    return String(card?.image_url || card?.card_id || "");
-  }
 
   function getFamilyListingInfo(card) {
     if (listingByCardId[card.card_id]) return listingByCardId[card.card_id];
@@ -388,7 +429,7 @@ export default function MyCollectionPage({ vaultView = false }) {
       (entries) => {
         if (entries[0]?.isIntersecting && !loadingMore) {
           setLoadingMore(true);
-          setVisibleCount((count) => Math.min(count + COLLECTION_PAGE_SIZE, gridCards.length));
+          setVisibleCount((count) => Math.min(count + COLLECTION_PAGE_SIZE, filteredGridCards.length));
           window.setTimeout(() => setLoadingMore(false), 150);
         }
       },
@@ -397,7 +438,11 @@ export default function MyCollectionPage({ vaultView = false }) {
 
     observer.observe(node);
     return () => observer.disconnect();
-  }, [hasMoreCards, loading, loadingMore, gridCards.length]);
+  }, [hasMoreCards, loading, loadingMore, filteredGridCards.length]);
+
+  useEffect(() => {
+    setVisibleCount(COLLECTION_PAGE_SIZE);
+  }, [tierFilter, statusFilter]);
 
   useEffect(() => {
     if (!token) return undefined;
@@ -748,7 +793,18 @@ export default function MyCollectionPage({ vaultView = false }) {
             </Link>
           </div>
         ) : (
-          <div className={collectionGridClass}>
+          <>
+            {!vaultView ? (
+              <CollectionFilterBar
+                tierFilter={tierFilter}
+                statusFilter={statusFilter}
+                onTierFilterChange={setTierFilter}
+                onStatusFilterChange={setStatusFilter}
+                showingCount={filteredGridCards.length}
+                totalCount={gridCards.length}
+              />
+            ) : null}
+            <div className={collectionGridClass}>
             {visibleGridCards.map((card) => {
               const badge = vaultTierBadge(card.tier);
               const pending = (card.status || "active") === "pending_trade";
@@ -922,6 +978,7 @@ export default function MyCollectionPage({ vaultView = false }) {
               </div>
             ) : null}
           </div>
+          </>
         )}
 
         {!vaultView && deletedCards.length > 0 ? (
@@ -1103,6 +1160,49 @@ export default function MyCollectionPage({ vaultView = false }) {
       <CollectionToast message={toast.message} variant={toast.variant} />
 
       <AppFooter />
+    </div>
+  );
+}
+
+function CollectionFilterBar({
+  tierFilter,
+  statusFilter,
+  onTierFilterChange,
+  onStatusFilterChange,
+  showingCount,
+  totalCount,
+}) {
+  return (
+    <div className="collection-filter-bar">
+      <div className="collection-filter-row" role="group" aria-label="Filter by card type">
+        {COLLECTION_TIER_FILTERS.map((option) => (
+          <button
+            key={option.id}
+            type="button"
+            className={`collection-filter-pill${tierFilter === option.id ? " collection-filter-pill--active" : ""}`}
+            aria-pressed={tierFilter === option.id}
+            onClick={() => onTierFilterChange(option.id)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+      <div className="collection-filter-row" role="group" aria-label="Filter by status">
+        {COLLECTION_STATUS_FILTERS.map((option) => (
+          <button
+            key={option.id}
+            type="button"
+            className={`collection-filter-pill${statusFilter === option.id ? " collection-filter-pill--active" : ""}`}
+            aria-pressed={statusFilter === option.id}
+            onClick={() => onStatusFilterChange(option.id)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+      <p className="collection-filter-count">
+        Showing {showingCount} of {totalCount} card{totalCount === 1 ? "" : "s"}
+      </p>
     </div>
   );
 }
