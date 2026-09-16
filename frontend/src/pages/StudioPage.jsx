@@ -685,6 +685,7 @@ export default function StudioPage() {
     return getActionCategory(actionCategory)?.label || "";
   }, [isAnimatedCardType, selectedScenarioTitle, selectedScenarioId, actionCategory]);
   const inCreationFlow = currentStep >= STEP_DETAILS && currentStep <= STEP_REVIEW;
+  const useFixedStudioLayout = !showWelcome && inCreationFlow && !animationLoadingCardId;
 
   const dismissWelcome = useCallback(() => {
     setShowWelcome(false);
@@ -2410,7 +2411,11 @@ export default function StudioPage() {
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-appBg text-slate-100">
+    <div
+      className={`min-h-screen overflow-x-hidden bg-appBg text-slate-100${
+        useFixedStudioLayout ? " studio-page-immersive" : ""
+      }`}
+    >
       <AppHeader />
 
       {showPendingPrompt && pendingSession ? (
@@ -2433,7 +2438,13 @@ export default function StudioPage() {
         />
       ) : null}
 
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-3 py-6 sm:gap-8 sm:px-6 sm:py-8 lg:px-8">
+      <main
+        className={
+          useFixedStudioLayout
+            ? "studio-main-immersive"
+            : "mx-auto flex w-full max-w-6xl flex-col gap-6 px-3 py-6 sm:gap-8 sm:px-6 sm:py-8 lg:px-8"
+        }
+      >
         {!inCreationFlow ? (
           <section className="studio-hero">
             <div className="relative z-[1] flex flex-col items-center gap-3">
@@ -2453,21 +2464,23 @@ export default function StudioPage() {
             </div>
           </section>
         ) : null}
-        <section className="surface-card p-3 sm:p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-base font-semibold text-white">Card Creation Experience</h2>
-              <p className="text-xs text-slate-400">Guided flow to create your collectible cards.</p>
-              {!initializing && !user ? (
-                <p className="mt-2 text-xs text-brand-gold/90">
-                  Sign up or log in to enter player details and create your own collectible cards.
-                </p>
-              ) : null}
+        {!useFixedStudioLayout ? (
+          <section className="surface-card p-3 sm:p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold text-white">Card Creation Experience</h2>
+                <p className="text-xs text-slate-400">Guided flow to create your collectible cards.</p>
+                {!initializing && !user ? (
+                  <p className="mt-2 text-xs text-brand-gold/90">
+                    Sign up or log in to enter player details and create your own collectible cards.
+                  </p>
+                ) : null}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        ) : null}
 
-        {(message || error) && (
+        {!useFixedStudioLayout && (message || error) && (
           <div
             className={`rounded-xl border px-4 py-3 text-sm shadow-lg ${
               error
@@ -2501,33 +2514,33 @@ export default function StudioPage() {
               completePrimaryLabel="View in Collection"
             />
           </section>
-        ) : (
-        <section
-          ref={wizardPanelRef}
-          className={`scroll-focus-target rounded-2xl border border-white/10 bg-cardBg shadow-xl shadow-black/30 sm:p-6 ${
-            !showWelcome && inCreationFlow ? "studio-wizard-panel p-3 sm:p-4" : "p-4"
-          }`}
-        >
-            {showWelcome && inCreationFlow ? (
-              <StudioWelcomeScreen onStart={dismissWelcome} />
-            ) : (
-              <>
-            {inCreationFlow ? (
-              <div className="studio-wizard-layout">
-                <div className="studio-wizard-layout__preview-pane">
-                  <StudioLivePreview
-                    firstName={firstName}
-                    lastName={lastName}
-                    displayName={displayName}
-                    position={position}
-                    jerseyNumber={jerseyNumber}
-                    teamName={teamName}
-                    tier={orderTier}
-                    photoUrl={livePreviewPhotoUrl}
-                  />
-                </div>
-                <div className="studio-wizard-layout__form-pane">
-            {inCreationFlow ? <StudioPhaseProgress currentStep={currentStep} /> : null}
+        ) : useFixedStudioLayout ? (
+        <div ref={wizardPanelRef} className="studio-container scroll-focus-target">
+            <div className="studio-preview-zone">
+              <StudioPhaseProgress currentStep={currentStep} />
+              <StudioLivePreview
+                firstName={firstName}
+                lastName={lastName}
+                displayName={displayName}
+                position={position}
+                jerseyNumber={jerseyNumber}
+                teamName={teamName}
+                tier={orderTier}
+                photoUrl={livePreviewPhotoUrl}
+              />
+            </div>
+            <div className="studio-form-zone">
+            {(message || error) ? (
+              <div
+                className={`mb-4 rounded-xl border px-4 py-3 text-sm shadow-lg ${
+                  error
+                    ? "border-rose-500/40 bg-rose-500/10 text-rose-100"
+                    : "border-[var(--color-border-gold)] bg-gold-subtle text-brand-gold"
+                }`}
+              >
+                {error || message}
+              </div>
+            ) : null}
 
             {user && inCreationFlow ? (
               <div className="mb-6">
@@ -3300,12 +3313,17 @@ export default function StudioPage() {
             </div>
               </>
             )}
-                </div>
-              </div>
-            ) : null}
-              </>
-            )}
-          </section>
+            </div>
+        </div>
+        ) : (
+        <section
+          ref={wizardPanelRef}
+          className="scroll-focus-target rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6"
+        >
+          {showWelcome && inCreationFlow ? (
+            <StudioWelcomeScreen onStart={dismissWelcome} />
+          ) : null}
+        </section>
         )}
 
         {user && !inCreationFlow ? <CardGallery cards={cards} /> : null}
@@ -3525,7 +3543,7 @@ export default function StudioPage() {
         />
       ) : null}
 
-      <AppFooter />
+      {!useFixedStudioLayout ? <AppFooter /> : null}
     </div>
   );
 }
