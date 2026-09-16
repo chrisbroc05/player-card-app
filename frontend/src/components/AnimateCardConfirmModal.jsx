@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import CardImage from "./CardImage";
 import AnimatedAiDisclaimer from "./AnimatedAiDisclaimer";
 import JerseyAnimationTip from "./JerseyAnimationTip";
 import Modal from "./Modal";
+import { toApiUrl } from "../config/api";
+import { getCardBannerStyles } from "../utils/cardBannerStyles";
 import { formatMoney } from "../utils/marketplace";
 import { creditTopUpShortfallMessage } from "../utils/credits";
+import { rarityDisplayLabel } from "../utils/rarityStyles";
 
 const CONFIRM_DELAY_MS = 1500;
 
@@ -49,6 +51,37 @@ export default function AnimateCardConfirmModal({
   const shortfall = intentOnly || confirmationOnly ? 0 : Math.max(0, animationCost - balance);
   const hasPreview = Boolean(card || previewImageUrl);
 
+  const previewMeta = useMemo(() => {
+    const previewCard =
+      card ||
+      (previewImageUrl
+        ? {
+            image_url: previewImageUrl,
+            player_name: previewAlt || "Card preview",
+            tier: "rookie",
+          }
+        : null);
+    if (!previewCard) return null;
+    const imageSrc = previewCard.image_url || previewImageUrl;
+    if (!imageSrc) return null;
+    const bannerStyles = getCardBannerStyles(
+      previewCard.tier,
+      previewCard.theme || previewCard.special_theme
+    );
+    const rarityLabel = rarityDisplayLabel(previewCard.rarity, previewCard.rarity_display_name);
+    const rarityNorm = String(rarityLabel || "").trim().toLowerCase();
+    const showRarityLabel =
+      rarityNorm &&
+      rarityNorm !== "base" &&
+      rarityNorm !== "standard" &&
+      rarityNorm !== "common";
+    return {
+      imageSrc: toApiUrl(imageSrc),
+      tierLabel: bannerStyles.tierPillLabel,
+      rarityLabel: showRarityLabel ? rarityLabel : "",
+    };
+  }, [card, previewImageUrl, previewAlt]);
+
   return (
     <Modal
       isOpen={open}
@@ -61,20 +94,21 @@ export default function AnimateCardConfirmModal({
         {intentOnly ? "Ready to create your animated card?" : "Ready to animate your card?"}
       </h3>
 
-      {hasPreview ? (
-        <div className="animate-modal-card-preview mt-5">
-          <CardImage
-            card={
-              card ||
-              (previewImageUrl
-                ? { image_url: previewImageUrl, player_name: previewAlt || "Card preview", tier: "rookie" }
-                : null)
-            }
-            alt={previewAlt}
-            showInfoBanner
-            variant="detail"
-            playOnHover={false}
-          />
+      {hasPreview && previewMeta ? (
+        <div className="animate-confirm-card-preview-wrap">
+          <div className="animate-confirm-card-preview">
+            <img
+              src={previewMeta.imageSrc}
+              alt={previewAlt}
+              className="animate-confirm-card-preview__image"
+            />
+          </div>
+          {previewMeta.tierLabel ? (
+            <p className="animate-confirm-card-preview__tier-label">{previewMeta.tierLabel}</p>
+          ) : null}
+          {previewMeta.rarityLabel ? (
+            <p className="animate-confirm-card-preview__tier-label">{previewMeta.rarityLabel}</p>
+          ) : null}
         </div>
       ) : null}
 

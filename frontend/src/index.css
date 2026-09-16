@@ -7712,6 +7712,45 @@
 
 .modal-portal-content--animate {
   max-height: 85vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 24px 20px 28px;
+}
+
+.animate-confirm-card-preview-wrap {
+  margin-top: 20px;
+  margin-bottom: 4px;
+}
+
+.animate-confirm-card-preview {
+  width: 85%;
+  min-width: 200px;
+  max-width: 280px;
+  margin: 0 auto;
+  aspect-ratio: 5 / 7;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 0 24px rgba(201, 168, 76, 0.25);
+}
+
+.animate-confirm-card-preview__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  border-radius: 12px;
+}
+
+.animate-confirm-card-preview__tier-label {
+  margin: 8px 0 0;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-align: center;
+  color: #c9a84c;
 }
 
 .modal-portal-action {

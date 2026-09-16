@@ -52,6 +52,7 @@ import {
   generationCapBlocked,
   generationUsageFromPayload,
 } from "../utils/generationUsage";
+import { invalidateCollectionCache } from "../utils/collectionCache";
 import { scrollAfterPaint } from "../utils/smoothScroll";
 import { playerNameFromForm, validatePlayerDetails } from "../utils/playerDetails";
 import { cleanupFailedHighlightCard, uploadHighlightClip } from "../utils/uploadHighlightClip";
@@ -2257,8 +2258,23 @@ export default function StudioPage() {
     setAnimationLoadingCardId(cardId);
   }
 
+  function clearAnimatedSuccessState() {
+    setAnimationLoadingCardId(null);
+    setAnimationConfirmed(false);
+    setAnimationFailed(false);
+    setAnimatedFlowStage(ANIMATED_FLOW_STAGE.IDLE);
+    setLatestGeneratedPreview(null);
+    setPreviewPollCardId("");
+    animatedChoiceShownForRef.current = "";
+    setShowAnimateConfirm(false);
+    setReviewSubPhase("setup");
+    setMessage("");
+  }
+
   async function handleAnimationComplete(completedData) {
     const cardId = animationLoadingCardId;
+    setAnimationLoadingCardId(null);
+
     try {
       if (currentOrderId && cardId) {
         const res = await fetch(`${API_BASE_URL}/orders/${currentOrderId}/approve-preview`, {
@@ -2283,18 +2299,16 @@ export default function StudioPage() {
       }
     } catch (err) {
       setError(err.message || "Could not finalize your animated card.");
-      setAnimationLoadingCardId(null);
-      setAnimatedFlowStage(ANIMATED_FLOW_STAGE.IDLE);
+      clearAnimatedSuccessState();
       return completedData;
     }
 
-    setAnimationLoadingCardId(null);
-    setAnimatedFlowStage(ANIMATED_FLOW_STAGE.IDLE);
-    setAnimationFailed(false);
-    setReviewSubPhase("approve");
-    setCurrentStep(STEP_REVIEW);
-    setMessage("Your animated card has been added to your collection.");
+    clearAnimatedSuccessState();
+    if (token) {
+      invalidateCollectionCache(`my-cards-${token}`);
+    }
     await Promise.all([fetchMyCards(), fetchOrders(), refreshUser(token)]);
+    navigate("/my-collection", { replace: true, state: { refreshCollection: true } });
     return completedData;
   }
 

@@ -412,10 +412,13 @@ export default function MyCollectionPage({ vaultView = false }) {
     if (!vaultView && !token) return;
     if (!isCollectionRoute) return undefined;
     const timer = setTimeout(() => {
-      loadCards();
+      loadCards({ force: Boolean(location.state?.refreshCollection) });
+      if (location.state?.refreshCollection) {
+        navigate(location.pathname, { replace: true, state: null });
+      }
     }, 100);
     return () => clearTimeout(timer);
-  }, [token, initializing, vaultView, loadCards, isCollectionRoute]);
+  }, [token, initializing, vaultView, loadCards, isCollectionRoute, location.pathname, location.state, navigate]);
 
   useEffect(() => {
     setVisibleCount(COLLECTION_PAGE_SIZE);
@@ -507,13 +510,16 @@ export default function MyCollectionPage({ vaultView = false }) {
   }
 
   const handleAnimationUpgradeComplete = useCallback(async () => {
-    invalidateCollectionCache(cacheKey);
-    await loadCards({ force: true });
     animationLoadingCardIdRef.current = null;
     animationSourceCardRef.current = null;
     setAnimationLoadingCardId(null);
+    invalidateCollectionCache(cacheKey);
+    await loadCards({ force: true });
+    if (!isCollectionRoute || vaultView) {
+      navigate("/my-collection", { replace: true, state: { refreshCollection: true } });
+    }
     showToast("Your animated card was added to your collection!");
-  }, [loadCards]);
+  }, [cacheKey, isCollectionRoute, loadCards, navigate, vaultView]);
 
   const handleAnimationUpgradeFailed = useCallback(() => {
     invalidateCollectionCache(cacheKey);
