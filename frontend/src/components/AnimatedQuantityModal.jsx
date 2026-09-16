@@ -25,7 +25,7 @@ function isValidAnimatedQty(value) {
   return Number.isInteger(n) && n >= COPY_QUANTITY_MIN && n <= ANIMATED_COPY_QUANTITY_MAX;
 }
 
-const PRESET_OPTIONS = [1, 2, 3, 4, 5, 10];
+const PRESET_OPTIONS = [1, 2, 3, 5, 10, 25, 50, 100];
 
 export default function AnimatedQuantityModal({
   open,
@@ -42,6 +42,7 @@ export default function AnimatedQuantityModal({
   const [mode, setMode] = useState("preset");
   const [customInput, setCustomInput] = useState("");
   const [step, setStep] = useState("quantity");
+  const [maxQtyWarning, setMaxQtyWarning] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -49,6 +50,7 @@ export default function AnimatedQuantityModal({
       setMode("preset");
       setCustomInput("");
       setStep("quantity");
+      setMaxQtyWarning(false);
     }
   }, [open]);
 
@@ -102,6 +104,19 @@ export default function AnimatedQuantityModal({
 
   function handleCustomInputChange(raw) {
     const digits = raw.replace(/\D/g, "");
+    if (digits === "") {
+      setCustomInput("");
+      setMaxQtyWarning(false);
+      return;
+    }
+    const parsed = Number(digits);
+    if (parsed > ANIMATED_COPY_QUANTITY_MAX) {
+      setCustomInput(String(ANIMATED_COPY_QUANTITY_MAX));
+      setMaxQtyWarning(true);
+      setSelected(ANIMATED_COPY_QUANTITY_MAX);
+      return;
+    }
+    setMaxQtyWarning(false);
     setCustomInput(digits);
     if (isValidAnimatedQty(digits)) {
       setSelected(clampAnimatedQty(digits));
@@ -135,7 +150,7 @@ export default function AnimatedQuantityModal({
                 </div>
               ) : null}
 
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              <div className="grid grid-cols-4 gap-2">
                 {PRESET_OPTIONS.map((q) => {
                   const isSel = mode === "preset" && selected === q;
                   return (
@@ -189,6 +204,9 @@ export default function AnimatedQuantityModal({
                     }`}
                   />
                   {customError ? <p className="mt-1.5 text-xs text-rose-300">{customError}</p> : null}
+                  {maxQtyWarning ? (
+                    <p className="mt-1.5 text-xs font-medium text-brand-gold">Maximum 100 copies</p>
+                  ) : null}
                 </div>
               ) : null}
 

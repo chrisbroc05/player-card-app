@@ -4,6 +4,7 @@ export const ANIMATION_PRIMARY_HINT =
   "This takes about 2-5 minutes — Kling AI is working hard to make it perfect.";
 
 export const ANIMATION_LONG_WAIT_MS = 3 * 60 * 1000;
+export const ANIMATION_FAILURE_TIMEOUT_MS = 3 * 60 * 1000;
 export const ANIMATION_EMAIL_HINT_MS = 5 * 60 * 1000;
 export const ANIMATION_EMAIL_FALLBACK_MS = 8 * 60 * 1000;
 

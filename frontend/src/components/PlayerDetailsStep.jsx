@@ -1,34 +1,30 @@
-import React, { useEffect, useState } from "react";
-import { validatePlayerDetails, POSITION_OPTIONS } from "../utils/playerDetails";
+import React from "react";
+import { POSITION_OPTIONS } from "../utils/playerDetails";
 
-function fieldErrorClass(hasError) {
-  return hasError ? "border-rose-500/60" : "border-white/15";
+const FIELD_ERROR_STYLE = {
+  color: "#EF5350",
+  fontFamily: '"Barlow Condensed", sans-serif',
+  fontSize: "12px",
+};
+
+function fieldBorderClass(hasError) {
+  return hasError ? "border-[rgba(239,83,80,0.6)]" : "border-white/15";
 }
 
 export default function PlayerDetailsStep({
   values,
-  onFieldBlur,
+  onFieldChange,
   onContinue,
   onBack,
   showErrors = false,
   errors = {},
 }) {
-  const [local, setLocal] = useState(values);
-
-  useEffect(() => {
-    setLocal(values);
-  }, [values]);
-
-  function updateLocal(field, value) {
-    setLocal((prev) => ({ ...prev, [field]: value }));
-  }
-
-  function blurField(field) {
-    onFieldBlur(field, local[field]);
+  function updateField(field, value) {
+    onFieldChange?.(field, value);
   }
 
   function handleContinue() {
-    onContinue(local);
+    onContinue(values);
   }
 
   return (
@@ -36,54 +32,58 @@ export default function PlayerDetailsStep({
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <input
-            className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 ${fieldErrorClass(showErrors && errors.playerName)}`}
+            className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 ${fieldBorderClass(showErrors && errors.firstName)}`}
             placeholder="First Name *"
-            value={local.firstName}
-            onChange={(e) => updateLocal("firstName", e.target.value)}
-            onBlur={() => blurField("firstName")}
+            value={values.firstName}
+            onChange={(e) => updateField("firstName", e.target.value)}
           />
+          {showErrors && errors.firstName ? (
+            <p className="mt-1" style={FIELD_ERROR_STYLE}>
+              {errors.firstName}
+            </p>
+          ) : null}
         </div>
         <div>
           <input
-            className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 ${fieldErrorClass(showErrors && errors.playerName)}`}
+            className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 ${fieldBorderClass(showErrors && errors.lastName)}`}
             placeholder="Last Name *"
-            value={local.lastName}
-            onChange={(e) => updateLocal("lastName", e.target.value)}
-            onBlur={() => blurField("lastName")}
+            value={values.lastName}
+            onChange={(e) => updateField("lastName", e.target.value)}
           />
-          {showErrors && errors.playerName ? (
-            <p className="mt-1 text-xs text-rose-300">{errors.playerName}</p>
+          {showErrors && errors.lastName ? (
+            <p className="mt-1" style={FIELD_ERROR_STYLE}>
+              {errors.lastName}
+            </p>
           ) : null}
         </div>
         <div className="sm:col-span-2">
           <input
-            className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 ${fieldErrorClass(showErrors && errors.playerName)}`}
+            className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 ${fieldBorderClass(false)}`}
             placeholder="Display Name (optional — used as player name if set)"
-            value={local.displayName}
-            onChange={(e) => updateLocal("displayName", e.target.value)}
-            onBlur={() => blurField("displayName")}
+            value={values.displayName}
+            onChange={(e) => updateField("displayName", e.target.value)}
           />
         </div>
         <div>
           <input
-            className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 ${fieldErrorClass(showErrors && errors.jerseyNumber)}`}
-            placeholder="Jersey Number *"
-            value={local.jerseyNumber}
-            onChange={(e) => updateLocal("jerseyNumber", e.target.value)}
-            onBlur={() => blurField("jerseyNumber")}
+            className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 ${fieldBorderClass(showErrors && errors.jerseyNumber)}`}
+            placeholder="Jersey Number"
+            value={values.jerseyNumber}
+            onChange={(e) => updateField("jerseyNumber", e.target.value)}
           />
           {showErrors && errors.jerseyNumber ? (
-            <p className="mt-1 text-xs text-rose-300">{errors.jerseyNumber}</p>
+            <p className="mt-1" style={FIELD_ERROR_STYLE}>
+              {errors.jerseyNumber}
+            </p>
           ) : null}
         </div>
         <div>
           <select
-            className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 text-slate-100 ${fieldErrorClass(showErrors && errors.position)}`}
-            value={local.position}
-            onChange={(e) => updateLocal("position", e.target.value)}
-            onBlur={() => blurField("position")}
+            className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 text-slate-100 ${fieldBorderClass(showErrors && errors.position)}`}
+            value={values.position}
+            onChange={(e) => updateField("position", e.target.value)}
           >
-            <option value="">Select Position</option>
+            <option value="">Select Position *</option>
             {POSITION_OPTIONS.map(({ value, label }) => (
               <option key={value} value={value}>
                 {label}
@@ -91,32 +91,36 @@ export default function PlayerDetailsStep({
             ))}
           </select>
           {showErrors && errors.position ? (
-            <p className="mt-1 text-xs text-rose-300">{errors.position}</p>
+            <p className="mt-1" style={FIELD_ERROR_STYLE}>
+              {errors.position}
+            </p>
           ) : null}
         </div>
         <div>
           <input
             type="number"
-            className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 ${fieldErrorClass(showErrors && errors.gradYear)}`}
+            className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 ${fieldBorderClass(showErrors && errors.gradYear)}`}
             placeholder="Grad Year *"
-            value={local.gradYear}
-            onChange={(e) => updateLocal("gradYear", e.target.value)}
-            onBlur={() => blurField("gradYear")}
+            value={values.gradYear}
+            onChange={(e) => updateField("gradYear", e.target.value)}
           />
           {showErrors && errors.gradYear ? (
-            <p className="mt-1 text-xs text-rose-300">{errors.gradYear}</p>
+            <p className="mt-1" style={FIELD_ERROR_STYLE}>
+              {errors.gradYear}
+            </p>
           ) : null}
         </div>
         <div>
           <input
-            className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 ${fieldErrorClass(showErrors && errors.teamName)}`}
-            placeholder="Team Name *"
-            value={local.teamName}
-            onChange={(e) => updateLocal("teamName", e.target.value)}
-            onBlur={() => blurField("teamName")}
+            className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 px-3 py-2.5 ${fieldBorderClass(showErrors && errors.teamName)}`}
+            placeholder="Team Name"
+            value={values.teamName}
+            onChange={(e) => updateField("teamName", e.target.value)}
           />
           {showErrors && errors.teamName ? (
-            <p className="mt-1 text-xs text-rose-300">{errors.teamName}</p>
+            <p className="mt-1" style={FIELD_ERROR_STYLE}>
+              {errors.teamName}
+            </p>
           ) : null}
         </div>
       </div>

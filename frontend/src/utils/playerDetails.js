@@ -34,23 +34,22 @@ export function validatePlayerDetails(
   gradYear
 ) {
   const errors = {};
-  const playerName = playerNameFromForm(firstName, lastName, displayName);
-  if (playerName.length < 2) {
-    errors.playerName = "Player name is required (minimum 2 characters)";
+  if (!firstName.trim()) {
+    errors.firstName = "This field is required";
   }
-  if (!teamName.trim()) errors.teamName = "Team name is required";
+  if (!lastName.trim()) {
+    errors.lastName = "This field is required";
+  }
   if (!position.trim()) {
-    errors.position = "Position is required";
+    errors.position = "This field is required";
   } else if (!VALID_POSITIONS.has(position.trim())) {
     errors.position = "Select a valid position";
   }
-  if (!jerseyNumber.trim()) {
-    errors.jerseyNumber = "Jersey number is required";
-  } else if (!/^\d+$/.test(jerseyNumber.trim())) {
+  if (jerseyNumber.trim() && !/^\d+$/.test(jerseyNumber.trim())) {
     errors.jerseyNumber = "Jersey number must be a number";
   }
   if (!String(gradYear || "").trim()) {
-    errors.gradYear = "Grad year is required";
+    errors.gradYear = "This field is required";
   } else if (!isValidGradYear(gradYear)) {
     errors.gradYear = "Enter a valid graduation year";
   }

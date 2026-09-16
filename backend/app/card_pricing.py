@@ -189,7 +189,7 @@ def animated_studio_total_price(quantity: int) -> dict:
     Studio animated card pricing: $10 base includes first copy;
     copies 2–4 at $2 each; 5+ total run uses $1.50 per additional copy.
     """
-    q = max(1, min(10, int(quantity)))
+    q = max(1, min(100, int(quantity)))
     base = animated_upgrade_price()
     extra = max(0, q - 1)
     if extra == 0:

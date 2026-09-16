@@ -1,19 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 
 export default function PhotoNotesStep({ value, onChange, onContinue, onBack }) {
-  const [localNotes, setLocalNotes] = useState(value || "");
+  const notes = value || "";
 
-  useEffect(() => {
-    setLocalNotes(value || "");
-  }, [value]);
-
-  function handleBlur() {
-    onChange(localNotes.trim().slice(0, 200));
+  function handleChange(next) {
+    onChange(next.slice(0, 200));
   }
 
   function handleContinue() {
-    const trimmed = localNotes.trim().slice(0, 200);
-    onChange(trimmed);
     onContinue();
   }
 
@@ -31,13 +25,12 @@ export default function PhotoNotesStep({ value, onChange, onContinue, onBack }) 
           id="photo-notes"
           rows={4}
           maxLength={200}
-          value={localNotes}
-          onChange={(e) => setLocalNotes(e.target.value.slice(0, 200))}
-          onBlur={handleBlur}
+          value={notes}
+          onChange={(e) => handleChange(e.target.value)}
           placeholder={`e.g. "I'm the player on the left in the red jersey"`}
           className="w-full resize-none rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-[var(--color-gold-bright/50] focus:outline-none focus:ring-1 focus:ring-[var(--color-gold-bright/40]"
         />
-        <p className="mt-1 text-right text-xs text-slate-500">{localNotes.length} / 200</p>
+        <p className="mt-1 text-right text-xs text-slate-500">{notes.length} / 200</p>
       </div>
       <div className="flex flex-wrap gap-2">
         <button

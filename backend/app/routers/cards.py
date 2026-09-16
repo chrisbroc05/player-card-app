@@ -198,7 +198,7 @@ class StudioAnimateBody(BaseModel):
 
     motion_id: str = Field(..., min_length=1, max_length=64)
     action_category: str | None = Field(default=None, max_length=32)
-    quantity: int = Field(default=1, ge=1, le=10)
+    quantity: int = Field(default=1, ge=1, le=100)
 
 
 @router.get("/animation-motions")

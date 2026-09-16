@@ -774,7 +774,8 @@ export default function MyCollectionPage({ vaultView = false }) {
               onAddToCollection={handleAnimationUpgradeComplete}
               onFailed={handleAnimationUpgradeFailed}
               onRetry={handleAnimationUpgradeRetry}
-              failureCreditMessage="Animation failed. Please contact support for assistance with your account."
+              failureCreditMessage="Something went wrong. Your credits have been refunded."
+              completePrimaryLabel="View in Collection"
             />
           </section>
         ) : initializing || loading ? (

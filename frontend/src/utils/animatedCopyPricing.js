@@ -1,6 +1,6 @@
 import { formatMoney } from "./marketplace";
 
-export const ANIMATED_COPY_QUANTITY_MAX = 10;
+export const ANIMATED_COPY_QUANTITY_MAX = 100;
 
 /** Mirror backend animated_studio_total_price. */
 export function animatedStudioTotalPrice(quantity, pricing = {}) {

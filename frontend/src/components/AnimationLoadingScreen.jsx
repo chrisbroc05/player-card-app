@@ -1,46 +1,93 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import React, { Component, useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { toApiUrl } from "../config/api";
-import CardCreationExperience from "./CardCreationExperience";
 import { useAnimationStatusPolling } from "../hooks/useAnimationStatusPolling";
-import {
-  ANIMATION_EMAIL_WAIT_MESSAGE,
-  ANIMATION_PRIMARY_HINT,
-  animationExtraWaitMessage,
-} from "../utils/animationWaitMessaging";
+import { ANIMATION_FAILURE_TIMEOUT_MS } from "../utils/animationWaitMessaging";
 
-export default function AnimationLoadingScreen({
+class AnimationLoadingErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error) {
+    console.error("Animation loading screen render error:", error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="animation-loading-screen">
+          <div className="animation-loading-screen__content">
+            <p className="animation-loading-screen__title">Animating Your Card...</p>
+            <p className="animation-loading-screen__subtitle">
+              Something went wrong displaying the progress screen. Your animation may still be processing.
+            </p>
+            {this.props.onRetry ? (
+              <button
+                type="button"
+                className="animation-loading-screen__primary-btn"
+                onClick={this.props.onRetry}
+              >
+                Try Again
+              </button>
+            ) : null}
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function LoadingDots() {
+  return (
+    <div className="animation-loading-screen__dots" aria-hidden>
+      <span />
+      <span />
+      <span />
+    </div>
+  );
+}
+
+function ProgressBar({ progress }) {
+  const pct = Math.min(100, Math.max(8, progress));
+  return (
+    <div className="animation-loading-screen__progress" aria-hidden>
+      <div className="animation-loading-screen__progress-fill" style={{ width: `${pct}%` }} />
+    </div>
+  );
+}
+
+function AnimationLoadingScreenInner({
   cardId,
   token,
-  tier = "rookie",
-  theme = "",
-  playerName = "",
-  teamName = "",
   cardImageUrl = "",
-  card = null,
-  motionName = "",
   onAddToCollection,
   onFailed,
   onRetry,
   allowRetry = true,
-  failureCreditMessage = "Animation failed. Please contact support. Your credits have not been charged.",
-  completePrimaryLabel = "Add to Collection",
+  failureCreditMessage = "Something went wrong. Your credits have been refunded.",
+  completePrimaryLabel = "View in Collection",
 }) {
   const [completedData, setCompletedData] = useState(null);
-  const [shareCopied, setShareCopied] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [pollKey, setPollKey] = useState(0);
   const [elapsedMs, setElapsedMs] = useState(0);
 
   useEffect(() => {
-    if (completedData?.animated_video_url || failed || retrying) return undefined;
+    if (completedData?.animated_video_url || retrying) return undefined;
     const startAt = Date.now();
     setElapsedMs(0);
     const timerId = window.setInterval(() => {
       setElapsedMs(Date.now() - startAt);
     }, 1000);
     return () => window.clearInterval(timerId);
-  }, [cardId, pollKey, completedData?.animated_video_url, failed, retrying]);
+  }, [cardId, pollKey, completedData?.animated_video_url, retrying]);
 
   const handlePollCompleted = useCallback((data) => {
     setCompletedData(data);
@@ -64,28 +111,8 @@ export default function AnimationLoadingScreen({
   });
 
   const videoUrl = completedData?.animated_video_url ? toApiUrl(completedData.animated_video_url) : "";
-  const cardShareUrl =
-    typeof window !== "undefined" && cardId
-      ? `${window.location.origin}/card/${encodeURIComponent(cardId)}`
-      : "";
-
-  async function handleShare() {
-    if (!cardShareUrl) return;
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: "My Prospect Legends animated card",
-          url: cardShareUrl,
-        });
-        return;
-      }
-      await navigator.clipboard.writeText(cardShareUrl);
-      setShareCopied(true);
-      window.setTimeout(() => setShareCopied(false), 2500);
-    } catch {
-      /* user cancelled share sheet */
-    }
-  }
+  const isComplete = Boolean(videoUrl);
+  const showFailure = failed || (timedOut && !isComplete);
 
   async function handleRetryClick() {
     if (!onRetry) return;
@@ -100,77 +127,87 @@ export default function AnimationLoadingScreen({
     }
   }
 
-  const shareButton = (
-    <button type="button" onClick={handleShare} className="acr-btn acr-btn--secondary">
-      {shareCopied ? "Link copied!" : "Share Card"}
-    </button>
-  );
-
-  if (timedOut && !completedData?.animated_video_url) {
-    return (
-      <div className="flex min-h-[70vh] flex-col items-center justify-center px-4 text-center">
-        <p className="text-lg font-semibold text-white">Still working on your animation</p>
-        <p className="mt-2 max-w-md text-sm text-slate-400">{ANIMATION_EMAIL_WAIT_MESSAGE}</p>
-        <Link
-          to="/my-collection"
-          className="mt-6 inline-flex min-h-[48px] items-center justify-center rounded-xl btn-primary px-6 text-sm font-semibold text-slate-950"
-        >
-          Go to My Collection
-        </Link>
-      </div>
-    );
-  }
-
-  if (failed) {
-    return (
-      <div className="flex min-h-[70vh] flex-col items-center justify-center px-4 text-center">
-        <p className="text-3xl opacity-60" aria-hidden>
-          ⚠
-        </p>
-        <h2 className="mt-4 text-xl font-semibold text-white">Animation failed</h2>
-        <p className="mt-3 max-w-md text-sm text-slate-400">{failureCreditMessage}</p>
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
-          {allowRetry && onRetry ? (
-            <button
-              type="button"
-              disabled={retrying}
-              onClick={handleRetryClick}
-              className="inline-flex min-h-[48px] items-center justify-center rounded-xl bg-violet-500 px-6 text-sm font-semibold text-white disabled:opacity-50"
-            >
-              {retrying ? "Retrying…" : "Try Again"}
-            </button>
-          ) : null}
-          <Link
-            to="/my-collection"
-            className="inline-flex min-h-[48px] items-center justify-center rounded-xl border border-white/20 px-6 text-sm font-medium text-slate-200"
-          >
-            Go to My Collection
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  const progress = Math.min(95, 8 + (elapsedMs / ANIMATION_FAILURE_TIMEOUT_MS) * 87);
 
   return (
-    <CardCreationExperience
-      active
-      fullscreen
-      cardType="animated"
-      tier={tier}
-      theme={theme}
-      playerName={playerName}
-      teamName={teamName}
-      generationComplete={Boolean(completedData?.animated_video_url)}
-      cardImageUrl={cardImageUrl}
-      card={card}
-      videoUrl={videoUrl}
-      motionName={motionName}
-      showPrimaryAction
-      primaryActionLabel={completePrimaryLabel}
-      onPrimaryAction={() => onAddToCollection?.(completedData)}
-      secondaryAction={shareButton}
-      hint={ANIMATION_PRIMARY_HINT}
-      extraWaitHint={animationExtraWaitMessage(elapsedMs)}
-    />
+    <div className="animation-loading-screen">
+      <div className="animation-loading-screen__content">
+        {isComplete ? (
+          <>
+            <div className="animation-loading-screen__success-card">
+              {videoUrl ? (
+                <video
+                  src={videoUrl}
+                  className="animation-loading-screen__success-video"
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                />
+              ) : cardImageUrl ? (
+                <img
+                  src={toApiUrl(cardImageUrl)}
+                  alt="Your animated card"
+                  className="animation-loading-screen__success-image"
+                />
+              ) : null}
+            </div>
+            <h2 className="animation-loading-screen__success-title">Your Animated Card is Ready! 🎉</h2>
+            <button
+              type="button"
+              className="animation-loading-screen__primary-btn"
+              onClick={() => onAddToCollection?.(completedData)}
+            >
+              {completePrimaryLabel}
+            </button>
+          </>
+        ) : showFailure ? (
+          <>
+            <p className="animation-loading-screen__failure-icon" aria-hidden>
+              ⚠
+            </p>
+            <h2 className="animation-loading-screen__title">Animation failed</h2>
+            <p className="animation-loading-screen__subtitle">{failureCreditMessage}</p>
+            <div className="animation-loading-screen__actions">
+              {allowRetry && onRetry ? (
+                <button
+                  type="button"
+                  disabled={retrying}
+                  className="animation-loading-screen__primary-btn"
+                  onClick={handleRetryClick}
+                >
+                  {retrying ? "Retrying…" : "Try Again"}
+                </button>
+              ) : null}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="animation-loading-screen__spinner" aria-hidden />
+            <h2 className="animation-loading-screen__title">Animating Your Card...</h2>
+            <p className="animation-loading-screen__subtitle">This usually takes 30-60 seconds</p>
+            <ProgressBar progress={progress} />
+            <LoadingDots />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function AnimationLoadingScreen(props) {
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  return createPortal(
+    <AnimationLoadingErrorBoundary onRetry={props.onRetry}>
+      <AnimationLoadingScreenInner {...props} />
+    </AnimationLoadingErrorBoundary>,
+    document.body
   );
 }

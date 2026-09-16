@@ -911,7 +911,7 @@ export default function StudioPage() {
     setTeamName(values.teamName || "");
   }
 
-  function handleDetailsFieldBlur(field, value) {
+  function handleDetailsFieldChange(field, value) {
     switch (field) {
       case "firstName":
         setFirstName(value);
@@ -2067,8 +2067,6 @@ export default function StudioPage() {
       await Promise.all([fetchOrders(), refreshUser(token)]);
       setPendingSession(null);
       setShowPendingPrompt(false);
-      setLatestGeneratedPreview(null);
-      setPreviewPollCardId("");
     } catch (err) {
       console.error("Animation start failed:", err);
       setAnimationFailed(true);
@@ -2506,7 +2504,8 @@ export default function StudioPage() {
               onAddToCollection={handleAnimationComplete}
               onFailed={handleAnimationFailed}
               onRetry={handleAnimationRetry}
-              failureCreditMessage="Animation failed. Please contact support. No additional credits were charged for this animation attempt."
+              failureCreditMessage="Something went wrong. Your credits have been refunded."
+              completePrimaryLabel="View in Collection"
             />
           </section>
         ) : (
@@ -2787,7 +2786,7 @@ export default function StudioPage() {
                   gradYear,
                   teamName,
                 }}
-                onFieldBlur={handleDetailsFieldBlur}
+                onFieldChange={handleDetailsFieldChange}
                 onContinue={handleDetailsContinue}
                 onBack={goBackStep}
                 showErrors={detailsShowErrors}

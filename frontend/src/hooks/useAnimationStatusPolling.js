@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE_URL, authHeaders } from "../config/api";
 import { normalizeAnimationStatus } from "../utils/animationCard";
-import { ANIMATION_EMAIL_FALLBACK_MS } from "../utils/animationWaitMessaging";
+import {
+  ANIMATION_EMAIL_FALLBACK_MS,
+  ANIMATION_FAILURE_TIMEOUT_MS,
+} from "../utils/animationWaitMessaging";
 
-export const ANIMATION_POLL_INTERVAL_MS = 5000;
+export const ANIMATION_POLL_INTERVAL_MS = 3000;
 export { ANIMATION_EMAIL_FALLBACK_MS as ANIMATION_MAX_POLL_MS };
 
 /**
@@ -19,6 +22,7 @@ export function useAnimationStatusPolling({
   onCompleted,
   onFailed,
   onTimeout,
+  failureTimeoutMs = ANIMATION_FAILURE_TIMEOUT_MS,
 }) {
   const onCompletedRef = useRef(onCompleted);
   const onFailedRef = useRef(onFailed);
@@ -93,7 +97,7 @@ export function useAnimationStatusPolling({
     const runPoll = async () => {
       if (cancelled || completionNotifiedRef.current) return;
 
-      if (Date.now() - startAt > ANIMATION_EMAIL_FALLBACK_MS) {
+      if (Date.now() - startAt > failureTimeoutMs) {
         setTimedOut(true);
         onTimeoutRef.current?.();
       }
@@ -131,7 +135,7 @@ export function useAnimationStatusPolling({
       if (intervalId) clearInterval(intervalId);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [enabled, cardId, token, pollKey, pollOnce]);
+  }, [enabled, cardId, token, pollKey, pollOnce, failureTimeoutMs]);
 
   return { status, result, timedOut, failed, reset };
 }
