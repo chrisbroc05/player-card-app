@@ -1,27 +1,21 @@
 import React, { useMemo } from "react";
-import { playerNameFromForm } from "../utils/playerDetails";
-import { POSITION_OPTIONS } from "../utils/playerDetails";
-import { normalizeHighlightThemeKey } from "../utils/highlightCardStyles";
-import { normalizeTierKey } from "../utils/cardTemplate";
-
-const THEME_PREVIEW_CLASS = {
-  neon: "studio-live-preview--theme-neon",
-  holographic: "studio-live-preview--theme-holo",
-  chrome: "studio-live-preview--theme-chrome",
-  retro: "studio-live-preview--theme-retro",
-  gold_edition: "studio-live-preview--theme-gold",
-  midnight: "studio-live-preview--theme-midnight",
-  inferno: "studio-live-preview--theme-inferno",
-  mvp: "studio-live-preview--theme-mvp",
-  diamond: "studio-live-preview--theme-diamond",
-  hall_of_fame: "studio-live-preview--theme-hof",
-  halloween: "studio-live-preview--theme-halloween",
-  christmas: "studio-live-preview--theme-christmas",
-};
+import { CARD_ASPECT_CLASS } from "../utils/cardTemplate";
+import { playerNameFromForm, POSITION_OPTIONS } from "../utils/playerDetails";
+import RarityBadge from "./RarityBadge";
+import { shouldShowRarityBadge } from "../utils/rarityStyles";
 
 function positionLabel(code) {
   const match = POSITION_OPTIONS.find((o) => o.value === code);
   return match?.label || code || "";
+}
+
+function tierBorderColor(tier) {
+  if (!tier) return "rgba(201, 168, 76, 0.3)";
+  const t = String(tier).toLowerCase().replace(/-/g, "_");
+  if (t === "legends" || t === "legendary") return "rgba(147, 51, 234, 0.8)";
+  if (t === "allstar" || t === "all_star" || t === "rare") return "rgba(201, 168, 76, 0.8)";
+  if (t === "rookie") return "rgba(192, 192, 192, 0.8)";
+  return "rgba(201, 168, 76, 0.3)";
 }
 
 export default function StudioLivePreview({
@@ -32,62 +26,72 @@ export default function StudioLivePreview({
   jerseyNumber = "",
   teamName = "",
   tier = "",
-  theme = "",
   photoUrl = "",
+  rarity = "",
 }) {
   const playerName = playerNameFromForm(firstName, lastName, displayName);
-  const hasPlayerInfo = playerName.length >= 2;
-  const tierKey = normalizeTierKey(tier || "rookie");
-  const themeKey = normalizeHighlightThemeKey(theme);
-
-  const tierClass =
-    tierKey === "legends"
-      ? "studio-live-preview__frame--legends"
-      : tierKey === "allstar"
-        ? "studio-live-preview__frame--allstar"
-        : tierKey === "rookie" && tier
-          ? "studio-live-preview__frame--rookie"
-          : "";
-
-  const themeClass = THEME_PREVIEW_CLASS[themeKey] || "";
-
+  const hasName = playerName.length >= 2;
   const posText = useMemo(() => positionLabel(position), [position]);
+  const hasPosition = Boolean(posText);
+  const showRarity = rarity && shouldShowRarityBadge(rarity);
 
   return (
     <div className="studio-live-preview-wrap">
-      <div className={`studio-live-preview__frame ${tierClass} ${themeClass}`}>
-        {photoUrl ? (
-          <>
-            <img src={photoUrl} alt="" className="studio-live-preview__photo" />
-            <div className="studio-live-preview__photo-gradient" aria-hidden />
-          </>
-        ) : null}
-        {jerseyNumber.trim() ? (
-          <span className="studio-live-preview__jersey">#{jerseyNumber.trim()}</span>
-        ) : null}
-        <div
-          className={`studio-live-preview__info${
-            hasPlayerInfo ? "" : " studio-live-preview__info--empty"
-          }`}
-        >
-          {hasPlayerInfo ? (
-            <>
-              <p className="studio-live-preview__name">{playerName}</p>
-              {posText ? <p className="studio-live-preview__position">{posText}</p> : null}
-              {teamName.trim() ? <p className="studio-live-preview__team">{teamName.trim()}</p> : null}
-            </>
-          ) : (
-            <>
-              <p className="studio-live-preview__placeholder-title">Your Card</p>
-              <p className="studio-live-preview__placeholder-sub">
-                Start filling in your info to see it come to life
-              </p>
-            </>
-          )}
+      <div
+        className={`studio-live-preview-card card-shell ${CARD_ASPECT_CLASS}`}
+        style={{ borderColor: tierBorderColor(tier) }}
+      >
+        <div className="studio-live-preview-card__media card-shell__media card-image-area">
+          <div className="card-image-area__stack card-player-vignette relative h-full w-full overflow-hidden">
+            {photoUrl ? (
+              <img
+                src={photoUrl}
+                alt=""
+                className="studio-live-preview-card__photo"
+              />
+            ) : (
+              <div className="studio-live-preview-card__photo-placeholder">
+                <span className="studio-live-preview-card__photo-icon" aria-hidden>
+                  📷
+                </span>
+                <p>Your photo goes here</p>
+              </div>
+            )}
+            <div className="studio-live-preview-card__photo-fade" aria-hidden />
+            <div className="card-player-inner-border pointer-events-none absolute inset-0" aria-hidden />
+            {showRarity ? (
+              <div className="card-rarity-badge-slot">
+                <RarityBadge rarity={rarity} size="thumb" />
+              </div>
+            ) : null}
+            {jerseyNumber.trim() ? (
+              <span className="studio-live-preview-card__jersey">#{jerseyNumber.trim()}</span>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="studio-live-preview-card__banner card-shell__banner">
+          <p
+            className={`studio-live-preview-card__name${
+              hasName ? "" : " studio-live-preview-card__name--placeholder"
+            }`}
+          >
+            {hasName ? playerName : "Player Name"}
+          </p>
+          <p
+            className={`studio-live-preview-card__position${
+              hasPosition ? "" : " studio-live-preview-card__position--placeholder"
+            }`}
+          >
+            {hasPosition ? posText : "Position"}
+          </p>
+          {teamName.trim() ? (
+            <p className="studio-live-preview-card__team">{teamName.trim()}</p>
+          ) : null}
         </div>
       </div>
       <p className="studio-live-preview__disclaimer">
-        Live Preview — Final card generated by AI
+        Live Preview — Layout matches your final card. AI will enhance the artwork.
       </p>
     </div>
   );

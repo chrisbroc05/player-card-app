@@ -339,6 +339,7 @@ export default function StudioPage() {
   }, [token]);
 
   const wizardPanelRef = useRef(null);
+  const photoUploadInputRef = useRef(null);
   const generationFocusRef = useRef(null);
   const configureFocusRef = useRef(null);
   const approveFocusRef = useRef(null);
@@ -377,7 +378,10 @@ export default function StudioPage() {
     if (uploadedPhotoUrl) return uploadedPhotoUrl;
     return imageFile ? URL.createObjectURL(imageFile) : "";
   }, [imageFile, uploadedPhotoUrl]);
-  const livePreviewPhotoUrl = imagePreviewUrl || uploadedPhotoUrl || facePhotoUrl || "";
+  const livePreviewPhotoUrl =
+    currentStep >= STEP_UPLOAD
+      ? imagePreviewUrl || uploadedPhotoUrl || facePhotoUrl || ""
+      : "";
   const phaseMeta = useMemo(() => getPhaseMeta(currentStep), [currentStep]);
   const generatedCardFullUrl = useMemo(() => toApiUrl(generatedCardUrl), [generatedCardUrl]);
   const playerDisplayName = playerNameFromForm(firstName, lastName, displayName);
@@ -795,6 +799,9 @@ export default function StudioPage() {
 
   function goToStep(step) {
     if (step > currentStep) return;
+    if (step < STEP_UPLOAD && currentStep >= STEP_UPLOAD) {
+      clearUploadState();
+    }
     setCurrentStep(step);
   }
 
@@ -840,6 +847,12 @@ export default function StudioPage() {
     setCurrentStep(STEP_PHOTO_NOTES);
   }
 
+  function resetPhotoUploadInput() {
+    if (photoUploadInputRef.current) {
+      photoUploadInputRef.current.value = "";
+    }
+  }
+
   function clearUploadState() {
     if (highlightClipDraft?.objectUrl) URL.revokeObjectURL(highlightClipDraft.objectUrl);
     setHighlightClipDraft(null);
@@ -854,6 +867,7 @@ export default function StudioPage() {
     setHighlightUploadState("idle");
     setHighlightUploadProgress(0);
     setHighlightUploadError("");
+    resetPhotoUploadInput();
   }
 
   function applyPlayerDetailsFields(values) {
@@ -974,7 +988,11 @@ export default function StudioPage() {
   }
 
   function goBackStep() {
-    setCurrentStep(getPrevWizardStep(currentStep, cardType));
+    const prevStep = getPrevWizardStep(currentStep, cardType);
+    if (prevStep < STEP_UPLOAD) {
+      clearUploadState();
+    }
+    setCurrentStep(prevStep);
   }
 
   useEffect(() => {
@@ -2486,27 +2504,30 @@ export default function StudioPage() {
         ) : (
         <section
           ref={wizardPanelRef}
-          className="scroll-focus-target rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6"
+          className={`scroll-focus-target rounded-2xl border border-white/10 bg-cardBg shadow-xl shadow-black/30 sm:p-6 ${
+            !showWelcome && inCreationFlow ? "studio-wizard-panel p-3 sm:p-4" : "p-4"
+          }`}
         >
             {showWelcome && inCreationFlow ? (
               <StudioWelcomeScreen onStart={dismissWelcome} />
             ) : (
               <>
-            {inCreationFlow ? <StudioPhaseProgress currentStep={currentStep} /> : null}
-
             {inCreationFlow ? (
-              <StudioLivePreview
-                firstName={firstName}
-                lastName={lastName}
-                displayName={displayName}
-                position={position}
-                jerseyNumber={jerseyNumber}
-                teamName={teamName}
-                tier={orderTier}
-                theme={specialTheme}
-                photoUrl={livePreviewPhotoUrl}
-              />
-            ) : null}
+              <div className="studio-wizard-layout">
+                <div className="studio-wizard-layout__preview-pane">
+                  <StudioLivePreview
+                    firstName={firstName}
+                    lastName={lastName}
+                    displayName={displayName}
+                    position={position}
+                    jerseyNumber={jerseyNumber}
+                    teamName={teamName}
+                    tier={orderTier}
+                    photoUrl={livePreviewPhotoUrl}
+                  />
+                </div>
+                <div className="studio-wizard-layout__form-pane">
+            {inCreationFlow ? <StudioPhaseProgress currentStep={currentStep} /> : null}
 
             {user && inCreationFlow ? (
               <div className="mb-6">
@@ -2568,6 +2589,7 @@ export default function StudioPage() {
                     )}
                   </div>
                   <input
+                    ref={photoUploadInputRef}
                     id="studio-photo-upload"
                     type="file"
                     accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif"
@@ -3278,6 +3300,9 @@ export default function StudioPage() {
             </div>
               </>
             )}
+                </div>
+              </div>
+            ) : null}
               </>
             )}
           </section>
