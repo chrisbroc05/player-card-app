@@ -1,7 +1,10 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import ListingModal from "./ListingModal";
 import PriorityBadge, { isPriorityListing } from "./PriorityBadge";
-import { formatMoney, PRIORITY_LISTING_FEE } from "../utils/marketplace";
+import { toApiUrl } from "../config/api";
+import { getCardBannerStyles } from "../utils/cardBannerStyles";
+import { formatMoney, PLATFORM_ROYALTY_RATE } from "../utils/marketplace";
+import { rarityDisplay } from "../utils/tierStyles";
 
 export default function MarketplaceListingActions({
   card,
@@ -19,16 +22,8 @@ export default function MarketplaceListingActions({
   listedTagLabel,
 }) {
   const [open, setOpen] = useState(false);
-  const [price, setPrice] = useState("");
-  const [priorityBoost, setPriorityBoost] = useState(false);
-  const [localError, setLocalError] = useState("");
   const [listSuccessOpen, setListSuccessOpen] = useState(false);
-
-  const priceNum = Number(price);
-  const totalWithBoost = useMemo(() => {
-    if (!Number.isFinite(priceNum) || priceNum < 0) return null;
-    return priorityBoost ? priceNum + PRIORITY_LISTING_FEE : priceNum;
-  }, [priceNum, priorityBoost]);
+  const [unlistError, setUnlistError] = useState("");
 
   const isListed = Boolean(listingInfo);
   const isPendingTrade = (card?.status || "active") === "pending_trade";
@@ -38,35 +33,12 @@ export default function MarketplaceListingActions({
 
   if (isPendingTrade || !isActive) return null;
 
-  async function handleList(e) {
-    e.preventDefault();
-    setLocalError("");
-    const n = Number(price);
-    if (!Number.isFinite(n) || n < 1.0) {
-      setLocalError("Asking price must be at least $1.00");
-      return;
-    }
-    try {
-      await onList(n, priorityBoost);
-      setOpen(false);
-      setPrice("");
-      setPriorityBoost(false);
-      if (onListSuccess) {
-        onListSuccess();
-      } else {
-        setListSuccessOpen(true);
-      }
-    } catch (err) {
-      setLocalError(err.message || "Could not list card.");
-    }
-  }
-
   async function handleUnlist() {
-    setLocalError("");
+    setUnlistError("");
     try {
       await onUnlist();
     } catch (err) {
-      setLocalError(err.message || "Could not remove listing.");
+      setUnlistError(err.message || "Could not remove listing.");
     }
   }
 
@@ -92,75 +64,175 @@ export default function MarketplaceListingActions({
               ? "Updating…"
               : listedActionLabel || `Listed at ${formatMoney(listingInfo.asking_price)} — Unlist`}
           </button>
+          {unlistError ? <p className="text-xs text-rose-300">{unlistError}</p> : null}
         </>
       ) : (
-        <>
-          {!open ? (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => {
-                if (useBulkFlow) {
-                  onOpenBulkList(card);
-                  return;
-                }
-                setOpen(true);
-                setLocalError("");
-                setPriorityBoost(false);
-              }}
-              className="inline-flex min-h-[40px] w-full items-center justify-center rounded-lg border bg-gold-subtle px-3 py-2 text-sm font-medium text-brand-gold transition hover:border-[var(--color-border-gold)] disabled:opacity-50"
-            >
-              {listButtonLabel}
-            </button>
-          ) : (
-            <form onSubmit={handleList} className="space-y-2 rounded-lg border border-white/10 bg-cardBg2 p-3">
-              <label className="block text-xs font-medium text-slate-400">Asking Price ($)</label>
-              <input
-                type="number"
-                min="1.00"
-                step="0.01"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                className="min-h-[42px] w-full rounded-lg border border-white/15 bg-cardBg px-3 py-2 text-sm text-slate-100"
-                placeholder="1.00"
-              />
-              <p className="text-xs text-slate-500">Minimum $1.00</p>
-              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-amber-500/25 bg-amber-500/10 p-3">
-                <input
-                  type="checkbox"
-                  checked={priorityBoost}
-                  onChange={(e) => setPriorityBoost(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-white/20 bg-cardBg text-amber-500 focus:ring-amber-400/50"
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium text-amber-100">
-                    Boost to top of marketplace — {formatMoney(PRIORITY_LISTING_FEE)}
-                  </span>
-                  <span className="mt-1 block text-xs text-slate-400">
-                    Your card will appear at the top of all listings for 7 days.
-                  </span>
-                  <span className="mt-2 block text-[11px] italic text-amber-200/80">
-                    Priority boost payment coming soon.
-                  </span>
-                </span>
-              </label>
-              {priorityBoost && totalWithBoost != null ? (
-                <p className="text-xs text-amber-200/90">
-                  Listing total when boost is enabled:{" "}
-                  <span className="font-semibold">{formatMoney(totalWithBoost)}</span>{" "}
-                  <span className="text-slate-500">(price + boost; payment not charged yet)</span>
-                </p>
-              ) : null}
-              <ListFormActions busy={busy} onCancel={() => setOpen(false)} />
-            </form>
-          )}
-        </>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => {
+            if (useBulkFlow) {
+              onOpenBulkList(card);
+              return;
+            }
+            setOpen(true);
+          }}
+          className="inline-flex min-h-[40px] w-full items-center justify-center rounded-lg border bg-gold-subtle px-3 py-2 text-sm font-medium text-brand-gold transition hover:border-[var(--color-border-gold)] disabled:opacity-50"
+        >
+          {listButtonLabel}
+        </button>
       )}
-      {localError ? <p className="text-xs text-rose-300">{localError}</p> : null}
+
+      <SingleCardListingModal
+        open={open}
+        card={card}
+        busy={busy}
+        onClose={() => setOpen(false)}
+        onList={onList}
+        onListSuccess={() => {
+          setOpen(false);
+          if (onListSuccess) {
+            onListSuccess();
+          } else {
+            setListSuccessOpen(true);
+          }
+        }}
+      />
+
       {!onListSuccess ? (
         <ListedSuccessModal open={listSuccessOpen} onClose={() => setListSuccessOpen(false)} />
       ) : null}
     </div>
+  );
+}
+
+function SingleCardListingModal({ open, card, busy, onClose, onList, onListSuccess }) {
+  const [price, setPrice] = useState("");
+  const [localError, setLocalError] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    setPrice("");
+    setLocalError("");
+  }, [open]);
+
+  const priceNum = Number(price);
+  const priceValid = Number.isFinite(priceNum) && priceNum >= 1;
+
+  const netEarnings = useMemo(() => {
+    if (!priceValid) return 0;
+    const fee = Math.round(priceNum * PLATFORM_ROYALTY_RATE * 100) / 100;
+    return Math.round((priceNum - fee) * 100) / 100;
+  }, [priceNum, priceValid]);
+
+  const tierLabel = useMemo(() => {
+    const banner = getCardBannerStyles(card?.tier, card?.theme || card?.special_theme);
+    const rarityLabel = card?.rarity_display_name || rarityDisplay(card?.rarity);
+    const rarityNorm = String(rarityLabel || "").trim().toLowerCase();
+    if (rarityNorm && rarityNorm !== "base" && rarityNorm !== "standard" && rarityNorm !== "common") {
+      return rarityLabel;
+    }
+    return banner.tierPillLabel;
+  }, [card]);
+
+  function handleClose() {
+    setPrice("");
+    setLocalError("");
+    onClose?.();
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setLocalError("");
+    if (!priceValid) {
+      setLocalError("Asking price must be at least $1.00");
+      return;
+    }
+    try {
+      await onList(priceNum, false);
+      setPrice("");
+      onListSuccess?.();
+    } catch (err) {
+      setLocalError(err.message || "Could not list card.");
+    }
+  }
+
+  if (!card) return null;
+
+  return (
+    <ListingModal
+      isOpen={open}
+      onClose={handleClose}
+      ariaLabelledby="single-list-player-name"
+      debugLabel="single-list"
+    >
+      <form className="listing-modal-body single-list-modal" onSubmit={handleSubmit}>
+        <button type="button" className="bulk-list-sheet__close" onClick={handleClose} aria-label="Close">
+          ×
+        </button>
+
+        <div className="single-list-modal__preview">
+          {card.image_url ? (
+            <img
+              src={toApiUrl(card.image_url)}
+              alt={card.player_name || "Card"}
+              className="single-list-modal__card-image"
+            />
+          ) : (
+            <div className="single-list-modal__card-image single-list-modal__card-placeholder" aria-hidden />
+          )}
+        </div>
+
+        <p id="single-list-player-name" className="single-list-modal__name">
+          {card.player_name || "Card"}
+        </p>
+        {tierLabel ? <p className="single-list-modal__tier">{tierLabel}</p> : null}
+
+        <div className="single-list-modal__section">
+          <label className="single-list-modal__label" htmlFor="single-list-price">
+            Asking Price
+          </label>
+          <div className="bulk-list-sheet__price-wrap">
+            <span className="bulk-list-sheet__price-prefix">$</span>
+            <input
+              id="single-list-price"
+              type="number"
+              min="1"
+              step="0.01"
+              inputMode="decimal"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              className="bulk-list-sheet__price-input"
+              placeholder="0.00"
+              disabled={busy}
+            />
+          </div>
+          {priceValid ? (
+            <p className="single-list-modal__earn">You&apos;d earn {formatMoney(netEarnings)}</p>
+          ) : (
+            <p className="bulk-list-sheet__hint">Minimum $1.00</p>
+          )}
+        </div>
+
+        {localError ? <p className="bulk-list-sheet__error">{localError}</p> : null}
+
+        <button
+          type="submit"
+          disabled={!priceValid || busy}
+          className="bulk-list-sheet__primary-btn listing-modal-action single-list-modal__primary-btn"
+        >
+          {busy ? "Listing…" : "List on Marketplace"}
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={handleClose}
+          className="bulk-list-sheet__secondary-btn listing-modal-action single-list-modal__secondary-btn"
+        >
+          Cancel
+        </button>
+      </form>
+    </ListingModal>
   );
 }
 
@@ -201,27 +273,5 @@ export function ListedSuccessModal({ open, onClose, variant = "default", onViewM
         </button>
       )}
     </ListingModal>
-  );
-}
-
-function ListFormActions({ busy, onCancel }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      <button
-        type="submit"
-        disabled={busy}
-        className="inline-flex min-h-[40px] flex-1 items-center justify-center rounded-lg btn-primary px-3 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50"
-      >
-        {busy ? "Listing…" : "List Card"}
-      </button>
-      <button
-        type="button"
-        disabled={busy}
-        onClick={onCancel}
-        className="inline-flex min-h-[40px] items-center justify-center rounded-lg border border-white/20 px-3 py-2 text-sm text-slate-300"
-      >
-        Cancel
-      </button>
-    </div>
   );
 }

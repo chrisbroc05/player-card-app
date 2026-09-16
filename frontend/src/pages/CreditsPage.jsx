@@ -14,6 +14,31 @@ import {
 } from "../utils/credits";
 
 const PRESET_AMOUNTS = [10, 20, 50, 100];
+const LEDGER_PAGE_SIZE = 10;
+
+const LEDGER_TYPE_ICONS = {
+  top_up: "💳",
+  gift: "🎁",
+  card_purchase: "🃏",
+  card_sale: "💰",
+  royalty: "👑",
+  generation: "✨",
+  animation: "⚡",
+  highlight: "🎬",
+  priority: "⭐",
+  withdrawal: "↧",
+  refund: "↩",
+};
+
+function ledgerTypeIcon(type) {
+  return LEDGER_TYPE_ICONS[(type || "").toLowerCase()] || "•";
+}
+
+function ledgerDescription(row) {
+  const note = (row?.note || "").trim();
+  if (note) return note;
+  return txTypeLabel(row?.transaction_type);
+}
 
 function txTypeLabel(type) {
   const t = (type || "").toLowerCase();
@@ -48,16 +73,40 @@ function formatLedgerDate(iso) {
   }
 }
 
-function ledgerTypeLabel(type) {
-  const t = (type || "").toLowerCase();
-  if (t === "withdrawal") {
-    return (
-      <span className="inline-block rounded-full border border-rose-500/40 bg-rose-500/15 px-2 py-0.5 text-[11px] font-medium text-rose-200">
-        {txTypeLabel(type)}
-      </span>
-    );
-  }
-  return <span className="font-medium text-white">{txTypeLabel(type)}</span>;
+function CreditLedgerRow({ row }) {
+  const amt = Number(row.amount);
+  const positive = amt >= 0;
+  const type = (row.transaction_type || "").toLowerCase();
+
+  return (
+    <li className="credit-ledger-row">
+      <div className="credit-ledger-row__left">
+        <div className="credit-ledger-row__type">
+          <span className="credit-ledger-row__icon" aria-hidden>
+            {ledgerTypeIcon(type)}
+          </span>
+          {type === "withdrawal" ? (
+            <span className="credit-ledger-row__type-label credit-ledger-row__type-label--withdrawal">
+              {txTypeLabel(type)}
+            </span>
+          ) : (
+            <span className="credit-ledger-row__type-label">{txTypeLabel(type)}</span>
+          )}
+        </div>
+        <p className="credit-ledger-row__description">{ledgerDescription(row)}</p>
+        <p className="credit-ledger-row__date">{formatLedgerDate(row.created_at)}</p>
+      </div>
+      <div className="credit-ledger-row__right">
+        <p
+          className={`credit-ledger-row__amount${positive ? " credit-ledger-row__amount--credit" : " credit-ledger-row__amount--debit"}`}
+        >
+          {positive ? "+" : ""}
+          {formatMoney(amt)}
+        </p>
+        <p className="credit-ledger-row__balance">Balance {formatMoney(row.balance_after)}</p>
+      </div>
+    </li>
+  );
 }
 
 export default function CreditsPage() {
@@ -71,6 +120,8 @@ export default function CreditsPage() {
   const [giftSearching, setGiftSearching] = useState(false);
   const [ledger, setLedger] = useState([]);
   const [ledgerLoading, setLedgerLoading] = useState(true);
+  const [ledgerLoadingMore, setLedgerLoadingMore] = useState(false);
+  const [hasMoreLedger, setHasMoreLedger] = useState(false);
   const [paymentsDisabled, setPaymentsDisabled] = useState(false);
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
@@ -126,23 +177,50 @@ export default function CreditsPage() {
     if (!token) return;
     setLedgerLoading(true);
     try {
-      const { res, unauthorized } = await authFetch(token, "/credits/ledger?limit=20");
+      const { res, unauthorized } = await authFetch(
+        token,
+        `/credits/ledger?limit=${LEDGER_PAGE_SIZE}&offset=0`
+      );
       if (unauthorized) return;
       if (res.status === 503) {
         setPaymentsDisabled(true);
         setLedger([]);
+        setHasMoreLedger(false);
         return;
       }
       setPaymentsDisabled(false);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not load credit history."));
-      setLedger(Array.isArray(data.entries) ? data.entries : []);
+      const entries = Array.isArray(data.entries) ? data.entries : [];
+      setLedger(entries);
+      setHasMoreLedger(entries.length === LEDGER_PAGE_SIZE);
     } catch (e) {
       setError(e.message || "Could not load credit history.");
     } finally {
       setLedgerLoading(false);
     }
   }, [token]);
+
+  const loadMoreLedger = useCallback(async () => {
+    if (!token || ledgerLoadingMore || !hasMoreLedger) return;
+    setLedgerLoadingMore(true);
+    try {
+      const { res, unauthorized } = await authFetch(
+        token,
+        `/credits/ledger?limit=${LEDGER_PAGE_SIZE}&offset=${ledger.length}`
+      );
+      if (unauthorized) return;
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not load more transactions."));
+      const entries = Array.isArray(data.entries) ? data.entries : [];
+      setLedger((prev) => [...prev, ...entries]);
+      setHasMoreLedger(entries.length === LEDGER_PAGE_SIZE);
+    } catch (e) {
+      setError(e.message || "Could not load more transactions.");
+    } finally {
+      setLedgerLoadingMore(false);
+    }
+  }, [token, ledger.length, ledgerLoadingMore, hasMoreLedger]);
 
   useEffect(() => {
     if (!token || initializing) return;
@@ -579,33 +657,23 @@ export default function CreditsPage() {
           ) : ledger.length === 0 ? (
             <p className="mt-4 text-sm text-slate-500">No transactions yet.</p>
           ) : (
-            <ul className="mt-4 space-y-3">
-              {ledger.map((row) => {
-                const amt = Number(row.amount);
-                const positive = amt >= 0;
-                return (
-                  <li
-                    key={row.id}
-                    className="rounded-xl border border-white/10 bg-cardBg2 px-3 py-3 text-sm"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div>
-                        {ledgerTypeLabel(row.transaction_type)}
-                        {row.note ? <p className="mt-0.5 text-xs text-slate-500">{row.note}</p> : null}
-                        <p className="mt-1 text-xs text-slate-600">{formatLedgerDate(row.created_at)}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className={`font-semibold tabular-nums ${positive ? "text-success" : "text-rose-300"}`}>
-                          {positive ? "+" : ""}
-                          {formatMoney(amt)}
-                        </p>
-                        <p className="text-xs text-slate-500">Balance {formatMoney(row.balance_after)}</p>
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+            <>
+              <ul className="credit-ledger-list mt-4">
+                {ledger.map((row) => (
+                  <CreditLedgerRow key={row.id} row={row} />
+                ))}
+              </ul>
+              {hasMoreLedger ? (
+                <button
+                  type="button"
+                  className="credit-ledger-show-more"
+                  disabled={ledgerLoadingMore}
+                  onClick={loadMoreLedger}
+                >
+                  {ledgerLoadingMore ? "Loading…" : "Show More Transactions"}
+                </button>
+              ) : null}
+            </>
           )}
         </section>
 

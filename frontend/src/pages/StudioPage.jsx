@@ -34,6 +34,15 @@ import AnimatedAiDisclaimer from "../components/AnimatedAiDisclaimer";
 import PlayerDetailsStep from "../components/PlayerDetailsStep";
 import PhotoNotesStep from "../components/PhotoNotesStep";
 import FacePhotoStep from "../components/FacePhotoStep";
+import StudioPhaseProgress from "../components/StudioPhaseProgress";
+import StudioLivePreview from "../components/StudioLivePreview";
+import StudioWelcomeScreen from "../components/StudioWelcomeScreen";
+import {
+  StudioPhaseHeader,
+  StudioWizardBack,
+  StudioWizardContinue,
+} from "../components/StudioWizardControls";
+import { getPhaseContinueLabel, getPhaseMeta } from "../utils/studioWizardPhases";
 import {
   getActionCategory,
   klingMotionForCategory,
@@ -75,29 +84,6 @@ const STEP_SCENARIO = 9;
 const STEP_PHOTO_NOTES = 10;
 const STEP_HIGHLIGHT_VIDEO = 11;
 const STEP_REVIEW = 12;
-const TOTAL_WIZARD_STEPS = 12;
-
-const WIZARD_STEP_LABELS = {
-  [STEP_DETAILS]: "Player Details",
-  [STEP_TIER]: "Choose Tier",
-  [STEP_THEME]: "Choose Theme",
-  [STEP_CARD_TYPE]: "Choose Card Type",
-  [STEP_UPLOAD]: "Upload",
-  [STEP_FACE_PHOTO]: "Face Photo",
-  [STEP_HANDEDNESS]: "Player Handedness",
-  [STEP_ACTION]: "Tag Your Action",
-  [STEP_SCENARIO]: "Match Your Photo",
-  [STEP_PHOTO_NOTES]: "Photo Details",
-  [STEP_HIGHLIGHT_VIDEO]: "Trim Highlight",
-  [STEP_REVIEW]: "Review & Generate",
-};
-
-function wizardStepLabel(step, cardType) {
-  if (step === STEP_UPLOAD) {
-    return cardType === "highlight" ? "Upload Video" : "Upload Photo";
-  }
-  return WIZARD_STEP_LABELS[step] || "";
-}
 
 const ANIMATED_FLOW_STAGE = {
   IDLE: "idle",
@@ -214,62 +200,6 @@ const TIER_UI = {
   },
 };
 
-function WizardProgress({ currentStep, isAnimated, isHighlight, cardType, onGoToStep }) {
-  const progressPct = Math.round((currentStep / TOTAL_WIZARD_STEPS) * 100);
-  const currentLabel = wizardStepLabel(currentStep, cardType);
-  return (
-    <div className="mb-6 rounded-xl border border-white/10 bg-cardBg2 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-          Step {currentStep} of {TOTAL_WIZARD_STEPS}
-        </p>
-        <p className="text-sm font-semibold text-white">{currentLabel}</p>
-      </div>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
-        <div
-          className="h-full rounded-full bg-gradient-to-r from-[#A8832A] via-[#C9A84C] to-[#E8C56A] transition-all duration-300"
-          style={{ width: `${progressPct}%` }}
-        />
-      </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        {Array.from({ length: TOTAL_WIZARD_STEPS }, (_, i) => {
-          const step = i + 1;
-          if (isAnimatedOnlyStep(step) && !isAnimated) return null;
-          if (isHighlightOnlyStep(step) && !isHighlight) return null;
-          if (isFacePhotoOnlyStep(step) && isHighlight) return null;
-          const done = step < currentStep;
-          const active = step === currentStep;
-          const canClick = done && typeof onGoToStep === "function";
-          return (
-            <button
-              key={step}
-              type="button"
-              disabled={!canClick}
-              onClick={() => canClick && onGoToStep(step)}
-              className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] transition ${
-                done
-                  ? "border-[var(--color-border-gold)] bg-gold-subtle text-brand-gold"
-                  : active
-                    ? "border-[var(--color-border-gold)] bg-gold-subtle text-brand-gold-bright"
-                    : "border-white/10 bg-cardBg text-slate-500"
-              } ${canClick ? "cursor-pointer hover:border-[var(--color-border-gold)]" : "cursor-default"}`}
-            >
-              <span
-                className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${
-                  done ? "btn-primary text-slate-950" : active ? "btn-primary text-slate-950" : "bg-white/10"
-                }`}
-              >
-                {done ? "✓" : step}
-              </span>
-              <span className="hidden sm:inline">{wizardStepLabel(step, cardType)}</span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 function formatApiError(detail, fallback) {
   if (!detail) return fallback;
   if (typeof detail === "string") return detail;
@@ -297,6 +227,13 @@ export default function StudioPage() {
   const { showCelebration } = useNewCardCelebration();
   const { highlightCardPrice } = useFeatures();
   const [currentStep, setCurrentStep] = useState(1);
+  const [showWelcome, setShowWelcome] = useState(() => {
+    try {
+      return sessionStorage.getItem("studio_welcome_dismissed") !== "1";
+    } catch {
+      return true;
+    }
+  });
   const [dragActive, setDragActive] = useState(false);
 
   const [firstName, setFirstName] = useState("");
@@ -440,6 +377,8 @@ export default function StudioPage() {
     if (uploadedPhotoUrl) return uploadedPhotoUrl;
     return imageFile ? URL.createObjectURL(imageFile) : "";
   }, [imageFile, uploadedPhotoUrl]);
+  const livePreviewPhotoUrl = imagePreviewUrl || uploadedPhotoUrl || facePhotoUrl || "";
+  const phaseMeta = useMemo(() => getPhaseMeta(currentStep), [currentStep]);
   const generatedCardFullUrl = useMemo(() => toApiUrl(generatedCardUrl), [generatedCardUrl]);
   const playerDisplayName = playerNameFromForm(firstName, lastName, displayName);
   const isAnimatedCardType = cardType === "animated";
@@ -742,6 +681,21 @@ export default function StudioPage() {
     return getActionCategory(actionCategory)?.label || "";
   }, [isAnimatedCardType, selectedScenarioTitle, selectedScenarioId, actionCategory]);
   const inCreationFlow = currentStep >= STEP_DETAILS && currentStep <= STEP_REVIEW;
+
+  const dismissWelcome = useCallback(() => {
+    setShowWelcome(false);
+    try {
+      sessionStorage.setItem("studio_welcome_dismissed", "1");
+    } catch {
+      /* ignore storage errors */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showPendingPrompt && pendingSession) {
+      setShowWelcome(false);
+    }
+  }, [showPendingPrompt, pendingSession]);
 
   useEffect(() => {
     if (!isAnimatedCardType || !actionCategory || !selectedScenarioId || selectedScenarioTitle) {
@@ -1477,6 +1431,7 @@ export default function StudioPage() {
       }
 
       applyDraftToWizard(pendingSession.draft);
+      setShowWelcome(false);
       setOrders((prev) => {
         const without = prev.filter((row) => row.id !== order.id);
         return [...without, order];
@@ -1544,6 +1499,12 @@ export default function StudioPage() {
   }
 
   function resetWizardToStart() {
+    setShowWelcome(true);
+    try {
+      sessionStorage.removeItem("studio_welcome_dismissed");
+    } catch {
+      /* ignore storage errors */
+    }
     setCurrentStep(STEP_DETAILS);
     setFirstName("");
     setLastName("");
@@ -2527,13 +2488,25 @@ export default function StudioPage() {
           ref={wizardPanelRef}
           className="scroll-focus-target rounded-2xl border border-white/10 bg-cardBg p-4 shadow-xl shadow-black/30 sm:p-6"
         >
-            <WizardProgress
-              currentStep={currentStep}
-              isAnimated={isAnimatedCardType}
-              isHighlight={isHighlightCardType}
-              cardType={cardType}
-              onGoToStep={goToStep}
-            />
+            {showWelcome && inCreationFlow ? (
+              <StudioWelcomeScreen onStart={dismissWelcome} />
+            ) : (
+              <>
+            {inCreationFlow ? <StudioPhaseProgress currentStep={currentStep} /> : null}
+
+            {inCreationFlow ? (
+              <StudioLivePreview
+                firstName={firstName}
+                lastName={lastName}
+                displayName={displayName}
+                position={position}
+                jerseyNumber={jerseyNumber}
+                teamName={teamName}
+                tier={orderTier}
+                theme={specialTheme}
+                photoUrl={livePreviewPhotoUrl}
+              />
+            ) : null}
 
             {user && inCreationFlow ? (
               <div className="mb-6">
@@ -2548,6 +2521,15 @@ export default function StudioPage() {
               />
             ) : (
               <>
+            {currentStep > STEP_DETAILS && currentStep <= STEP_REVIEW ? (
+              <StudioWizardBack onClick={goBackStep} />
+            ) : null}
+
+            {currentStep >= STEP_DETAILS && currentStep <= STEP_REVIEW ? (
+              <StudioPhaseHeader title={phaseMeta.title} subtitle={phaseMeta.subtitle} />
+            ) : null}
+
+            <div key={currentStep} className="studio-step-panel">
             {currentStep === STEP_UPLOAD ? (
               isHighlightCardType ? (
                 <HighlightVideoStep
@@ -2659,23 +2641,12 @@ export default function StudioPage() {
                       </label>
                     </>
                   )}
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={goBackStep}
-                      className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
-                    >
-                      Back
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!canAdvanceFromStep}
-                      onClick={tryAdvanceStep}
-                      className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl btn-primary px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
-                    >
-                      Continue
-                    </button>
-                  </div>
+                  <StudioWizardContinue
+                    disabled={!canAdvanceFromStep}
+                    onClick={tryAdvanceStep}
+                  >
+                    Continue →
+                  </StudioWizardContinue>
                 </div>
               )
             ) : null}
@@ -2719,23 +2690,12 @@ export default function StudioPage() {
                   highlightCardPrice={generationPricing?.highlight_card_price ?? highlightCardPrice}
                   animatedUpgradePrice={generationPricing?.animated_upgrade_price ?? 10}
                 />
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={goBackStep}
-                    className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
-                  >
-                    Back
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!canAdvanceFromStep}
-                    onClick={tryAdvanceStep}
-                    className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl btn-primary px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
-                  >
-                    Continue to Upload
-                  </button>
-                </div>
+                <StudioWizardContinue
+                  disabled={!canAdvanceFromStep}
+                  onClick={tryAdvanceStep}
+                >
+                  {getPhaseContinueLabel(STEP_CARD_TYPE)}
+                </StudioWizardContinue>
               </div>
             ) : null}
 
@@ -2756,15 +2716,6 @@ export default function StudioPage() {
                   error={photoStepError}
                   tier={orderTier || "rookie"}
                 />
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={goBackStep}
-                    className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
-                  >
-                    Back
-                  </button>
-                </div>
               </div>
             ) : null}
 
@@ -2777,15 +2728,6 @@ export default function StudioPage() {
                   error={actionStepError}
                   tier={orderTier || "rookie"}
                 />
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={goBackStep}
-                    className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
-                  >
-                    Back
-                  </button>
-                </div>
               </div>
             ) : null}
 
@@ -2802,9 +2744,9 @@ export default function StudioPage() {
                 }}
                 onFieldChange={handleDetailsFieldChange}
                 onContinue={handleDetailsContinue}
-                onBack={goBackStep}
                 showErrors={detailsShowErrors}
                 errors={detailsErrors}
+                continueLabel={getPhaseContinueLabel(STEP_DETAILS)}
               />
             ) : null}
 
@@ -2864,23 +2806,12 @@ export default function StudioPage() {
                     </button>
                   ))}
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={goBackStep}
-                    className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
-                  >
-                    Back
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!canAdvanceFromStep}
-                    onClick={tryAdvanceStep}
-                    className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl btn-primary px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
-                  >
-                    Continue to Theme Selection
-                  </button>
-                </div>
+                <StudioWizardContinue
+                  disabled={!canAdvanceFromStep}
+                  onClick={tryAdvanceStep}
+                >
+                  Continue →
+                </StudioWizardContinue>
               </div>
             ) : null}
 
@@ -2902,23 +2833,12 @@ export default function StudioPage() {
                     setThemeStepError("");
                   }}
                 />
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={goBackStep}
-                    className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
-                  >
-                    Back
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!canAdvanceFromStep}
-                    onClick={tryAdvanceStep}
-                    className="inline-flex min-h-[46px] w-full items-center justify-center rounded-xl btn-primary px-4 py-2.5 text-sm font-medium text-slate-950 sm:w-auto disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
-                  >
-                    Continue to Card Type Selection
-                  </button>
-                </div>
+                <StudioWizardContinue
+                  disabled={!canAdvanceFromStep}
+                  onClick={tryAdvanceStep}
+                >
+                  Continue →
+                </StudioWizardContinue>
               </div>
             ) : null}
 
@@ -2933,15 +2853,6 @@ export default function StudioPage() {
                   error={scenarioStepError}
                   tier={orderTier || "rookie"}
                 />
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={goBackStep}
-                    className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
-                  >
-                    Back
-                  </button>
-                </div>
               </div>
             ) : null}
 
@@ -3011,38 +2922,25 @@ export default function StudioPage() {
                   creditBalance={creditBalance}
                   phase="pre-generate"
                 />
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={goBackStep}
-                    className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/20 bg-cardBg2 px-4 py-2.5 text-sm font-medium text-slate-100"
-                  >
-                    Back
-                  </button>
-                  {generationCap.blocked ? (
-                    <GenerationCapNotice
-                      usage={generationUsage}
-                      period={generationCap.period}
-                      className="flex-1"
-                    />
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={requestGenerateFirstPreview}
-                        disabled={!canCreateOrder || !generationPricing || Boolean(orderActionKey)}
-                        className="inline-flex min-h-[52px] flex-1 items-center justify-center rounded-xl btn-primary px-6 py-3 text-base font-semibold text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400 sm:flex-none"
-                      >
-                        {orderActionKey === "generate-first"
-                          ? "Generating..."
-                          : isHighlightCardType
-                            ? "Preview My Highlight Card — Free"
-                            : "Generate My Card — Free Preview"}
-                      </button>
-                      <GenerationDailyUsageHint usage={generationUsage} className="w-full basis-full text-center sm:text-left" />
-                    </>
-                  )}
-                </div>
+                {generationCap.blocked ? (
+                  <GenerationCapNotice
+                    usage={generationUsage}
+                    period={generationCap.period}
+                    className="flex-1"
+                  />
+                ) : (
+                  <>
+                    <StudioWizardContinue
+                      onClick={requestGenerateFirstPreview}
+                      disabled={!canCreateOrder || !generationPricing || Boolean(orderActionKey)}
+                    >
+                      {orderActionKey === "generate-first"
+                        ? "Generating..."
+                        : getPhaseContinueLabel(STEP_REVIEW, { isReview: true })}
+                    </StudioWizardContinue>
+                    <GenerationDailyUsageHint usage={generationUsage} className="w-full basis-full text-center sm:text-left" />
+                  </>
+                )}
               </div>
             ) : null}
 
@@ -3377,6 +3275,9 @@ export default function StudioPage() {
                 )}
               </div>
             ) : null}
+            </div>
+              </>
+            )}
               </>
             )}
           </section>
