@@ -4508,7 +4508,11 @@
   color: rgba(255, 255, 255, 0.55);
 }
 
-.stat-sheet-chart-card__loading,
+.stat-sheet-chart-card__body {
+  position: relative;
+  min-height: 120px;
+}
+
 .stat-sheet-chart-card__empty {
   margin: 0;
   min-height: 120px;
@@ -4519,6 +4523,41 @@
   font-size: 13px;
   color: rgba(255, 255, 255, 0.45);
   padding: 16px;
+}
+
+.stat-sheet-loading-shell {
+  position: relative;
+}
+
+.stat-sheet-loading-shell--loading > :not(.stat-sheet-loading-shell__overlay) {
+  opacity: 0.4;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.stat-sheet-loading-shell__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.stat-sheet-loading-shell__spinner {
+  width: 28px;
+  height: 28px;
+  border: 2px solid rgba(201, 168, 76, 0.2);
+  border-top-color: #c9a84c;
+  border-radius: 50%;
+  animation: stat-sheet-spin 0.7s linear infinite;
+}
+
+@keyframes stat-sheet-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .profile-stat-sheet__grid {
