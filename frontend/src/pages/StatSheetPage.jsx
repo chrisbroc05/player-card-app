@@ -37,6 +37,49 @@ function truncateName(name, max = 12) {
   return `${s.slice(0, max)}…`;
 }
 
+function TopSalesBarLabel(props) {
+  const { x = 0, y = 0, width = 0, height = 0, value, viewBox } = props;
+  if (value == null || width <= 0) return null;
+
+  const label = formatMoney(value);
+  const chartWidth = viewBox?.width ?? 300;
+  const labelWidth = 50;
+  const isLong = x + width > chartWidth - labelWidth;
+  const centerY = y + height / 2;
+
+  if (isLong) {
+    return (
+      <text
+        x={x + width - 8}
+        y={centerY}
+        fill="#FFFFFF"
+        fontSize={12}
+        fontFamily="Barlow Condensed, sans-serif"
+        fontWeight={700}
+        textAnchor="end"
+        dominantBaseline="middle"
+      >
+        {label}
+      </text>
+    );
+  }
+
+  return (
+    <text
+      x={x + width + 8}
+      y={centerY}
+      fill="#C9A84C"
+      fontSize={12}
+      fontFamily="Barlow Condensed, sans-serif"
+      fontWeight={700}
+      textAnchor="start"
+      dominantBaseline="middle"
+    >
+      {label}
+    </text>
+  );
+}
+
 function SpendingVsEarningsChart({ data, loading }) {
   const chartData = useMemo(
     () =>
@@ -157,6 +200,12 @@ function TopSalesChart({ sales, loading }) {
 
   const hasSales = chartData.length > 0;
 
+  const chartMax = useMemo(() => {
+    if (!chartData.length) return 1;
+    const maxSale = Math.max(...chartData.map((s) => s.sale_price));
+    return maxSale > 0 ? maxSale * 1.2 : 1;
+  }, [chartData]);
+
   return (
     <section className="stat-sheet-chart-card">
       <h3 className="stat-sheet-chart-card__title">Your Best Sales</h3>
@@ -170,9 +219,9 @@ function TopSalesChart({ sales, loading }) {
             <BarChart
               layout="vertical"
               data={chartData}
-              margin={{ top: 4, right: 16, left: 4, bottom: 4 }}
+              margin={{ top: 4, right: 8, left: 4, bottom: 4 }}
             >
-              <XAxis type="number" hide domain={[0, "dataMax"]} />
+              <XAxis type="number" hide domain={[0, chartMax]} />
               <YAxis
                 type="category"
                 dataKey="name"
@@ -196,13 +245,7 @@ function TopSalesChart({ sales, loading }) {
                 {chartData.map((entry) => (
                   <Cell key={entry.fullName} fill="url(#statSheetGoldGradient)" />
                 ))}
-                <LabelList
-                  dataKey="sale_price"
-                  position="right"
-                  formatter={(v) => formatMoney(v)}
-                  fill="rgba(255,255,255,0.7)"
-                  fontSize={11}
-                />
+                <LabelList dataKey="sale_price" content={TopSalesBarLabel} />
               </Bar>
             </BarChart>
           </ResponsiveContainer>
