@@ -69,7 +69,7 @@ export default function ProfileSettingsMenu() {
 
       <SettingsGroup title="Activity">
         <SettingsItem icon={History} label="Transaction History" href="#transaction-history" />
-        <SettingsItem icon={BarChart3} label="My Stat Sheet" href="#stat-sheet" />
+        <SettingsItem icon={BarChart3} label="My Stat Sheet" to="/profile/stats" />
         <SettingsItem icon={Sparkles} label="Collection Highlights" href="#collection-highlights" />
       </SettingsGroup>
 

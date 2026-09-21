@@ -4402,10 +4402,123 @@
 }
 
 .profile-stat-sheet__filters .collection-filter-pill--active,
-.profile-transaction-history__filters .collection-filter-pill--active {
+.profile-transaction-history__filters .collection-filter-pill--active,
+.stat-sheet-page__filters .collection-filter-pill--active {
   background: linear-gradient(135deg, #c9a84c, #e8c56a);
   border-color: transparent;
   color: #0a0a0a;
+}
+
+.profile-stat-sheet__view-all-wrap {
+  margin: 10px 0 0;
+  text-align: right;
+}
+
+.profile-stat-sheet__view-all {
+  font-size: 12px;
+  font-weight: 600;
+  color: #c9a84c;
+  text-decoration: none;
+}
+
+.profile-stat-sheet__view-all:hover {
+  text-decoration: underline;
+}
+
+@keyframes pageSlideInRight {
+  from {
+    transform: translateX(24px);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.page-slide-in-right {
+  animation: pageSlideInRight 0.22s ease-out;
+}
+
+.stat-sheet-page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px 16px calc(var(--pill-nav-height, 100px) + env(safe-area-inset-bottom, 0px) + 24px);
+}
+
+.stat-sheet-page__header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.stat-sheet-page__back {
+  justify-self: start;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+}
+
+.stat-sheet-page__back:hover {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.stat-sheet-page__title {
+  margin: 0;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  color: #ffffff;
+  text-align: center;
+}
+
+.stat-sheet-page__header-spacer {
+  width: 56px;
+}
+
+.stat-sheet-page__filters {
+  margin-bottom: 16px;
+}
+
+.stat-sheet-chart-card {
+  margin-top: 20px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.stat-sheet-chart-card__title {
+  margin: 0 0 12px;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.stat-sheet-chart-card__legend {
+  margin: 10px 0 0;
+  font-size: 12px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.stat-sheet-chart-card__loading,
+.stat-sheet-chart-card__empty {
+  margin: 0;
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.45);
+  padding: 16px;
 }
 
 .profile-stat-sheet__grid {

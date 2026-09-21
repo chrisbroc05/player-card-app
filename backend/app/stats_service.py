@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 from sqlalchemy import func
@@ -35,6 +35,20 @@ EARN_TX_TYPES = (TX_CARD_SALE, TX_ROYALTY)
 
 
 @dataclass
+class MonthlyStatPoint:
+    month: str
+    earnings: float
+    spending: float
+    cards_created: int
+
+
+@dataclass
+class TopSalePoint:
+    player_name: str
+    sale_price: float
+
+
+@dataclass
 class StatsSummary:
     cards_created: int
     cards_sold: int
@@ -42,6 +56,8 @@ class StatsSummary:
     total_spent: float
     best_sale: float
     collection_count: int
+    monthly_data: list[MonthlyStatPoint] = field(default_factory=list)
+    top_sales: list[TopSalePoint] = field(default_factory=list)
 
 
 def _period_bounds(period: str, now: datetime | None = None) -> tuple[datetime | None, datetime | None]:
@@ -68,6 +84,37 @@ def _period_bounds(period: str, now: datetime | None = None) -> tuple[datetime |
     return None, None
 
 
+def _month_start(year: int, month: int) -> datetime:
+    return datetime(year, month, 1, tzinfo=timezone.utc)
+
+
+def _next_month_start(year: int, month: int) -> datetime:
+    if month == 12:
+        return _month_start(year + 1, 1)
+    return _month_start(year, month + 1)
+
+
+def _last_n_month_ranges(
+    n: int,
+    now: datetime | None = None,
+) -> list[tuple[str, datetime, datetime]]:
+    """Return (label, start, end) for the last n calendar months, oldest first."""
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+
+    ranges: list[tuple[str, datetime, datetime]] = []
+    y, m = now.year, now.month
+    for offset in range(n - 1, -1, -1):
+        total = y * 12 + m - 1 - offset
+        yy = total // 12
+        mm = total % 12 + 1
+        start = _month_start(yy, mm)
+        end = now if offset == 0 else _next_month_start(yy, mm)
+        ranges.append((start.strftime("%b"), start, end))
+    return ranges
+
+
 def _apply_created_filter(query, model_created_col, start: datetime | None, end: datetime | None):
     if start is not None:
         query = query.filter(model_created_col >= start)
@@ -76,12 +123,85 @@ def _apply_created_filter(query, model_created_col, start: datetime | None, end:
     return query
 
 
+def _sum_earned(db: Session, user_id: int, start: datetime, end: datetime) -> float:
+    q = db.query(func.coalesce(func.sum(CreditLedger.amount), 0)).filter(
+        CreditLedger.user_id == user_id,
+        CreditLedger.transaction_type.in_(EARN_TX_TYPES),
+        CreditLedger.amount > 0,
+        CreditLedger.created_at >= start,
+        CreditLedger.created_at < end,
+    )
+    return float_from_decimal(q.scalar())
+
+
+def _sum_spent(db: Session, user_id: int, start: datetime, end: datetime) -> float:
+    q = db.query(func.coalesce(func.sum(func.abs(CreditLedger.amount)), 0)).filter(
+        CreditLedger.user_id == user_id,
+        CreditLedger.transaction_type.in_(SPEND_TX_TYPES),
+        CreditLedger.amount < 0,
+        CreditLedger.created_at >= start,
+        CreditLedger.created_at < end,
+    )
+    return float_from_decimal(q.scalar())
+
+
+def _count_cards_created(db: Session, user_id: int, start: datetime, end: datetime) -> int:
+    created_f = cards_created_by_user_filter(user_id)
+    q = db.query(func.count(Card.id)).filter(
+        created_f,
+        Card.created_at >= start,
+        Card.created_at < end,
+    )
+    return int(q.scalar() or 0)
+
+
+def _compute_monthly_data(db: Session, user_id: int, now: datetime | None = None) -> list[MonthlyStatPoint]:
+    return [
+        MonthlyStatPoint(
+            month=label,
+            earnings=_sum_earned(db, user_id, start, end),
+            spending=_sum_spent(db, user_id, start, end),
+            cards_created=_count_cards_created(db, user_id, start, end),
+        )
+        for label, start, end in _last_n_month_ranges(6, now)
+    ]
+
+
+def _compute_top_sales(
+    db: Session,
+    user_id: int,
+    start: datetime | None,
+    end: datetime | None,
+    *,
+    limit: int = 5,
+) -> list[TopSalePoint]:
+    q = (
+        db.query(MarketplaceOffer, Card)
+        .join(Card, MarketplaceOffer.card_id == Card.card_id)
+        .filter(
+            MarketplaceOffer.seller_id == user_id,
+            MarketplaceOffer.status == "accepted",
+        )
+        .order_by(MarketplaceOffer.offer_amount.desc(), MarketplaceOffer.id.desc())
+    )
+    q = _apply_created_filter(q, MarketplaceOffer.updated_at, start, end)
+    rows = q.limit(limit).all()
+    return [
+        TopSalePoint(
+            player_name=(card.player_name or "Unknown").strip() or "Unknown",
+            sale_price=float_from_decimal(offer.offer_amount),
+        )
+        for offer, card in rows
+    ]
+
+
 def compute_stats_summary(db: Session, user_id: int, period: str) -> StatsSummary:
     period_key = (period or "this_month").strip().lower()
     if period_key not in VALID_PERIODS:
         period_key = "this_month"
 
-    start, end = _period_bounds(period_key)
+    now = datetime.now(timezone.utc)
+    start, end = _period_bounds(period_key, now)
     created_f = cards_created_by_user_filter(user_id)
     collection_f = owned_collection_filter(user_id)
 
@@ -131,4 +251,6 @@ def compute_stats_summary(db: Session, user_id: int, period: str) -> StatsSummar
         total_spent=total_spent,
         best_sale=best_sale,
         collection_count=collection_count,
+        monthly_data=_compute_monthly_data(db, user_id, now),
+        top_sales=_compute_top_sales(db, user_id, start, end),
     )

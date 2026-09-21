@@ -14,6 +14,7 @@ import TradesPage from "./pages/TradesPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminRoute from "./components/AdminRoute";
 import ProfilePage from "./pages/ProfilePage";
+import StatSheetPage from "./pages/StatSheetPage";
 import MarketplacePage from "./pages/MarketplacePage";
 import MarketplaceCardDetailPage from "./pages/MarketplaceCardDetailPage";
 import MarketplaceMyListingsPage from "./pages/MarketplaceMyListingsPage";
@@ -26,6 +27,7 @@ import HelpPage from "./pages/HelpPage";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import PublicProfilePage from "./pages/PublicProfilePage";
+import ScrollToTop from "./components/ScrollToTop";
 import { IOSInstallHint } from "./components/IOSInstallHint";
 import { BiometricGate } from "./components/BiometricGate";
 import { useAuth } from "./context/AuthContext";
@@ -92,6 +94,7 @@ export default function App() {
 
   return (
     <>
+      <ScrollToTop />
       <div key={location.pathname} className="page-content">
         <Routes location={location}>
           <Route path="/index.html" element={<Navigate to="/" replace />} />
@@ -121,6 +124,7 @@ export default function App() {
           <Route path="/marketplace/:cardId" element={<MarketplaceCardDetailPage />} />
           <Route path="/marketplace" element={<MarketplacePage />} />
           <Route path="/trades" element={<TradesPage />} />
+          <Route path="/profile/stats" element={<StatSheetPage />} />
           <Route path="/profile/:username" element={<PublicProfilePage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/settings" element={<SettingsPage />} />
