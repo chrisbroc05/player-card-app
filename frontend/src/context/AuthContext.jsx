@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY, authHeaders } from "../config/api";
 import { clearActivityTracking } from "../utils/activityTracker";
+import { clearProfileSession, initProfileSession } from "../utils/profileSession";
 
 function formatApiError(detail, fallback) {
   if (!detail) return fallback;
@@ -94,6 +95,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     clearActivityTracking();
+    clearProfileSession();
     sessionStorage.clear();
     setToken("");
     setUser(null);
@@ -123,7 +125,10 @@ export function AuthProvider({ children }) {
           return;
         }
         const data = await res.json();
-        if (!cancelled) setUser(data);
+        if (!cancelled) {
+          setUser(data);
+          initProfileSession();
+        }
       } catch {
         if (!cancelled) {
           localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
@@ -162,6 +167,7 @@ export function AuthProvider({ children }) {
       localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, accessToken);
       setToken(accessToken);
       setUser(userData);
+      initProfileSession({ isFreshAuth: true });
       refreshNavBadges(accessToken);
     },
     [refreshNavBadges]

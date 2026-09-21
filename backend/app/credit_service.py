@@ -416,20 +416,32 @@ def apply_stripe_checkout_credits(
         print(f"[credit_service] gift ledger row recorded for purchaser={purchaser_user_id}", flush=True)
 
 
+LEDGER_CATEGORY_TYPES: dict[str, frozenset[str]] = {
+    "credits": frozenset({TX_TOP_UP, TX_GIFT, TX_REFUND}),
+    "marketplace": frozenset({TX_CARD_PURCHASE, TX_CARD_SALE, TX_ROYALTY}),
+    "withdrawals": frozenset({TX_WITHDRAWAL}),
+}
+
+
 def get_ledger(
     db: Session,
     user_id: int,
     *,
     limit: int = 50,
     offset: int = 0,
+    category: str | None = None,
 ) -> list[dict[str, Any]]:
     """Paginated ledger entries for a user, most recent first."""
     lim = max(1, min(int(limit), 200))
     off = max(0, int(offset))
+    q = db.query(CreditLedger).filter(CreditLedger.user_id == user_id)
+    cat = (category or "").strip().lower()
+    if cat and cat != "all":
+        allowed = LEDGER_CATEGORY_TYPES.get(cat)
+        if allowed:
+            q = q.filter(CreditLedger.transaction_type.in_(allowed))
     rows = (
-        db.query(CreditLedger)
-        .filter(CreditLedger.user_id == user_id)
-        .order_by(CreditLedger.created_at.desc(), CreditLedger.id.desc())
+        q.order_by(CreditLedger.created_at.desc(), CreditLedger.id.desc())
         .offset(off)
         .limit(lim)
         .all()

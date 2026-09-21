@@ -489,7 +489,7 @@ export default function CreditsPage() {
           </button>
         </section>
 
-        <section className="mb-8 rounded-2xl border border-white/10 bg-cardBg p-5">
+        <section id="withdraw" className="mb-8 rounded-2xl border border-white/10 bg-cardBg p-5">
           <h2 className="text-lg font-semibold text-white">Withdraw Earnings</h2>
           {profileLoading ? (
             <div className="mt-6 flex justify-center py-6">

@@ -65,12 +65,13 @@ def credits_balance(
 def credits_ledger(
     limit: int = Query(default=20, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    category: str | None = Query(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     require_payments_enabled()
-    rows = get_ledger(db, user.id, limit=limit, offset=offset)
-    return {"entries": rows, "limit": limit, "offset": offset}
+    rows = get_ledger(db, user.id, limit=limit, offset=offset, category=category)
+    return {"entries": rows, "limit": limit, "offset": offset, "category": category or "all"}
 
 
 @router.post("/checkout")

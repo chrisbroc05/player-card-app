@@ -1,10 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Navigate, useLocation, useSearchParams } from "react-router-dom";
-import { ChevronDown } from "lucide-react";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import LogoutConfirmModal from "../components/LogoutConfirmModal";
 import CardImage from "../components/CardImage";
+import ProfileHeader from "../components/profile/ProfileHeader";
+import ProfileBalanceCard from "../components/profile/ProfileBalanceCard";
+import ProfileStatSheet from "../components/profile/ProfileStatSheet";
+import ProfileTransactionHistory from "../components/profile/ProfileTransactionHistory";
+import ProfileSettingsMenu from "../components/profile/ProfileSettingsMenu";
 import { ProfileActivityCompactList } from "../components/ActivityHistory";
 import { getCardBannerStyles } from "../utils/cardBannerStyles";
 import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY, authHeaders } from "../config/api";
@@ -33,85 +37,6 @@ function formatProfileDate(iso) {
   } catch {
     return "";
   }
-}
-
-function ProfileFinancials({ token }) {
-  const [expanded, setExpanded] = useState(false);
-  const [financials, setFinancials] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!expanded || !token) return undefined;
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(`${API_BASE_URL}/auth/profile/financials`, {
-          headers: { ...authHeaders(token) },
-          cache: "no-store",
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!cancelled && res.ok) setFinancials(data);
-      } catch {
-        if (!cancelled) setFinancials(null);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [expanded, token]);
-
-  const rows = financials
-    ? [
-        { label: "Total spent on cards", value: financials.total_spent_on_cards },
-        { label: "Total earned from sales", value: financials.total_earned_from_sales },
-        { label: "Total withdrawn", value: financials.total_withdrawn },
-        { label: "Current balance", value: financials.current_balance },
-        { label: "Total animated cards cost", value: financials.total_animated_cards_cost },
-        { label: "Total highlight cards cost", value: financials.total_highlight_cards_cost },
-      ]
-    : [];
-
-  return (
-    <section className="profile-financials">
-      <button
-        type="button"
-        className="profile-financials__toggle"
-        onClick={() => setExpanded((v) => !v)}
-        aria-expanded={expanded}
-      >
-        <span>My Financials</span>
-        <ChevronDown className={`profile-financials__chevron${expanded ? " profile-financials__chevron--open" : ""}`} aria-hidden />
-      </button>
-      {expanded ? (
-        <div className="profile-financials__panel">
-          {loading ? (
-            <p className="profile-financials__loading">Loading financials…</p>
-          ) : (
-            <dl className="profile-financials__grid">
-              {rows.map((row) => (
-                <React.Fragment key={row.label}>
-                  <dt className="profile-financials__label">{row.label}</dt>
-                  <dd className="profile-financials__amount">{formatMoney(row.value ?? 0)}</dd>
-                </React.Fragment>
-              ))}
-            </dl>
-          )}
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
-function ProfileKpi({ label, value }) {
-  return (
-    <div className="profile-page__kpi">
-      <p className="profile-page__kpi-value">{value}</p>
-      <p className="profile-page__kpi-label">{label}</p>
-    </div>
-  );
 }
 
 function ProfileHighlightCard({ label, children, footer }) {
@@ -192,7 +117,7 @@ function ProfileRecentActivity({ token }) {
   return (
     <section>
       <div className="profile-page__activity-head">
-        <h2 className="profile-page__section-title">Recent Activity</h2>
+        <h2 className="profile-section-title">Recent Activity</h2>
         <Link to="/trades#activity-history" className="profile-page__activity-link">
           View All →
         </Link>
@@ -217,6 +142,8 @@ export default function ProfilePage() {
   const [error, setError] = useState("");
   const [connectBanner, setConnectBanner] = useState("");
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [financials, setFinancials] = useState(null);
+  const [financialsLoading, setFinancialsLoading] = useState(true);
 
   const loadProfile = useCallback(async () => {
     if (!token) return;
@@ -248,6 +175,29 @@ export default function ProfilePage() {
   }, [token, initializing, loadProfile]);
 
   useEffect(() => {
+    if (!token) return undefined;
+    let cancelled = false;
+    (async () => {
+      setFinancialsLoading(true);
+      try {
+        const res = await fetch(`${API_BASE_URL}/auth/profile/financials`, {
+          headers: { ...authHeaders(token) },
+          cache: "no-store",
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled && res.ok) setFinancials(data);
+      } catch {
+        if (!cancelled) setFinancials(null);
+      } finally {
+        if (!cancelled) setFinancialsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  useEffect(() => {
     const connect = searchParams.get("connect");
     if (connect === "complete") {
       setConnectBanner("success");
@@ -264,6 +214,8 @@ export default function ProfilePage() {
   }
 
   const dash = "—";
+  const displayName = profile?.display_name || user?.display_name || dash;
+  const handle = profile?.display_name || user?.display_name || "";
   const mp = profile?.marketplace_stats;
   const biggestSale = mp?.highest_sale ?? null;
   const rarestCard = profile?.rarest_card ?? null;
@@ -306,47 +258,19 @@ export default function ProfilePage() {
           </div>
         ) : (
           <div className="profile-page__sections">
-            {/* Section 1 — User header */}
-            <section className="profile-page__header">
-              <h1 className="profile-page__name">
-                {profile?.display_name || user?.display_name || dash}
-              </h1>
-              <p className="profile-page__member-since">
-                Member since {profile?.member_since || dash}
-              </p>
-              <div className="profile-page__header-row">
-                <span className="profile-page__balance">
-                  Balance: {formatMoney(profile?.credit_balance ?? 0)}
-                </span>
-                <a href="#payout-settings" className="profile-page__payout-link">
-                  Payout settings
-                </a>
-              </div>
-            </section>
+            <ProfileHeader displayName={displayName} handle={handle} />
 
-            <hr className="profile-page__divider" />
+            <ProfileBalanceCard
+              creditBalance={financials?.current_balance ?? profile?.credit_balance ?? user?.credit_balance ?? 0}
+              marketplaceEarnings={financials?.total_earned_from_sales ?? 0}
+              totalWithdrawn={financials?.total_withdrawn ?? 0}
+              loading={financialsLoading}
+            />
 
-            {/* Section 2 — Stats */}
-            <section>
-              <h2 className="profile-page__section-title">Your Stats</h2>
-              <div className="profile-page__kpi-grid">
-                <ProfileKpi label="Cards Owned" value={profile?.total_cards_owned ?? 0} />
-                <ProfileKpi label="Cards Created" value={profile?.total_cards_ever_created ?? 0} />
-                <ProfileKpi label="Cards Traded" value={profile?.cards_traded_away ?? 0} />
-                <ProfileKpi label="Cards Received" value={profile?.cards_received_via_trade ?? 0} />
-              </div>
-              <div className="profile-page__kpi-grid profile-page__kpi-grid--secondary">
-                <ProfileKpi label="Animated Cards" value={profile?.animated_cards_owned ?? 0} />
-                <ProfileKpi label="Highlight Cards" value={profile?.highlight_cards_owned ?? 0} />
-                <ProfileKpi
-                  label="Marketplace Activity"
-                  value={profile?.marketplace_activity_count ?? 0}
-                />
-              </div>
-            </section>
+            {token ? <ProfileStatSheet token={token} /> : null}
 
-            <section className="profile-page__collection-highlights">
-              <h2 className="profile-page__section-title">Collection Highlights</h2>
+            <section id="collection-highlights" className="profile-page__collection-highlights">
+              <h2 className="profile-section-title">Collection Highlights</h2>
               <div className="profile-page__highlights profile-page__highlights--solo">
                 <ProfileHighlightCard
                   label="Rarest Card Owned"
@@ -375,14 +299,8 @@ export default function ProfilePage() {
               </div>
             </section>
 
-            <hr className="profile-page__divider" />
-
-            {token ? <ProfileFinancials token={token} /> : null}
-
-            <hr className="profile-page__divider" />
-
-            {/* Section 3 — Highlight cards */}
             <section className="profile-page__highlights-section">
+              <h2 className="profile-section-title">Biggest Sale</h2>
               <div className="profile-page__highlights profile-page__highlights--solo">
                 <ProfileHighlightCard
                   label="Biggest Sale"
@@ -415,21 +333,14 @@ export default function ProfilePage() {
               </div>
             </section>
 
-            <hr className="profile-page__divider" />
+            {token ? <ProfileTransactionHistory token={token} /> : null}
 
-            {/* Section 4 — Recent Activity */}
             {token ? <ProfileRecentActivity token={token} /> : null}
 
-            {/* Account settings (parent email) */}
-            <section className="profile-page__account">
-              <h2 className="profile-page__section-title">Account Settings</h2>
-              <ParentEmailSettings token={token} profile={profile} onSaved={loadProfile} />
-            </section>
+            <ProfileSettingsMenu />
 
-            {/* Section 5 — Payout Settings */}
-            <hr className="profile-page__divider" />
-            <section id="payout-settings">
-              <h2 className="profile-page__section-title">Payout Settings</h2>
+            <section id="payout-settings" className="profile-payout-section">
+              <h2 className="profile-section-title">Payout Settings</h2>
               <PayoutSettings
                 token={token}
                 profile={profile}
@@ -441,7 +352,7 @@ export default function ProfilePage() {
             <div className="profile-page__logout-wrap">
               <button
                 type="button"
-                className="profile-page__logout-btn"
+                className="profile-logout-btn"
                 onClick={() => setShowLogoutConfirm(true)}
               >
                 Log Out
@@ -460,74 +371,6 @@ export default function ProfilePage() {
         />
       ) : null}
     </div>
-  );
-}
-
-function ParentEmailSettings({ token, profile, onSaved }) {
-  const [parentEmail, setParentEmail] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    setParentEmail(profile?.parent_email || "");
-  }, [profile?.parent_email]);
-
-  async function handleSave(e) {
-    e.preventDefault();
-    setError("");
-    setMessage("");
-    const trimmed = parentEmail.trim();
-    if (trimmed && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-      setError("Please enter a valid parent email address.");
-      return;
-    }
-    if (!token) return;
-    setSaving(true);
-    try {
-      const res = await fetch(`${API_BASE_URL}/auth/update-profile`, {
-        method: "POST",
-        headers: { ...authHeaders(token), "Content-Type": "application/json" },
-        body: JSON.stringify({ parent_email: trimmed || null }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not save settings."));
-      setMessage("Parent email saved.");
-      await onSaved?.();
-    } catch (err) {
-      setError(err.message || "Save failed.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <form onSubmit={handleSave} className="max-w-md space-y-3">
-      <div>
-        <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
-          Parent or Guardian Email
-        </label>
-        <input
-          type="email"
-          value={parentEmail}
-          onChange={(e) => setParentEmail(e.target.value)}
-          placeholder="parent@email.com"
-          className="mt-1 min-h-[44px] w-full rounded-lg border border-white/15 bg-cardBg2 px-3 py-2 text-slate-100 placeholder:text-slate-500"
-        />
-        <p className="mt-1 text-xs text-slate-500">
-          If provided, a parent or guardian will receive copies of important account notifications.
-        </p>
-      </div>
-      <button
-        type="submit"
-        disabled={saving}
-        className="min-h-[40px] rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
-      >
-        {saving ? "Saving…" : "Save"}
-      </button>
-      {error ? <p className="text-sm text-rose-300">{error}</p> : null}
-      {message ? <p className="text-sm text-success">{message}</p> : null}
-    </form>
   );
 }
 

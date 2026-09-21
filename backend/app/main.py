@@ -102,6 +102,7 @@ from routers.stripe_webhook import router as stripe_webhook_router  # noqa: E402
 from routers.contact import router as contact_router  # noqa: E402
 from routers.public_profile import router as public_profile_router  # noqa: E402
 from routers.settings import router as settings_router  # noqa: E402
+from routers.stats import router as stats_router  # noqa: E402
 from routers.users import router as users_router  # noqa: E402
 from theme_library import (  # noqa: E402
     THEME_CATEGORIES,
@@ -227,6 +228,7 @@ app.include_router(contact_router, prefix="/contact", tags=["contact"])
 app.include_router(public_profile_router, prefix="/profile", tags=["profile"])
 app.include_router(activity_router, prefix="/activity", tags=["activity"])
 app.include_router(credits_router, prefix="/credits", tags=["credits"])
+app.include_router(stats_router, prefix="/stats", tags=["stats"])
 app.include_router(connect_router, prefix="/connect", tags=["connect"])
 app.include_router(users_router, prefix="/users", tags=["users"])
 app.include_router(stripe_webhook_router, prefix="/webhooks", tags=["webhooks"])

@@ -4255,9 +4255,9 @@
 /* ── Profile page ── */
 .profile-page {
   width: 100%;
-  max-width: 960px;
+  max-width: 640px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 24px 16px calc(var(--pill-nav-height, 100px) + env(safe-area-inset-bottom, 0px) + 32px);
   overflow: visible;
 }
 
@@ -4268,11 +4268,305 @@
   overflow: visible;
 }
 
-.profile-page__section-title {
+.profile-page__section-title,
+.profile-section-title {
   margin: 0 0 16px;
-  font-size: 16px;
-  font-weight: 500;
-  color: var(--text-primary);
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.profile-header__avatar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(201, 168, 76, 0.15);
+  border: 2px solid rgba(201, 168, 76, 0.35);
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  color: #c9a84c;
+}
+
+.profile-header__info {
+  min-width: 0;
+  flex: 1;
+}
+
+.profile-header__name {
+  margin: 0;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1.1;
+  color: #ffffff;
+}
+
+.profile-header__handle {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.profile-header__meta {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.profile-balance-card {
+  background: rgba(201, 168, 76, 0.08);
+  border: 1px solid rgba(201, 168, 76, 0.2);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.profile-balance-card__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.profile-balance-card__label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.profile-balance-card__amount {
+  margin: 6px 0 0;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+
+.profile-balance-card__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.profile-balance-card__btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  text-align: center;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.profile-balance-card__btn--outline {
+  background: transparent;
+  border: 1px solid rgba(201, 168, 76, 0.4);
+  color: #c9a84c;
+}
+
+.profile-balance-card__btn--primary {
+  border: none;
+  background: linear-gradient(135deg, #c9a84c, #e8c56a);
+  color: #0a0a0a;
+  font-weight: 800;
+}
+
+.profile-balance-card__loading {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.profile-stat-sheet__filters,
+.profile-transaction-history__filters {
+  margin-bottom: 16px;
+}
+
+.profile-stat-sheet__filters .collection-filter-pill--active,
+.profile-transaction-history__filters .collection-filter-pill--active {
+  background: linear-gradient(135deg, #c9a84c, #e8c56a);
+  border-color: transparent;
+  color: #0a0a0a;
+}
+
+.profile-stat-sheet__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.profile-stat-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 14px 12px;
+  text-align: center;
+}
+
+.profile-stat-card__icon {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.profile-stat-card__value {
+  margin: 0;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+
+.profile-stat-card__label {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.profile-stat-sheet__error,
+.profile-transaction-history__error {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #fca5a5;
+}
+
+.profile-transaction-history__loading,
+.profile-transaction-history__empty {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.profile-tx-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.profile-tx-dot--green {
+  background: #4caf50;
+}
+
+.profile-tx-dot--gray {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.profile-tx-dot--gold {
+  background: #c9a84c;
+}
+
+.credit-ledger-row__amount--gold {
+  color: #c9a84c;
+}
+
+.profile-settings-group {
+  margin-top: 8px;
+}
+
+.profile-settings-group__title {
+  margin: 20px 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.profile-settings-group__rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-settings-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 0;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: transparent;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  font: inherit;
+}
+
+.profile-settings-item__left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.profile-settings-item__icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.profile-settings-item__label {
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.profile-settings-item__chevron {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.profile-payout-section {
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.profile-logout-btn {
+  display: block;
+  width: 100%;
+  margin-top: 24px;
+  padding: 14px 16px;
+  border: 1px solid rgba(239, 83, 80, 0.3);
+  border-radius: 10px;
+  background: transparent;
+  color: #ef5350;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.profile-logout-btn:hover {
+  background: rgba(239, 83, 80, 0.08);
 }
 
 .profile-page__divider {
@@ -5096,7 +5390,8 @@
   margin-bottom: 16px;
 }
 
-.profile-page__activity-head .profile-page__section-title {
+.profile-page__activity-head .profile-page__section-title,
+.profile-page__activity-head .profile-section-title {
   margin-bottom: 0;
 }
 
@@ -5234,23 +5529,7 @@
 }
 
 .profile-page__logout-wrap {
-  display: flex;
-  justify-content: center;
-  padding: 32px 16px 8px;
-}
-
-.profile-page__logout-btn {
-  border: none;
-  background: transparent;
-  padding: 8px 12px;
-  font-size: 13px;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  transition: color 0.15s ease;
-}
-
-.profile-page__logout-btn:hover {
-  color: var(--color-text-secondary, #aaaaaa);
+  padding: 0 0 8px;
 }
 
 .profile-page__banner {
