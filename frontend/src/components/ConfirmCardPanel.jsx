@@ -4,7 +4,7 @@ import ExpandableCardView from "./ExpandableCardView";
 import HighlightCardPreview from "./HighlightCardPreview";
 import QuantitySelector from "./QuantitySelector";
 import RarityBadge from "./RarityBadge";
-import StartOverButton from "./StartOverButton";
+import { StartOverButton } from "./StartOverConfirmModal";
 import { rarityDisplayLabel } from "../utils/rarityStyles";
 
 export default function ConfirmCardPanel({
@@ -124,3 +124,4 @@ export default function ConfirmCardPanel({
       </div>
     </div>
   );
+}
