@@ -226,10 +226,10 @@ export function forgeLoadingMessage(rarity, elapsedMs, generationComplete) {
     return "A legend has been born...";
   }
   if (elapsedMs >= 5000 && key === RARITY_KEYS.ONE_OF_ONE) {
-    return "Wait... something incredible is happening...";
+    return "Something rare is brewing...";
   }
   if (elapsedMs >= 5000 && (key === RARITY_KEYS.GOLD_AUTO || key === RARITY_KEYS.BLACK_LABEL)) {
-    return "Something special is happening...";
+    return "Something special is coming...";
   }
   return null;
 }

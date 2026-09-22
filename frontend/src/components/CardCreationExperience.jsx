@@ -27,11 +27,11 @@ const TEXT_FADE_MS = 500;
 const PHASE_CROSSFADE_MS = 500;
 
 const LOADING_FUN_FACTS = [
-  "Every card has a chance to pull a rare Foil or Refractor",
-  "Gold Autos are pulled by only 1 in 50 players",
-  "A 1 of 1 has never been pulled twice for the same player and tier",
-  "Your card rarity is determined the moment generation begins",
-  "Black Label cards have a 0.1% pull rate — rarer than a hole in one",
+  "Any card can pull Foil or Refractor",
+  "Gold Autos: 1 in 50 pull rate",
+  "1 of 1: unique per player & tier",
+  "Rarity set when generation starts",
+  "Black Label: 0.1% pull rate",
 ];
 
 function LoadingFunFacts() {
@@ -50,7 +50,10 @@ function LoadingFunFacts() {
   }, []);
 
   return (
-    <p className={`cce-fun-fact${visible ? " cce-fun-fact--visible" : ""}`} aria-live="polite">
+    <p
+      className={`loading-blurb cce-fun-fact${visible ? " cce-fun-fact--visible" : ""}`}
+      aria-live="polite"
+    >
       {LOADING_FUN_FACTS[index]}
     </p>
   );
@@ -59,7 +62,7 @@ function LoadingFunFacts() {
 function ExperienceText({ text, visible }) {
   return (
     <p
-      className={`cce-text ${visible ? "cce-text--visible" : "cce-text--hidden"}`}
+      className={`loading-blurb cce-text ${visible ? "cce-text--visible" : "cce-text--hidden"}`}
       aria-live="polite"
     >
       {text || "\u00a0"}

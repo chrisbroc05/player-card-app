@@ -9161,6 +9161,10 @@ button:active:not(:disabled) {
   z-index: 10;
 }
 
+.studio-preview-zone--hidden {
+  display: none;
+}
+
 .studio-form-zone {
   flex: 1;
   overflow-y: auto;

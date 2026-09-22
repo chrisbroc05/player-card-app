@@ -15,9 +15,9 @@ from utils.storage import app_data_root, local_path_from_media_url, save_bytes_t
 logger = logging.getLogger(__name__)
 
 WATERMARK_TEXT = "P R O S P E C T  L E G E N D S"
-WATERMARK_OPACITY = 51  # 20% of 255
+WATERMARK_OPACITY = 89  # 35% of 255 (temporary — dial back to 51 / 20% after verification)
 WATERMARK_MARGIN_RIGHT = 12
-WATERMARK_MARGIN_BOTTOM = 28
+WATERMARK_MARGIN_BOTTOM = 60
 MIN_FONT_SIZE = 14
 FONT_SIZE_RATIO = 0.018
 
@@ -47,8 +47,10 @@ def add_watermark(image_bytes: bytes) -> bytes:
     Composite semi-transparent "PROSPECT LEGENDS" text onto the bottom-right of a card image.
     Returns PNG bytes suitable for R2 storage.
     """
+    logger.info("Applying watermark to card image")
     img = Image.open(BytesIO(image_bytes))
     img = img.convert("RGBA")
+    logger.info("Card dimensions: %sx%s", img.width, img.height)
 
     overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
@@ -62,6 +64,7 @@ def add_watermark(image_bytes: bytes) -> bytes:
 
     x = img.width - text_width - WATERMARK_MARGIN_RIGHT
     y = img.height - text_height - WATERMARK_MARGIN_BOTTOM
+    logger.info("Watermark position: x=%s, y=%s", x, y)
 
     draw.text(
         (x, y),
@@ -74,6 +77,7 @@ def add_watermark(image_bytes: bytes) -> bytes:
 
     output = BytesIO()
     watermarked.save(output, format="PNG")
+    logger.info("Watermark applied successfully")
     return output.getvalue()
 
 
@@ -93,6 +97,7 @@ def watermark_and_reupload(image_url: str, *, card_id: str | None = None) -> str
     Download a card image, apply the watermark, and upload a new final PNG to storage.
     Returns the new public URL.
     """
+    logger.info("Watermark re-upload for card_id=%s url=%s", card_id, image_url)
     image_bytes = _fetch_image_bytes(image_url)
     watermarked = add_watermark(image_bytes)
 

@@ -206,6 +206,15 @@ async def lifespan(_app: FastAPI):
     run_marketplace_expiration_pass()
     run_deleted_cards_cleanup_pass()
     start_marketplace_scheduler()
+    try:
+        import PIL
+
+        print(f"[startup] Pillow version: {PIL.__version__}", flush=True)
+        logger.info("Pillow version: %s", PIL.__version__)
+    except ImportError:
+        print("[startup] WARNING: Pillow (PIL) is not installed", flush=True)
+        logger.warning("Pillow (PIL) is not installed — card watermarks will fail")
+
     if is_r2_configured():
         print("[startup] Media storage: Cloudflare R2 (local disk mounts disabled)", flush=True)
     else:
@@ -407,7 +416,10 @@ def _persist_card_png_bytes(file_bytes: bytes, card_filename: str, *, apply_wate
     if apply_watermark:
         from utils.watermark import add_watermark
 
+        logger.info("Applying watermark before R2 upload: %s", card_filename)
         file_bytes = add_watermark(file_bytes)
+    else:
+        logger.info("Skipping watermark for preview upload: %s", card_filename)
     return save_bytes_to_storage(
         file_bytes,
         r2_key=f"cards/{card_filename}",

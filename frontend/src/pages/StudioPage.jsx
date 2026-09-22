@@ -2516,7 +2516,11 @@ export default function StudioPage() {
           </section>
         ) : useFixedStudioLayout ? (
         <div ref={wizardPanelRef} className="studio-container scroll-focus-target">
-            <div className="studio-preview-zone">
+            <div
+              className={`studio-preview-zone${
+                previewConfigureOpen && currentStep === STEP_REVIEW ? " studio-preview-zone--hidden" : ""
+              }`}
+            >
               <StudioPhaseProgress currentStep={currentStep} />
               <StudioLivePreview
                 firstName={firstName}

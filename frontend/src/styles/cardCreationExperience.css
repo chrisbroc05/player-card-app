@@ -61,16 +61,27 @@
   min-height: 340px;
 }
 
+.loading-blurb {
+  text-align: center;
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 280px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.4;
+  padding: 0 16px;
+}
+
 .cce-text {
   position: relative;
   z-index: 4;
   margin-top: 1.25rem;
-  min-height: 1.25rem;
+  min-height: 2.8rem;
   font-family: var(--cce-tier-font);
   font-size: 14px;
   letter-spacing: 0.04em;
   color: var(--cce-tier-muted);
-  text-align: center;
   transition: opacity 0.5s ease;
 }
 
@@ -123,9 +134,8 @@
 
 .cce-fun-fact {
   margin: 0;
-  min-height: 2.5rem;
+  min-height: 2.8rem;
   font-size: 12px;
-  line-height: 1.45;
   color: var(--color-text-muted, rgba(148, 163, 184, 0.75));
   opacity: 0;
   transition: opacity 0.28s ease;
