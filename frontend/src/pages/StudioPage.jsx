@@ -28,6 +28,7 @@ import AnimatedCardChoiceModal from "../components/AnimatedCardChoiceModal";
 import AnimatedQuantityModal from "../components/AnimatedQuantityModal";
 import GenerationOverlay from "../components/GenerationOverlay";
 import PreviewSelectionPanel from "../components/PreviewSelectionPanel";
+import ConfirmCardPanel from "../components/ConfirmCardPanel";
 import StartOverConfirmModal, { StartOverButton } from "../components/StartOverConfirmModal";
 import AnimatedFlowExplainer from "../components/AnimatedFlowExplainer";
 import AnimatedAiDisclaimer from "../components/AnimatedAiDisclaimer";
@@ -2563,7 +2564,7 @@ export default function StudioPage() {
               <StudioWizardBack onClick={goBackStep} />
             ) : null}
 
-            {currentStep >= STEP_DETAILS && currentStep <= STEP_REVIEW ? (
+            {currentStep >= STEP_DETAILS && currentStep <= STEP_REVIEW && !previewConfigureOpen ? (
               <StudioPhaseHeader title={phaseMeta.title} subtitle={phaseMeta.subtitle} />
             ) : null}
 
@@ -3027,7 +3028,7 @@ export default function StudioPage() {
                 ) : null}
                 {!generationOverlayOpen && (
                   <>
-                {!isGenerating ? (
+                {!isGenerating && !previewConfigureOpen ? (
                   <>
                     <GenerationCostSummary
                       playerName={playerDisplayName}
@@ -3038,7 +3039,7 @@ export default function StudioPage() {
                       tierLabel={selectedTierLabel}
                       themeLabel={specialTheme ? selectedThemeLabel : ""}
                       isAnimated={isAnimatedCardType}
-                  isHighlight={isHighlightCardType}
+                      isHighlight={isHighlightCardType}
                       motionName={motionDisplayName}
                       copyQuantity={copyQuantity}
                       pricing={generationPricing}
@@ -3130,119 +3131,39 @@ export default function StudioPage() {
                     ) : null}
 
                     {previewConfigureOpen && (!isAnimatedCardType || animatedSaveStaticFlow) ? (
-                      <div
-                        ref={configureFocusRef}
-                        className="scroll-focus-target rounded-2xl border border-violet-400/30 bg-cardBg2 p-4 sm:p-6"
-                      >
-                        <p className="text-center text-sm font-medium text-white">Confirm your card</p>
-                        <div className="mx-auto mt-4 max-w-xs">
-                          {isHighlightCardType && highlightClipDraft?.confirmed ? (
-                            <ExpandableCardView
-                              showHint
-                              card={highlightPreviewExpandCard}
-                              alt="Selected preview"
-                              localHighlightVideoUrl={highlightClipDraft.objectUrl}
-                              highlightTrimStart={highlightClipDraft.trimStart ?? 0}
-                              highlightTrimEnd={highlightClipDraft.trimEnd ?? null}
-                            >
-                              <HighlightCardPreview
-                                playerName={playerDisplayName}
-                                teamName={teamName}
-                                position={position}
-                                jerseyNumber={jerseyNumber}
-                                gradYear={gradYear}
-                                tier={orderTier}
-                                theme={specialTheme}
-                                clipDraft={highlightClipDraft}
-                                forcePlay
-                              />
-                            </ExpandableCardView>
-                          ) : (
-                            <ExpandableCardView
-                              showHint
-                              card={
-                                featuredDisplayCard || {
-                                  image_url: selectedPreviewUrl || generatedCardUrl,
-                                  player_name: playerDisplayName,
-                                  team_name: teamName,
-                                  position,
-                                  jersey_number: jerseyNumber,
-                                  grad_year: gradYear,
-                                  tier: orderTier || "rookie",
-                                  theme: specialTheme,
-                                  special_theme: specialTheme,
-                                }
-                              }
-                              alt="Selected preview"
-                            >
-                              <CardImage
-                                card={
-                                  featuredDisplayCard || {
-                                    image_url: selectedPreviewUrl || generatedCardUrl,
-                                    player_name: playerDisplayName,
-                                    team_name: teamName,
-                                    position,
-                                    jersey_number: jerseyNumber,
-                                    grad_year: gradYear,
-                                    tier: orderTier || "rookie",
-                                    theme: specialTheme,
-                                  }
-                                }
-                                alt="Selected preview"
-                                showInfoBanner
-                              />
-                            </ExpandableCardView>
-                          )}
-                        </div>
-                        <GenerationCostSummary
+                      <div ref={configureFocusRef}>
+                        <ConfirmCardPanel
+                          card={featuredDisplayCard}
                           playerName={playerDisplayName}
+                          tierLabel={selectedTierLabel}
+                          isHighlightCardType={isHighlightCardType}
+                          highlightClipDraft={highlightClipDraft}
+                          highlightPreviewExpandCard={highlightPreviewExpandCard}
+                          playerDisplayName={playerDisplayName}
                           teamName={teamName}
                           position={position}
                           jerseyNumber={jerseyNumber}
                           gradYear={gradYear}
-                          tierLabel={selectedTierLabel}
-                          themeLabel={specialTheme ? selectedThemeLabel : ""}
-                          isAnimated={false}
-                          isHighlight={isHighlightCardType}
-                          motionName={motionDisplayName}
+                          orderTier={orderTier}
+                          specialTheme={specialTheme}
+                          showFreePreviewNotice={activePreviewCount > 0}
                           copyQuantity={copyQuantity}
-                          pricing={generationPricing}
-                          creditBalance={creditBalance}
-                          phase="confirm"
-                          showBalance
-                        />
-                        <QuantitySelector
-                          disabled={addCollectionLoading}
-                          loading={addCollectionLoading}
+                          setCopyQuantity={setCopyQuantity}
                           copyPricingTiers={copyPricingTiers}
-                          tierBasePrice={additionalPreviewCost}
-                          value={copyQuantity}
-                          onChange={setCopyQuantity}
+                          additionalPreviewCost={additionalPreviewCost}
+                          addCollectionLoading={addCollectionLoading}
+                          orderActionBusy={Boolean(orderActionKey)}
+                          startOverBusy={startOverBusy}
                           onConfirm={handleConfirmAddToCollection}
-                          confirmLabel="Add to Collection"
-                          loadingLabel="Creating your cards..."
-                          heading="How many copies do you want?"
-                          subheading="Order multiple copies to trade with teammates and friends."
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
+                          onBack={() => {
                             setPreviewConfigureOpen(false);
                             setAnimatedSaveStaticFlow(false);
                             if (isAnimatedCardType) {
                               setAnimatedFlowStage(ANIMATED_FLOW_STAGE.CHOICE);
                             }
                           }}
-                          className="mt-3 w-full text-center text-sm text-slate-400 hover:text-slate-200"
-                        >
-                          ← Back
-                        </button>
-                        <div className="mt-4 flex justify-center">
-                          <StartOverButton
-                            onClick={() => setShowStartOverConfirm(true)}
-                            disabled={startOverBusy || addCollectionLoading || Boolean(orderActionKey)}
-                          />
-                        </div>
+                          onStartOver={() => setShowStartOverConfirm(true)}
+                        />
                       </div>
                     ) : null}
 

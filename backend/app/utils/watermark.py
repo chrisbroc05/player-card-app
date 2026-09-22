@@ -15,30 +15,33 @@ from utils.storage import app_data_root, local_path_from_media_url, save_bytes_t
 logger = logging.getLogger(__name__)
 
 WATERMARK_TEXT = "P R O S P E C T  L E G E N D S"
-WATERMARK_OPACITY = 89  # 35% of 255 (temporary — dial back to 51 / 20% after verification)
+WATERMARK_OPACITY = 102  # 40% of 255
 WATERMARK_MARGIN_RIGHT = 12
 WATERMARK_MARGIN_BOTTOM = 60
-MIN_FONT_SIZE = 14
-FONT_SIZE_RATIO = 0.018
+MIN_FONT_SIZE = 28
+FONT_SIZE_RATIO = 0.045
 
-_FONT_CANDIDATES: tuple[str, ...] = (
+_FONT_PATHS: tuple[str, ...] = (
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+    "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf",
+    "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
+    "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+    "/Library/Fonts/Arial Bold.ttf",
     str(Path(__file__).resolve().parent.parent / "fonts" / "BarlowCondensed-Regular.ttf"),
-    "/Library/Fonts/Barlow Condensed.ttf",
-    "/Library/Fonts/BarlowCondensed-Regular.ttf",
-    "/System/Library/Fonts/Supplemental/Arial Narrow.ttf",
-    "/Library/Fonts/Arial Narrow.ttf",
-    "/usr/share/fonts/truetype/msttcorefonts/arialn.ttf",
-    "/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed.ttf",
 )
 
 
 def _load_watermark_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
-    for path in _FONT_CANDIDATES:
+    for path in _FONT_PATHS:
         try:
-            return ImageFont.truetype(path, size)
-        except OSError:
+            font = ImageFont.truetype(path, size)
+            logger.info("Watermark font loaded: %s", path)
+            return font
+        except Exception:
             continue
-    logger.warning("No condensed watermark font found; using PIL default")
+    logger.warning("No font found — watermark may be tiny")
     return ImageFont.load_default()
 
 

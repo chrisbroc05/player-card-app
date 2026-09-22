@@ -14,6 +14,18 @@
 #
 services:
   - type: web
+    name: player-card-backend
+    runtime: python
+    repo: https://github.com/chrisbroc05/player-card-app.git
+    branch: main
+    rootDir: backend
+    buildCommand: bash build.sh
+    startCommand: cd app && uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.11"
+
+  - type: web
     name: player-card-app
     runtime: static
     repo: https://github.com/chrisbroc05/player-card-app.git

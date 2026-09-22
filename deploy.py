@@ -65,6 +65,10 @@ Media storage: all production media is on Cloudflare R2 (R2_* env vars above).
 APP_DATA_DIR is no longer required on Render — it is only used for local dev
 when R2 is not configured. The Render persistent disk can be removed after
 running backend/scripts/migrate_to_r2.py.
+
+Backend build (Render): use backend/build.sh — installs fonts-dejavu-core and
+fonts-liberation for card/watermark rendering, then pip install -r requirements.txt.
+If the service was created manually, set build command to: bash build.sh
 """
 
 from __future__ import annotations
