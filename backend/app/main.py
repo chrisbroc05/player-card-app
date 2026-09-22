@@ -403,7 +403,11 @@ def _cleanup_temp_source(path: Path, is_temp: bool) -> None:
         path.unlink(missing_ok=True)
 
 
-def _persist_card_png_bytes(file_bytes: bytes, card_filename: str) -> str:
+def _persist_card_png_bytes(file_bytes: bytes, card_filename: str, *, apply_watermark: bool = True) -> str:
+    if apply_watermark:
+        from utils.watermark import add_watermark
+
+        file_bytes = add_watermark(file_bytes)
     return save_bytes_to_storage(
         file_bytes,
         r2_key=f"cards/{card_filename}",
@@ -1108,6 +1112,8 @@ def _generate_card_pillow(
     source_path: Path,
     tier: str = "base",
     special_theme: str | None = None,
+    *,
+    apply_watermark: bool = True,
 ) -> dict:
     """Local fallback: draw name + team on the photo and save to cards/."""
     with Image.open(source_path) as image:
@@ -1115,7 +1121,7 @@ def _generate_card_pillow(
         card_filename = f"player-{player_id}-{uuid4().hex}.png"
         buf = io.BytesIO()
         final_rgb.save(buf, format="PNG")
-        public_url = _persist_card_png_bytes(buf.getvalue(), card_filename)
+        public_url = _persist_card_png_bytes(buf.getvalue(), card_filename, apply_watermark=apply_watermark)
 
     return {
         "filename": card_filename,
@@ -1131,6 +1137,8 @@ def _generate_highlight_placeholder(
     player_id: int,
     tier: str = "base",
     special_theme: str | None = None,
+    *,
+    apply_watermark: bool = True,
 ) -> dict:
     """Tier-colored gradient placeholder — highlight cards use video as primary content."""
     tier_norm = tier.lower()
@@ -1147,7 +1155,7 @@ def _generate_highlight_placeholder(
     card_filename = f"highlight-placeholder-{player_id}-{uuid4().hex}.png"
     buf = io.BytesIO()
     img.convert("RGB").save(buf, format="PNG")
-    public_url = _persist_card_png_bytes(buf.getvalue(), card_filename)
+    public_url = _persist_card_png_bytes(buf.getvalue(), card_filename, apply_watermark=apply_watermark)
 
     return {
         "filename": card_filename,
@@ -1168,6 +1176,7 @@ def _generate_card_openai(
     face_source_path: Path | None = None,
     vault_tier: str | None = None,
     rarity_template: int | None = None,
+    apply_watermark: bool = True,
 ) -> dict:
     """
     1) Prefer GPT Image edit on the player photo only (portrait — UI renders card chrome).
@@ -1274,7 +1283,7 @@ def _generate_card_openai(
     buf = io.BytesIO()
     final_rgb.save(buf, format="PNG")
     file_bytes = buf.getvalue()
-    public_url = _persist_card_png_bytes(file_bytes, card_filename)
+    public_url = _persist_card_png_bytes(file_bytes, card_filename, apply_watermark=apply_watermark)
 
     result = {
         "filename": card_filename,
@@ -1285,11 +1294,12 @@ def _generate_card_openai(
         "special_theme": special_theme,
     }
     logger.info(
-        "Card image saved player_id=%s generation=%s url=%s bytes=%s",
+        "Card image saved player_id=%s generation=%s url=%s bytes=%s watermarked=%s",
         player_id,
         generation,
         result["url"],
         len(file_bytes),
+        apply_watermark,
     )
     return result
 
@@ -2369,6 +2379,7 @@ def generate_card_for_order(
             order_id,
             tier=card_tier,
             special_theme=order.get("special_theme"),
+            apply_watermark=False,
         )
     else:
         source_path, is_temp = _resolve_source_path_from_image_url(order["player_image_url"])
@@ -2390,6 +2401,7 @@ def generate_card_for_order(
                     face_source_path=face_path,
                     vault_tier=vault_tier_val,
                     rarity_template=pulled_template,
+                    apply_watermark=False,
                 )
             except Exception as exc:
                 logger.exception(
@@ -2398,7 +2410,12 @@ def generate_card_for_order(
                     exc,
                 )
                 result = _generate_card_pillow(
-                    player_row, order_id, source_path, tier=card_tier, special_theme=order.get("special_theme")
+                    player_row,
+                    order_id,
+                    source_path,
+                    tier=card_tier,
+                    special_theme=order.get("special_theme"),
+                    apply_watermark=False,
                 )
         finally:
             _cleanup_temp_source(source_path, is_temp)
@@ -2535,12 +2552,17 @@ def approve_order_preview(
 
     generated_cards = order.get("generated_cards", [])
     card_ids = [str(g.get("card_id") or "") for g in generated_cards if g.get("card_id")]
-    finalize_order_preview(
+    _selected_id, watermarked_url = finalize_order_preview(
         db,
         owner_id=current_user.id,
         final_image_url=final_url,
         generated_card_ids=card_ids,
     )
+    if watermarked_url:
+        order["final_card_url"] = watermarked_url
+        for generated in generated_cards:
+            if _selected_id and str(generated.get("card_id") or "") == _selected_id:
+                generated["image_url"] = watermarked_url
 
     return Order.model_validate(order)
 

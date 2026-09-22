@@ -441,10 +441,11 @@ def finalize_order_preview(
     owner_id: int,
     final_image_url: str,
     generated_card_ids: list[str],
-) -> str | None:
+) -> tuple[str | None, str | None]:
     """
     Promote the chosen preview to active; mark other order previews discarded.
-    Returns the activated card_id, if any.
+    Applies the baked-in watermark and re-uploads the final image to storage.
+    Returns (activated card_id, watermarked image URL), if any.
     """
     selected_id: str | None = None
     for cid in generated_card_ids:
@@ -470,8 +471,20 @@ def finalize_order_preview(
         elif (card.status or "") == "preview":
             card.status = "discarded"
 
+    watermarked_url: str | None = None
+    if selected_id:
+        selected_card = get_card_by_card_id(db, selected_id)
+        if selected_card and (selected_card.image_url or "").strip():
+            from utils.watermark import watermark_and_reupload
+
+            watermarked_url = watermark_and_reupload(
+                selected_card.image_url,
+                card_id=selected_card.card_id,
+            )
+            selected_card.image_url = watermarked_url
+
     db.commit()
-    return selected_id
+    return selected_id, watermarked_url
 
 
 def get_card_by_card_id(db: Session, canonical_id: str) -> Card | None:
