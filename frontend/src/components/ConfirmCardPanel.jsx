@@ -1,14 +1,30 @@
-import React from "react";
-import CardImage from "./CardImage";
-import ExpandableCardView from "./ExpandableCardView";
+import React, { useEffect, useState } from "react";
 import HighlightCardPreview from "./HighlightCardPreview";
 import QuantitySelector from "./QuantitySelector";
-import RarityBadge from "./RarityBadge";
 import { StartOverButton } from "./StartOverConfirmModal";
+import { toApiUrl } from "../config/api";
 import { rarityDisplayLabel } from "../utils/rarityStyles";
+
+function CardIconPlaceholder() {
+  return (
+    <svg
+      className="studio-confirm-card-fallback__icon"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      aria-hidden
+    >
+      <rect x="4" y="2" width="16" height="20" rx="2" />
+      <path d="M8 14l2.5-2.5L13 14l2-2 3 3" />
+      <circle cx="9" cy="8" r="1.5" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
 
 export default function ConfirmCardPanel({
   card,
+  imageUrl,
   playerName,
   tierLabel,
   isHighlightCardType,
@@ -34,7 +50,7 @@ export default function ConfirmCardPanel({
   onStartOver,
 }) {
   const displayCard = card || {
-    image_url: "",
+    image_url: imageUrl || "",
     player_name: playerDisplayName,
     team_name: teamName,
     position,
@@ -47,19 +63,23 @@ export default function ConfirmCardPanel({
 
   const rarityKey = displayCard.rarity || "standard";
   const rarityLabel = displayCard.rarity_display_name || rarityDisplayLabel(rarityKey);
+  const tierRarityLine = [tierLabel, rarityLabel].filter(Boolean).join(" — ");
+
+  const resolvedImageUrl = (imageUrl || displayCard.image_url || "").trim();
+  const [imgFailed, setImgFailed] = useState(false);
+
+  useEffect(() => {
+    setImgFailed(false);
+  }, [resolvedImageUrl]);
+
+  const showHighlightPreview = isHighlightCardType && highlightClipDraft?.confirmed;
+  const showImage = Boolean(resolvedImageUrl) && !imgFailed && !showHighlightPreview;
 
   return (
     <div className="studio-confirm-panel scroll-focus-target">
       <div className="studio-confirm-card-wrap">
-        {isHighlightCardType && highlightClipDraft?.confirmed ? (
-          <ExpandableCardView
-            showHint
-            card={highlightPreviewExpandCard}
-            alt="Selected preview"
-            localHighlightVideoUrl={highlightClipDraft.objectUrl}
-            highlightTrimStart={highlightClipDraft.trimStart ?? 0}
-            highlightTrimEnd={highlightClipDraft.trimEnd ?? null}
-          >
+        {showHighlightPreview ? (
+          <div className="studio-confirm-card-media studio-confirm-card-media--highlight">
             <HighlightCardPreview
               playerName={playerDisplayName}
               teamName={teamName}
@@ -71,27 +91,29 @@ export default function ConfirmCardPanel({
               clipDraft={highlightClipDraft}
               forcePlay
             />
-          </ExpandableCardView>
+          </div>
+        ) : showImage ? (
+          <img
+            className="studio-confirm-card-media"
+            src={toApiUrl(resolvedImageUrl)}
+            alt={playerName || playerDisplayName || "Generated card preview"}
+            onError={() => setImgFailed(true)}
+          />
         ) : (
-          <ExpandableCardView showHint card={displayCard} alt="Selected preview">
-            <CardImage card={displayCard} alt="Selected preview" showInfoBanner={false} />
-          </ExpandableCardView>
+          <div className="studio-confirm-card-fallback" role="img" aria-label="Card preview unavailable">
+            <CardIconPlaceholder />
+            <span className="studio-confirm-card-fallback__label">Card preview</span>
+          </div>
         )}
       </div>
 
       <div className="studio-confirm-meta">
         <p className="studio-confirm-player-name">{playerName || playerDisplayName || "Your Player"}</p>
-        <div className="studio-confirm-badges">
-          <RarityBadge rarity={rarityKey} />
-          {rarityKey === "standard" ? (
-            <span className="studio-confirm-rarity-label">{rarityLabel || "Base"}</span>
-          ) : null}
-        </div>
-        {tierLabel ? <p className="studio-confirm-tier-label">{tierLabel}</p> : null}
+        {tierRarityLine ? <p className="studio-confirm-tier-rarity">{tierRarityLine}</p> : null}
       </div>
 
       {showFreePreviewNotice ? (
-        <p className="studio-confirm-free-notice">This is your free preview</p>
+        <p className="studio-confirm-free-notice">✓ Free Preview</p>
       ) : null}
 
       <QuantitySelector
@@ -108,11 +130,7 @@ export default function ConfirmCardPanel({
         subheading="Order multiple copies to trade with teammates and friends."
       />
 
-      <button
-        type="button"
-        onClick={onBack}
-        className="studio-confirm-back-btn"
-      >
+      <button type="button" onClick={onBack} className="studio-confirm-back-btn">
         ← Back
       </button>
 

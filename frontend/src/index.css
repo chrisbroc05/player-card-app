@@ -9173,16 +9173,60 @@ button:active:not(:disabled) {
 }
 
 .studio-confirm-card-wrap {
-  width: 100%;
-  max-width: 280px;
+  width: 75%;
+  max-width: 260px;
   margin: 0 auto;
   aspect-ratio: 5 / 7;
 }
 
-.studio-confirm-card-wrap .card-image-frame,
-.studio-confirm-card-wrap .expandable-card-view {
+.studio-confirm-card-media {
+  display: block;
   width: 100%;
   height: 100%;
+  border-radius: 12px;
+  object-fit: cover;
+  object-position: center top;
+  box-shadow: 0 0 20px rgba(201, 168, 76, 0.25);
+}
+
+.studio-confirm-card-media--highlight {
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 0 20px rgba(201, 168, 76, 0.25);
+}
+
+.studio-confirm-card-media--highlight .highlight-card-preview {
+  width: 100%;
+  height: 100%;
+}
+
+.studio-confirm-card-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(201, 168, 76, 0.45);
+  background: linear-gradient(160deg, rgba(201, 168, 76, 0.08), rgba(22, 22, 22, 0.95));
+  box-shadow: 0 0 20px rgba(201, 168, 76, 0.25);
+  color: rgba(201, 168, 76, 0.85);
+}
+
+.studio-confirm-card-fallback__icon {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.studio-confirm-card-fallback__label {
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(201, 168, 76, 0.75);
 }
 
 .studio-confirm-meta {
@@ -9197,43 +9241,33 @@ button:active:not(:disabled) {
 .studio-confirm-player-name {
   margin: 0;
   font-family: "Barlow Condensed", sans-serif;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 800;
   color: #fff;
 }
 
-.studio-confirm-badges {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-}
-
-.studio-confirm-rarity-label {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(148, 163, 184, 0.9);
-}
-
-.studio-confirm-tier-label {
+.studio-confirm-tier-rarity {
   margin: 0;
   font-family: "Barlow Condensed", sans-serif;
   font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+  font-weight: 700;
+  letter-spacing: 1px;
   text-transform: uppercase;
-  color: rgba(201, 168, 76, 0.85);
+  color: #c9a84c;
 }
 
 .studio-confirm-free-notice {
-  margin: 0.75rem auto 0;
+  margin: 0.65rem auto 0;
   font-size: 12px;
   line-height: 1.4;
   text-align: center;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.studio-confirm-panel > .mt-6.rounded-2xl > button:last-child {
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 16px;
+  font-weight: 800;
 }
 
 .studio-confirm-back-btn {

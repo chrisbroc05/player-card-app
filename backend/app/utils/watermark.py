@@ -15,11 +15,11 @@ from utils.storage import app_data_root, local_path_from_media_url, save_bytes_t
 logger = logging.getLogger(__name__)
 
 WATERMARK_TEXT = "P R O S P E C T  L E G E N D S"
-WATERMARK_OPACITY = 102  # 40% of 255
-WATERMARK_MARGIN_RIGHT = 12
-WATERMARK_MARGIN_BOTTOM = 60
-MIN_FONT_SIZE = 28
-FONT_SIZE_RATIO = 0.045
+WATERMARK_OPACITY = 64  # 25% of 255
+WATERMARK_MARGIN_RIGHT = 8
+WATERMARK_MARGIN_TOP = 8
+MIN_FONT_SIZE = 12
+FONT_SIZE_RATIO = 0.02
 
 _FONT_PATHS: tuple[str, ...] = (
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
@@ -47,7 +47,7 @@ def _load_watermark_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageF
 
 def add_watermark(image_bytes: bytes) -> bytes:
     """
-    Composite semi-transparent "PROSPECT LEGENDS" text onto the bottom-right of a card image.
+    Composite semi-transparent "PROSPECT LEGENDS" text onto the top-right of a card image.
     Returns PNG bytes suitable for R2 storage.
     """
     logger.info("Applying watermark to card image")
@@ -66,7 +66,7 @@ def add_watermark(image_bytes: bytes) -> bytes:
     text_height = bbox[3] - bbox[1]
 
     x = img.width - text_width - WATERMARK_MARGIN_RIGHT
-    y = img.height - text_height - WATERMARK_MARGIN_BOTTOM
+    y = WATERMARK_MARGIN_TOP
     logger.info("Watermark position: x=%s, y=%s", x, y)
 
     draw.text(

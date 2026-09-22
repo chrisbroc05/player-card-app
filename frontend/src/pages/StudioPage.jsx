@@ -3134,6 +3134,12 @@ export default function StudioPage() {
                       <div ref={configureFocusRef}>
                         <ConfirmCardPanel
                           card={featuredDisplayCard}
+                          imageUrl={
+                            selectedPreviewUrl ||
+                            generatedCardUrl ||
+                            featuredDisplayCard?.image_url ||
+                            ""
+                          }
                           playerName={playerDisplayName}
                           tierLabel={selectedTierLabel}
                           isHighlightCardType={isHighlightCardType}
