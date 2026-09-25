@@ -89,7 +89,10 @@ from marketplace_scheduler import (
 from marketplace_repo import attach_copy_stats_to_card_dicts, copy_stats_for_card, float_from_decimal  # noqa: E402
 from parent_email_utils import normalize_optional_parent_email  # noqa: E402
 from email_service import send_welcome_email  # noqa: E402
-from schema_migrations import run_schema_migrations_after_models  # noqa: E402
+from schema_migrations import (  # noqa: E402
+    run_connect_marketplace_migrations,
+    run_schema_migrations_after_models,
+)
 from trade_routes import router as trade_router  # noqa: E402
 from routers.activity import router as activity_router  # noqa: E402
 from routers.admin import router as admin_router  # noqa: E402
@@ -202,6 +205,7 @@ async def lifespan(_app: FastAPI):
     _ensure_local_media_dirs()
     Base.metadata.create_all(bind=engine)
     run_schema_migrations_after_models(engine)
+    run_connect_marketplace_migrations(engine)
     _startup_validate_admin_account()
     run_marketplace_expiration_pass()
     run_deleted_cards_cleanup_pass()

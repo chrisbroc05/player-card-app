@@ -1,7 +1,13 @@
 """Idempotent ALTER TABLE for existing DBs. Call after Base.metadata.create_all."""
 
+from __future__ import annotations
+
+import logging
+
 from sqlalchemy import inspect, text
 from sqlalchemy.engine import Engine
+
+logger = logging.getLogger(__name__)
 
 
 def run_schema_migrations_after_models(engine: Engine) -> None:
@@ -695,9 +701,23 @@ def run_schema_migrations_after_models(engine: Engine) -> None:
                     )
                 )
 
-        if "users" in insp.get_table_names():
+
+def run_connect_marketplace_migrations(engine: Engine) -> None:
+    """
+    Marketplace / Stripe Connect schema changes in an isolated transaction.
+
+    Kept separate from the legacy cards migration block so a failure elsewhere
+    cannot roll back these required columns and tables.
+    """
+    insp = inspect(engine)
+    dialect = engine.dialect.name
+    table_names = set(insp.get_table_names())
+
+    with engine.begin() as conn:
+        if "users" in table_names:
             ucols = {c["name"] for c in insp.get_columns("users")}
             if "marketplace_balance" not in ucols:
+                logger.info("Migration: adding users.marketplace_balance")
                 if dialect == "postgresql":
                     conn.execute(
                         text(
@@ -713,6 +733,7 @@ def run_schema_migrations_after_models(engine: Engine) -> None:
                         )
                     )
             if "stripe_charges_enabled" not in ucols:
+                logger.info("Migration: adding users.stripe_charges_enabled")
                 if dialect == "postgresql":
                     conn.execute(
                         text(
@@ -728,10 +749,10 @@ def run_schema_migrations_after_models(engine: Engine) -> None:
                         )
                     )
 
-        tables = set(insp.get_table_names())
-        if "credit_ledger" in tables:
+        if "credit_ledger" in table_names:
             lcols = {c["name"] for c in insp.get_columns("credit_ledger")}
             if "balance_type" not in lcols:
+                logger.info("Migration: adding credit_ledger.balance_type")
                 if dialect == "postgresql":
                     conn.execute(
                         text(
@@ -747,8 +768,9 @@ def run_schema_migrations_after_models(engine: Engine) -> None:
                         )
                     )
 
-        tables = set(insp.get_table_names())
-        if "platform_revenue_ledger" not in tables:
+        table_names = set(insp.get_table_names())
+        if "platform_revenue_ledger" not in table_names:
+            logger.info("Migration: creating platform_revenue_ledger")
             if dialect == "postgresql":
                 conn.execute(
                     text(
@@ -780,8 +802,9 @@ def run_schema_migrations_after_models(engine: Engine) -> None:
                     )
                 )
 
-        tables = set(insp.get_table_names())
-        if "processed_stripe_events" not in tables:
+        table_names = set(insp.get_table_names())
+        if "processed_stripe_events" not in table_names:
+            logger.info("Migration: creating processed_stripe_events")
             if dialect == "postgresql":
                 conn.execute(
                     text(
@@ -808,3 +831,6 @@ def run_schema_migrations_after_models(engine: Engine) -> None:
                         """
                     )
                 )
+
+    logger.info("Connect/marketplace migrations complete")
+

@@ -160,23 +160,34 @@ def record_platform_revenue(
 
 
 def _stripe_session_already_processed(db: Session, session_id: str) -> bool:
-    if (
-        db.query(ProcessedStripeEvent.id)
-        .filter(ProcessedStripeEvent.event_id == f"checkout:{session_id}")
-        .first()
-        is not None
-    ):
-        return True
-    return (
-        db.query(CreditLedger.id)
-        .filter(
-            CreditLedger.reference_id == session_id,
-            CreditLedger.balance_type == BALANCE_TYPE_MARKETPLACE,
+    ref = (session_id or "").strip()
+    if not ref:
+        return False
+    try:
+        if (
+            db.query(ProcessedStripeEvent.id)
+            .filter(ProcessedStripeEvent.event_id == f"checkout:{ref}")
+            .first()
+            is not None
+        ):
+            return True
+    except Exception as exc:
+        logger.warning("Could not query processed_stripe_events for %s: %s", ref, exc)
+        db.rollback()
+
+    try:
+        q = db.query(CreditLedger.id).filter(
+            CreditLedger.reference_id == ref,
             CreditLedger.amount > Decimal("0.00"),
+            CreditLedger.transaction_type == TX_TOP_UP,
         )
-        .first()
-        is not None
-    )
+        if hasattr(CreditLedger, "balance_type"):
+            q = q.filter(CreditLedger.balance_type == BALANCE_TYPE_MARKETPLACE)
+        return q.first() is not None
+    except Exception as exc:
+        logger.warning("Could not query credit_ledger idempotency for %s: %s", ref, exc)
+        db.rollback()
+        return False
 
 
 def apply_marketplace_stripe_checkout(
@@ -487,12 +498,20 @@ def require_seller_onboarding_complete(db: Session, user: User) -> None:
 
 
 def stripe_event_already_processed(db: Session, event_id: str) -> bool:
-    return (
-        db.query(ProcessedStripeEvent.id)
-        .filter(ProcessedStripeEvent.event_id == event_id)
-        .first()
-        is not None
-    )
+    eid = (event_id or "").strip()
+    if not eid:
+        return False
+    try:
+        return (
+            db.query(ProcessedStripeEvent.id)
+            .filter(ProcessedStripeEvent.event_id == eid)
+            .first()
+            is not None
+        )
+    except Exception as exc:
+        logger.warning("Could not query processed_stripe_events for event %s: %s", eid, exc)
+        db.rollback()
+        return False
 
 
 def mark_stripe_event_processed(db: Session, event_id: str, event_type: str) -> None:
