@@ -63,6 +63,8 @@ def normalize_card_type(card_type: str | None) -> str:
     raw = (card_type or "static").strip().lower()
     if raw == "highlight":
         return "highlight"
+    if raw == "animated":
+        return "animated"
     if raw in ("standard", "static"):
         return "static"
     return "static"
@@ -79,7 +81,8 @@ def card_creation_quote(
     ct = normalize_card_type(card_type)
     base = card_creation_price(key)
     highlight_fee = highlight_card_price() if ct == "highlight" else 0.0
-    animated_fee = animated_upgrade_price() if ct == "static" and animated else 0.0
+    includes_animation = ct == "animated" or (ct == "static" and animated)
+    animated_fee = animated_upgrade_price() if includes_animation else 0.0
     total = round(base + highlight_fee + animated_fee, 2)
     return {
         "tier": key,
@@ -87,7 +90,7 @@ def card_creation_quote(
         "base_price": base,
         "highlight_fee": highlight_fee,
         "animated_fee": animated_fee,
-        "animated_selected": bool(animated and ct == "static"),
+        "animated_selected": includes_animation,
         "total": total,
     }
 

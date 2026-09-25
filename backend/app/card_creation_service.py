@@ -45,13 +45,18 @@ def begin_card_creation_checkout(
     ct = normalize_card_type(card_type)
     if ct == "highlight":
         animated = False
+    elif ct == "animated":
+        animated = True
     quote = card_creation_quote(tier, card_type=ct, animated=animated)
     amount = Decimal(str(quote["total"])).quantize(Decimal("0.01"))
 
     snapshot = dict(order_snapshot)
-    snapshot["card_type"] = "highlight" if ct == "highlight" else "standard"
+    if ct == "highlight":
+        snapshot["card_type"] = "highlight"
+    else:
+        snapshot["card_type"] = "standard"
     snapshot["checkout_card_type"] = ct
-    snapshot["checkout_animated"] = bool(animated)
+    snapshot["checkout_animated"] = bool(animated or ct == "animated")
     if highlight_staging:
         snapshot["highlight_staging"] = highlight_staging
 
@@ -142,7 +147,7 @@ def fulfill_card_creation_from_webhook(db: Session, session: dict) -> None:
     tier = normalize_order_tier(metadata.get("tier"))
     card_type = normalize_card_type(metadata.get("card_type"))
     animated_raw = (metadata.get("animated") or "false").strip().lower()
-    animated = animated_raw in ("true", "1", "yes")
+    animated = card_type == "animated" or animated_raw in ("true", "1", "yes")
     copy_quantity = int(metadata.get("copy_quantity") or 1)
     amount = Decimal(str(metadata.get("amount_dollars") or "0"))
 

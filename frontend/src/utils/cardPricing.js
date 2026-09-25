@@ -2,7 +2,9 @@ import { API_BASE_URL } from "../config/api";
 
 export async function fetchGenerationPrice(tier, { cardType = "static", animated = false } = {}) {
   const key = tier || "rookie";
-  const type = cardType === "highlight" ? "highlight" : "static";
+  let type = "static";
+  if (cardType === "highlight") type = "highlight";
+  else if (cardType === "animated") type = "animated";
   const params = new URLSearchParams({
     tier: key,
     card_type: type,

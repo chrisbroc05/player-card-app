@@ -12,8 +12,14 @@ const ICON_HIGHLIGHT = (
   </svg>
 );
 
+const ICON_ANIMATED = (
+  <svg className="h-10 w-10 text-violet-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+  </svg>
+);
+
 export default function CardTypeStep({ value, onChange }) {
-  const selected = value === "highlight" ? "highlight" : "standard";
+  const selected = value || "standard";
 
   const options = [
     {
@@ -30,6 +36,13 @@ export default function CardTypeStep({ value, onChange }) {
       icon: ICON_HIGHLIGHT,
       selectedClass: "border-[var(--color-border-gold)] bg-gold-subtle shadow-[0_0_28px_rgba(45,212,191,0.22)]",
     },
+    {
+      id: "animated",
+      label: "Animated",
+      description: "Your static card brought to life with AI animation",
+      icon: ICON_ANIMATED,
+      selectedClass: "border-violet-400/70 bg-violet-500/10 shadow-[0_0_28px_rgba(167,139,250,0.22)]",
+    },
   ];
 
   return (
@@ -38,7 +51,7 @@ export default function CardTypeStep({ value, onChange }) {
         <h3 className="text-lg font-semibold text-white">Choose Your Card Type</h3>
         <p className="mt-1 text-sm text-slate-400">Pick how you want your player card to look.</p>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
         {options.map((opt) => {
           const isSel = selected === opt.id;
           return (
@@ -51,7 +64,15 @@ export default function CardTypeStep({ value, onChange }) {
               }`}
             >
               <div className="mb-3">{opt.icon}</div>
-              <p className={`text-base font-semibold ${isSel && opt.id === "highlight" ? "text-brand-gold-bright" : "text-white"}`}>
+              <p
+                className={`text-base font-semibold ${
+                  isSel && opt.id === "highlight"
+                    ? "text-brand-gold-bright"
+                    : isSel && opt.id === "animated"
+                      ? "text-violet-100"
+                      : "text-white"
+                }`}
+              >
                 {opt.label}
               </p>
               <p className="mt-1 text-sm text-slate-400">{opt.description}</p>

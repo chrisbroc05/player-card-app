@@ -770,6 +770,8 @@ def fulfill_paid_card_creation(
     ct = normalize_card_type(card_type)
     if ct == "highlight":
         animated = False
+    elif ct == "animated":
+        animated = True
 
     order = dict(order_snapshot)
     if ct == "highlight":
@@ -822,12 +824,12 @@ def fulfill_paid_card_creation(
             raise ValueError("Highlight checkout missing staged video")
         _apply_highlight_staging_to_card(db, card_id, staging)
 
-    if ct == "static" and animated:
+    if animated and ct in ("static", "animated"):
         _start_paid_card_animation(db, card_id, order)
 
     amt = Decimal(str(amount_dollars)).quantize(Decimal("0.01"))
     tier_label = (tier or "rookie").replace("_", " ").title()
-    type_label = "Highlight" if ct == "highlight" else "Animated" if animated else "Static"
+    type_label = "Highlight" if ct == "highlight" else "Animated" if ct == "animated" or animated else "Static"
     record_platform_revenue(
         db,
         amount=amt,

@@ -140,7 +140,7 @@ def create_card_creation_checkout_session(
     ct = (card_type or "static").strip().lower()
     if ct == "highlight":
         label = f"{tier_label} Highlight — {qty} {copy_word} included"
-    elif animated:
+    elif ct == "animated" or animated:
         label = f"{tier_label} Animated Card — {qty} {copy_word} included"
     else:
         label = f"{tier_label} Static Card — {qty} {copy_word} included"
@@ -158,7 +158,7 @@ def create_card_creation_checkout_session(
             "tier": (tier or "rookie").strip().lower(),
             "card_type": ct,
             "copy_quantity": str(qty),
-            "animated": "true" if animated else "false",
+            "animated": "true" if (animated or ct == "animated") else "false",
             "checkout_id": str(checkout_id),
             "order_id": str(order_id),
         },

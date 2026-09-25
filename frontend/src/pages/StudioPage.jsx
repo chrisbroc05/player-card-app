@@ -7,7 +7,6 @@ import CardImage from "../components/CardImage";
 import CardGallery from "../components/CardGallery";
 import PostGenerationPanel from "../components/PostGenerationPanel";
 import StudioAuthGate from "../components/StudioAuthGate";
-import StudioCreditBalance from "../components/StudioCreditBalance";
 import GenerationCostSummary from "../components/GenerationCostSummary";
 import GenerationCapNotice, { GenerationDailyUsageHint } from "../components/GenerationCapNotice";
 import ThemeLibraryPicker from "../components/ThemeLibraryPicker";
@@ -1132,8 +1131,8 @@ export default function StudioPage() {
     (async () => {
       try {
         const data = await fetchGenerationPrice(orderTier, {
-          cardType: cardType === "highlight" ? "highlight" : "static",
-          animated: animateAtCheckout && cardType !== "highlight",
+          cardType,
+          animated: cardType === "standard" && animateAtCheckout,
         });
         if (!cancelled) {
           setGenerationPricing(data);
@@ -1966,11 +1965,14 @@ export default function StudioPage() {
         player_image_url: playerData.image_url,
         face_photo_url: facePhotoUrl.trim() || null,
         tier: orderTier,
-        card_type: isHighlightCardType ? "highlight" : "standard",
+        card_type: isHighlightCardType ? "highlight" : isAnimatedCardType ? "animated" : "standard",
         special_theme: specialTheme || null,
         selected_motion_id:
-          animateAtCheckout && actionCategory ? klingMotionForCategory(actionCategory) || null : null,
-        action_category: animateAtCheckout && actionCategory ? actionCategory : null,
+          (isAnimatedCardType || animateAtCheckout) && actionCategory
+            ? klingMotionForCategory(actionCategory) || null
+            : null,
+        action_category:
+          (isAnimatedCardType || animateAtCheckout) && actionCategory ? actionCategory : null,
         throwing_hand: null,
         batting_side: null,
         photo_notes: null,
@@ -2067,7 +2069,7 @@ export default function StudioPage() {
   async function handlePayAndGenerate() {
     if (generationCap.blocked) return;
     if (!canCreateOrder || !generationPricing) return;
-    if (animateAtCheckout && !isHighlightCardType && !actionCategory) {
+    if ((isAnimatedCardType || animateAtCheckout) && !actionCategory) {
       setAnimateCheckoutError("Select an action for your animation.");
       return;
     }
@@ -2087,11 +2089,12 @@ export default function StudioPage() {
       const checkoutPayload = {
         order_id: orderId,
         copy_quantity: copyQuantity,
-        card_type: isHighlightCardType ? "highlight" : "static",
-        animated: animateAtCheckout && !isHighlightCardType,
-        action_category: animateAtCheckout && actionCategory ? actionCategory : null,
+        card_type: isHighlightCardType ? "highlight" : isAnimatedCardType ? "animated" : "static",
+        animated: isAnimatedCardType || animateAtCheckout,
+        action_category:
+          (isAnimatedCardType || animateAtCheckout) && actionCategory ? actionCategory : null,
         selected_motion_id:
-          animateAtCheckout && actionCategory
+          (isAnimatedCardType || animateAtCheckout) && actionCategory
             ? klingMotionForCategory(actionCategory) || null
             : null,
       };
@@ -2703,12 +2706,6 @@ export default function StudioPage() {
               </div>
             ) : null}
 
-            {user && inCreationFlow ? (
-              <div className="mb-6">
-                <StudioCreditBalance balance={creditBalance} />
-              </div>
-            ) : null}
-
             {!user && currentStep >= STEP_TIER ? (
               <StudioAuthGate
                 onBackToTiers={() => goToStep(STEP_TIER)}
@@ -2882,6 +2879,7 @@ export default function StudioPage() {
                     setActionCategory("");
                     setThrowingHand("");
                     setBattingSide("");
+                    if (type === "animated") setAnimateAtCheckout(false);
                   }}
                 />
                 <StudioWizardContinue
@@ -3103,7 +3101,28 @@ export default function StudioPage() {
                   value={copyQuantity}
                   onChange={setCopyQuantity}
                 />
-                {!isHighlightCardType ? (
+                {isAnimatedCardType ? (
+                  <div className="rounded-2xl border border-white/10 bg-[#111111]/90 p-4 sm:p-5">
+                    <p className="text-sm font-semibold text-white">Choose your animation action</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Pick the motion that best matches your photo — animation is included in your card price.
+                    </p>
+                    <div className="mt-4">
+                      <ActionCategoryStep
+                        value={actionCategory}
+                        onSelect={(cat) => {
+                          setActionCategory(cat);
+                          setAnimateCheckoutError("");
+                        }}
+                        onContinue={() => {}}
+                        error={animateCheckoutError}
+                        tier={orderTier || "rookie"}
+                        hideContinue
+                      />
+                    </div>
+                  </div>
+                ) : null}
+                {cardType === "standard" ? (
                   <AnimatedUpgradeOption
                     enabled={animateAtCheckout}
                     onEnabledChange={(next) => {
@@ -3131,9 +3150,10 @@ export default function StudioPage() {
                   tierLabel={selectedTierLabel}
                   themeLabel={specialTheme ? selectedThemeLabel : ""}
                   isHighlight={isHighlightCardType}
+                  isAnimated={isAnimatedCardType}
                   copyQuantity={copyQuantity}
                   pricing={generationPricing}
-                  animateAtCheckout={animateAtCheckout && !isHighlightCardType}
+                  animateAtCheckout={animateAtCheckout && cardType === "standard"}
                   phase="pay-upfront"
                 />
                 {orderActionKey === "card-creation-return" ? (

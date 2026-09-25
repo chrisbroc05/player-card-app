@@ -367,12 +367,17 @@ def card_creation_checkout(
 
     order = _get_order_or_404(body.order_id)
     ct = normalize_card_type(body.card_type)
-    animated = bool(body.animated) and ct == "static"
+    if ct == "animated":
+        animated = True
+    elif ct == "static":
+        animated = bool(body.animated)
+    else:
+        animated = False
 
     if animated and not (body.action_category or body.selected_motion_id):
         raise HTTPException(
             status_code=400,
-            detail="Select an animation action before adding the animated upgrade.",
+            detail="Select an animation action before checkout.",
         )
 
     if ct == "highlight" and not (body.highlight_staging_url or "").strip():
