@@ -19,25 +19,35 @@ export function MarketplaceModalShell({
   ariaLabelledBy,
   children,
   onBackdropClick,
+  /** "sheet" = bottom sheet on mobile; "centered" = vertically centered with internal scroll */
+  variant = "sheet",
 }) {
   if (!open) return null;
 
+  const isCentered = variant === "centered";
+  const overlayClass = isCentered
+    ? "marketplace-modal-overlay marketplace-modal-overlay--centered"
+    : "marketplace-modal-overlay";
+  const panelClass = isCentered
+    ? `marketplace-modal-panel marketplace-modal-panel--centered border ${borderClass} bg-cardBg shadow-2xl shadow-black/50`
+    : `marketplace-modal-panel mobile-bottom-sheet border ${borderClass} bg-cardBg shadow-2xl shadow-black/50`;
+
   return (
     <div
-      className="marketplace-modal-overlay"
+      className={overlayClass}
       style={{ zIndex }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onBackdropClick?.();
       }}
     >
       <div
-        className={`marketplace-modal-panel mobile-bottom-sheet border ${borderClass} bg-cardBg shadow-2xl shadow-black/50`}
+        className={panelClass}
         role="dialog"
         aria-modal="true"
         aria-labelledby={ariaLabelledBy}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="marketplace-modal-handle" aria-hidden="true" />
+        {!isCentered ? <div className="marketplace-modal-handle" aria-hidden="true" /> : null}
         {children}
       </div>
     </div>

@@ -6199,7 +6199,11 @@
   max-width: 32rem;
   border-radius: 1rem;
   padding: 24px;
-  max-height: min(90vh, 720px);
+  max-height: min(90dvh, 90vh, 720px);
+  overflow: hidden;
+}
+
+.marketplace-modal-panel--centered {
   overflow: hidden;
 }
 
@@ -6292,13 +6296,33 @@
 }
 
 @media (max-width: 639px) {
-  .marketplace-modal-overlay {
+  .marketplace-modal-overlay--centered {
+    align-items: center;
+    justify-content: center;
+    padding: max(12px, env(safe-area-inset-top, 0px)) 16px
+      calc(var(--pill-nav-height) + env(safe-area-inset-bottom, 0px) + 12px);
+  }
+
+  .marketplace-modal-panel--centered {
+    position: relative;
+    bottom: auto;
+    left: auto;
+    right: auto;
+    width: 100%;
+    max-width: min(100%, 420px);
+    max-height: min(90dvh, calc(100dvh - var(--pill-nav-height) - env(safe-area-inset-top, 0px) - 24px));
+    overflow: hidden;
+    border-radius: 1rem;
+    padding: 16px;
+  }
+
+  .marketplace-modal-overlay:not(.marketplace-modal-overlay--centered) {
     align-items: flex-end;
     padding: 0;
     padding-bottom: calc(var(--pill-nav-height) + env(safe-area-inset-bottom, 0px));
   }
 
-  .marketplace-modal-panel {
+  .marketplace-modal-panel.mobile-bottom-sheet {
     position: fixed;
     bottom: 0;
     left: 0;
@@ -6558,6 +6582,41 @@
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: rgba(255, 255, 255, 0.04);
   color: #e2e8f0;
+}
+
+/* Manage Offers modal — centered, scrollable on mobile */
+.offer-review-modal {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
+}
+
+.offer-review-modal__header {
+  flex-shrink: 0;
+}
+
+.offer-review-modal__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.offer-review-offer-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  padding: 10px 0 4px;
+  background: linear-gradient(to top, var(--bg-primary) 75%, rgba(15, 23, 42, 0));
+}
+
+@media (max-width: 639px) {
+  .offer-review-offer-actions {
+    padding-bottom: 8px;
+  }
 }
 
 /* Manage Offers modal — full card visibility */

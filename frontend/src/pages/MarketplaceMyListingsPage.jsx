@@ -878,26 +878,30 @@ function OfferReviewModal({
     <MarketplaceModalShell
       open={open}
       zIndex={72}
+      variant="centered"
       ariaLabelledBy="review-offers-title"
       onBackdropClick={onClose}
     >
-      <MarketplaceModalContent className="offer-review-modal">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 id="review-offers-title" className="text-xl font-semibold text-white">
-              Review Offers
-            </h2>
-            <p className="mt-1 text-sm text-slate-400">Incoming offers for {listing.player_name}</p>
+      <div className="offer-review-modal">
+        <div className="offer-review-modal__header">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 id="review-offers-title" className="text-xl font-semibold text-white">
+                Review Offers
+              </h2>
+              <p className="mt-1 text-sm text-slate-400">Incoming offers for {listing.player_name}</p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex min-h-[40px] items-center justify-center rounded-lg border border-white/20 px-4 text-sm text-slate-300"
+            >
+              Close
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex min-h-[40px] items-center justify-center rounded-lg border border-white/20 px-4 text-sm text-slate-300"
-          >
-            Close
-          </button>
         </div>
 
+        <div className="offer-review-modal__scroll">
         <div className="offer-review-listing mt-4">
           <div className="offer-review-listing__card">
             <CardImage
@@ -1008,12 +1012,12 @@ function OfferReviewModal({
                           <p className="text-xs text-slate-500">Buyer will see your counter and can accept or decline</p>
                         </>
                       )}
-                      <div className="flex flex-wrap gap-2">
+                      <div className="offer-review-offer-actions flex flex-wrap gap-2">
                         <button
                           type="button"
                           disabled={counterBusyId === offer.offer_id || (isTrade && counterTradeCardIds.length < 1)}
                           onClick={() => onSendCounter(offer)}
-                          className="min-h-[40px] rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+                          className="min-h-[44px] rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
                         >
                           {counterBusyId === offer.offer_id
                             ? "Sending…"
@@ -1027,19 +1031,19 @@ function OfferReviewModal({
                             setCounterAmount("");
                             setCounterTradeCardIds([]);
                           }}
-                          className="min-h-[40px] rounded-lg border border-white/20 px-4 text-sm text-slate-300"
+                          className="min-h-[44px] rounded-lg border border-white/20 px-4 text-sm text-slate-300"
                         >
                           Cancel
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <div className="mt-3 flex flex-wrap gap-2">
+                    <div className="offer-review-offer-actions mt-3 flex flex-wrap gap-2">
                       <button
                         type="button"
                         disabled={actionKey === `accept-${offer.offer_id}`}
                         onClick={() => onRequestAccept(offer, listing)}
-                        className="min-h-[40px] rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+                        className="min-h-[44px] rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
                       >
                         {actionKey === `accept-${offer.offer_id}` ? "Accepting…" : "Accept"}
                       </button>
@@ -1047,7 +1051,7 @@ function OfferReviewModal({
                         type="button"
                         disabled={actionKey === `decline-${offer.offer_id}`}
                         onClick={() => onRequestDecline(offer, listing)}
-                        className="min-h-[40px] rounded-lg border border-white/20 px-4 text-sm text-slate-300 disabled:opacity-50"
+                        className="min-h-[44px] rounded-lg border border-white/20 px-4 text-sm text-slate-300 disabled:opacity-50"
                       >
                         {actionKey === `decline-${offer.offer_id}` ? "Declining…" : "Decline"}
                       </button>
@@ -1059,7 +1063,7 @@ function OfferReviewModal({
                           setCounterAmount("");
                           setCounterTradeCardIds([]);
                         }}
-                        className="min-h-[40px] rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 text-sm font-medium text-amber-200 disabled:opacity-50"
+                        className="min-h-[44px] rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 text-sm font-medium text-amber-200 disabled:opacity-50"
                       >
                         Counter
                       </button>
@@ -1070,7 +1074,8 @@ function OfferReviewModal({
             );
           })}
         </ul>
-      </MarketplaceModalContent>
+        </div>
+      </div>
     </MarketplaceModalShell>
   );
 }
