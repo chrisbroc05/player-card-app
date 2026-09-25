@@ -23,7 +23,7 @@ import AnimatedBadge from "../components/AnimatedBadge";
 import HighlightBadge from "../components/HighlightBadge";
 import ErrorBoundary from "../components/ErrorBoundary";
 import { CARD_IMAGE_FRAME_DETAIL } from "../utils/cardImageStyles";
-import { authFetch, formatApiError } from "../utils/authFetch";
+import { authFetch, formatApiError, marketplaceListErrorFromDetail } from "../utils/authFetch";
 import { normalizeCardForDisplay, safeMotionLabel } from "../utils/cardDetailUtils";
 
 function formatCreatedAt(iso) {
@@ -57,6 +57,7 @@ export default function CardDetailPage() {
   const [marketplaceBusy, setMarketplaceBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [connectProfile, setConnectProfile] = useState(null);
 
   const refetchCard = useCallback(async () => {
     if (!cardId) return;
@@ -158,6 +159,24 @@ export default function CardDetailPage() {
     loadListingStatus();
   }, [loadListingStatus]);
 
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { res } = await authFetch(token, "/auth/profile");
+        if (!cancelled && res.ok) {
+          setConnectProfile(await res.json().catch(() => null));
+        }
+      } catch {
+        if (!cancelled) setConnectProfile(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
   async function listCardOnMarketplace(askingPrice, isPriority = false) {
     if (!token || !card?.card_id) return;
     setMarketplaceBusy(true);
@@ -174,7 +193,7 @@ export default function CardDetailPage() {
       });
       if (unauthorized) throw new Error("Session expired.");
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not list card."));
+      if (!res.ok) throw marketplaceListErrorFromDetail(data?.detail, "Could not list card.");
       setListingInfo((prev) => ({
         ...(prev || {}),
         card_id: card.card_id,
@@ -207,7 +226,7 @@ export default function CardDetailPage() {
       });
       if (unauthorized) throw new Error("Session expired.");
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not list copies."));
+      if (!res.ok) throw marketplaceListErrorFromDetail(data?.detail, "Could not list copies.");
       refreshNavBadges?.();
       await Promise.all([refetchCard(), loadListingStatus()]);
     } catch (e) {
@@ -415,6 +434,8 @@ export default function CardDetailPage() {
                             )
                       }
                       busy={marketplaceBusy}
+                      token={token}
+                      connectProfile={connectProfile}
                       onList={listCardOnMarketplace}
                       onUnlist={unlistCardFromMarketplace}
                       onOpenBulkList={() => setListingSheetOpen(true)}
@@ -459,6 +480,8 @@ export default function CardDetailPage() {
               )
         }
         busy={marketplaceBusy}
+        token={token}
+        connectProfile={connectProfile}
         onClose={() => setListingSheetOpen(false)}
         onConfirm={async ({ quantity, askingPrice }) => {
           await bulkListOnMarketplace(displayCard.card_id, quantity, askingPrice);

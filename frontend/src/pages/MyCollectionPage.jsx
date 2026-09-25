@@ -20,7 +20,7 @@ import GenerationCapNotice from "../components/GenerationCapNotice";
 import CollectionToast from "../components/CollectionToast";
 import DeleteCardModal from "../components/DeleteCardModal";
 import PermanentDeleteCardModal from "../components/PermanentDeleteCardModal";
-import { authFetch, formatApiError } from "../utils/authFetch";
+import { authFetch, formatApiError, marketplaceListErrorFromDetail } from "../utils/authFetch";
 import { formatMoney } from "../utils/marketplace";
 import { canAnimateCard, isAnimatedCard, isAnimationInProgress } from "../utils/animationCard";
 import { normalizeTierKey } from "../utils/cardTemplate";
@@ -56,6 +56,7 @@ export default function MyCollectionPage({ vaultView = false }) {
   const [listingByCardId, setListingByCardId] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [connectProfile, setConnectProfile] = useState(null);
   const [cancelKey, setCancelKey] = useState("");
   const [marketplaceBusyId, setMarketplaceBusyId] = useState("");
   const [animateModalCard, setAnimateModalCard] = useState(null);
@@ -190,7 +191,7 @@ export default function MyCollectionPage({ vaultView = false }) {
       });
       if (unauthorized) throw new Error("Session expired.");
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not list card."));
+      if (!res.ok) throw marketplaceListErrorFromDetail(data?.detail, "Could not list card.");
       invalidateCollectionCache(cacheKey);
       await loadCards({ force: true });
       refreshNavBadges?.();
@@ -218,7 +219,7 @@ export default function MyCollectionPage({ vaultView = false }) {
       });
       if (unauthorized) throw new Error("Session expired.");
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not list copies."));
+      if (!res.ok) throw marketplaceListErrorFromDetail(data?.detail, "Could not list copies.");
       invalidateCollectionCache(cacheKey);
       await loadCards({ force: true });
       refreshNavBadges?.();
@@ -419,6 +420,24 @@ export default function MyCollectionPage({ vaultView = false }) {
     }, 100);
     return () => clearTimeout(timer);
   }, [token, initializing, vaultView, loadCards, isCollectionRoute, location.pathname, location.state, navigate]);
+
+  useEffect(() => {
+    if (!token || initializing) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { res } = await authFetch(token, "/auth/profile");
+        if (!cancelled && res.ok) {
+          setConnectProfile(await res.json().catch(() => null));
+        }
+      } catch {
+        if (!cancelled) setConnectProfile(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token, initializing]);
 
   useEffect(() => {
     setVisibleCount(COLLECTION_PAGE_SIZE);
@@ -929,6 +948,8 @@ export default function MyCollectionPage({ vaultView = false }) {
                         listingInfo={availableToList <= 0 && copiesListed > 0 ? familyListing : null}
                         copiesAvailable={availableToList}
                         busy={marketplaceBusyId === card.card_id}
+                        token={token}
+                        connectProfile={connectProfile}
                         onList={(price, isPriority) => listCardOnMarketplace(card.card_id, price, isPriority)}
                         onUnlist={() => unlistCardFromMarketplace(card.card_id)}
                         onListSuccess={() => setListSuccessOpen(true)}
@@ -1106,6 +1127,8 @@ export default function MyCollectionPage({ vaultView = false }) {
         copiesOwned={listingSheet?.card?.copies_owned || 1}
         copiesAvailable={listingSheet?.card?.copies_available ?? 1}
         busy={Boolean(marketplaceBusyId)}
+        token={token}
+        connectProfile={connectProfile}
         onClose={() => {
           setListingSheet(null);
         }}

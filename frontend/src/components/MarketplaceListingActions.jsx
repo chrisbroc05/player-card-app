@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import ListingModal from "./ListingModal";
+import MarketplaceConnectPrompt from "./MarketplaceConnectPrompt";
 import PriorityBadge, { isPriorityListing } from "./PriorityBadge";
 import { toApiUrl } from "../config/api";
 import { getCardBannerStyles } from "../utils/cardBannerStyles";
@@ -20,6 +21,8 @@ export default function MarketplaceListingActions({
   listButtonLabel = "List on Marketplace",
   listedActionLabel,
   listedTagLabel,
+  token = "",
+  connectProfile = null,
 }) {
   const [open, setOpen] = useState(false);
   const [listSuccessOpen, setListSuccessOpen] = useState(false);
@@ -87,6 +90,8 @@ export default function MarketplaceListingActions({
         open={open}
         card={card}
         busy={busy}
+        token={token}
+        connectProfile={connectProfile}
         onClose={() => setOpen(false)}
         onList={onList}
         onListSuccess={() => {
@@ -106,14 +111,16 @@ export default function MarketplaceListingActions({
   );
 }
 
-function SingleCardListingModal({ open, card, busy, onClose, onList, onListSuccess }) {
+function SingleCardListingModal({ open, card, busy, token, connectProfile, onClose, onList, onListSuccess }) {
   const [price, setPrice] = useState("");
   const [localError, setLocalError] = useState("");
+  const [connectGateActive, setConnectGateActive] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setPrice("");
     setLocalError("");
+    setConnectGateActive(false);
   }, [open]);
 
   const priceNum = Number(price);
@@ -153,6 +160,7 @@ function SingleCardListingModal({ open, card, busy, onClose, onList, onListSucce
       setPrice("");
       onListSuccess?.();
     } catch (err) {
+      setConnectGateActive(Boolean(err.connectRequired));
       setLocalError(err.message || "Could not list card.");
     }
   }
@@ -215,6 +223,16 @@ function SingleCardListingModal({ open, card, busy, onClose, onList, onListSucce
         </div>
 
         {localError ? <p className="bulk-list-sheet__error">{localError}</p> : null}
+        {connectGateActive ? (
+          <div className="single-list-modal__section">
+            <MarketplaceConnectPrompt
+              profile={connectProfile}
+              token={token}
+              compact
+              requireSellReady
+            />
+          </div>
+        ) : null}
 
         <button
           type="submit"

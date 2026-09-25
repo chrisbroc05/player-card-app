@@ -1714,6 +1714,7 @@ class UserPublic(BaseModel):
     display_name: str
     created_at: str
     credit_balance: float = 0.0
+    marketplace_balance: float = 0.0
 
 
 class AuthTokenResponse(BaseModel):
@@ -1732,6 +1733,7 @@ def _user_public(user: User) -> UserPublic:
         display_name=user.display_name,
         created_at=created.isoformat(),
         credit_balance=float_from_decimal(user.credit_balance),
+        marketplace_balance=float_from_decimal(getattr(user, "marketplace_balance", None) or 0),
     )
 
 

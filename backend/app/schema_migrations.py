@@ -694,3 +694,117 @@ def run_schema_migrations_after_models(engine: Engine) -> None:
                         """
                     )
                 )
+
+        if "users" in insp.get_table_names():
+            ucols = {c["name"] for c in insp.get_columns("users")}
+            if "marketplace_balance" not in ucols:
+                if dialect == "postgresql":
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS "
+                            "marketplace_balance NUMERIC(10,2) NOT NULL DEFAULT 0.00"
+                        )
+                    )
+                else:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ADD COLUMN marketplace_balance "
+                            "NUMERIC(10,2) NOT NULL DEFAULT 0.00"
+                        )
+                    )
+            if "stripe_charges_enabled" not in ucols:
+                if dialect == "postgresql":
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS "
+                            "stripe_charges_enabled BOOLEAN NOT NULL DEFAULT false"
+                        )
+                    )
+                else:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ADD COLUMN stripe_charges_enabled "
+                            "BOOLEAN NOT NULL DEFAULT 0"
+                        )
+                    )
+
+        tables = set(insp.get_table_names())
+        if "credit_ledger" in tables:
+            lcols = {c["name"] for c in insp.get_columns("credit_ledger")}
+            if "balance_type" not in lcols:
+                if dialect == "postgresql":
+                    conn.execute(
+                        text(
+                            "ALTER TABLE credit_ledger ADD COLUMN IF NOT EXISTS "
+                            "balance_type VARCHAR(16) NOT NULL DEFAULT 'card'"
+                        )
+                    )
+                else:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE credit_ledger ADD COLUMN balance_type "
+                            "VARCHAR(16) NOT NULL DEFAULT 'card'"
+                        )
+                    )
+
+        tables = set(insp.get_table_names())
+        if "platform_revenue_ledger" not in tables:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE IF NOT EXISTS platform_revenue_ledger (
+                            id SERIAL PRIMARY KEY,
+                            amount NUMERIC(10,2) NOT NULL,
+                            source VARCHAR(32) NOT NULL,
+                            reference_id VARCHAR(128),
+                            note TEXT,
+                            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                        )
+                        """
+                    )
+                )
+            else:
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE platform_revenue_ledger (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            amount NUMERIC(10,2) NOT NULL,
+                            source VARCHAR(32) NOT NULL,
+                            reference_id VARCHAR(128),
+                            note TEXT,
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """
+                    )
+                )
+
+        tables = set(insp.get_table_names())
+        if "processed_stripe_events" not in tables:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE IF NOT EXISTS processed_stripe_events (
+                            id SERIAL PRIMARY KEY,
+                            event_id VARCHAR(255) NOT NULL UNIQUE,
+                            event_type VARCHAR(64) NOT NULL,
+                            processed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                        )
+                        """
+                    )
+                )
+            else:
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE processed_stripe_events (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            event_id VARCHAR(255) NOT NULL UNIQUE,
+                            event_type VARCHAR(64) NOT NULL,
+                            processed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """
+                    )
+                )

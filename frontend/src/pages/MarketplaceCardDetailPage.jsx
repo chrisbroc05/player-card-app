@@ -86,12 +86,12 @@ export default function MarketplaceCardDetailPage() {
         const { res } = await authFetch(token, "/credits/balance");
         const data = await res.json().catch(() => ({}));
         if (!cancelled && res.ok) {
-          setBuyerBalance(Number(data.credit_balance) || 0);
+          setBuyerBalance(Number(data.marketplace_balance ?? data.credit_balance) || 0);
         } else if (!cancelled) {
-          setBuyerBalance(Number(user.credit_balance) || 0);
+          setBuyerBalance(Number(user.marketplace_balance ?? user.credit_balance) || 0);
         }
       } catch {
-        if (!cancelled) setBuyerBalance(Number(user.credit_balance) || 0);
+        if (!cancelled) setBuyerBalance(Number(user.marketplace_balance ?? user.credit_balance) || 0);
       }
     }
     loadBalance();
@@ -441,7 +441,8 @@ function OfferPanel({
         <>
           {buyerBalance != null ? (
             <p className="rounded-lg border border-white/10 bg-cardBg2 px-3 py-2 text-sm text-slate-300">
-              Your balance: <span className="font-semibold text-brand-gold">{formatMoney(buyerBalance)}</span>
+              Marketplace balance:{" "}
+              <span className="font-semibold text-brand-gold">{formatMoney(buyerBalance)}</span>
             </p>
           ) : null}
 

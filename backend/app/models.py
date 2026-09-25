@@ -25,9 +25,13 @@ class User(Base):
     google_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     parent_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
     credit_balance: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("0.00"), nullable=False)
+    marketplace_balance: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2), default=Decimal("0.00"), nullable=False
+    )
     stripe_account_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     stripe_account_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
     stripe_onboarding_complete: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    stripe_charges_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     stripe_payouts_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     settings: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     reset_token: Mapped[str | None] = mapped_column(String(100), nullable=True)
@@ -65,9 +69,30 @@ class CreditLedger(Base):
     transaction_type: Mapped[str] = mapped_column(String(32), nullable=False)
     reference_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    balance_type: Mapped[str] = mapped_column(String(16), default="card", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     user: Mapped["User"] = relationship("User", back_populates="credit_ledger_entries", foreign_keys=[user_id])
+
+
+class PlatformRevenueLedger(Base):
+    __tablename__ = "platform_revenue_ledger"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    source: Mapped[str] = mapped_column(String(32), nullable=False)
+    reference_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ProcessedStripeEvent(Base):
+    __tablename__ = "processed_stripe_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    event_id: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    processed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class Card(Base):

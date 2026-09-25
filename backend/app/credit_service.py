@@ -78,6 +78,7 @@ def _append_ledger_row(
     transaction_type: str,
     reference_id: str | None,
     note: str | None,
+    balance_type: str = "card",
 ) -> CreditLedger:
     tx = (transaction_type or "").strip().lower()
     if tx not in VALID_TRANSACTION_TYPES:
@@ -89,6 +90,7 @@ def _append_ledger_row(
         transaction_type=tx,
         reference_id=(reference_id or "").strip() or None,
         note=(note or "").strip() or None,
+        balance_type=(balance_type or "card").strip() or "card",
         created_at=utcnow(),
     )
     db.add(row)
@@ -320,6 +322,7 @@ def ledger_row_dict(row: CreditLedger) -> dict[str, Any]:
         "transaction_type": row.transaction_type,
         "reference_id": row.reference_id or "",
         "note": row.note or "",
+        "balance_type": getattr(row, "balance_type", None) or "card",
         "created_at": row.created_at.isoformat() if row.created_at else "",
     }
 
@@ -430,11 +433,15 @@ def get_ledger(
     limit: int = 50,
     offset: int = 0,
     category: str | None = None,
+    balance_type: str | None = None,
 ) -> list[dict[str, Any]]:
     """Paginated ledger entries for a user, most recent first."""
     lim = max(1, min(int(limit), 200))
     off = max(0, int(offset))
     q = db.query(CreditLedger).filter(CreditLedger.user_id == user_id)
+    bt = (balance_type or "").strip().lower()
+    if bt and bt != "all":
+        q = q.filter(CreditLedger.balance_type == bt)
     cat = (category or "").strip().lower()
     if cat and cat != "all":
         allowed = LEDGER_CATEGORY_TYPES.get(cat)

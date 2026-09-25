@@ -11,6 +11,23 @@ export function formatApiError(detail, fallback) {
   return fallback;
 }
 
+/** Build an Error from a marketplace list/connect API detail payload. */
+export function marketplaceListErrorFromDetail(detail, fallback = "Could not list card.") {
+  if (
+    detail &&
+    typeof detail === "object" &&
+    detail.code === "stripe_onboarding_incomplete"
+  ) {
+    const err = new Error(detail.message || "Complete Stripe onboarding to sell on the marketplace.");
+    err.connectRequired = true;
+    err.connectCode = detail.code;
+    return err;
+  }
+  const err = new Error(formatApiError(detail, fallback));
+  err.connectRequired = false;
+  return err;
+}
+
 /**
  * Authenticated fetch; on 401 clears token and returns { unauthorized: true }.
  */

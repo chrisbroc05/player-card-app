@@ -43,10 +43,37 @@ class ConnectUrlResponse(BaseModel):
 class ConnectStatusResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    stripe_connect_account_id: str | None = None
+    stripe_account_id: str | None = None
     stripe_account_status: str | None = None
     stripe_onboarding_complete: bool = False
+    stripe_charges_enabled: bool = False
     stripe_payouts_enabled: bool = False
     charges_enabled: bool = False
+    payouts_enabled: bool = False
+
+
+@router.get("/status", response_model=ConnectStatusResponse)
+def connect_status(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Return current Stripe Connect status for the authenticated user."""
+    require_payments_enabled()
+    if user.stripe_account_id:
+        status = sync_connect_account_status(db, user)
+    else:
+        status = {
+            "stripe_connect_account_id": None,
+            "stripe_account_id": None,
+            "stripe_account_status": None,
+            "stripe_onboarding_complete": False,
+            "stripe_charges_enabled": False,
+            "stripe_payouts_enabled": False,
+            "charges_enabled": False,
+            "payouts_enabled": False,
+        }
+    return ConnectStatusResponse(**status)
 
 
 @router.post("/create-account", response_model=ConnectAccountResponse)
@@ -89,7 +116,16 @@ def connect_refresh_status(
     """Fetch current Stripe Connect account status and update the user record."""
     require_payments_enabled()
     if not user.stripe_account_id:
-        raise HTTPException(status_code=400, detail="No Stripe Connect account")
+        return ConnectStatusResponse(
+            stripe_connect_account_id=None,
+            stripe_account_id=None,
+            stripe_account_status=None,
+            stripe_onboarding_complete=False,
+            stripe_charges_enabled=False,
+            stripe_payouts_enabled=False,
+            charges_enabled=False,
+            payouts_enabled=False,
+        )
     status = sync_connect_account_status(db, user)
     return ConnectStatusResponse(**status)
 

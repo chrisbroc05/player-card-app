@@ -3,13 +3,10 @@
 from __future__ import annotations
 
 import logging
-import os
 import re
-import uuid
 from datetime import timedelta
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 
-import stripe
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import asc, desc, func, or_
@@ -18,11 +15,10 @@ from sqlalchemy.orm import Session
 from auth import get_current_user, get_optional_current_user
 from card_repo import get_card_by_card_id
 from copy_limits import validate_bulk_list_quantity
-from credit_service import (
-    InsufficientCreditsError,
-    TX_ROYALTY,
-    add_credits,
-    deduct_credits,
+from marketplace_service import (
+    InsufficientMarketplaceBalanceError,
+    require_seller_onboarding_complete,
+    settle_marketplace_cash_sale,
 )
 from database import get_db
 from email_service import (
@@ -53,7 +49,6 @@ from marketplace_repo import (
     list_unlisted_copy_cards,
     listing_active_filter,
     listing_dict,
-    royalty_rate_percent_label,
     log_priority_listing_pending_charge,
     partition_and_sort_marketplace_rows,
     buyer_offer_row_dict,
@@ -82,15 +77,6 @@ logger = logging.getLogger(__name__)
 _CARD_ID_PATH_PATTERN = re.compile(r"^FL-(\d{4})-(\d{6})$", re.IGNORECASE)
 
 
-def _decimal_to_cents(amount: Decimal | float | int | None) -> int:
-    """Convert USD amount to integer cents with deterministic rounding."""
-    if amount is None:
-        return 0
-    dec = amount if isinstance(amount, Decimal) else Decimal(str(amount))
-    cents = (dec * Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-    return int(cents)
-
-
 def _canonical_card_id(raw: str) -> str | None:
     s = (raw or "").strip()
     m = _CARD_ID_PATH_PATTERN.match(s)
@@ -107,51 +93,6 @@ def _resolve_card(db: Session, card_id_raw: str) -> Card:
     if card is None:
         raise HTTPException(status_code=404, detail="Card not found")
     return card
-
-
-def _platform_admin_user(db: Session) -> User:
-    admin_email_raw = (os.environ.get("ADMIN_EMAIL") or "").strip()
-    admin_email = admin_email_raw.lower()
-    logger.info("Marketplace royalty lookup for ADMIN_EMAIL='%s'", admin_email_raw)
-    if not admin_email:
-        raise HTTPException(status_code=503, detail="ADMIN_EMAIL is not configured")
-    admin_user = db.query(User).filter(func.lower(User.email) == admin_email).first()
-    logger.info(
-        "Marketplace royalty admin lookup result for '%s': %s",
-        admin_email_raw,
-        f"user_id={admin_user.id}, email={admin_user.email}" if admin_user else "none",
-    )
-    if admin_user is None:
-        near_matches = (
-            db.query(User.id, User.email)
-            .filter(User.email.ilike(f"%{admin_email_raw}%"))
-            .limit(5)
-            .all()
-        )
-        logger.error(
-            "Admin account not found for email: %s. Near matches: %s",
-            admin_email_raw,
-            [(int(uid), email) for uid, email in near_matches],
-        )
-        logger.warning("Auto-creating platform admin user for marketplace royalties: %s", admin_email_raw)
-        admin_user = User(
-            email=admin_email,
-            display_name="Platform Admin",
-            hashed_password=f"!platform-admin-autocreated-{uuid.uuid4().hex}",
-            parent_email=None,
-        )
-        try:
-            db.add(admin_user)
-            db.flush()
-            logger.warning(
-                "Marketplace auto-created platform admin user: user_id=%s email=%s",
-                admin_user.id,
-                admin_user.email,
-            )
-        except Exception as exc:
-            logger.error("Failed to auto-create platform admin user in marketplace: %s", str(exc))
-            raise HTTPException(status_code=503, detail="Platform admin account not found") from exc
-    return admin_user
 
 
 def _tier_filter_values(tier: str) -> list[str] | None:
@@ -295,65 +236,38 @@ def _settle_cash_offer_credits(
     seller_id: int,
     amount_decimal: Decimal,
 ) -> tuple[User, User, float, float, float, float, float]:
-    buyer = db.query(User).filter(User.id == buyer_id).first()
-    if buyer is None:
-        raise HTTPException(status_code=400, detail="Buyer account not found")
-    seller = db.query(User).filter(User.id == seller_id).first()
-    if seller is None:
-        raise HTTPException(status_code=400, detail="Seller account not found")
-
-    offer_amount = float_from_decimal(amount_decimal)
-    if float(buyer.credit_balance or 0) < offer_amount:
-        raise HTTPException(status_code=400, detail="Buyer has insufficient credits")
-
-    royalty_amount_f = float_from_decimal(compute_royalty_amount(amount_decimal))
-    seller_receives_f = round(offer_amount - royalty_amount_f, 2)
-
     try:
-        buyer_row = deduct_credits(
-            user_id=buyer.id,
-            amount=offer_amount,
-            transaction_type="card_purchase",
-            reference_id=str(offer.id),
-            note=f"Purchased {card.player_name} ({card.card_id})",
-            db=db,
-            commit=False,
+        (
+            buyer,
+            seller,
+            offer_amount,
+            royalty_amount_f,
+            seller_receives_f,
+            buyer_balance_after,
+            seller_balance_after,
+            _transfer_id,
+        ) = settle_marketplace_cash_sale(
+            db,
+            offer=offer,
+            card=card,
+            buyer_id=buyer_id,
+            seller_id=seller_id,
+            amount_decimal=amount_decimal,
         )
-    except InsufficientCreditsError as e:
-        raise HTTPException(status_code=400, detail="Buyer has insufficient credits") from e
+    except InsufficientMarketplaceBalanceError as e:
+        raise HTTPException(
+            status_code=400,
+            detail="Buyer has insufficient marketplace balance",
+        ) from e
 
-    seller_row = add_credits(
-        user_id=seller.id,
-        amount=seller_receives_f,
-        transaction_type="card_sale",
-        reference_id=str(offer.id),
-        note=f"Sold {card.player_name} ({card.card_id})",
-        db=db,
-    )
-
-    platform_admin = _platform_admin_user(db)
-    add_credits(
-        user_id=platform_admin.id,
-        amount=royalty_amount_f,
-        transaction_type=TX_ROYALTY,
-        reference_id=str(offer.id),
-        note=(
-            f"{royalty_rate_percent_label()} royalty - "
-            f"{buyer.display_name} purchased {card.player_name} ({card.card_id}) "
-            f"from {seller.display_name} for ${offer_amount:.2f}"
-        ),
-        db=db,
-    )
-
-    offer.royalty_amount = decimal_from_float(royalty_amount_f)
     return (
         buyer,
         seller,
         offer_amount,
         royalty_amount_f,
         seller_receives_f,
-        float_from_decimal(buyer_row.balance_after),
-        float_from_decimal(seller_row.balance_after),
+        buyer_balance_after,
+        seller_balance_after,
     )
 
 
@@ -363,6 +277,7 @@ def marketplace_list(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    require_seller_onboarding_complete(db, current_user)
     card = _resolve_card(db, body.card_id)
     if card.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="You do not own this card")
@@ -433,6 +348,7 @@ def marketplace_bulk_list(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    require_seller_onboarding_complete(db, current_user)
     anchor = _resolve_card(db, body.card_id)
     if anchor.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="You do not own this card")
@@ -810,40 +726,7 @@ def marketplace_accept_offer(
 
     amount_f = float_from_decimal(offer.offer_amount)
     collection_url = f"{frontend_url()}/my-collection"
-    payout_initiated = False
-
-    if (
-        not _is_card_trade_offer(offer)
-        and current_user.stripe_payouts_enabled
-        and (current_user.stripe_account_id or "").strip()
-    ):
-        try:
-            stripe.api_key = (os.environ.get("STRIPE_SECRET_KEY") or "").strip()
-            gross_cents = _decimal_to_cents(offer.offer_amount)
-            royalty_cents = _decimal_to_cents(offer.royalty_amount)
-            net_transfer_cents = max(0, gross_cents - royalty_cents)
-            stripe.Transfer.create(
-                amount=net_transfer_cents,
-                currency="usd",
-                destination=current_user.stripe_account_id,
-                transfer_group=str(offer.id),
-                description=f"Marketplace sale payout for {card.card_id}",
-                metadata={
-                    "offer_id": str(offer.id),
-                    "card_id": card.card_id,
-                    "gross_cents": str(gross_cents),
-                    "royalty_cents": str(royalty_cents),
-                    "net_transfer_cents": str(net_transfer_cents),
-                },
-            )
-            payout_initiated = True
-            print(
-                f"TRANSFER SUCCESS: ${net_transfer_cents / 100:.2f} to {current_user.stripe_account_id} "
-                f"(gross=${gross_cents / 100:.2f}, royalty=${royalty_cents / 100:.2f})",
-                flush=True,
-            )
-        except Exception as e:
-            print(f"TRANSFER ERROR: {str(e)}", flush=True)
+    payout_initiated = not _is_card_trade_offer(offer)
 
     schedule_user_email(
         background_tasks,
@@ -1126,40 +1009,7 @@ def marketplace_offer_counter_accept(
 
     amount_f = float_from_decimal(offer.counter_amount or offer.offer_amount)
     collection_url = f"{frontend_url()}/my-collection"
-    payout_initiated = False
-
-    if (
-        not _is_card_trade_offer(offer)
-        and seller.stripe_payouts_enabled
-        and (seller.stripe_account_id or "").strip()
-    ):
-        try:
-            stripe.api_key = (os.environ.get("STRIPE_SECRET_KEY") or "").strip()
-            gross_cents = _decimal_to_cents(offer.offer_amount)
-            royalty_cents = _decimal_to_cents(offer.royalty_amount)
-            net_transfer_cents = max(0, gross_cents - royalty_cents)
-            stripe.Transfer.create(
-                amount=net_transfer_cents,
-                currency="usd",
-                destination=seller.stripe_account_id,
-                transfer_group=str(offer.id),
-                description=f"Marketplace counter sale payout for {card.card_id}",
-                metadata={
-                    "offer_id": str(offer.id),
-                    "card_id": card.card_id,
-                    "gross_cents": str(gross_cents),
-                    "royalty_cents": str(royalty_cents),
-                    "net_transfer_cents": str(net_transfer_cents),
-                },
-            )
-            payout_initiated = True
-            print(
-                f"TRANSFER SUCCESS: ${net_transfer_cents / 100:.2f} to {seller.stripe_account_id} "
-                f"(gross=${gross_cents / 100:.2f}, royalty=${royalty_cents / 100:.2f})",
-                flush=True,
-            )
-        except Exception as e:
-            print(f"TRANSFER ERROR: {str(e)}", flush=True)
+    payout_initiated = not _is_card_trade_offer(offer)
 
     schedule_user_email(
         background_tasks,

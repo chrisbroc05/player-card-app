@@ -380,12 +380,14 @@ function PayoutSettings({ token, profile, loading, onProfileUpdate }) {
   const [error, setError] = useState("");
   const autoRefreshed = useRef(false);
 
+  const chargesEnabled =
+    profile?.stripe_charges_enabled === true || profile?.charges_enabled === true;
   const connected =
-    profile?.stripe_onboarding_complete === true && profile?.stripe_payouts_enabled === true;
+    chargesEnabled && profile?.stripe_payouts_enabled === true;
   const pending =
     !connected &&
-    profile?.stripe_account_status === "pending" &&
-    profile?.stripe_onboarding_complete !== true;
+    (profile?.stripe_connect_account_id || profile?.stripe_account_id) &&
+    profile?.stripe_account_status === "pending";
 
   const refreshStatus = useCallback(async () => {
     const authToken = (token || localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) || "").trim();
@@ -408,8 +410,10 @@ function PayoutSettings({ token, profile, loading, onProfileUpdate }) {
         throw new Error(formatApiError(data?.detail, "Could not refresh payout status."));
       }
       onProfileUpdate?.({
+        stripe_connect_account_id: data.stripe_connect_account_id ?? data.stripe_account_id,
         stripe_account_status: data.stripe_account_status,
         stripe_onboarding_complete: data.stripe_onboarding_complete,
+        stripe_charges_enabled: data.stripe_charges_enabled ?? data.charges_enabled,
         stripe_payouts_enabled: data.stripe_payouts_enabled,
       });
     } catch (err) {
@@ -505,7 +509,7 @@ function PayoutSettings({ token, profile, loading, onProfileUpdate }) {
           Bank Account Connected
         </span>
         <p className="text-sm text-slate-400">
-          Payouts enabled. Earnings from card sales will be available to withdraw.
+          Marketplace payouts enabled. Withdraw marketplace earnings from the Credits page.
         </p>
         <button
           type="button"

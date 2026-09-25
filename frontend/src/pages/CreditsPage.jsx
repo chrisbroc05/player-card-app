@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
+import MarketplaceConnectPrompt from "../components/MarketplaceConnectPrompt";
 import { useAuth } from "../context/AuthContext";
 import { authFetch, formatApiError } from "../utils/authFetch";
 import { formatMoney } from "../utils/marketplace";
@@ -133,11 +134,16 @@ export default function CreditsPage() {
   const [withdrawErrorModalMessage, setWithdrawErrorModalMessage] = useState("");
   const [withdrawSuccessData, setWithdrawSuccessData] = useState(null);
   const [payoutsEnabled, setPayoutsEnabled] = useState(false);
+  const [chargesEnabled, setChargesEnabled] = useState(false);
+  const [connectProfile, setConnectProfile] = useState(null);
+  const [marketplaceBalance, setMarketplaceBalance] = useState(0);
   const [profileLoading, setProfileLoading] = useState(true);
+  const [marketplaceCheckoutBusy, setMarketplaceCheckoutBusy] = useState(false);
   const [error, setError] = useState("");
   const [banner, setBanner] = useState("");
 
-  const balance = user?.credit_balance ?? 0;
+  const cardBalance = user?.credit_balance ?? 0;
+  const balance = marketplaceBalance;
 
   const parsedWithdrawAmount = useMemo(() => {
     const n = Number(withdrawAmount);
@@ -227,43 +233,60 @@ export default function CreditsPage() {
     loadLedger();
   }, [token, initializing, loadLedger]);
 
+  const loadBalancesAndProfile = useCallback(async () => {
+    if (!token) return;
+    setProfileLoading(true);
+    try {
+      const [balRes, profileRes] = await Promise.all([
+        authFetch(token, "/credits/balance"),
+        authFetch(token, "/auth/profile"),
+      ]);
+      if (balRes.res.ok) {
+        const balData = await balRes.res.json().catch(() => ({}));
+        setMarketplaceBalance(Number(balData.marketplace_balance) || 0);
+      }
+      if (profileRes.res.ok) {
+        const data = await profileRes.res.json().catch(() => ({}));
+        setConnectProfile(data);
+        setPayoutsEnabled(data.stripe_payouts_enabled === true);
+        setChargesEnabled(data.stripe_charges_enabled === true);
+      }
+    } catch {
+      setPayoutsEnabled(false);
+    } finally {
+      setProfileLoading(false);
+    }
+  }, [token]);
+
   useEffect(() => {
     if (!token || initializing) {
       setProfileLoading(false);
       return;
     }
-    let cancelled = false;
-    (async () => {
-      setProfileLoading(true);
-      try {
-        const { res } = await authFetch(token, "/auth/profile");
-        if (cancelled) return;
-        if (res.ok) {
-          const data = await res.json().catch(() => ({}));
-          setPayoutsEnabled(data.stripe_payouts_enabled === true);
-        }
-      } catch {
-        if (!cancelled) setPayoutsEnabled(false);
-      } finally {
-        if (!cancelled) setProfileLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [token, initializing]);
+    loadBalancesAndProfile();
+  }, [token, initializing, loadBalancesAndProfile]);
 
   useEffect(() => {
     if (searchParams.get("success") === "true") {
-      setBanner("Credits added to your account successfully!");
+      setBanner("Card creation credits added successfully!");
       refreshUser?.();
       loadLedger();
+      loadBalancesAndProfile();
       setSearchParams({}, { replace: true });
     } else if (searchParams.get("cancelled") === "true") {
       setBanner("Checkout cancelled. No charges were made.");
       setSearchParams({}, { replace: true });
+    } else if (searchParams.get("marketplace_success") === "true") {
+      setBanner("Marketplace funds added successfully!");
+      refreshUser?.();
+      loadLedger();
+      loadBalancesAndProfile();
+      setSearchParams({}, { replace: true });
+    } else if (searchParams.get("marketplace_cancelled") === "true") {
+      setBanner("Marketplace checkout cancelled. No charges were made.");
+      setSearchParams({}, { replace: true });
     }
-  }, [searchParams, setSearchParams, refreshUser, loadLedger]);
+  }, [searchParams, setSearchParams, refreshUser, loadLedger, loadBalancesAndProfile]);
 
   useEffect(() => {
     if (!token || giftQuery.trim().length < 3) {
@@ -294,7 +317,7 @@ export default function CreditsPage() {
       return;
     }
     if (n > balance) {
-      setWithdrawError("Insufficient credits");
+      setWithdrawError("Insufficient marketplace balance");
       return;
     }
     setWithdrawConfirmOpen(true);
@@ -331,7 +354,8 @@ export default function CreditsPage() {
           )
         );
       }
-      const newBalance = Number(data.credit_balance);
+      const newBalance = Number(data.marketplace_balance ?? data.credit_balance);
+      setMarketplaceBalance(Number.isFinite(newBalance) ? newBalance : balance - n);
       setWithdrawAmount("");
       await Promise.all([refreshUser?.(), loadLedger()]);
       setWithdrawSuccessData({
@@ -348,6 +372,43 @@ export default function CreditsPage() {
       setWithdrawErrorOpen(true);
     } finally {
       setWithdrawBusy(false);
+    }
+  }
+
+  async function startMarketplaceCheckout() {
+    if (!token) return;
+    setError("");
+    const n = resolvedAmount;
+    if (n == null || !isValidCreditLoadAmount(n)) {
+      setError(`Select or enter an amount of at least ${minCreditPurchaseLabel()}`);
+      return;
+    }
+    setMarketplaceCheckoutBusy(true);
+    try {
+      const { res, unauthorized } = await authFetch(token, "/credits/marketplace-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount_dollars: n }),
+      });
+      if (unauthorized) {
+        setError("Session expired. Please sign in again.");
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 503) {
+        setPaymentsDisabled(true);
+        throw new Error(formatApiError(data?.detail, "Payments not yet enabled"));
+      }
+      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not start marketplace checkout."));
+      if (data.checkout_url) {
+        window.location.href = data.checkout_url;
+        return;
+      }
+      throw new Error("No checkout URL returned.");
+    } catch (e) {
+      setError(e.message || "Checkout failed.");
+    } finally {
+      setMarketplaceCheckoutBusy(false);
     }
   }
 
@@ -400,9 +461,17 @@ export default function CreditsPage() {
     <div className="min-h-screen overflow-x-hidden bg-appBg text-slate-100">
       <AppHeader />
       <main className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-8 text-center">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Your balance</p>
-          <p className="mt-2 text-4xl font-bold tabular-nums text-brand-gold">{formatMoney(balance)}</p>
+        <div className="mb-8 grid gap-4 sm:grid-cols-2">
+          <div className="rounded-2xl border border-white/10 bg-cardBg p-5 text-center">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Card creation credits</p>
+            <p className="mt-2 text-3xl font-bold tabular-nums text-brand-gold">{formatMoney(cardBalance)}</p>
+            <p className="mt-1 text-xs text-slate-500">Studio generation, animation & highlights</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-cardBg p-5 text-center">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Marketplace balance</p>
+            <p className="mt-2 text-3xl font-bold tabular-nums text-brand-gold">{formatMoney(marketplaceBalance)}</p>
+            <p className="mt-1 text-xs text-slate-500">Buy & sell cards only — not usable in Studio</p>
+          </div>
         </div>
 
         {banner ? (
@@ -425,8 +494,10 @@ export default function CreditsPage() {
         ) : null}
 
         <section className="mb-8 rounded-2xl border border-white/10 bg-cardBg p-5">
-          <h2 className="text-lg font-semibold text-white">Add Credits</h2>
-          <p className="mt-1 text-sm text-slate-400">Load credits into your account via Stripe (test mode).</p>
+          <h2 className="text-lg font-semibold text-white">Add Card Creation Credits</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Load credits for Studio card generation via Stripe (direct platform charge — test mode).
+          </p>
 
           <div className="mt-4 flex flex-wrap gap-2">
             {PRESET_AMOUNTS.map((amt) => (
@@ -489,19 +560,40 @@ export default function CreditsPage() {
           </button>
         </section>
 
+        <section className="mb-8 rounded-2xl border border-white/10 bg-cardBg p-5">
+          <h2 className="text-lg font-semibold text-white">Load Marketplace Funds</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Add spending balance for marketplace purchases. Requires a Stripe Connect account (Express).
+          </p>
+          <div className="mt-4">
+            <MarketplaceConnectPrompt profile={connectProfile} token={token} compact />
+          </div>
+          <button
+            type="button"
+            disabled={paymentsDisabled || marketplaceCheckoutBusy || !checkoutAmountValid}
+            onClick={startMarketplaceCheckout}
+            className="mt-5 min-h-[48px] w-full rounded-xl btn-secondary font-semibold disabled:opacity-50"
+          >
+            {marketplaceCheckoutBusy ? "Redirecting to Stripe…" : `Load ${loadCreditsButtonLabel.replace("Load ", "")} to Marketplace`}
+          </button>
+        </section>
+
         <section id="withdraw" className="mb-8 rounded-2xl border border-white/10 bg-cardBg p-5">
-          <h2 className="text-lg font-semibold text-white">Withdraw Earnings</h2>
+          <h2 className="text-lg font-semibold text-white">Withdraw Marketplace Earnings</h2>
           {profileLoading ? (
             <div className="mt-6 flex justify-center py-6">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-[var(--color-gold-primary)]" />
             </div>
           ) : balance <= 0 ? (
             <p className="mt-3 text-sm text-slate-400">
-              You have no credits to withdraw. Sell cards on the marketplace to earn credits.
+              You have no marketplace balance to withdraw. Sell cards on the marketplace to earn funds.
             </p>
           ) : payoutsEnabled ? (
             <>
-              <p className="mt-1 text-sm text-slate-400">Transfer your credit balance to your connected bank account.</p>
+              <p className="mt-1 text-sm text-slate-400">
+                Payout from your Stripe Express account to your linked bank. Timing follows Stripe&apos;s payout
+                schedule (typically 2–7 business days in test mode).
+              </p>
               <p className="mt-4 text-xs font-medium uppercase tracking-wide text-slate-500">Available to withdraw</p>
               <p className="mt-1 text-3xl font-bold tabular-nums text-brand-gold">{formatMoney(balance)}</p>
 
@@ -562,14 +654,15 @@ export default function CreditsPage() {
             </>
           ) : (
             <>
+              <MarketplaceConnectPrompt profile={connectProfile} token={token} compact requireSellReady />
               <p className="mt-3 text-sm text-slate-400">
-                Connect your bank account to withdraw your earnings.
+                Complete Stripe onboarding to withdraw marketplace earnings to your bank.
               </p>
               <Link
                 to="/profile"
-                className="mt-5 flex min-h-[48px] w-full items-center justify-center rounded-xl btn-primary font-semibold"
+                className="mt-5 flex min-h-[48px] w-full items-center justify-center rounded-xl btn-secondary font-semibold"
               >
-                Connect Bank Account
+                Manage payout settings
               </Link>
             </>
           )}

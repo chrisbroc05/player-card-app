@@ -42,19 +42,25 @@ def ensure_connect_account(db: Session, user: User) -> str:
     frontend = (os.environ.get("FRONTEND_URL") or "").strip().rstrip("/")
     if not frontend:
         raise RuntimeError("FRONTEND_URL is not configured")
+    logger.info("Creating Stripe Connect Express account for user %s", user.id)
     account = stripe.Account.create(
         type="express",
         country="US",
         email=user.email,
         business_profile={"url": frontend},
-        capabilities={"transfers": {"requested": True}},
+        capabilities={
+            "card_payments": {"requested": True},
+            "transfers": {"requested": True},
+        },
     )
     user.stripe_account_id = account.id
     user.stripe_account_status = STATUS_PENDING
     user.stripe_onboarding_complete = False
+    user.stripe_charges_enabled = False
     user.stripe_payouts_enabled = False
     db.commit()
     db.refresh(user)
+    logger.info("Connect account created: %s for user %s", account.id, user.id)
     return account.id
 
 
@@ -72,8 +78,8 @@ def create_onboarding_link(db: Session, user: User) -> str:
 
     link = stripe.AccountLink.create(
         account=stripe_account_id,
-        refresh_url=f"{frontend}/profile",
-        return_url=f"{frontend}/profile",
+        refresh_url=f"{frontend}/profile?connect=refresh",
+        return_url=f"{frontend}/profile?connect=complete",
         type=link_type,
     )
     url = link.url
@@ -82,12 +88,16 @@ def create_onboarding_link(db: Session, user: User) -> str:
     return url
 
 
-def connect_status_payload(user: User, *, charges_enabled: bool = False) -> dict[str, bool | str | None]:
+def connect_status_payload(user: User) -> dict[str, bool | str | None]:
     return {
+        "stripe_connect_account_id": user.stripe_account_id,
+        "stripe_account_id": user.stripe_account_id,
         "stripe_account_status": user.stripe_account_status,
         "stripe_onboarding_complete": bool(user.stripe_onboarding_complete),
+        "stripe_charges_enabled": bool(getattr(user, "stripe_charges_enabled", False)),
         "stripe_payouts_enabled": bool(user.stripe_payouts_enabled),
-        "charges_enabled": charges_enabled,
+        "charges_enabled": bool(getattr(user, "stripe_charges_enabled", False)),
+        "payouts_enabled": bool(user.stripe_payouts_enabled),
     }
 
 
@@ -96,7 +106,6 @@ def sync_connect_account_status(db: Session, user: User) -> dict[str, bool | str
     if not user.stripe_account_id:
         return connect_status_payload(user)
 
-    charges_enabled = False
     try:
         _configure_stripe()
         account = stripe.Account.retrieve(user.stripe_account_id)
@@ -105,12 +114,22 @@ def sync_connect_account_status(db: Session, user: User) -> dict[str, bool | str
         details_submitted = bool(getattr(account, "details_submitted", False))
 
         user.stripe_payouts_enabled = payouts_enabled
-        user.stripe_account_status = STATUS_ACTIVE if payouts_enabled else STATUS_PENDING
-        user.stripe_onboarding_complete = (
-            details_submitted or payouts_enabled or charges_enabled
-        )
+        user.stripe_charges_enabled = charges_enabled
+        if payouts_enabled and charges_enabled:
+            user.stripe_account_status = STATUS_ACTIVE
+        elif details_submitted:
+            user.stripe_account_status = STATUS_PENDING
+        else:
+            user.stripe_account_status = STATUS_PENDING
+        user.stripe_onboarding_complete = details_submitted or payouts_enabled or charges_enabled
         db.commit()
         db.refresh(user)
+        logger.info(
+            "Connect status synced for user %s: charges=%s payouts=%s",
+            user.id,
+            charges_enabled,
+            payouts_enabled,
+        )
     except Exception as exc:
         logger.warning(
             "Failed to sync Stripe Connect status for user %s: %s",
@@ -119,7 +138,7 @@ def sync_connect_account_status(db: Session, user: User) -> dict[str, bool | str
         )
         db.rollback()
 
-    return connect_status_payload(user, charges_enabled=charges_enabled)
+    return connect_status_payload(user)
 
 
 def create_dashboard_link(user: User) -> str:
