@@ -39,6 +39,18 @@ def _configure_stripe() -> None:
     stripe.api_key = (os.environ.get("STRIPE_SECRET_KEY") or "").strip()
 
 
+def _as_stripe_dict(obj) -> dict:
+    """Normalize stripe SDK objects (v15+) or plain dicts for handler code."""
+    if obj is None:
+        return {}
+    if isinstance(obj, dict):
+        return obj
+    to_dict = getattr(obj, "to_dict", None)
+    if callable(to_dict):
+        return to_dict()
+    return dict(obj)
+
+
 def _handle_checkout_completed(db: Session, session: dict, event_id: str) -> None:
     metadata = session.get("metadata") or {}
     fund_type = (metadata.get("fund_type") or "card").strip().lower()
@@ -179,8 +191,9 @@ async def stripe_webhook(request: Request):
         logger.warning("WEBHOOK signature verification failed: %s", exc)
         return JSONResponse(status_code=400, content={"detail": "Invalid signature"})
 
-    event_id = event.get("id") or ""
-    event_type = event.get("type") or ""
+    event_dict = _as_stripe_dict(event)
+    event_id = event_dict.get("id") or ""
+    event_type = event_dict.get("type") or ""
     logger.info("WEBHOOK event type=%s id=%s", event_type, event_id)
 
     try:
@@ -189,13 +202,8 @@ async def stripe_webhook(request: Request):
                 logger.info("WEBHOOK already processed: %s", event_id)
                 return {"received": True, "duplicate": True}
 
-            obj = event["data"]["object"]
-            if hasattr(obj, "_to_dict_recursive"):
-                obj_dict = obj._to_dict_recursive()
-            elif isinstance(obj, dict):
-                obj_dict = obj
-            else:
-                obj_dict = dict(obj)
+            data = event_dict.get("data") or {}
+            obj_dict = _as_stripe_dict(data.get("object"))
 
             if event_type == "checkout.session.completed":
                 _handle_checkout_completed(db, obj_dict, event_id)
