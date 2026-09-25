@@ -13,9 +13,9 @@ _TIER_ENV_KEYS: dict[str, str] = {
 }
 
 _TIER_DEFAULTS: dict[str, float] = {
-    "rookie": 2.00,
-    "all_star": 4.00,
-    "legends": 6.00,
+    "rookie": 2.50,
+    "all_star": 4.50,
+    "legends": 6.50,
 }
 
 _CARD_TIER_TO_ORDER: dict[str, str] = {
@@ -47,11 +47,49 @@ def _parse_price(raw: str | None, default: float) -> float:
 
 
 def tier_generation_price(tier: str | None) -> float:
-    """Per-preview regeneration price for the given order tier (not additional copies)."""
+    """Per-preview regeneration price for the given order tier (legacy credit path)."""
     key = normalize_order_tier(tier)
     env_name = _TIER_ENV_KEYS[key]
     default = _TIER_DEFAULTS[key]
     return _parse_price(os.environ.get(env_name), default)
+
+
+def card_creation_price(tier: str | None) -> float:
+    """Flat upfront Stripe tier price for card creation (includes all copies)."""
+    return tier_generation_price(tier)
+
+
+def normalize_card_type(card_type: str | None) -> str:
+    raw = (card_type or "static").strip().lower()
+    if raw == "highlight":
+        return "highlight"
+    if raw in ("standard", "static"):
+        return "static"
+    return "static"
+
+
+def card_creation_quote(
+    tier: str | None,
+    *,
+    card_type: str = "static",
+    animated: bool = False,
+) -> dict:
+    """Upfront Stripe total for card creation (copies included in tier price)."""
+    key = normalize_order_tier(tier)
+    ct = normalize_card_type(card_type)
+    base = card_creation_price(key)
+    highlight_fee = highlight_card_price() if ct == "highlight" else 0.0
+    animated_fee = animated_upgrade_price() if ct == "static" and animated else 0.0
+    total = round(base + highlight_fee + animated_fee, 2)
+    return {
+        "tier": key,
+        "card_type": ct,
+        "base_price": base,
+        "highlight_fee": highlight_fee,
+        "animated_fee": animated_fee,
+        "animated_selected": bool(animated and ct == "static"),
+        "total": total,
+    }
 
 
 def _copy_tier_defaults() -> list[dict]:
@@ -213,11 +251,23 @@ def animated_studio_total_price(quantity: int) -> dict:
     }
 
 
-def generation_price_payload(tier: str | None) -> dict:
+def generation_price_payload(
+    tier: str | None,
+    *,
+    card_type: str = "static",
+    animated: bool = False,
+) -> dict:
     key = normalize_order_tier(tier)
+    quote = card_creation_quote(key, card_type=card_type, animated=animated)
     return {
         "tier": key,
-        "first_preview_price": 0.0,
+        "card_type": quote["card_type"],
+        "base_price": quote["base_price"],
+        "highlight_fee": quote["highlight_fee"],
+        "animated_fee": quote["animated_fee"],
+        "animated_selected": quote["animated_selected"],
+        "card_creation_price": quote["total"],
+        "first_preview_price": quote["total"],
         "additional_preview_price": tier_generation_price(key),
         "animated_upgrade_price": animated_upgrade_price(),
         "highlight_card_price": highlight_card_price(),

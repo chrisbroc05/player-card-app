@@ -24,6 +24,7 @@ TX_HIGHLIGHT = "highlight"
 TX_PRIORITY = "priority"
 TX_WITHDRAWAL = "withdrawal"
 TX_REFUND = "refund"
+TX_CARD_CREATION = "card_creation"
 
 VALID_TRANSACTION_TYPES = frozenset(
     {
@@ -38,6 +39,7 @@ VALID_TRANSACTION_TYPES = frozenset(
         TX_PRIORITY,
         TX_WITHDRAWAL,
         TX_REFUND,
+        TX_CARD_CREATION,
     }
 )
 
@@ -419,8 +421,37 @@ def apply_stripe_checkout_credits(
         print(f"[credit_service] gift ledger row recorded for purchaser={purchaser_user_id}", flush=True)
 
 
+def record_card_creation_payment(
+    db: Session,
+    *,
+    user_id: int,
+    amount_dollars: Decimal | float,
+    tier: str,
+    copy_quantity: int,
+    stripe_session_id: str,
+) -> CreditLedger:
+    """Log upfront card creation payment (does not change credit balance)."""
+    user = _lock_user(db, user_id)
+    balance = _user_balance(user)
+    amt = _decimal_amount(amount_dollars)
+    tier_label = (tier or "rookie").replace("_", " ").title()
+    qty = max(1, int(copy_quantity))
+    copy_word = "copy" if qty == 1 else "copies"
+    note = f"Card Created — {tier_label} tier ({qty} {copy_word})"
+    return _append_ledger_row(
+        db,
+        user_id=user_id,
+        amount=-amt,
+        balance_after=balance,
+        transaction_type=TX_CARD_CREATION,
+        reference_id=stripe_session_id,
+        note=note,
+        balance_type="card",
+    )
+
+
 LEDGER_CATEGORY_TYPES: dict[str, frozenset[str]] = {
-    "credits": frozenset({TX_TOP_UP, TX_GIFT, TX_REFUND}),
+    "credits": frozenset({TX_TOP_UP, TX_GIFT, TX_REFUND, TX_CARD_CREATION}),
     "marketplace": frozenset({TX_CARD_PURCHASE, TX_CARD_SALE, TX_ROYALTY}),
     "withdrawals": frozenset({TX_WITHDRAWAL}),
 }

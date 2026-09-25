@@ -29,6 +29,7 @@ const LEDGER_TYPE_ICONS = {
   priority: "⭐",
   withdrawal: "↧",
   refund: "↩",
+  card_creation: "🃏",
 };
 
 function ledgerTypeIcon(type) {
@@ -55,6 +56,7 @@ function txTypeLabel(type) {
     priority: "Priority listing",
     withdrawal: "Withdrawal",
     refund: "Refund",
+    card_creation: "Card Created",
   };
   return labels[t] || type || "—";
 }

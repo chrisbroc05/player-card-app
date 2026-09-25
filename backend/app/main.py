@@ -51,7 +51,16 @@ from auth import (  # noqa: E402
     hash_password,
     verify_password,
 )
-from credit_service import InsufficientCreditsError, TX_ANIMATION, TX_GENERATION, deduct_credits  # noqa: E402
+from credit_service import (  # noqa: E402
+    InsufficientCreditsError,
+    TX_ANIMATION,
+    TX_GENERATION,
+    deduct_credits,
+    record_card_creation_payment,
+)
+from decimal import Decimal  # noqa: E402
+from marketplace_service import record_platform_revenue  # noqa: E402
+from payments_config import payments_enabled  # noqa: E402
 from card_pricing import (  # noqa: E402
     animated_upgrade_price,
     copy_charge_for_quantity,
@@ -486,6 +495,356 @@ def _get_order_or_404(order_id: int) -> dict:
         if order["id"] == order_id:
             return order
     raise HTTPException(status_code=404, detail="Order not found")
+
+
+def _upsert_in_memory_order(order: dict) -> None:
+    oid = int(order["id"])
+    for i, existing in enumerate(_orders):
+        if existing["id"] == oid:
+            _orders[i] = order
+            return
+    _orders.append(order)
+
+
+def _generate_order_card_internal(
+    db: Session,
+    *,
+    user_id: int,
+    order: dict,
+    skip_credit_billing: bool = False,
+) -> GeneratedOrderCard:
+    """Generate one preview card for an in-memory order (shared by HTTP and webhook fulfillment)."""
+    order_id = int(order["id"])
+    preview_count = int(order.get("preview_count", 0))
+    preview_limit = int(order.get("preview_limit", _preview_limit_for_tier(order.get("tier", "rookie"))))
+    if preview_count >= preview_limit:
+        raise HTTPException(status_code=400, detail="Preview limit reached")
+
+    order_tier = str(order.get("tier", "rookie"))
+    card_type = str(order.get("card_type", "standard") or "standard")
+    player_label = _player_display_name(
+        {
+            "first_name": order.get("player_first_name", ""),
+            "last_name": order.get("player_last_name", ""),
+            "display_name": order.get("player_display_name"),
+        }
+    )
+
+    if not skip_credit_billing and preview_count > 0:
+        charge = tier_generation_price(order_tier)
+        if charge > 0:
+            try:
+                deduct_credits(
+                    user_id=user_id,
+                    amount=charge,
+                    transaction_type=TX_GENERATION,
+                    reference_id=str(order_id),
+                    note=f"Card preview - {order_tier} tier",
+                    db=db,
+                )
+            except InsufficientCreditsError as exc:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Insufficient credits. Please add credits to your account at /credits",
+                ) from exc
+
+    player_row = {
+        "first_name": order.get("player_first_name", ""),
+        "last_name": order.get("player_last_name", ""),
+        "display_name": order.get("player_display_name"),
+        "jersey_number": order.get("player_jersey_number", ""),
+        "position": order.get("player_position", ""),
+        "grad_year": order.get("player_grad_year", ""),
+        "team_name": order.get("player_team_name") or order.get("player_team", ""),
+        "image_url": order["player_image_url"],
+        "special_theme": order.get("special_theme"),
+    }
+    card_tier = _order_tier_to_card_tier(order["tier"])
+    vault_tier_val = _vault_tier_from_order_tier(str(order.get("tier", "rookie")))
+    face_photo_raw = (order.get("face_photo_url") or "").strip() or None
+    new_card_id = next_collectible_card_id(db)
+    pulled_rarity, pulled_template = resolve_rarity_pull(
+        db,
+        card_id=new_card_id,
+        player_name=player_label,
+        tier=vault_tier_val,
+        logger=logger,
+    )
+
+    if card_type == "highlight":
+        result = _generate_highlight_placeholder(
+            player_row,
+            order_id,
+            tier=card_tier,
+            special_theme=order.get("special_theme"),
+            apply_watermark=False,
+        )
+    else:
+        source_path, is_temp = _resolve_source_path_from_image_url(order["player_image_url"])
+        face_path: Path | None = None
+        face_is_temp = False
+        if face_photo_raw:
+            try:
+                face_path, face_is_temp = resolve_source_image_path(face_photo_raw, UPLOAD_DIR)
+            except ValueError as exc:
+                logger.warning("Face photo could not be resolved for order %s: %s", order_id, exc)
+        try:
+            try:
+                result = _generate_card_openai(
+                    player_row,
+                    order_id,
+                    source_path,
+                    tier=card_tier,
+                    special_theme=order.get("special_theme"),
+                    face_source_path=face_path,
+                    vault_tier=vault_tier_val,
+                    rarity_template=pulled_template,
+                    apply_watermark=False,
+                )
+            except Exception as exc:
+                logger.exception(
+                    "OpenAI card generation failed for order %s, using pillow fallback: %s",
+                    order_id,
+                    exc,
+                )
+                result = _generate_card_pillow(
+                    player_row,
+                    order_id,
+                    source_path,
+                    tier=card_tier,
+                    special_theme=order.get("special_theme"),
+                    apply_watermark=False,
+                )
+        finally:
+            _cleanup_temp_source(source_path, is_temp)
+            if face_path is not None and face_is_temp:
+                _cleanup_temp_source(face_path, face_is_temp)
+
+    new_card_id = next_collectible_card_id(db)
+    preview_session_id = _preview_session_id_for_order(order)
+    draft_metadata = order.get("draft_metadata")
+    if not draft_metadata:
+        draft_metadata = _draft_metadata_from_order(order)
+        order["draft_metadata"] = draft_metadata
+    player_photo_url = (order.get("player_image_url") or "").strip() or None
+    face_photo_stored = None
+    if face_photo_raw:
+        from utils.storage import finalize_face_photo_url
+
+        face_photo_stored = finalize_face_photo_url(face_photo_raw, new_card_id)
+    photo_notes = (order.get("photo_notes") or "").strip()[:200] or None
+    animation_scenario_id = (order.get("animation_scenario_id") or "").strip() or None
+    action_category = (order.get("action_category") or "").strip() or None
+    throwing_hand = (order.get("throwing_hand") or "").strip().lower() or None
+    batting_side = (order.get("batting_side") or "").strip().lower() or None
+    vault_rec = _store_generated_card(
+        db,
+        _player_id_for_order(order),
+        result["url"],
+        _style_from_generated_card(result),
+        gen_tier=card_tier,
+        player_row=player_row,
+        special_theme=order.get("special_theme"),
+        owner_name=order.get("customer_name") or "unassigned",
+        vault_tier=vault_tier_val,
+        owner_id=user_id,
+        predefined_card_id=new_card_id,
+        status="preview",
+        preview_session_id=preview_session_id,
+        draft_metadata=draft_metadata,
+        player_photo_url=player_photo_url if card_type == "animated" else None,
+        face_photo_url=face_photo_stored,
+        photo_notes=photo_notes if card_type == "animated" else None,
+        animation_scenario_id=animation_scenario_id if card_type == "animated" else None,
+        action_category=action_category if card_type == "animated" else None,
+        throwing_hand=throwing_hand if card_type == "animated" else None,
+        batting_side=batting_side if card_type == "animated" else None,
+        pulled_rarity=pulled_rarity,
+        pulled_template=pulled_template,
+    )
+
+    generated = GeneratedOrderCard(
+        card_id=new_card_id,
+        image_url=result["url"],
+        tier=card_tier,
+        created_at=vault_rec["created_at"],
+        edition_number=1,
+        print_run=1,
+        owner_name=order.get("customer_name") or "unassigned",
+        player_name=_player_display_name(player_row),
+        team_name=_player_team_name(player_row),
+        special_theme=order.get("special_theme"),
+        rarity=vault_rec.get("rarity") or "standard",
+        rarity_template=int(vault_rec.get("rarity_template") or 1),
+        rarity_display_name=vault_rec.get("rarity_display_name") or "Base",
+        template_name=vault_rec.get("template_name") or "Classic",
+    )
+    order.setdefault("generated_cards", []).append(generated.model_dump())
+    order["preview_count"] = preview_count + 1
+    order["preview_limit"] = preview_limit
+    return generated
+
+
+def _apply_highlight_staging_to_card(db: Session, card_id: str, staging: dict) -> None:
+    """Attach pre-uploaded highlight video to a card (paid at checkout — no credits)."""
+    orm = get_card_by_card_id(db, card_id)
+    if orm is None:
+        raise ValueError(f"Card not found: {card_id}")
+    video_url = (staging.get("url") or staging.get("staging_url") or "").strip()
+    if not video_url:
+        raise ValueError("Highlight video staging URL missing")
+    orm.is_highlight = True
+    orm.highlight_video_url = video_url
+    trim_start = staging.get("trim_start")
+    trim_end = staging.get("trim_end")
+    orm.highlight_trim_start = round(float(trim_start), 3) if trim_start is not None else 0.0
+    orm.highlight_trim_end = round(float(trim_end), 3) if trim_end is not None else None
+    orm.highlight_status = "completed"
+    orm.highlight_uploaded_at = datetime.now(timezone.utc)
+    db.flush()
+
+
+def _start_paid_card_animation(db: Session, card_id: str, order: dict) -> None:
+    """Queue animation for a card paid for at checkout (+$10 add-on)."""
+    import threading
+
+    from animation_tasks import process_animation
+    from data.animation_motions import kling_motion_for_action_category, list_motions_public
+
+    motion_id = (order.get("selected_motion_id") or "").strip()
+    action_category = (order.get("action_category") or "").strip() or None
+    if not motion_id and action_category:
+        motion_id = (kling_motion_for_action_category(action_category) or "").strip()
+    if not motion_id:
+        motions = list_motions_public()
+        if motions:
+            motion_id = str(motions[0].get("id") or "").strip()
+    if not motion_id:
+        raise ValueError("Animation add-on selected but no motion is configured")
+
+    orm = get_card_by_card_id(db, card_id)
+    if orm is None:
+        raise ValueError(f"Card not found: {card_id}")
+    orm.animation_status = "pending"
+    orm.animation_motion = motion_id
+    if action_category:
+        orm.action_category = action_category
+    orm.animation_requested_at = datetime.now(timezone.utc)
+    orm.animation_completed_at = None
+    orm.is_animated = False
+    orm.animated_video_url = None
+    db.flush()
+
+    thread = threading.Thread(
+        target=process_animation,
+        args=(card_id, motion_id),
+        daemon=True,
+        name=f"paid-animate-{card_id}",
+    )
+    thread.start()
+
+
+def fulfill_paid_card_creation(
+    db: Session,
+    *,
+    user_id: int,
+    order_snapshot: dict,
+    copy_quantity: int,
+    stripe_session_id: str,
+    amount_dollars: Decimal | float,
+    tier: str,
+    card_type: str = "static",
+    animated: bool = False,
+) -> str:
+    """
+    Generate, finalize, and mint copies after Stripe card-creation payment.
+    Returns the primary card_id added to the user's collection.
+    """
+    from card_pricing import normalize_card_type
+    from utils.usage import check_generation_cap
+
+    allowed, cap_message = check_generation_cap(db, user_id)
+    if not allowed:
+        raise ValueError(cap_message or "Generation limit reached")
+
+    ct = normalize_card_type(card_type)
+    if ct == "highlight":
+        animated = False
+
+    order = dict(order_snapshot)
+    if ct == "highlight":
+        order["card_type"] = "highlight"
+    else:
+        order["card_type"] = "standard"
+    _upsert_in_memory_order(order)
+
+    generated = _generate_order_card_internal(
+        db,
+        user_id=user_id,
+        order=order,
+        skip_credit_billing=True,
+    )
+    final_url = generated.image_url
+    card_id = generated.card_id
+    order["final_card_url"] = final_url
+    order["delivered_at"] = datetime.now(timezone.utc).isoformat()
+    order["status"] = "delivered"
+
+    generated_cards = order.get("generated_cards", [])
+    card_ids = [str(g.get("card_id") or "") for g in generated_cards if g.get("card_id")]
+    selected_id, watermarked_url = finalize_order_preview(
+        db,
+        owner_id=user_id,
+        final_image_url=final_url,
+        generated_card_ids=card_ids,
+    )
+    if watermarked_url:
+        order["final_card_url"] = watermarked_url
+        card_id = selected_id or card_id
+    _upsert_in_memory_order(order)
+
+    qty = max(1, int(copy_quantity))
+    if qty > 1:
+        orm = get_card_by_card_id(db, card_id)
+        if orm is None:
+            raise ValueError(f"Generated card not found: {card_id}")
+        validate_copy_order_quantity(
+            db,
+            owner_id=user_id,
+            anchor=orm,
+            target_quantity=qty,
+        )
+        expand_print_run_for_owner_image(db, template=orm, target_quantity=qty)
+
+    staging = order.get("highlight_staging")
+    if ct == "highlight":
+        if not staging:
+            raise ValueError("Highlight checkout missing staged video")
+        _apply_highlight_staging_to_card(db, card_id, staging)
+
+    if ct == "static" and animated:
+        _start_paid_card_animation(db, card_id, order)
+
+    amt = Decimal(str(amount_dollars)).quantize(Decimal("0.01"))
+    tier_label = (tier or "rookie").replace("_", " ").title()
+    type_label = "Highlight" if ct == "highlight" else "Animated" if animated else "Static"
+    record_platform_revenue(
+        db,
+        amount=amt,
+        source="card_creation",
+        reference_id=stripe_session_id,
+        note=f"Card creation — {type_label} {tier_label} ({qty} copies)",
+    )
+    record_card_creation_payment(
+        db,
+        user_id=user_id,
+        amount_dollars=amt,
+        tier=tier,
+        copy_quantity=qty,
+        stripe_session_id=stripe_session_id,
+    )
+    db.flush()
+    return card_id
 
 
 def _order_tier_to_card_tier(order_tier: str) -> CardTier:
@@ -2337,181 +2696,22 @@ def generate_card_for_order(
     Generate one card from order player data and image.
     Stores generated card metadata in order.generated_cards.
     """
+    if payments_enabled():
+        raise HTTPException(
+            status_code=400,
+            detail="Card generation requires payment. Use Pay & Generate on the review screen.",
+        )
     order = _get_order_or_404(order_id)
-    preview_count = int(order.get("preview_count", 0))
-    preview_limit = int(order.get("preview_limit", _preview_limit_for_tier(order.get("tier", "rookie"))))
-    if preview_count >= preview_limit:
-        raise HTTPException(status_code=400, detail="Preview limit reached")
-
     from utils.usage import require_generation_capacity
 
     if (blocked := require_generation_capacity(db, current_user.id)) is not None:
         return blocked
-
-    order_tier = str(order.get("tier", "rookie"))
-    card_type = str(order.get("card_type", "standard") or "standard")
-    player_label = _player_display_name(
-        {
-            "first_name": order.get("player_first_name", ""),
-            "last_name": order.get("player_last_name", ""),
-            "display_name": order.get("player_display_name"),
-        }
-    )
-
-    try:
-        if preview_count > 0:
-            charge = tier_generation_price(order_tier)
-            if charge > 0:
-                deduct_credits(
-                    user_id=current_user.id,
-                    amount=charge,
-                    transaction_type=TX_GENERATION,
-                    reference_id=str(order_id),
-                    note=f"Card preview - {order_tier} tier",
-                    db=db,
-                )
-    except InsufficientCreditsError as exc:
-        raise HTTPException(
-            status_code=400,
-            detail="Insufficient credits. Please add credits to your account at /credits",
-        ) from exc
-
-    player_row = {
-        "first_name": order.get("player_first_name", ""),
-        "last_name": order.get("player_last_name", ""),
-        "display_name": order.get("player_display_name"),
-        "jersey_number": order.get("player_jersey_number", ""),
-        "position": order.get("player_position", ""),
-        "grad_year": order.get("player_grad_year", ""),
-        "team_name": order.get("player_team_name") or order.get("player_team", ""),
-        "image_url": order["player_image_url"],
-        "special_theme": order.get("special_theme"),
-    }
-    card_tier = _order_tier_to_card_tier(order["tier"])
-    vault_tier_val = _vault_tier_from_order_tier(str(order.get("tier", "rookie")))
-    face_photo_raw = (order.get("face_photo_url") or "").strip() or None
-    new_card_id = next_collectible_card_id(db)
-    pulled_rarity, pulled_template = resolve_rarity_pull(
+    return _generate_order_card_internal(
         db,
-        card_id=new_card_id,
-        player_name=player_label,
-        tier=vault_tier_val,
-        logger=logger,
+        user_id=current_user.id,
+        order=order,
+        skip_credit_billing=False,
     )
-
-    if card_type == "highlight":
-        result = _generate_highlight_placeholder(
-            player_row,
-            order_id,
-            tier=card_tier,
-            special_theme=order.get("special_theme"),
-            apply_watermark=False,
-        )
-    else:
-        source_path, is_temp = _resolve_source_path_from_image_url(order["player_image_url"])
-        face_path: Path | None = None
-        face_is_temp = False
-        if face_photo_raw:
-            try:
-                face_path, face_is_temp = resolve_source_image_path(face_photo_raw, UPLOAD_DIR)
-            except ValueError as exc:
-                logger.warning("Face photo could not be resolved for order %s: %s", order_id, exc)
-        try:
-            try:
-                result = _generate_card_openai(
-                    player_row,
-                    order_id,
-                    source_path,
-                    tier=card_tier,
-                    special_theme=order.get("special_theme"),
-                    face_source_path=face_path,
-                    vault_tier=vault_tier_val,
-                    rarity_template=pulled_template,
-                    apply_watermark=False,
-                )
-            except Exception as exc:
-                logger.exception(
-                    "OpenAI card generation failed for order %s, using pillow fallback: %s",
-                    order_id,
-                    exc,
-                )
-                result = _generate_card_pillow(
-                    player_row,
-                    order_id,
-                    source_path,
-                    tier=card_tier,
-                    special_theme=order.get("special_theme"),
-                    apply_watermark=False,
-                )
-        finally:
-            _cleanup_temp_source(source_path, is_temp)
-            if face_path is not None and face_is_temp:
-                _cleanup_temp_source(face_path, face_is_temp)
-
-    new_card_id = next_collectible_card_id(db)
-    owner_id = current_user.id
-    preview_session_id = _preview_session_id_for_order(order)
-    draft_metadata = order.get("draft_metadata")
-    if not draft_metadata:
-        draft_metadata = _draft_metadata_from_order(order)
-        order["draft_metadata"] = draft_metadata
-    player_photo_url = (order.get("player_image_url") or "").strip() or None
-    face_photo_stored = None
-    if face_photo_raw:
-        from utils.storage import finalize_face_photo_url
-
-        face_photo_stored = finalize_face_photo_url(face_photo_raw, new_card_id)
-    photo_notes = (order.get("photo_notes") or "").strip()[:200] or None
-    animation_scenario_id = (order.get("animation_scenario_id") or "").strip() or None
-    action_category = (order.get("action_category") or "").strip() or None
-    throwing_hand = (order.get("throwing_hand") or "").strip().lower() or None
-    batting_side = (order.get("batting_side") or "").strip().lower() or None
-    vault_rec = _store_generated_card(
-        db,
-        _player_id_for_order(order),
-        result["url"],
-        _style_from_generated_card(result),
-        gen_tier=card_tier,
-        player_row=player_row,
-        special_theme=order.get("special_theme"),
-        owner_name=order.get("customer_name") or "unassigned",
-        vault_tier=vault_tier_val,
-        owner_id=owner_id,
-        predefined_card_id=new_card_id,
-        status="preview",
-        preview_session_id=preview_session_id,
-        draft_metadata=draft_metadata,
-        player_photo_url=player_photo_url if card_type == "animated" else None,
-        face_photo_url=face_photo_stored,
-        photo_notes=photo_notes if card_type == "animated" else None,
-        animation_scenario_id=animation_scenario_id if card_type == "animated" else None,
-        action_category=action_category if card_type == "animated" else None,
-        throwing_hand=throwing_hand if card_type == "animated" else None,
-        batting_side=batting_side if card_type == "animated" else None,
-        pulled_rarity=pulled_rarity,
-        pulled_template=pulled_template,
-    )
-
-    generated = GeneratedOrderCard(
-        card_id=new_card_id,
-        image_url=result["url"],
-        tier=card_tier,
-        created_at=vault_rec["created_at"],
-        edition_number=1,
-        print_run=1,
-        owner_name=order.get("customer_name") or "unassigned",
-        player_name=_player_display_name(player_row),
-        team_name=_player_team_name(player_row),
-        special_theme=order.get("special_theme"),
-        rarity=vault_rec.get("rarity") or "standard",
-        rarity_template=int(vault_rec.get("rarity_template") or 1),
-        rarity_display_name=vault_rec.get("rarity_display_name") or "Base",
-        template_name=vault_rec.get("template_name") or "Classic",
-    )
-    order.setdefault("generated_cards", []).append(generated.model_dump())
-    order["preview_count"] = preview_count + 1
-    order["preview_limit"] = preview_limit
-    return generated
 
 
 @app.post("/orders/{order_id}/deliver", response_model=Order)

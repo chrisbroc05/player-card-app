@@ -20,6 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from animation_tasks import process_animation
+from card_creation_service import begin_card_creation_checkout, get_card_creation_checkout_status
 from card_pricing import animated_studio_total_price, animated_upgrade_price, generation_price_payload, highlight_card_price, normalize_order_tier
 from auth import get_current_user
 from card_cleanup import (
@@ -248,9 +249,176 @@ async def test_pika_connection():
 
 
 @router.get("/generation-price")
-def get_generation_price(tier: str = Query(..., min_length=1, max_length=40)):
-    """Public pricing for card previews by order tier (no auth)."""
-    return generation_price_payload(normalize_order_tier(tier))
+def get_generation_price(
+    tier: str = Query(..., min_length=1, max_length=40),
+    card_type: str = Query(default="static", max_length=20),
+    animated: bool = Query(default=False),
+):
+    """Public pricing for card creation by tier, type, and optional animation add-on."""
+    from card_pricing import normalize_card_type
+
+    return generation_price_payload(
+        normalize_order_tier(tier),
+        card_type=normalize_card_type(card_type),
+        animated=animated,
+    )
+
+
+class CardCreationCheckoutBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    order_id: int = Field(..., ge=1)
+    copy_quantity: int = Field(..., ge=1, le=100)
+    card_type: str = Field(default="static", max_length=20)
+    animated: bool = False
+    action_category: str | None = Field(default=None, max_length=64)
+    selected_motion_id: str | None = Field(default=None, max_length=64)
+    highlight_staging_url: str | None = Field(default=None, max_length=512)
+    highlight_trim_start: float | None = None
+    highlight_trim_end: float | None = None
+
+
+@router.post("/creation-highlight-staging")
+async def upload_creation_highlight_staging(
+    order_id: int = Form(...),
+    file: UploadFile = File(..., description="Highlight video (MP4, MOV, AVI, or WebM)"),
+    trim_start_seconds: float = Form(0),
+    trim_end_seconds: float | None = Form(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Stage highlight video before Stripe checkout (no credit charge — paid at checkout)."""
+    from main import _get_order_or_404
+
+    order = _get_order_or_404(order_id)
+    if (order.get("customer_email") or "").strip().lower() not in ("", current_user.email.lower()):
+        if order.get("customer_name") != current_user.display_name:
+            pass  # in-memory orders belong to session; rely on auth + order id
+    _ = order
+
+    ext = video_extension_for_content_type(file.content_type, file.filename)
+    if ext is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Only video uploads are allowed (MP4, MOV, AVI, or WebM).",
+        )
+
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file.")
+    if len(data) > MAX_HIGHLIGHT_UPLOAD_BYTES:
+        raise HTTPException(status_code=400, detail="Video file is too large (max 100 MB).")
+
+    tmp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+            tmp.write(data)
+            tmp_path = Path(tmp.name)
+        source_duration = validate_upload_duration(tmp_path)
+    except ValueError as exc:
+        if tmp_path is not None:
+            tmp_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    trim_start = max(0.0, float(trim_start_seconds or 0))
+    if trim_end_seconds is not None:
+        trim_end_raw = float(trim_end_seconds)
+    elif source_duration is not None:
+        trim_end_raw = min(source_duration, trim_start + 10.0)
+    else:
+        trim_end_raw = trim_start + 10.0
+    if trim_end_raw <= trim_start:
+        trim_end_raw = source_duration if source_duration else trim_start + 10.0
+
+    trim_start, trim_end = validate_trim_range(
+        trim_start=trim_start,
+        trim_end=trim_end_raw,
+        source_duration=source_duration,
+    )
+
+    out_filename = f"staging-{current_user.id}-{order_id}-{uuid4().hex}{ext}"
+    upload_content_type = content_type_for_filename(out_filename, file.content_type or "video/mp4")
+    public_url = save_bytes_to_storage(
+        data,
+        r2_key=f"highlights/staging/{out_filename}",
+        content_type=upload_content_type,
+        local_dir=_highlights_dir(),
+        local_url_prefix="/highlights",
+    )
+    if tmp_path is not None:
+        tmp_path.unlink(missing_ok=True)
+
+    return {
+        "staging_url": public_url,
+        "trim_start": round(trim_start, 3),
+        "trim_end": round(trim_end, 3) if trim_end is not None else None,
+    }
+
+
+@router.post("/creation-checkout")
+def card_creation_checkout(
+    body: CardCreationCheckoutBody,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Start Stripe Checkout for upfront card creation (includes all copies)."""
+    from card_pricing import normalize_card_type
+    from main import _get_order_or_404
+
+    order = _get_order_or_404(body.order_id)
+    ct = normalize_card_type(body.card_type)
+    animated = bool(body.animated) and ct == "static"
+
+    if animated and not (body.action_category or body.selected_motion_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Select an animation action before adding the animated upgrade.",
+        )
+
+    if ct == "highlight" and not (body.highlight_staging_url or "").strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Highlight video must be uploaded before checkout.",
+        )
+
+    if body.action_category:
+        order["action_category"] = body.action_category.strip()
+    if body.selected_motion_id:
+        order["selected_motion_id"] = body.selected_motion_id.strip()
+
+    highlight_staging = None
+    if ct == "highlight":
+        highlight_staging = {
+            "url": body.highlight_staging_url.strip(),
+            "staging_url": body.highlight_staging_url.strip(),
+            "trim_start": body.highlight_trim_start if body.highlight_trim_start is not None else 0.0,
+            "trim_end": body.highlight_trim_end,
+        }
+
+    return begin_card_creation_checkout(
+        db,
+        user=current_user,
+        order_id=body.order_id,
+        order_snapshot=order,
+        copy_quantity=body.copy_quantity,
+        card_type=ct,
+        animated=animated,
+        highlight_staging=highlight_staging,
+    )
+
+
+@router.get("/creation-checkout/status")
+def card_creation_checkout_status(
+    session_id: str = Query(..., min_length=8, max_length=255),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Poll fulfillment status after returning from Stripe Checkout."""
+    return get_card_creation_checkout_status(
+        db,
+        user_id=current_user.id,
+        session_id=session_id,
+    )
 
 
 @router.get("/generation-usage")

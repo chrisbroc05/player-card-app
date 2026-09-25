@@ -832,5 +832,105 @@ def run_connect_marketplace_migrations(engine: Engine) -> None:
                     )
                 )
 
+        if "card_creation_checkouts" in table_names:
+            cc_cols = {c["name"] for c in insp.get_columns("card_creation_checkouts")}
+            if "card_type" not in cc_cols:
+                logger.info("Migration: adding card_creation_checkouts.card_type")
+                if dialect == "postgresql":
+                    conn.execute(
+                        text(
+                            "ALTER TABLE card_creation_checkouts ADD COLUMN IF NOT EXISTS "
+                            "card_type VARCHAR(16) NOT NULL DEFAULT 'static'"
+                        )
+                    )
+                else:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE card_creation_checkouts ADD COLUMN card_type "
+                            "VARCHAR(16) NOT NULL DEFAULT 'static'"
+                        )
+                    )
+            if "animated" not in cc_cols:
+                logger.info("Migration: adding card_creation_checkouts.animated")
+                if dialect == "postgresql":
+                    conn.execute(
+                        text(
+                            "ALTER TABLE card_creation_checkouts ADD COLUMN IF NOT EXISTS "
+                            "animated BOOLEAN NOT NULL DEFAULT false"
+                        )
+                    )
+                else:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE card_creation_checkouts ADD COLUMN animated "
+                            "BOOLEAN NOT NULL DEFAULT 0"
+                        )
+                    )
+
+        table_names = set(insp.get_table_names())
+        if "card_creation_checkouts" not in table_names:
+            logger.info("Migration: creating card_creation_checkouts")
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE IF NOT EXISTS card_creation_checkouts (
+                            id SERIAL PRIMARY KEY,
+                            user_id INTEGER NOT NULL REFERENCES users(id),
+                            order_id INTEGER NOT NULL,
+                            stripe_session_id VARCHAR(255) UNIQUE,
+                            order_snapshot JSON NOT NULL,
+                            tier VARCHAR(32) NOT NULL,
+                            card_type VARCHAR(16) NOT NULL DEFAULT 'static',
+                            animated BOOLEAN NOT NULL DEFAULT false,
+                            copy_quantity INTEGER NOT NULL,
+                            amount_dollars NUMERIC(10,2) NOT NULL,
+                            status VARCHAR(32) NOT NULL DEFAULT 'pending',
+                            result_card_id VARCHAR(64),
+                            error_message TEXT,
+                            created_at TIMESTAMPTZ DEFAULT NOW(),
+                            updated_at TIMESTAMPTZ DEFAULT NOW()
+                        )
+                        """
+                    )
+                )
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS ix_card_creation_checkouts_user_id "
+                        "ON card_creation_checkouts (user_id)"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS ix_card_creation_checkouts_order_id "
+                        "ON card_creation_checkouts (order_id)"
+                    )
+                )
+            else:
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE card_creation_checkouts (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            user_id INTEGER NOT NULL,
+                            order_id INTEGER NOT NULL,
+                            stripe_session_id VARCHAR(255) UNIQUE,
+                            order_snapshot JSON NOT NULL,
+                            tier VARCHAR(32) NOT NULL,
+                            card_type VARCHAR(16) NOT NULL DEFAULT 'static',
+                            animated BOOLEAN NOT NULL DEFAULT false,
+                            copy_quantity INTEGER NOT NULL,
+                            amount_dollars NUMERIC(10,2) NOT NULL,
+                            status VARCHAR(32) NOT NULL DEFAULT 'pending',
+                            result_card_id VARCHAR(64),
+                            error_message TEXT,
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            FOREIGN KEY(user_id) REFERENCES users(id)
+                        )
+                        """
+                    )
+                )
+
     logger.info("Connect/marketplace migrations complete")
 

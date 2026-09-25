@@ -1,10 +1,14 @@
 import { API_BASE_URL } from "../config/api";
 
-export async function fetchGenerationPrice(tier) {
+export async function fetchGenerationPrice(tier, { cardType = "static", animated = false } = {}) {
   const key = tier || "rookie";
-  const res = await fetch(
-    `${API_BASE_URL}/cards/generation-price?tier=${encodeURIComponent(key)}`
-  );
+  const type = cardType === "highlight" ? "highlight" : "static";
+  const params = new URLSearchParams({
+    tier: key,
+    card_type: type,
+    animated: animated ? "true" : "false",
+  });
+  const res = await fetch(`${API_BASE_URL}/cards/generation-price?${params.toString()}`);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(data?.detail || "Could not load pricing.");

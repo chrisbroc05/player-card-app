@@ -9,6 +9,7 @@ export default function ActionCategoryStep({
   error = "",
   tier = "rookie",
   continueBusy = false,
+  hideContinue = false,
 }) {
   const tierConfig = normalizeExperienceTier(tier);
   const selectedCategory = getActionCategory(value);
@@ -51,7 +52,7 @@ export default function ActionCategoryStep({
         })}
       </div>
 
-      {value ? (
+      {value && !hideContinue ? (
         <button
           type="button"
           disabled={continueBusy}

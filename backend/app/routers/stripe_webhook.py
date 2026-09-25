@@ -11,6 +11,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from card_creation_service import fulfill_card_creation_from_webhook
 from credit_service import apply_stripe_checkout_credits
 from database import engine
 from marketplace_service import (
@@ -75,13 +76,21 @@ def _handle_checkout_completed(db: Session, session: dict, event_id: str) -> Non
             recipient_user_id=recipient_user_id,
             amount_dollars=amount,
         )
-    else:
+    elif fund_type == "card_creation":
+        fulfill_card_creation_from_webhook(db, session)
+    elif fund_type == "card":
         apply_stripe_checkout_credits(
             db,
             session_id=session_id,
             purchaser_user_id=purchaser_user_id,
             recipient_user_id=recipient_user_id,
             amount_dollars=amount,
+        )
+    else:
+        logger.warning(
+            "Unknown checkout fund_type=%s session=%s — skipping",
+            fund_type,
+            session_id,
         )
     mark_stripe_event_processed(db, event_id, "checkout.session.completed")
     db.commit()

@@ -1,8 +1,5 @@
 import React from "react";
-import { Link } from "react-router-dom";
 import { formatMoney } from "../utils/marketplace";
-import { creditTopUpShortfallMessage } from "../utils/credits";
-import { copyChargeForQuantity, normalizeCopyTiers } from "../utils/copyPricing";
 
 function hasDisplayValue(value) {
   if (value == null) return false;
@@ -30,15 +27,11 @@ function SummarySection({ title, rows }) {
   );
 }
 
-function TotalLine({ label, value, highlight = false, free = false }) {
+function TotalLine({ label, value, highlight = false }) {
   return (
     <div className="flex justify-between gap-4 py-1.5">
       <span className="text-slate-300">{label}</span>
-      <span
-        className={`font-medium tabular-nums ${
-          free ? "text-success" : highlight ? "text-brand-gold" : "text-white"
-        }`}
-      >
+      <span className={`font-medium tabular-nums ${highlight ? "text-brand-gold" : "text-white"}`}>
         {value}
       </span>
     </div>
@@ -53,26 +46,25 @@ export default function GenerationCostSummary({
   gradYear,
   tierLabel,
   themeLabel,
-  isAnimated,
   isHighlight = false,
-  motionName,
   copyQuantity = 1,
   pricing,
-  creditBalance,
-  showBalance = true,
-  phase = "pre-generate",
+  animateAtCheckout = false,
+  phase = "pay-upfront",
 }) {
   if (!pricing) return null;
 
-  const animated = Number(pricing.animated_upgrade_price) || 0;
-  const highlight = Number(pricing.highlight_card_price) || 0;
-  const copyTiers = normalizeCopyTiers(pricing.copy_pricing_tiers);
-  const balance = Number(creditBalance) || 0;
   const copies = Math.max(1, Number(copyQuantity) || 1);
-  const copyCharge = copyChargeForQuantity(copies, 1, copyTiers);
-  const { extra: extraCopies, unit: copyUnitPrice, total: extraCopyCost } = copyCharge;
+  const basePrice = Number(pricing.base_price ?? pricing.card_creation_price) || 0;
+  const highlightFee = Number(pricing.highlight_fee) || 0;
+  const animatedFee = animateAtCheckout ? Number(pricing.animated_fee ?? pricing.animated_upgrade_price) || 0 : 0;
+  const total =
+    phase === "pay-upfront"
+      ? Number(pricing.card_creation_price) ||
+        basePrice + (isHighlight ? highlightFee : 0) + animatedFee
+      : 0;
 
-  const cardTypeLabel = isHighlight ? "Highlight" : isAnimated ? "Animated" : "Static";
+  const cardTypeLabel = isHighlight ? "Highlight" : "Static";
 
   const playerRows = [
     hasDisplayValue(playerName) && { label: "Player name", value: playerName },
@@ -83,25 +75,11 @@ export default function GenerationCostSummary({
   ];
 
   const cardRows = [
-    hasDisplayValue(tierLabel) && { label: "Card tier", value: tierLabel },
-    hasDisplayValue(themeLabel) && { label: "Theme", value: themeLabel },
     { label: "Card type", value: cardTypeLabel },
-    isAnimated && hasDisplayValue(motionName) && { label: "Motion", value: motionName },
-    { label: "Copies", value: String(copies) },
-    extraCopies > 0 && {
-      label: "Copy rate applied",
-      value: `${formatMoney(copyUnitPrice)} each`,
-    },
+    hasDisplayValue(tierLabel) && { label: "Tier", value: tierLabel },
+    hasDisplayValue(themeLabel) && { label: "Theme", value: themeLabel },
+    { label: "Pack", value: `${copies} ${copies === 1 ? "copy" : "copies"}` },
   ];
-
-  let totalDue = 0;
-  if (phase === "pre-generate") {
-    totalDue = 0;
-  } else {
-    totalDue = extraCopyCost;
-  }
-
-  const shortfall = Math.max(0, totalDue - balance);
 
   return (
     <div className="rounded-xl border border-white/10 bg-cardBg2 p-4 text-sm text-slate-300 sm:p-5">
@@ -114,82 +92,28 @@ export default function GenerationCostSummary({
       <div className="mt-4">
         <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Order Total</p>
         <div className="mt-2 rounded-lg border border-white/10 bg-cardBg/80 p-3">
-          {phase === "pre-generate" ? (
+          {isHighlight ? (
             <>
-              <TotalLine label="First preview" value="FREE" free />
-              {isHighlight ? (
-                <TotalLine label="Highlight video upgrade" value={`+${formatMoney(highlight)}`} />
-              ) : isAnimated ? (
-                <TotalLine
-                  label="Animated upgrade"
-                  value={`${formatMoney(animated)} if you animate`}
-                />
-              ) : (
-                <TotalLine label="Standard card" value="FREE" free />
-              )}
-              {extraCopies > 0 ? (
-                <TotalLine
-                  label={`Additional copies (${extraCopies})`}
-                  value={formatMoney(extraCopyCost)}
-                />
-              ) : null}
+              <TotalLine
+                label={`${tierLabel || "Card"} price`}
+                value={formatMoney(basePrice)}
+              />
+              <TotalLine label="Highlight upgrade" value={formatMoney(highlightFee || Number(pricing.highlight_card_price) || 5)} />
             </>
           ) : (
             <>
-              <TotalLine label="First card (from preview)" value="Included" free />
-              {extraCopies > 0 ? (
-                <>
-                  <TotalLine label="Copy rate applied" value={`${formatMoney(copyUnitPrice)} each`} />
-                  <TotalLine
-                    label={`Copy subtotal (${extraCopies} ${extraCopies === 1 ? "copy" : "copies"})`}
-                    value={formatMoney(extraCopyCost)}
-                  />
-                </>
-              ) : (
-                <TotalLine label="Copy subtotal" value={formatMoney(0)} />
-              )}
-              {isHighlight ? (
-                <TotalLine label="Highlight video upgrade" value={`+${formatMoney(highlight)} when you upload`} />
-              ) : isAnimated ? (
-                <TotalLine label="Animated upgrade" value="Charged when you confirm animation" free />
+              <TotalLine label="Base price" value={formatMoney(basePrice)} />
+              {animateAtCheckout ? (
+                <TotalLine label="Animated upgrade" value={`+${formatMoney(animatedFee)}`} />
               ) : null}
             </>
           )}
           <div className="mt-2 flex justify-between gap-4 border-t border-white/10 pt-2">
-            <span className="font-semibold text-white">
-              {phase === "confirm" ? "Total due on confirm" : "Total due now"}
-            </span>
-            <span className="text-base font-bold tabular-nums text-brand-gold">
-              {totalDue <= 0 ? "FREE" : formatMoney(totalDue)}
-            </span>
+            <span className="font-semibold text-white">Total</span>
+            <span className="text-base font-bold tabular-nums text-brand-gold">{formatMoney(total)}</span>
           </div>
         </div>
       </div>
-
-      {showBalance ? (
-        <p className="mt-3 text-sm">
-          Your credit balance:{" "}
-          <span className="font-semibold tabular-nums text-brand-gold">{formatMoney(balance)}</span>
-        </p>
-      ) : null}
-
-      {shortfall > 0 ? (
-        <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-100">
-          <p className="font-medium text-amber-50">
-            You need {formatMoney(totalDue)} in credits to continue.
-          </p>
-          <p className="mt-1">Your current balance: {formatMoney(balance)}</p>
-          <p className="mt-1">{creditTopUpShortfallMessage(shortfall)}</p>
-          <Link
-            to="/credits"
-            target="_blank"
-            rel="noreferrer"
-            className="mt-3 inline-flex min-h-[40px] items-center justify-center rounded-lg btn-primary px-4 py-2 text-sm font-semibold text-slate-950"
-          >
-            Add Credits
-          </Link>
-        </div>
-      ) : null}
     </div>
   );
 }

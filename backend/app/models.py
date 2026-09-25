@@ -95,6 +95,26 @@ class ProcessedStripeEvent(Base):
     processed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class CardCreationCheckout(Base):
+    __tablename__ = "card_creation_checkouts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    order_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    stripe_session_id: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True, index=True)
+    order_snapshot: Mapped[dict] = mapped_column(JSON, nullable=False)
+    tier: Mapped[str] = mapped_column(String(32), nullable=False)
+    card_type: Mapped[str] = mapped_column(String(16), nullable=False, default="static")
+    animated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    copy_quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    amount_dollars: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
+    result_card_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
 class Card(Base):
     __tablename__ = "cards"
 

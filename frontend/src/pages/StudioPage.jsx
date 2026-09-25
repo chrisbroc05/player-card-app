@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import BrandLogo from "../components/BrandLogo";
 import AppFooter from "../components/AppFooter";
@@ -18,6 +18,8 @@ import { buildHighlightPreviewCard } from "../utils/highlightCard";
 import HighlightVideoStep from "../components/HighlightVideoStep";
 import HighlightProcessingScreen from "../components/HighlightProcessingScreen";
 import QuantitySelector from "../components/QuantitySelector";
+import PackSizeSelector from "../components/PackSizeSelector";
+import AnimatedUpgradeOption from "../components/AnimatedUpgradeOption";
 import ActionCategoryStep from "../components/ActionCategoryStep";
 import HandednessStep from "../components/HandednessStep";
 import ScenarioSelectionStep, { SCENARIO_NONE_ID } from "../components/ScenarioSelectionStep";
@@ -73,18 +75,18 @@ import {
   markPendingCardsDiscarded,
 } from "../utils/pendingCardSession";
 
-const STEP_DETAILS = 1;
+const STEP_CARD_TYPE = 1;
 const STEP_TIER = 2;
 const STEP_THEME = 3;
-const STEP_CARD_TYPE = 4;
+const STEP_DETAILS = 4;
 const STEP_UPLOAD = 5;
 const STEP_FACE_PHOTO = 6;
-const STEP_HANDEDNESS = 7;
-const STEP_ACTION = 8;
-const STEP_SCENARIO = 9;
-const STEP_PHOTO_NOTES = 10;
-const STEP_HIGHLIGHT_VIDEO = 11;
-const STEP_REVIEW = 12;
+const STEP_HIGHLIGHT_VIDEO = 7;
+const STEP_REVIEW = 8;
+const STEP_HANDEDNESS = 9;
+const STEP_ACTION = 10;
+const STEP_SCENARIO = 11;
+const STEP_PHOTO_NOTES = 12;
 
 const ANIMATED_FLOW_STAGE = {
   IDLE: "idle",
@@ -113,47 +115,33 @@ function isFacePhotoOnlyStep(step) {
 }
 
 function getNextWizardStep(step, cardType) {
-  const isAnimated = cardType === "animated";
   const isHighlight = cardType === "highlight";
-  if (step === STEP_DETAILS) return STEP_TIER;
+  if (step === STEP_CARD_TYPE) return STEP_TIER;
   if (step === STEP_TIER) return STEP_THEME;
-  if (step === STEP_THEME) return STEP_CARD_TYPE;
-  if (step === STEP_CARD_TYPE) return STEP_UPLOAD;
+  if (step === STEP_THEME) return STEP_DETAILS;
+  if (step === STEP_DETAILS) return STEP_UPLOAD;
   if (step === STEP_UPLOAD) {
     if (isHighlight) return STEP_HIGHLIGHT_VIDEO;
     return STEP_FACE_PHOTO;
   }
-  if (step === STEP_FACE_PHOTO) {
-    if (isAnimated) return STEP_HANDEDNESS;
-    return STEP_REVIEW;
-  }
-  if (step === STEP_HANDEDNESS) return STEP_ACTION;
-  if (step === STEP_ACTION) return STEP_SCENARIO;
-  if (step === STEP_SCENARIO) return STEP_PHOTO_NOTES;
-  if (step === STEP_PHOTO_NOTES) return STEP_REVIEW;
+  if (step === STEP_FACE_PHOTO) return STEP_REVIEW;
   if (step === STEP_HIGHLIGHT_VIDEO) return STEP_REVIEW;
   return Math.min(step + 1, STEP_REVIEW);
 }
 
 function getPrevWizardStep(step, cardType) {
-  const isAnimated = cardType === "animated";
   const isHighlight = cardType === "highlight";
   if (step === STEP_REVIEW) {
     if (isHighlight) return STEP_HIGHLIGHT_VIDEO;
-    if (isAnimated) return STEP_PHOTO_NOTES;
     return STEP_FACE_PHOTO;
   }
-  if (step === STEP_PHOTO_NOTES) return STEP_SCENARIO;
-  if (step === STEP_SCENARIO) return STEP_ACTION;
-  if (step === STEP_ACTION) return STEP_HANDEDNESS;
-  if (step === STEP_HANDEDNESS) return STEP_FACE_PHOTO;
-  if (step === STEP_FACE_PHOTO) return STEP_UPLOAD;
   if (step === STEP_HIGHLIGHT_VIDEO) return STEP_UPLOAD;
-  if (step === STEP_UPLOAD) return STEP_CARD_TYPE;
-  if (step === STEP_CARD_TYPE) return STEP_THEME;
+  if (step === STEP_FACE_PHOTO) return STEP_UPLOAD;
+  if (step === STEP_UPLOAD) return STEP_DETAILS;
+  if (step === STEP_DETAILS) return STEP_THEME;
   if (step === STEP_THEME) return STEP_TIER;
-  if (step === STEP_TIER) return STEP_DETAILS;
-  return Math.max(step - 1, STEP_DETAILS);
+  if (step === STEP_TIER) return STEP_CARD_TYPE;
+  return Math.max(step - 1, STEP_CARD_TYPE);
 }
 
 const TIER_UI = {
@@ -223,6 +211,7 @@ function formatApiError(detail, fallback) {
 
 export default function StudioPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { token, user, initializing, refreshUser } = useAuth();
   const { settings, settingsLoaded } = useSettings();
   const { showCelebration } = useNewCardCelebration();
@@ -315,6 +304,8 @@ export default function StudioPage() {
   const [previewPollCardId, setPreviewPollCardId] = useState("");
   const [addCollectionLoading, setAddCollectionLoading] = useState(false);
   const [copyQuantity, setCopyQuantity] = useState(1);
+  const [animateAtCheckout, setAnimateAtCheckout] = useState(false);
+  const [animateCheckoutError, setAnimateCheckoutError] = useState("");
   const [pendingSession, setPendingSession] = useState(null);
   const [showPendingPrompt, setShowPendingPrompt] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
@@ -685,7 +676,7 @@ export default function StudioPage() {
     }
     return getActionCategory(actionCategory)?.label || "";
   }, [isAnimatedCardType, selectedScenarioTitle, selectedScenarioId, actionCategory]);
-  const inCreationFlow = currentStep >= STEP_DETAILS && currentStep <= STEP_REVIEW;
+  const inCreationFlow = currentStep >= STEP_CARD_TYPE && currentStep <= STEP_REVIEW;
   const useFixedStudioLayout = !showWelcome && inCreationFlow && !animationLoadingCardId;
 
   const dismissWelcome = useCallback(() => {
@@ -928,11 +919,16 @@ export default function StudioPage() {
     }
     setDetailsShowErrors(false);
     setDetailsErrors({});
-    setCurrentStep(STEP_TIER);
+    setCurrentStep(STEP_UPLOAD);
   }
 
   function tryAdvanceStep() {
     if (currentStep === STEP_DETAILS) {
+      return;
+    }
+    if (currentStep === STEP_CARD_TYPE) {
+      if (!cardType) return;
+      setCurrentStep(STEP_TIER);
       return;
     }
     if (currentStep === STEP_TIER) {
@@ -950,11 +946,7 @@ export default function StudioPage() {
         return;
       }
       setThemeStepError("");
-      setCurrentStep(STEP_CARD_TYPE);
-      return;
-    }
-    if (currentStep === STEP_CARD_TYPE) {
-      setCurrentStep(STEP_UPLOAD);
+      setCurrentStep(STEP_DETAILS);
       return;
     }
     if (currentStep === STEP_UPLOAD) {
@@ -1013,6 +1005,29 @@ export default function StudioPage() {
     }
     loadGenerationUsage();
   }, [token, loadGenerationUsage]);
+
+  const cardCreationReturnHandled = useRef("");
+
+  useEffect(() => {
+    if (!token || initializing) return undefined;
+    const cancelled = searchParams.get("card_creation_cancelled");
+    if (cancelled === "true") {
+      setSearchParams({}, { replace: true });
+      setCurrentStep(STEP_REVIEW);
+      setReviewSubPhase("setup");
+      setMessage("");
+      setError("Payment was cancelled. You can try again when ready.");
+      return undefined;
+    }
+    const success = searchParams.get("card_creation_success");
+    const sessionId = (searchParams.get("session_id") || "").trim();
+    if (success !== "true" || !sessionId) return undefined;
+    if (cardCreationReturnHandled.current === sessionId) return undefined;
+    cardCreationReturnHandled.current = sessionId;
+    setSearchParams({}, { replace: true });
+    completeCardCreationReturn(sessionId);
+    return undefined;
+  }, [token, initializing, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!isAnimatedCardType && isAnimatedOnlyStep(currentStep)) {
@@ -1116,7 +1131,10 @@ export default function StudioPage() {
     let cancelled = false;
     (async () => {
       try {
-        const data = await fetchGenerationPrice(orderTier);
+        const data = await fetchGenerationPrice(orderTier, {
+          cardType: cardType === "highlight" ? "highlight" : "static",
+          animated: animateAtCheckout && cardType !== "highlight",
+        });
         if (!cancelled) {
           setGenerationPricing(data);
           setPricingError("");
@@ -1131,7 +1149,7 @@ export default function StudioPage() {
     return () => {
       cancelled = true;
     };
-  }, [orderTier]);
+  }, [orderTier, cardType, animateAtCheckout]);
 
   useEffect(() => {
     if (!user || !token) return undefined;
@@ -1525,7 +1543,9 @@ export default function StudioPage() {
     } catch {
       /* ignore storage errors */
     }
-    setCurrentStep(STEP_DETAILS);
+    setCurrentStep(STEP_CARD_TYPE);
+    setAnimateAtCheckout(false);
+    setAnimateCheckoutError("");
     setFirstName("");
     setLastName("");
     setDisplayName("");
@@ -1946,14 +1966,15 @@ export default function StudioPage() {
         player_image_url: playerData.image_url,
         face_photo_url: facePhotoUrl.trim() || null,
         tier: orderTier,
-        card_type: cardType,
+        card_type: isHighlightCardType ? "highlight" : "standard",
         special_theme: specialTheme || null,
-        selected_motion_id: selectedMotionId || klingMotionForCategory(actionCategory) || null,
-        action_category: actionCategory || null,
-        throwing_hand: isAnimatedCardType ? throwingHand || null : null,
-        batting_side: isAnimatedCardType ? battingSide || null : null,
-        photo_notes: isAnimatedCardType ? photoNotes.trim().slice(0, 200) || null : null,
-        animation_scenario_id: isAnimatedCardType ? selectedScenarioId || null : null,
+        selected_motion_id:
+          animateAtCheckout && actionCategory ? klingMotionForCategory(actionCategory) || null : null,
+        action_category: animateAtCheckout && actionCategory ? actionCategory : null,
+        throwing_hand: null,
+        batting_side: null,
+        photo_notes: null,
+        animation_scenario_id: null,
         add_ons: [],
       }),
     });
@@ -1965,11 +1986,146 @@ export default function StudioPage() {
   }
 
   function requestGenerateFirstPreview() {
-    if (isAnimatedCardType) {
-      setShowAnimateConfirm(true);
+    handlePayAndGenerate();
+  }
+
+  async function pollCardCreationStatus(sessionId, { maxAttempts = 90, intervalMs = 2000 } = {}) {
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const res = await fetch(
+        `${API_BASE_URL}/cards/creation-checkout/status?session_id=${encodeURIComponent(sessionId)}`,
+        { headers: { ...authHeaders(token) } }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(formatApiError(data?.detail, "Could not verify payment."));
+      }
+      if (data.status === "completed" && data.result_card_id) {
+        return data;
+      }
+      if (data.status === "failed") {
+        throw new Error(data.error_message || "Card generation failed after payment.");
+      }
+      await new Promise((resolve) => {
+        setTimeout(resolve, intervalMs);
+      });
+    }
+    throw new Error(
+      "Your payment was received. Card generation is still in progress — check My Collection shortly."
+    );
+  }
+
+  async function completeCardCreationReturn(sessionId) {
+    setCurrentStep(STEP_REVIEW);
+    setReviewSubPhase("setup");
+    setIsCreating(true);
+    setOrderActionKey("card-creation-return");
+    setError("");
+    setMessage("Payment confirmed — generating your card...");
+    try {
+      const result = await pollCardCreationStatus(sessionId);
+      const detail = await fetchCardDetailById(result.result_card_id);
+      await Promise.all([fetchMyCards(), fetchOrders(), refreshUser(token)]);
+      invalidateCollectionCache();
+      setReviewSubPhase("approve");
+      setMessage(
+        `Your card has been added to your collection${result.copy_quantity > 1 ? ` (${result.copy_quantity} copies)` : ""}.`
+      );
+      await showCelebration({
+        card: detail,
+        source: "created",
+        showAnimateUpsell: !isHighlightCardType && !result.animated,
+      });
+    } catch (err) {
+      setError(err.message || "Could not complete card creation.");
+    } finally {
+      setIsCreating(false);
+      setOrderActionKey("");
+    }
+  }
+
+  async function uploadHighlightStaging(orderId) {
+    if (!isHighlightCardType || !highlightClipDraft?.file) {
+      throw new Error("Highlight video is required before checkout.");
+    }
+    const form = new FormData();
+    form.append("order_id", String(orderId));
+    form.append("file", highlightClipDraft.file, highlightClipDraft.file.name || "highlight.mp4");
+    form.append("trim_start_seconds", String(highlightClipDraft.trimStart ?? 0));
+    form.append("trim_end_seconds", String(highlightClipDraft.trimEnd ?? 0));
+    const res = await fetch(`${API_BASE_URL}/cards/creation-highlight-staging`, {
+      method: "POST",
+      headers: { ...authHeaders(token) },
+      body: form,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(formatApiError(data?.detail, "Could not upload highlight video."));
+    }
+    return data;
+  }
+
+  async function handlePayAndGenerate() {
+    if (generationCap.blocked) return;
+    if (!canCreateOrder || !generationPricing) return;
+    if (animateAtCheckout && !isHighlightCardType && !actionCategory) {
+      setAnimateCheckoutError("Select an action for your animation.");
       return;
     }
-    handleGenerateFirstPreview();
+    setAnimateCheckoutError("");
+
+    setIsCreating(true);
+    setOrderActionKey("pay-generate");
+    setMessage("");
+    setError("");
+    try {
+      const orderId = await ensureOrderForGeneration();
+      let highlightStaging = null;
+      if (isHighlightCardType) {
+        setMessage("Uploading highlight video...");
+        highlightStaging = await uploadHighlightStaging(orderId);
+      }
+      const checkoutPayload = {
+        order_id: orderId,
+        copy_quantity: copyQuantity,
+        card_type: isHighlightCardType ? "highlight" : "static",
+        animated: animateAtCheckout && !isHighlightCardType,
+        action_category: animateAtCheckout && actionCategory ? actionCategory : null,
+        selected_motion_id:
+          animateAtCheckout && actionCategory
+            ? klingMotionForCategory(actionCategory) || null
+            : null,
+      };
+      if (highlightStaging) {
+        checkoutPayload.highlight_staging_url = highlightStaging.staging_url;
+        checkoutPayload.highlight_trim_start = highlightStaging.trim_start;
+        checkoutPayload.highlight_trim_end = highlightStaging.trim_end;
+      }
+      const res = await fetch(`${API_BASE_URL}/cards/creation-checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders(token) },
+        body: JSON.stringify(checkoutPayload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(formatApiError(data?.detail, "Could not start checkout."));
+      }
+      if (!data.checkout_url) {
+        throw new Error("Checkout URL was not returned.");
+      }
+      try {
+        sessionStorage.setItem(
+          "studio_card_creation_pending",
+          JSON.stringify({ orderId, copyQuantity, reviewSubPhase: "setup" })
+        );
+      } catch {
+        /* ignore storage errors */
+      }
+      window.location.href = data.checkout_url;
+    } catch (err) {
+      setError(err.message || "Could not start payment.");
+      setIsCreating(false);
+      setOrderActionKey("");
+    }
   }
 
   function handleAnimatedChoiceAnimate() {
@@ -2553,18 +2709,18 @@ export default function StudioPage() {
               </div>
             ) : null}
 
-            {!user && currentStep >= STEP_DETAILS ? (
+            {!user && currentStep >= STEP_TIER ? (
               <StudioAuthGate
-                onBackToTiers={() => goToStep(STEP_DETAILS)}
+                onBackToTiers={() => goToStep(STEP_TIER)}
                 backLabel="← Back to player details"
               />
             ) : (
               <>
-            {currentStep > STEP_DETAILS && currentStep <= STEP_REVIEW ? (
+            {currentStep > STEP_CARD_TYPE && currentStep <= STEP_REVIEW ? (
               <StudioWizardBack onClick={goBackStep} />
             ) : null}
 
-            {currentStep >= STEP_DETAILS && currentStep <= STEP_REVIEW && !previewConfigureOpen ? (
+            {currentStep >= STEP_TIER && currentStep <= STEP_REVIEW && !previewConfigureOpen ? (
               <StudioPhaseHeader title={phaseMeta.title} subtitle={phaseMeta.subtitle} />
             ) : null}
 
@@ -2718,23 +2874,21 @@ export default function StudioPage() {
                   onChange={(type) => {
                     if (type !== cardType) clearUploadState();
                     setCardType(type);
-                    if (type === "standard" || type === "highlight") {
-                      setSelectedMotionId("");
-                      setSelectedScenarioId("");
-                      setSelectedScenarioTitle("");
-                      setActionCategory("");
-                      setThrowingHand("");
-                      setBattingSide("");
-                    }
+                    setAnimateAtCheckout(false);
+                    setAnimateCheckoutError("");
+                    setSelectedMotionId("");
+                    setSelectedScenarioId("");
+                    setSelectedScenarioTitle("");
+                    setActionCategory("");
+                    setThrowingHand("");
+                    setBattingSide("");
                   }}
-                  highlightCardPrice={generationPricing?.highlight_card_price ?? highlightCardPrice}
-                  animatedUpgradePrice={generationPricing?.animated_upgrade_price ?? 10}
                 />
                 <StudioWizardContinue
                   disabled={!canAdvanceFromStep}
                   onClick={tryAdvanceStep}
                 >
-                  {getPhaseContinueLabel(STEP_CARD_TYPE)}
+                  Choose Your Tier →
                 </StudioWizardContinue>
               </div>
             ) : null}
@@ -2908,11 +3062,9 @@ export default function StudioPage() {
             {currentStep === STEP_REVIEW && reviewSubPhase === "setup" ? (
               <div className="grid gap-8">
                 <div>
-                  <h3 className="text-lg font-semibold text-white">Review & Generate</h3>
+                  <h3 className="text-lg font-semibold text-white">Review & Pay</h3>
                   <p className="mt-1 text-sm text-slate-400">
-                    {isHighlightCardType
-                      ? "Preview your highlight card below — your first look is free before you add to collection."
-                      : "Confirm your choices. Your first preview is free — additional previews and copies use credits."}
+                    Confirm your choices, select how many copies you want, and pay to generate your card.
                   </p>
                   {pricingError ? (
                     <p className="mt-2 text-sm text-rose-300">{pricingError}</p>
@@ -2921,7 +3073,7 @@ export default function StudioPage() {
                 {isHighlightCardType && highlightClipDraft?.confirmed ? (
                   <div className="grid gap-3">
                     <p className="text-center text-xs font-medium uppercase tracking-[0.18em] text-brand-gold-bright/90">
-                      Your highlight preview
+                      Your highlight clip
                     </p>
                     <ExpandableCardView
                       showHint
@@ -2946,6 +3098,30 @@ export default function StudioPage() {
                     </ExpandableCardView>
                   </div>
                 ) : null}
+                <PackSizeSelector
+                  disabled={Boolean(orderActionKey)}
+                  value={copyQuantity}
+                  onChange={setCopyQuantity}
+                />
+                {!isHighlightCardType ? (
+                  <AnimatedUpgradeOption
+                    enabled={animateAtCheckout}
+                    onEnabledChange={(next) => {
+                      setAnimateAtCheckout(next);
+                      setAnimateCheckoutError("");
+                      if (!next) setActionCategory("");
+                    }}
+                    animatedUpgradePrice={generationPricing?.animated_upgrade_price ?? 10}
+                    actionCategory={actionCategory}
+                    onActionCategoryChange={(cat) => {
+                      setActionCategory(cat);
+                      setAnimateCheckoutError("");
+                    }}
+                    disabled={Boolean(orderActionKey)}
+                    error={animateCheckoutError}
+                    tier={orderTier || "rookie"}
+                  />
+                ) : null}
                 <GenerationCostSummary
                   playerName={playerDisplayName}
                   teamName={teamName}
@@ -2954,14 +3130,20 @@ export default function StudioPage() {
                   gradYear={gradYear}
                   tierLabel={selectedTierLabel}
                   themeLabel={specialTheme ? selectedThemeLabel : ""}
-                  isAnimated={isAnimatedCardType}
                   isHighlight={isHighlightCardType}
-                  motionName={motionDisplayName}
                   copyQuantity={copyQuantity}
                   pricing={generationPricing}
-                  creditBalance={creditBalance}
-                  phase="pre-generate"
+                  animateAtCheckout={animateAtCheckout && !isHighlightCardType}
+                  phase="pay-upfront"
                 />
+                {orderActionKey === "card-creation-return" ? (
+                  <div className="rounded-xl border bg-gold-subtle px-4 py-3 text-sm text-brand-gold">
+                    <p className="font-medium text-brand-gold-bright">{message || "Generating your card..."}</p>
+                    <p className="mt-1 text-xs text-brand-gold/90">
+                      Payment received — your card is being created. This usually takes under a minute.
+                    </p>
+                  </div>
+                ) : null}
                 {generationCap.blocked ? (
                   <GenerationCapNotice
                     usage={generationUsage}
@@ -2974,9 +3156,15 @@ export default function StudioPage() {
                       onClick={requestGenerateFirstPreview}
                       disabled={!canCreateOrder || !generationPricing || Boolean(orderActionKey)}
                     >
-                      {orderActionKey === "generate-first"
-                        ? "Generating..."
-                        : getPhaseContinueLabel(STEP_REVIEW, { isReview: true })}
+                      {orderActionKey === "pay-generate"
+                        ? "Opening checkout..."
+                        : orderActionKey === "card-creation-return"
+                          ? "Generating your card..."
+                          : `Pay & Generate — ${formatMoney(
+                              generationPricing?.card_creation_price ??
+                                generationPricing?.first_preview_price ??
+                                0
+                            )}`}
                     </StudioWizardContinue>
                     <GenerationDailyUsageHint usage={generationUsage} className="w-full basis-full text-center sm:text-left" />
                   </>
