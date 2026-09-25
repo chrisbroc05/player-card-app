@@ -261,7 +261,7 @@ export default function ProfilePage() {
             <ProfileHeader displayName={displayName} handle={handle} />
 
             <ProfileBalanceCard
-              creditBalance={financials?.current_balance ?? profile?.credit_balance ?? user?.credit_balance ?? 0}
+              marketplaceBalance={profile?.marketplace_balance ?? user?.marketplace_balance ?? 0}
               marketplaceEarnings={financials?.total_earned_from_sales ?? 0}
               totalWithdrawn={financials?.total_withdrawn ?? 0}
               loading={financialsLoading}

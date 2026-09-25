@@ -32,6 +32,7 @@ export default function AppHeader() {
   const onCredits = location.pathname.startsWith("/credits");
 
   const hasNotifications = pendingIncomingTradesCount + pendingIncomingMarketplaceCount > 0;
+  const marketplaceBalance = Number(user?.marketplace_balance ?? 0);
 
   function handleLogout() {
     performLogout(logout);
@@ -99,7 +100,7 @@ export default function AppHeader() {
                   className={`credit-badge inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition sm:text-sm ${
                     onCredits ? "surface-card--selected" : ""
                   }`}
-                  title="Your credit balance"
+                  title="Your marketplace balance"
                 >
                   <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
                     <path
@@ -108,7 +109,7 @@ export default function AppHeader() {
                       d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 12m15 0v3a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15v-3"
                     />
                   </svg>
-                  <span className="tabular-nums">{formatMoney(user.credit_balance ?? 0)}</span>
+                  <span className="tabular-nums">{formatMoney(marketplaceBalance)}</span>
                 </Link>
                 <Link
                   to="/settings"
@@ -160,9 +161,9 @@ export default function AppHeader() {
           <div className="mobile-header-right">
             {user ? (
               <>
-                <Link to="/credits" className="credits-badge" title="Your credit balance">
+                <Link to="/credits" className="credits-badge" title="Your marketplace balance">
                   <Coins className="credits-badge__icon" strokeWidth={2} aria-hidden />
-                  <span className="credits-badge__amount tabular-nums">{formatMoney(user.credit_balance ?? 0)}</span>
+                  <span className="credits-badge__amount tabular-nums">{formatMoney(marketplaceBalance)}</span>
                 </Link>
                 <Link
                   to="/settings"

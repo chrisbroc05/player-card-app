@@ -891,11 +891,7 @@ function OfferReviewModal({
               </h2>
               <p className="mt-1 text-sm text-slate-400">Incoming offers for {listing.player_name}</p>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex min-h-[40px] items-center justify-center rounded-lg border border-white/20 px-4 text-sm text-slate-300"
-            >
+            <button type="button" onClick={onClose} className="btn-ghost min-h-[40px] px-3 text-sm">
               Close
             </button>
           </div>
@@ -1012,12 +1008,12 @@ function OfferReviewModal({
                           <p className="text-xs text-slate-500">Buyer will see your counter and can accept or decline</p>
                         </>
                       )}
-                      <div className="offer-review-offer-actions flex flex-wrap gap-2">
+                      <div className="offer-review-offer-actions offer-review-offer-actions--pair">
                         <button
                           type="button"
                           disabled={counterBusyId === offer.offer_id || (isTrade && counterTradeCardIds.length < 1)}
                           onClick={() => onSendCounter(offer)}
-                          className="min-h-[44px] rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+                          className="btn-primary disabled:opacity-50"
                         >
                           {counterBusyId === offer.offer_id
                             ? "Sending…"
@@ -1031,29 +1027,21 @@ function OfferReviewModal({
                             setCounterAmount("");
                             setCounterTradeCardIds([]);
                           }}
-                          className="min-h-[44px] rounded-lg border border-white/20 px-4 text-sm text-slate-300"
+                          className="btn-ghost disabled:opacity-50"
                         >
                           Cancel
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <div className="offer-review-offer-actions mt-3 flex flex-wrap gap-2">
+                    <div className="offer-review-offer-actions mt-3">
                       <button
                         type="button"
                         disabled={actionKey === `accept-${offer.offer_id}`}
                         onClick={() => onRequestAccept(offer, listing)}
-                        className="min-h-[44px] rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+                        className="btn-primary disabled:opacity-50"
                       >
                         {actionKey === `accept-${offer.offer_id}` ? "Accepting…" : "Accept"}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={actionKey === `decline-${offer.offer_id}`}
-                        onClick={() => onRequestDecline(offer, listing)}
-                        className="min-h-[44px] rounded-lg border border-white/20 px-4 text-sm text-slate-300 disabled:opacity-50"
-                      >
-                        {actionKey === `decline-${offer.offer_id}` ? "Declining…" : "Decline"}
                       </button>
                       <button
                         type="button"
@@ -1063,9 +1051,17 @@ function OfferReviewModal({
                           setCounterAmount("");
                           setCounterTradeCardIds([]);
                         }}
-                        className="min-h-[44px] rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 text-sm font-medium text-amber-200 disabled:opacity-50"
+                        className="btn-secondary disabled:opacity-50"
                       >
                         Counter
+                      </button>
+                      <button
+                        type="button"
+                        disabled={actionKey === `decline-${offer.offer_id}`}
+                        onClick={() => onRequestDecline(offer, listing)}
+                        className="btn-danger disabled:opacity-50"
+                      >
+                        {actionKey === `decline-${offer.offer_id}` ? "Declining…" : "Decline"}
                       </button>
                     </div>
                   )
@@ -1130,6 +1126,7 @@ function UnlistAllConfirmModal({ open, group, busy, onClose, onConfirm }) {
 function AcceptOfferConfirmModal({ open, payload, actionBusy, onBack, onConfirm }) {
   if (!open || !payload?.offer) return null;
   const offer = payload.offer;
+  const listing = payload.listing;
   const isTrade = (offer.offer_type || "cash") === "card_trade";
   const gross = Number(offer.offer_amount || 0);
   const fee = computeRoyaltyPreview(gross);
@@ -1138,54 +1135,73 @@ function AcceptOfferConfirmModal({ open, payload, actionBusy, onBack, onConfirm 
     <MarketplaceModalShell
       open={open}
       zIndex={73}
+      variant="centered"
       ariaLabelledBy="accept-offer-confirm-title"
       onBackdropClick={onBack}
     >
-      <MarketplaceModalContent>
-        <h3 id="accept-offer-confirm-title" className="text-xl font-semibold text-white">
-          Accept this offer?
-        </h3>
-        <div className="mt-3 space-y-2 rounded-lg border border-white/10 bg-cardBg2 p-3 text-sm">
-          <p className="text-slate-300">
-            Buyer: <span className="font-semibold text-white">{offer.buyer_display_name}</span>
-          </p>
-          {isTrade ? (
-            <p className="text-slate-300">
-              Card <span className="font-semibold text-white">{offer.player_name || payload.listing?.player_name}</span>{" "}
-              will be added to your collection.
-            </p>
-          ) : (
-            <>
-              <p className="text-slate-300">
-                Amount: <span className="font-semibold text-white">{formatMoney(gross)}</span> will be added to your credit
-                balance
-              </p>
-              <p className="text-slate-400">{platformRoyaltyPercentLabel()} platform fee ({formatMoney(fee)}) has been deducted</p>
-              <p className="text-slate-300">
-                Net amount you receive: <span className="font-semibold text-brand-gold">{formatMoney(net)}</span>
-              </p>
-            </>
-          )}
+      <div className="accept-offer-confirm-modal">
+        <div className="accept-offer-confirm-modal__header">
+          <h3 id="accept-offer-confirm-title" className="text-xl font-semibold text-white">
+            Accept this offer?
+          </h3>
+          <p className="mt-1 text-sm text-slate-400">Review the deal before confirming</p>
         </div>
-      </MarketplaceModalContent>
-      <MarketplaceModalActions>
-        <button
-          type="button"
-          disabled={actionBusy}
-          onClick={onBack}
-          className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg border border-white/20 px-4 text-sm text-slate-300"
-        >
-          Go Back
-        </button>
-        <button
-          type="button"
-          disabled={actionBusy}
-          onClick={onConfirm}
-          className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
-        >
-          {actionBusy ? "Accepting…" : "Yes, Accept"}
-        </button>
-      </MarketplaceModalActions>
+
+        <div className="accept-offer-confirm-modal__scroll">
+          {listing ? (
+            <div className="accept-offer-confirm-modal__card">
+              <CardImage
+                card={listing}
+                alt={listing.player_name}
+                frameClassName="w-full"
+                infoBannerVariant="compact"
+                showInfoBanner
+              />
+            </div>
+          ) : null}
+
+          <div className="accept-offer-confirm-modal__summary">
+            <p className="text-base font-semibold text-white">{listing?.player_name || offer.player_name}</p>
+            {listing?.team_name ? <p className="mt-0.5 text-sm text-slate-400">{listing.team_name}</p> : null}
+            <dl className="accept-offer-confirm-modal__details">
+              <div className="accept-offer-confirm-modal__detail-row">
+                <dt>Buyer</dt>
+                <dd>{offer.buyer_display_name}</dd>
+              </div>
+              {isTrade ? (
+                <div className="accept-offer-confirm-modal__detail-row">
+                  <dt>You receive</dt>
+                  <dd>Trade cards added to your collection</dd>
+                </div>
+              ) : (
+                <>
+                  <div className="accept-offer-confirm-modal__detail-row">
+                    <dt>Offer amount</dt>
+                    <dd>{formatMoney(gross)}</dd>
+                  </div>
+                  <div className="accept-offer-confirm-modal__detail-row">
+                    <dt>{platformRoyaltyPercentLabel()} platform fee</dt>
+                    <dd className="text-slate-400">−{formatMoney(fee)}</dd>
+                  </div>
+                  <div className="accept-offer-confirm-modal__detail-row accept-offer-confirm-modal__detail-row--highlight">
+                    <dt>Net to marketplace balance</dt>
+                    <dd className="text-brand-gold">{formatMoney(net)}</dd>
+                  </div>
+                </>
+              )}
+            </dl>
+          </div>
+        </div>
+
+        <MarketplaceModalActions className="accept-offer-confirm-modal__actions">
+          <button type="button" disabled={actionBusy} onClick={onBack} className="btn-ghost flex-1 disabled:opacity-50">
+            Go Back
+          </button>
+          <button type="button" disabled={actionBusy} onClick={onConfirm} className="btn-primary flex-1 disabled:opacity-50">
+            {actionBusy ? "Accepting…" : "Yes, Accept"}
+          </button>
+        </MarketplaceModalActions>
+      </div>
     </MarketplaceModalShell>
   );
 }
@@ -1245,7 +1261,7 @@ function AcceptOfferSuccessModal({ open, payload, onGoProfile, onBackListings })
         </p>
         {newBalance != null ? (
           <p className="mt-1 text-center text-[13px] text-brand-gold">
-            Current credit balance: {formatMoney(newBalance)}
+            Current marketplace balance: {formatMoney(newBalance)}
           </p>
         ) : null}
 

@@ -6609,14 +6609,122 @@
   position: sticky;
   bottom: 0;
   z-index: 2;
-  padding: 10px 0 4px;
-  background: linear-gradient(to top, var(--bg-primary) 75%, rgba(15, 23, 42, 0));
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px 0 4px;
+  background: linear-gradient(to top, var(--bg-primary) 80%, rgba(15, 23, 42, 0));
+}
+
+.offer-review-offer-actions .btn-primary,
+.offer-review-offer-actions .btn-secondary,
+.offer-review-offer-actions .btn-danger,
+.offer-review-offer-actions .btn-ghost {
+  min-height: 44px;
+  width: 100%;
+  font-size: 13px;
+}
+
+.offer-review-offer-actions--pair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 480px) {
+  .offer-review-offer-actions:not(.offer-review-offer-actions--pair) {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 639px) {
   .offer-review-offer-actions {
     padding-bottom: 8px;
   }
+}
+
+.accept-offer-confirm-modal {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
+}
+
+.accept-offer-confirm-modal__header {
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.accept-offer-confirm-modal__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-top: 16px;
+}
+
+.accept-offer-confirm-modal__card {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  max-width: 168px;
+  margin: 0 auto;
+}
+
+.accept-offer-confirm-modal__summary {
+  margin-top: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 16px;
+  text-align: center;
+}
+
+.accept-offer-confirm-modal__details {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+.accept-offer-confirm-modal__detail-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.accept-offer-confirm-modal__detail-row dt {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.accept-offer-confirm-modal__detail-row dd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: right;
+}
+
+.accept-offer-confirm-modal__detail-row--highlight {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.accept-offer-confirm-modal__actions {
+  flex-shrink: 0;
+  margin-top: 0;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-primary);
+}
+
+.accept-offer-confirm-modal__actions .btn-primary,
+.accept-offer-confirm-modal__actions .btn-ghost {
+  min-height: 48px;
 }
 
 /* Manage Offers modal — full card visibility */

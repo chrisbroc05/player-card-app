@@ -47,6 +47,13 @@ export default function App() {
   }, [logout, navigate]);
 
   useEffect(() => {
+    const connect = new URLSearchParams(location.search).get("connect");
+    if (connect && location.pathname !== "/credits") {
+      navigate(`/credits?connect=${encodeURIComponent(connect)}`, { replace: true });
+    }
+  }, [location.pathname, location.search, navigate]);
+
+  useEffect(() => {
     if (initializing || !token) return undefined;
 
     let cancelled = false;

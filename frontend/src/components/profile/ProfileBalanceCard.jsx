@@ -12,7 +12,7 @@ function BalanceItem({ label, amount }) {
 }
 
 export default function ProfileBalanceCard({
-  creditBalance = 0,
+  marketplaceBalance = 0,
   marketplaceEarnings = 0,
   totalWithdrawn = 0,
   loading = false,
@@ -20,7 +20,7 @@ export default function ProfileBalanceCard({
   return (
     <section className="profile-balance-card" aria-label="Account balances">
       <div className="profile-balance-card__grid">
-        <BalanceItem label="Credits Balance" amount={creditBalance} />
+        <BalanceItem label="Marketplace Balance" amount={marketplaceBalance} />
         <BalanceItem label="Marketplace Earnings" amount={marketplaceEarnings} />
         <BalanceItem label="Total Withdrawn" amount={totalWithdrawn} />
       </div>
@@ -29,7 +29,7 @@ export default function ProfileBalanceCard({
           Withdraw Earnings
         </Link>
         <Link to="/credits" className="profile-balance-card__btn profile-balance-card__btn--primary">
-          Add Credits
+          Load Funds
         </Link>
       </div>
       {loading ? <p className="profile-balance-card__loading">Updating balances…</p> : null}

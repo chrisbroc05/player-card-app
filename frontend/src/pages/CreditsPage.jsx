@@ -8,7 +8,6 @@ import { authFetch, formatApiError } from "../utils/authFetch";
 import { formatMoney } from "../utils/marketplace";
 import {
   MIN_CREDIT_LOAD,
-  creditTopUpShortfallMessage,
   isValidCreditLoadAmount,
   minCreditPurchaseError,
   minCreditPurchaseLabel,
@@ -75,6 +74,70 @@ function formatLedgerDate(iso) {
   }
 }
 
+function LoadAmountPicker({
+  selectedAmount,
+  onSelectPreset,
+  customAmount,
+  onCustomChange,
+  disabled,
+}) {
+  const customAmountBelowMinimum =
+    selectedAmount == null &&
+    customAmount !== "" &&
+    Number.isFinite(Number(customAmount)) &&
+    Number(customAmount) > 0 &&
+    Number(customAmount) < MIN_CREDIT_LOAD;
+
+  return (
+    <>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {PRESET_AMOUNTS.map((amt) => (
+          <button
+            key={amt}
+            type="button"
+            disabled={disabled}
+            onClick={() => onSelectPreset(amt)}
+            className={`min-h-[44px] rounded-xl border px-4 text-sm font-semibold transition ${
+              selectedAmount === amt
+                ? "marketplace-tab marketplace-tab--active border-[var(--color-gold-primary)]"
+                : "border-white/15 text-slate-300 hover:border-[var(--color-border-gold)]"
+            }`}
+          >
+            ${amt}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-4">
+        <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          Or enter a custom amount
+        </label>
+        <div className="relative mt-1">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+          <input
+            type="number"
+            min={MIN_CREDIT_LOAD}
+            step="0.01"
+            disabled={disabled}
+            value={customAmount}
+            onChange={(e) => onCustomChange(e.target.value)}
+            placeholder={minCreditPurchaseLabel().replace("$", "")}
+            className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 py-2 pl-7 pr-3 text-slate-100 ${
+              customAmountBelowMinimum ? "border-rose-500/50" : "border-white/15"
+            }`}
+          />
+        </div>
+        {customAmountBelowMinimum ? (
+          <p className="mt-1 text-xs text-rose-300">{minCreditPurchaseError()}</p>
+        ) : null}
+        <p className="mt-1 text-[12px]" style={{ color: "var(--text-muted)" }}>
+          Minimum purchase: {minCreditPurchaseLabel()}
+        </p>
+      </div>
+    </>
+  );
+}
+
 function CreditLedgerRow({ row }) {
   const amt = Number(row.amount);
   const positive = amt >= 0;
@@ -116,16 +179,11 @@ export default function CreditsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedAmount, setSelectedAmount] = useState(20);
   const [customAmount, setCustomAmount] = useState("");
-  const [giftQuery, setGiftQuery] = useState("");
-  const [giftResults, setGiftResults] = useState([]);
-  const [giftRecipient, setGiftRecipient] = useState(null);
-  const [giftSearching, setGiftSearching] = useState(false);
   const [ledger, setLedger] = useState([]);
   const [ledgerLoading, setLedgerLoading] = useState(true);
   const [ledgerLoadingMore, setLedgerLoadingMore] = useState(false);
   const [hasMoreLedger, setHasMoreLedger] = useState(false);
   const [paymentsDisabled, setPaymentsDisabled] = useState(false);
-  const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [withdrawBusy, setWithdrawBusy] = useState(false);
   const [withdrawError, setWithdrawError] = useState("");
@@ -143,7 +201,6 @@ export default function CreditsPage() {
   const [error, setError] = useState("");
   const [banner, setBanner] = useState("");
 
-  const cardBalance = user?.credit_balance ?? 0;
   const balance = marketplaceBalance;
 
   const parsedWithdrawAmount = useMemo(() => {
@@ -163,22 +220,26 @@ export default function CreditsPage() {
     return null;
   }, [selectedAmount, customAmount]);
 
-  const loadCreditsButtonLabel = useMemo(() => {
-    if (checkoutBusy) return "Redirecting to Stripe…";
-    if (resolvedAmount == null || !isValidCreditLoadAmount(resolvedAmount)) return "Load Credits";
+  const loadMarketplaceButtonLabel = useMemo(() => {
+    if (marketplaceCheckoutBusy) return "Redirecting to Stripe…";
+    if (resolvedAmount == null || !isValidCreditLoadAmount(resolvedAmount)) return "Load Marketplace Funds";
     const amountLabel = Number.isInteger(resolvedAmount)
       ? `$${resolvedAmount}`
       : formatMoney(resolvedAmount);
-    return `Load ${amountLabel} Credits`;
-  }, [checkoutBusy, resolvedAmount]);
-
-  const customAmountBelowMinimum = useMemo(() => {
-    if (selectedAmount != null || customAmount === "") return false;
-    const n = Number(customAmount);
-    return Number.isFinite(n) && n > 0 && n < MIN_CREDIT_LOAD;
-  }, [selectedAmount, customAmount]);
+    return `Load ${amountLabel} to Marketplace`;
+  }, [marketplaceCheckoutBusy, resolvedAmount]);
 
   const checkoutAmountValid = resolvedAmount != null && isValidCreditLoadAmount(resolvedAmount);
+
+  function selectPresetAmount(amt) {
+    setSelectedAmount(amt);
+    setCustomAmount("");
+  }
+
+  function changeCustomAmount(value) {
+    setCustomAmount(value);
+    setSelectedAmount(null);
+  }
 
   const loadLedger = useCallback(async () => {
     if (!token) return;
@@ -349,16 +410,7 @@ export default function CreditsPage() {
 
   useEffect(() => {
     if (searchParams.get("connect")) return;
-    if (searchParams.get("success") === "true") {
-      setBanner("Card creation credits added successfully!");
-      refreshUser?.();
-      loadLedger();
-      loadBalancesAndProfile();
-      setSearchParams({}, { replace: true });
-    } else if (searchParams.get("cancelled") === "true") {
-      setBanner("Checkout cancelled. No charges were made.");
-      setSearchParams({}, { replace: true });
-    } else if (searchParams.get("marketplace_success") === "true") {
+    if (searchParams.get("marketplace_success") === "true") {
       setBanner("Marketplace funds added successfully!");
       refreshUser?.();
       loadLedger();
@@ -369,27 +421,6 @@ export default function CreditsPage() {
       setSearchParams({}, { replace: true });
     }
   }, [searchParams, setSearchParams, refreshUser, loadLedger, loadBalancesAndProfile]);
-
-  useEffect(() => {
-    if (!token || giftQuery.trim().length < 3) {
-      setGiftResults([]);
-      return undefined;
-    }
-    const handle = setTimeout(async () => {
-      setGiftSearching(true);
-      try {
-        const q = encodeURIComponent(giftQuery.trim());
-        const { res } = await authFetch(token, `/users/search?q=${q}`);
-        const data = await res.json().catch(() => []);
-        setGiftResults(Array.isArray(data) ? data : []);
-      } catch {
-        setGiftResults([]);
-      } finally {
-        setGiftSearching(false);
-      }
-    }, 300);
-    return () => clearTimeout(handle);
-  }, [giftQuery, token]);
 
   function openWithdrawConfirm() {
     setWithdrawError("");
@@ -494,47 +525,6 @@ export default function CreditsPage() {
     }
   }
 
-  async function startCheckout(recipientUserId) {
-    if (!token) return;
-    setError("");
-    const n = resolvedAmount;
-    if (n == null || !isValidCreditLoadAmount(n)) {
-      setError(`Select or enter an amount of at least ${minCreditPurchaseLabel()}`);
-      return;
-    }
-    setCheckoutBusy(true);
-    try {
-      const body = {
-        amount_dollars: n,
-        recipient_user_id: recipientUserId ?? null,
-      };
-      const { res, unauthorized } = await authFetch(token, "/credits/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (unauthorized) {
-        setError("Session expired. Please sign in again.");
-        return;
-      }
-      const data = await res.json().catch(() => ({}));
-      if (res.status === 503) {
-        setPaymentsDisabled(true);
-        throw new Error(formatApiError(data?.detail, "Payments not yet enabled"));
-      }
-      if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not start checkout."));
-      if (data.checkout_url) {
-        window.location.href = data.checkout_url;
-        return;
-      }
-      throw new Error("No checkout URL returned.");
-    } catch (e) {
-      setError(e.message || "Checkout failed.");
-    } finally {
-      setCheckoutBusy(false);
-    }
-  }
-
   if (!initializing && !token && !user) {
     return <Navigate to="/login" replace state={{ from: "/credits" }} />;
   }
@@ -555,17 +545,10 @@ export default function CreditsPage() {
     <div className="min-h-screen overflow-x-hidden bg-appBg text-slate-100">
       <AppHeader />
       <main className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-8 grid gap-4 sm:grid-cols-2">
-          <div className="rounded-2xl border border-white/10 bg-cardBg p-5 text-center">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Card creation credits</p>
-            <p className="mt-2 text-3xl font-bold tabular-nums text-brand-gold">{formatMoney(cardBalance)}</p>
-            <p className="mt-1 text-xs text-slate-500">Studio generation, animation & highlights</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-cardBg p-5 text-center">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Marketplace balance</p>
-            <p className="mt-2 text-3xl font-bold tabular-nums text-brand-gold">{formatMoney(marketplaceBalance)}</p>
-            <p className="mt-1 text-xs text-slate-500">Buy & sell cards only — not usable in Studio</p>
-          </div>
+        <div className="mb-8 rounded-2xl border border-white/10 bg-cardBg p-5 text-center">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Marketplace balance</p>
+          <p className="mt-2 text-3xl font-bold tabular-nums text-brand-gold">{formatMoney(marketplaceBalance)}</p>
+          <p className="mt-1 text-xs text-slate-500">Buy & sell cards on the marketplace — not usable in Studio</p>
         </div>
 
         {banner ? (
@@ -588,77 +571,18 @@ export default function CreditsPage() {
         ) : null}
 
         <section className="mb-8 rounded-2xl border border-white/10 bg-cardBg p-5">
-          <h2 className="text-lg font-semibold text-white">Add Card Creation Credits</h2>
-          <p className="mt-1 text-sm text-slate-400">
-            Load credits for Studio card generation via Stripe (direct platform charge — test mode).
-          </p>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            {PRESET_AMOUNTS.map((amt) => (
-              <button
-                key={amt}
-                type="button"
-                disabled={paymentsDisabled || checkoutBusy}
-                onClick={() => {
-                  setSelectedAmount(amt);
-                  setCustomAmount("");
-                }}
-                className={`min-h-[44px] rounded-xl border px-4 text-sm font-semibold transition ${
-                  selectedAmount === amt
-                    ? "border-[var(--color-gold-primary] marketplace-tab marketplace-tab--active"
-                    : "border-white/15 text-slate-300 hover:border-[var(--color-border-gold)]"
-                }`}
-              >
-                ${amt}
-              </button>
-            ))}
-          </div>
-
-          <div className="mt-4">
-            <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Or enter a custom amount
-            </label>
-            <div className="relative mt-1">
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
-              <input
-                type="number"
-                min={MIN_CREDIT_LOAD}
-                step="0.01"
-                disabled={paymentsDisabled || checkoutBusy}
-                value={customAmount}
-                onChange={(e) => {
-                  setCustomAmount(e.target.value);
-                  setSelectedAmount(null);
-                }}
-                placeholder={minCreditPurchaseLabel().replace("$", "")}
-                className={`min-h-[44px] w-full rounded-xl border bg-cardBg2 py-2 pl-7 pr-3 text-slate-100 ${
-                  customAmountBelowMinimum ? "border-rose-500/50" : "border-white/15"
-                }`}
-              />
-            </div>
-            {customAmountBelowMinimum ? (
-              <p className="mt-1 text-xs text-rose-300">{minCreditPurchaseError()}</p>
-            ) : null}
-            <p className="mt-1 text-[12px]" style={{ color: "var(--text-muted)" }}>
-              Minimum purchase: {minCreditPurchaseLabel()}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            disabled={paymentsDisabled || checkoutBusy || !checkoutAmountValid}
-            onClick={() => startCheckout(null)}
-            className="mt-5 min-h-[48px] w-full rounded-xl btn-primary font-semibold text-slate-950 disabled:opacity-50"
-          >
-            {checkoutBusy ? "Redirecting to Stripe…" : loadCreditsButtonLabel}
-          </button>
-        </section>
-
-        <section className="mb-8 rounded-2xl border border-white/10 bg-cardBg p-5">
           <h2 className="text-lg font-semibold text-white">Load Marketplace Funds</h2>
           <p className="mt-1 text-sm text-slate-400">
             Add spending balance for marketplace purchases. Requires a Stripe Connect account (Express).
           </p>
+          <LoadAmountPicker
+            selectedAmount={selectedAmount}
+            onSelectPreset={selectPresetAmount}
+            customAmount={customAmount}
+            onCustomChange={changeCustomAmount}
+            disabled={paymentsDisabled || marketplaceCheckoutBusy}
+          />
+
           <div className="mt-4">
             <MarketplaceConnectPrompt
               profile={connectProfile}
@@ -671,9 +595,9 @@ export default function CreditsPage() {
             type="button"
             disabled={paymentsDisabled || marketplaceCheckoutBusy || !checkoutAmountValid}
             onClick={startMarketplaceCheckout}
-            className="mt-5 min-h-[48px] w-full rounded-xl btn-secondary font-semibold disabled:opacity-50"
+            className="mt-5 min-h-[48px] w-full rounded-xl btn-primary font-semibold text-slate-950 disabled:opacity-50"
           >
-            {marketplaceCheckoutBusy ? "Redirecting to Stripe…" : `Load ${loadCreditsButtonLabel.replace("Load ", "")} to Marketplace`}
+            {loadMarketplaceButtonLabel}
           </button>
         </section>
 
@@ -773,79 +697,11 @@ export default function CreditsPage() {
           )}
         </section>
 
-        <section className="mb-8 rounded-2xl border border-white/10 bg-cardBg p-5">
-          <h2 className="text-lg font-semibold text-white">Gift Credits</h2>
-          <p className="mt-1 text-sm text-slate-400">
-            Load credits into another user&apos;s account (e.g. a child) by email or display name.
-          </p>
-
-          <div className="mt-4">
-            <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Find recipient</label>
-            <input
-              type="text"
-              disabled={paymentsDisabled || checkoutBusy}
-              value={giftQuery}
-              onChange={(e) => {
-                setGiftQuery(e.target.value);
-                setGiftRecipient(null);
-              }}
-              placeholder="Search by email or display name (min 3 characters)"
-              className="mt-1 min-h-[44px] w-full rounded-xl border border-white/15 bg-cardBg2 px-3 py-2 text-slate-100"
-            />
-            {giftSearching ? <p className="mt-1 text-xs text-slate-500">Searching…</p> : null}
-            {giftResults.length > 0 && !giftRecipient ? (
-              <ul className="mt-2 max-h-40 overflow-y-auto rounded-lg border border-white/10 bg-cardBg2">
-                {giftResults.map((u) => (
-                  <li key={u.id}>
-                    <button
-                      type="button"
-                      className="w-full px-3 py-2 text-left text-sm text-slate-200 hover:bg-white/5"
-                      onClick={() => {
-                        setGiftRecipient(u);
-                        setGiftQuery(u.display_name);
-                        setGiftResults([]);
-                      }}
-                    >
-                      {u.display_name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-            {giftRecipient ? (
-              <p className="mt-2 text-sm text-brand-gold">
-                Gifting to: <span className="font-semibold text-white">{giftRecipient.display_name}</span>{" "}
-                <button
-                  type="button"
-                  className="ml-2 text-xs text-slate-400 underline"
-                  onClick={() => {
-                    setGiftRecipient(null);
-                    setGiftQuery("");
-                  }}
-                >
-                  Change
-                </button>
-              </p>
-            ) : null}
-          </div>
-
-          <button
-            type="button"
-            disabled={
-              paymentsDisabled ||
-              checkoutBusy ||
-              !giftRecipient ||
-              !checkoutAmountValid
-            }
-            onClick={() => startCheckout(giftRecipient?.id)}
-            className="btn-primary mt-5 min-h-[48px] w-full font-semibold disabled:opacity-50"
-          >
-            {checkoutBusy ? "Redirecting to Stripe…" : "Gift Credits via Stripe"}
-          </button>
-        </section>
-
         <section className="rounded-2xl border border-white/10 bg-cardBg p-5">
-          <h2 className="text-lg font-semibold text-white">Credit History</h2>
+          <h2 className="text-lg font-semibold text-white">Transaction History</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Includes marketplace activity and legacy card-creation credits.
+          </p>
           {ledgerLoading ? (
             <div className="mt-6 flex justify-center py-8">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-[var(--color-gold-primary)]" />
@@ -944,7 +800,7 @@ export default function CreditsPage() {
               shortly.
             </p>
             <p className="mt-4 text-center text-sm text-slate-300">
-              Your new credit balance:{" "}
+              Your new marketplace balance:{" "}
               <span className="font-semibold tabular-nums text-white">
                 {formatMoney(withdrawSuccessData.newBalance)}
               </span>
