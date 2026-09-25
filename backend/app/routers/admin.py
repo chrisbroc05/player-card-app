@@ -31,6 +31,7 @@ from card_repo import get_card_by_card_id
 from database import get_db
 from marketplace_repo import float_from_decimal, listing_active_filter
 from models import Card, CreditLedger, MarketplaceOffer, PlatformRevenueLedger, TradeOffer, User, utcnow
+from marketplace_service import backfill_platform_revenue_ledger
 from stripe_connect import configure_stripe_client, create_onboarding_link
 from utils.usage import get_generation_caps, get_platform_generation_count, get_user_generation_count
 from utils.rarity import (
@@ -209,6 +210,15 @@ def _platform_revenue_withdrawable(db: Session, admin_user_id: int) -> float:
     earned = _platform_revenue_earned_total(db)
     withdrawn = _admin_royalties_withdrawn_total(db, admin_user_id)
     return max(0.0, round(earned - withdrawn, 2))
+
+
+def _ensure_platform_revenue_ledger_current(db: Session) -> None:
+    """Backfill legacy marketplace fees so earnings totals match full sale history."""
+    try:
+        backfill_platform_revenue_ledger(db)
+    except Exception:
+        logger.exception("platform_revenue_ledger backfill failed")
+        db.rollback()
 
 
 def _record_admin_royalty_withdrawal(
@@ -823,6 +833,8 @@ def admin_financials_royalties(
     db: Session = Depends(get_db),
     _admin: dict[str, Any] = Depends(require_admin),
 ):
+    _ensure_platform_revenue_ledger_current(db)
+
     start_dt = _date_range_start(date_range)
     sort_desc = (sort or "desc").strip().lower() != "asc"
     search_q = (search or "").strip().lower()
@@ -906,9 +918,11 @@ def admin_financials_royalties(
                 "note": revenue.note or "",
             }
         )
+    lifetime_total_royalties = _platform_revenue_earned_total(db)
     return {
         "entries": entries,
         "total_royalties": total_royalties,
+        "lifetime_total_royalties": lifetime_total_royalties,
         "total_count": total_count,
         "date_range": date_range,
         "search": search_q,
@@ -922,6 +936,7 @@ def admin_royalty_balance(
     db: Session = Depends(get_db),
     _admin: dict[str, Any] = Depends(require_admin),
 ):
+    _ensure_platform_revenue_ledger_current(db)
     try:
         admin_user = _platform_admin_user(db)
     except HTTPException as exc:
@@ -970,6 +985,7 @@ def admin_earnings_monthly(
     db: Session = Depends(get_db),
     _admin: dict[str, Any] = Depends(require_admin),
 ):
+    _ensure_platform_revenue_ledger_current(db)
     now = datetime.now(timezone.utc)
     current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     month_starts: list[datetime] = []

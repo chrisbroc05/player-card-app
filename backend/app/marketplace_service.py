@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+from datetime import timezone
 from decimal import Decimal
 
 import stripe
@@ -131,6 +132,15 @@ def deduct_marketplace_balance(
     )
 
 
+def _effective_offer_timestamp(offer: MarketplaceOffer):
+    eff = offer.updated_at or offer.created_at
+    if eff is None:
+        return utcnow()
+    if eff.tzinfo is None:
+        return eff.replace(tzinfo=timezone.utc)
+    return eff
+
+
 def record_platform_revenue(
     db: Session,
     *,
@@ -138,6 +148,7 @@ def record_platform_revenue(
     source: str,
     reference_id: str | None,
     note: str | None,
+    created_at=None,
 ) -> PlatformRevenueLedger:
     amt = _decimal_amount(amount)
     if amt <= Decimal("0.00"):
@@ -147,7 +158,7 @@ def record_platform_revenue(
         source=source,
         reference_id=(reference_id or "").strip() or None,
         note=(note or "").strip() or None,
-        created_at=utcnow(),
+        created_at=created_at or utcnow(),
     )
     db.add(row)
     logger.info(
@@ -157,6 +168,48 @@ def record_platform_revenue(
         reference_id,
     )
     return row
+
+
+def backfill_platform_revenue_ledger(db: Session) -> int:
+    """
+    Idempotent backfill: accepted marketplace offers with royalties that predate
+    platform_revenue_ledger get a matching ledger row (reference_id = offer id).
+    """
+    existing_refs = {
+        (ref or "").strip()
+        for (ref,) in db.query(PlatformRevenueLedger.reference_id).all()
+        if (ref or "").strip()
+    }
+
+    offers = (
+        db.query(MarketplaceOffer)
+        .filter(
+            MarketplaceOffer.status == "accepted",
+            MarketplaceOffer.royalty_amount > 0,
+        )
+        .all()
+    )
+
+    added = 0
+    for offer in offers:
+        ref = str(offer.id)
+        if ref in existing_refs:
+            continue
+        record_platform_revenue(
+            db,
+            amount=offer.royalty_amount,
+            source=REVENUE_SOURCE_MARKETPLACE_SALE,
+            reference_id=ref,
+            note=f"Marketplace platform fee — offer {ref} (historical backfill)",
+            created_at=_effective_offer_timestamp(offer),
+        )
+        existing_refs.add(ref)
+        added += 1
+
+    if added:
+        db.commit()
+        logger.info("Backfilled %s platform_revenue_ledger row(s) from marketplace offers", added)
+    return added
 
 
 def _stripe_session_already_processed(db: Session, session_id: str) -> bool:

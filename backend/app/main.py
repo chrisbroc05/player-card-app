@@ -206,6 +206,14 @@ async def lifespan(_app: FastAPI):
     Base.metadata.create_all(bind=engine)
     run_schema_migrations_after_models(engine)
     run_connect_marketplace_migrations(engine)
+    try:
+        from marketplace_service import backfill_platform_revenue_ledger
+        from database import SessionLocal
+
+        with SessionLocal() as db:
+            backfill_platform_revenue_ledger(db)
+    except Exception:
+        logger.exception("Startup platform_revenue_ledger backfill failed")
     _startup_validate_admin_account()
     run_marketplace_expiration_pass()
     run_deleted_cards_cleanup_pass()
