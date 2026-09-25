@@ -54,7 +54,11 @@ import { useAuth } from "../context/AuthContext";
 import { useSettings } from "../context/SettingsContext";
 import { useFeatures } from "../context/FeatureContext";
 import { useNewCardCelebration } from "../context/NewCardCelebrationContext";
-import { fetchGenerationPrice } from "../utils/cardPricing";
+import {
+  fetchAllTierCreationPrices,
+  fetchGenerationPrice,
+  formatTierStepPriceLabel,
+} from "../utils/cardPricing";
 import { copyChargeForQuantity, normalizeCopyTiers, parseCopyLimitError } from "../utils/copyPricing";
 import { formatMoney } from "../utils/marketplace";
 import { creditTopUpShortfallMessage } from "../utils/credits";
@@ -287,6 +291,7 @@ export default function StudioPage() {
   const [animationFailed, setAnimationFailed] = useState(false);
   const [animationConfirmed, setAnimationConfirmed] = useState(false);
   const [generationPricing, setGenerationPricing] = useState(null);
+  const [tierStepQuotes, setTierStepQuotes] = useState(null);
   const [pricingError, setPricingError] = useState("");
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
   const [showAnimateConfirm, setShowAnimateConfirm] = useState(false);
@@ -1048,10 +1053,9 @@ export default function StudioPage() {
   useEffect(() => {
     if (prevStepRef.current === currentStep) return;
     prevStepRef.current = currentStep;
-    if (currentStep >= STEP_DETAILS && currentStep <= STEP_REVIEW) {
-      return;
-    }
-    scrollAfterPaint(wizardPanelRef.current);
+    if (typeof window === "undefined") return;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
   }, [currentStep]);
 
   useEffect(() => {
@@ -1121,6 +1125,25 @@ export default function StudioPage() {
   useEffect(() => {
     fetchThemes();
   }, [fetchThemes]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const quotes = await fetchAllTierCreationPrices(cardType);
+        if (!cancelled) {
+          setTierStepQuotes(quotes);
+        }
+      } catch {
+        if (!cancelled) {
+          setTierStepQuotes(null);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [cardType]);
 
   useEffect(() => {
     if (!orderTier) {
@@ -2994,6 +3017,11 @@ export default function StudioPage() {
                       <p className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[11px] ${opt.pill}`}>
                         {opt.sub}
                       </p>
+                      {tierStepQuotes?.[opt.value] ? (
+                        <p className="mt-2 text-sm font-medium tabular-nums text-brand-gold">
+                          {formatTierStepPriceLabel(tierStepQuotes[opt.value], cardType)}
+                        </p>
+                      ) : null}
                       <p className="mt-2 text-xs text-slate-200/90">{opt.desc}</p>
                     </button>
                   ))}

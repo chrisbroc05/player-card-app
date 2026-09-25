@@ -20,9 +20,9 @@ Optional:
 Backend on Render should also set:
   PAYMENTS_ENABLED=false
     Gate credit/payment API routes until Stripe is wired (503 when false).
-  CARD_PRICE_ROOKIE=2.00
-  CARD_PRICE_ALLSTAR=4.00
-  CARD_PRICE_LEGENDS=6.00
+  CARD_PRICE_ROOKIE=2.50
+  CARD_PRICE_ALLSTAR=4.50
+  CARD_PRICE_LEGENDS=6.50
   ANIMATED_CARD_PRICE=10.00
     Animated card upgrade on first preview (Studio flow).
   HIGHLIGHT_CARD_PRICE=5.00
@@ -85,6 +85,12 @@ from pathlib import Path
 DEFAULT_BACKEND_SERVICE_ID = "srv-d7mi1l8g4nts73am8ka0"
 DEFAULT_FRONTEND_SERVICE_ID = "srv-d7mi6i1kh4rs73an84bg"
 
+BACKEND_PRICING_ENV: dict[str, str] = {
+    "CARD_PRICE_ROOKIE": "2.50",
+    "CARD_PRICE_ALLSTAR": "4.50",
+    "CARD_PRICE_LEGENDS": "6.50",
+}
+
 
 def _required_env(name: str) -> str:
     value = (os.environ.get(name) or "").strip()
@@ -106,6 +112,56 @@ def _load_dotenv(path: Path) -> None:
         value = value.strip().strip('"').strip("'")
         if key and key not in os.environ:
             os.environ[key] = value
+
+
+def _api_request(
+    api_base: str,
+    api_key: str,
+    *,
+    method: str,
+    path: str,
+    payload: dict | None = None,
+) -> dict | list | None:
+    url = f"{api_base}{path}"
+    data = json.dumps(payload).encode("utf-8") if payload is not None else None
+    req = urllib.request.Request(
+        url,
+        data=data,
+        method=method,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
+            **({"Content-Type": "application/json"} if payload is not None else {}),
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            body = resp.read().decode("utf-8")
+    except urllib.error.URLError as exc:
+        reason = getattr(exc, "reason", None)
+        if isinstance(reason, ssl.SSLCertVerificationError):
+            insecure_ctx = ssl._create_unverified_context()
+            with urllib.request.urlopen(req, timeout=30, context=insecure_ctx) as resp:
+                body = resp.read().decode("utf-8")
+        else:
+            raise
+    return json.loads(body) if body else None
+
+
+def put_env_var(api_base: str, api_key: str, service_id: str, key: str, value: str) -> None:
+    _api_request(
+        api_base,
+        api_key,
+        method="PUT",
+        path=f"/services/{service_id}/env-vars/{key}",
+        payload={"value": value},
+    )
+
+
+def sync_backend_pricing_env(api_base: str, api_key: str, service_id: str) -> None:
+    for key, value in BACKEND_PRICING_ENV.items():
+        put_env_var(api_base, api_key, service_id, key, value)
+        print(f"Synced backend env: {key}={value}")
 
 
 def trigger_deploy(api_base: str, api_key: str, service_id: str) -> dict:
@@ -197,6 +253,9 @@ def main() -> int:
         api_base = (os.environ.get("RENDER_API_BASE") or "https://api.render.com/v1").strip()
         timeout_seconds = int(os.environ.get("RENDER_DEPLOY_TIMEOUT_SECONDS") or "1200")
         poll_interval_seconds = int(os.environ.get("RENDER_POLL_INTERVAL_SECONDS") or "10")
+
+        print("Syncing backend card pricing env vars...")
+        sync_backend_pricing_env(api_base, api_key, backend_service_id)
 
         print("Triggering backend deploy...")
         backend_result = trigger_deploy(api_base, api_key, backend_service_id)
