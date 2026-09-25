@@ -64,7 +64,21 @@ def ensure_connect_account(db: Session, user: User) -> str:
     return account.id
 
 
-def create_onboarding_link(db: Session, user: User) -> str:
+def _safe_return_path(path: str | None, default: str = "/credits") -> str:
+    """Sanitize a frontend path for Stripe Account Link return/refresh URLs."""
+    p = (path or default).strip()
+    if not p.startswith("/") or p.startswith("//"):
+        return default
+    return p.split("?")[0].split("#")[0] or default
+
+
+def create_onboarding_link(
+    db: Session,
+    user: User,
+    *,
+    return_path: str = "/credits",
+    refresh_path: str | None = None,
+) -> str:
     """Ensure Connect account exists and return a fresh Stripe Account Link URL."""
     stripe_account_id = ensure_connect_account(db, user)
     _configure_stripe()
@@ -72,14 +86,17 @@ def create_onboarding_link(db: Session, user: User) -> str:
     if not frontend:
         raise RuntimeError("FRONTEND_URL is not configured")
 
+    safe_return = _safe_return_path(return_path)
+    safe_refresh = _safe_return_path(refresh_path, safe_return)
+
     account = stripe.Account.retrieve(stripe_account_id)
     details_submitted = bool(getattr(account, "details_submitted", False))
     link_type = "account_update" if details_submitted else "account_onboarding"
 
     link = stripe.AccountLink.create(
         account=stripe_account_id,
-        refresh_url=f"{frontend}/profile?connect=refresh",
-        return_url=f"{frontend}/profile?connect=complete",
+        refresh_url=f"{frontend}{safe_refresh}?connect=refresh",
+        return_url=f"{frontend}{safe_return}?connect=complete",
         type=link_type,
     )
     url = link.url

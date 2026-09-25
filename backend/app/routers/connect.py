@@ -5,7 +5,7 @@ from __future__ import annotations
 import traceback
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from auth import get_current_user
@@ -38,6 +38,13 @@ class ConnectUrlResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     url: str
+
+
+class ConnectOnboardingBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    return_path: str = Field(default="/credits", max_length=200)
+    refresh_path: str | None = Field(default=None, max_length=200)
 
 
 class ConnectStatusResponse(BaseModel):
@@ -91,12 +98,18 @@ def connect_create_account(
 
 @router.post("/onboarding-link", response_model=ConnectUrlResponse)
 def connect_onboarding_link(
+    body: ConnectOnboardingBody = ConnectOnboardingBody(),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     try:
         require_payments_enabled()
-        url = create_onboarding_link(db, user)
+        url = create_onboarding_link(
+            db,
+            user,
+            return_path=body.return_path,
+            refresh_path=body.refresh_path,
+        )
         return ConnectUrlResponse(url=url)
     except HTTPException:
         raise

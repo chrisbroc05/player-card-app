@@ -117,10 +117,12 @@ export function AuthProvider({ children }) {
           headers: { Authorization: `Bearer ${t}` },
         });
         if (!res.ok) {
-          localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
-          if (!cancelled) {
-            setToken("");
-            setUser(null);
+          if (res.status === 401) {
+            localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+            if (!cancelled) {
+              setToken("");
+              setUser(null);
+            }
           }
           return;
         }
@@ -130,11 +132,7 @@ export function AuthProvider({ children }) {
           initProfileSession();
         }
       } catch {
-        if (!cancelled) {
-          localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
-          setToken("");
-          setUser(null);
-        }
+        /* Keep token on transient network errors (e.g. after Stripe redirect). */
       } finally {
         if (!cancelled) setInitializing(false);
       }

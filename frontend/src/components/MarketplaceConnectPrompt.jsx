@@ -11,6 +11,7 @@ export default function MarketplaceConnectPrompt({
   onStatusUpdate,
   compact = false,
   requireSellReady = false,
+  returnPath = "/credits",
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -49,6 +50,10 @@ export default function MarketplaceConnectPrompt({
       const res = await fetch(`${API_BASE_URL}/connect/onboarding-link`, {
         method: "POST",
         headers: { ...authHeaders(authToken), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          return_path: returnPath,
+          refresh_path: returnPath,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -64,7 +69,7 @@ export default function MarketplaceConnectPrompt({
     } finally {
       setBusy(false);
     }
-  }, [token]);
+  }, [token, returnPath]);
 
   if (requireSellReady && sellReady) {
     return null;

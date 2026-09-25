@@ -13,6 +13,7 @@ import {
   minCreditPurchaseError,
   minCreditPurchaseLabel,
 } from "../utils/credits";
+import { updateLastActive } from "../utils/activityTracker";
 
 const PRESET_AMOUNTS = [10, 20, 50, 100];
 const LEDGER_PAGE_SIZE = 10;
@@ -113,7 +114,7 @@ function CreditLedgerRow({ row }) {
 export default function CreditsPage() {
   const { user, token, initializing, refreshUser } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [selectedAmount, setSelectedAmount] = useState(null);
+  const [selectedAmount, setSelectedAmount] = useState(20);
   const [customAmount, setCustomAmount] = useState("");
   const [giftQuery, setGiftQuery] = useState("");
   const [giftResults, setGiftResults] = useState([]);
@@ -194,7 +195,9 @@ export default function CreditsPage() {
         setHasMoreLedger(false);
         return;
       }
-      setPaymentsDisabled(false);
+      if (res.ok) {
+        setPaymentsDisabled(false);
+      }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(formatApiError(data?.detail, "Could not load credit history."));
       const entries = Array.isArray(data.entries) ? data.entries : [];
@@ -233,40 +236,119 @@ export default function CreditsPage() {
     loadLedger();
   }, [token, initializing, loadLedger]);
 
+  const applyConnectStatus = useCallback((status) => {
+    if (!status) return;
+    setConnectProfile((prev) => ({ ...(prev || {}), ...status }));
+    setPayoutsEnabled(
+      status.stripe_payouts_enabled === true || status.payouts_enabled === true
+    );
+    setChargesEnabled(
+      status.stripe_charges_enabled === true || status.charges_enabled === true
+    );
+  }, []);
+
+  const refreshConnectStatus = useCallback(async () => {
+    if (!token) return null;
+    const { res, unauthorized } = await authFetch(token, "/connect/status");
+    if (unauthorized) return null;
+    if (res.status === 503) {
+      setPaymentsDisabled(true);
+      return null;
+    }
+    if (res.ok) {
+      setPaymentsDisabled(false);
+      const status = await res.json().catch(() => ({}));
+      applyConnectStatus(status);
+      return status;
+    }
+    return null;
+  }, [token, applyConnectStatus]);
+
   const loadBalancesAndProfile = useCallback(async () => {
     if (!token) return;
     setProfileLoading(true);
     try {
-      const [balRes, profileRes] = await Promise.all([
+      const [connectRes, balRes, profileRes] = await Promise.all([
+        authFetch(token, "/connect/status"),
         authFetch(token, "/credits/balance"),
         authFetch(token, "/auth/profile"),
       ]);
+      if (connectRes.res.status === 503 || balRes.res.status === 503) {
+        setPaymentsDisabled(true);
+      } else if (connectRes.res.ok || balRes.res.ok) {
+        setPaymentsDisabled(false);
+      }
+      if (connectRes.res.ok) {
+        applyConnectStatus(await connectRes.res.json().catch(() => ({})));
+      }
       if (balRes.res.ok) {
         const balData = await balRes.res.json().catch(() => ({}));
         setMarketplaceBalance(Number(balData.marketplace_balance) || 0);
       }
       if (profileRes.res.ok) {
         const data = await profileRes.res.json().catch(() => ({}));
-        setConnectProfile(data);
-        setPayoutsEnabled(data.stripe_payouts_enabled === true);
-        setChargesEnabled(data.stripe_charges_enabled === true);
+        setConnectProfile((prev) => ({ ...(prev || {}), ...data }));
+        if (!connectRes.res.ok) {
+          setPayoutsEnabled(data.stripe_payouts_enabled === true);
+          setChargesEnabled(data.stripe_charges_enabled === true);
+        }
       }
     } catch {
-      setPayoutsEnabled(false);
+      /* keep existing connect/payments state on transient errors */
     } finally {
       setProfileLoading(false);
     }
-  }, [token]);
+  }, [token, applyConnectStatus]);
 
   useEffect(() => {
     if (!token || initializing) {
       setProfileLoading(false);
       return;
     }
+    if (searchParams.get("connect")) return;
     loadBalancesAndProfile();
-  }, [token, initializing, loadBalancesAndProfile]);
+  }, [token, initializing, loadBalancesAndProfile, searchParams]);
 
   useEffect(() => {
+    const connect = searchParams.get("connect");
+    if (connect !== "complete" && connect !== "refresh") return undefined;
+    if (!token || initializing) return undefined;
+
+    let cancelled = false;
+    (async () => {
+      setProfileLoading(true);
+      updateLastActive();
+      await Promise.all([
+        refreshConnectStatus(),
+        refreshUser?.(token),
+        loadBalancesAndProfile(),
+        loadLedger(),
+      ]);
+      if (cancelled) return;
+      setBanner(
+        connect === "complete"
+          ? "Stripe connected successfully! You can load marketplace funds and withdraw earnings."
+          : "Please finish Stripe verification to enable marketplace payouts."
+      );
+      setSearchParams({}, { replace: true });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    searchParams,
+    token,
+    initializing,
+    refreshConnectStatus,
+    refreshUser,
+    loadBalancesAndProfile,
+    loadLedger,
+    setSearchParams,
+  ]);
+
+  useEffect(() => {
+    if (searchParams.get("connect")) return;
     if (searchParams.get("success") === "true") {
       setBanner("Card creation credits added successfully!");
       refreshUser?.();
@@ -453,8 +535,20 @@ export default function CreditsPage() {
     }
   }
 
-  if (!initializing && !user) {
+  if (!initializing && !token && !user) {
     return <Navigate to="/login" replace state={{ from: "/credits" }} />;
+  }
+
+  if (initializing || (token && !user)) {
+    return (
+      <div className="min-h-screen bg-appBg text-slate-100">
+        <AppHeader />
+        <main className="mx-auto flex max-w-2xl justify-center px-4 py-24">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/15 border-t-[var(--color-gold-primary)]" />
+        </main>
+        <AppFooter />
+      </div>
+    );
   }
 
   return (
@@ -566,7 +660,12 @@ export default function CreditsPage() {
             Add spending balance for marketplace purchases. Requires a Stripe Connect account (Express).
           </p>
           <div className="mt-4">
-            <MarketplaceConnectPrompt profile={connectProfile} token={token} compact />
+            <MarketplaceConnectPrompt
+              profile={connectProfile}
+              token={token}
+              compact
+              returnPath="/credits"
+            />
           </div>
           <button
             type="button"
@@ -654,7 +753,13 @@ export default function CreditsPage() {
             </>
           ) : (
             <>
-              <MarketplaceConnectPrompt profile={connectProfile} token={token} compact requireSellReady />
+              <MarketplaceConnectPrompt
+                profile={connectProfile}
+                token={token}
+                compact
+                requireSellReady
+                returnPath="/credits"
+              />
               <p className="mt-3 text-sm text-slate-400">
                 Complete Stripe onboarding to withdraw marketplace earnings to your bank.
               </p>

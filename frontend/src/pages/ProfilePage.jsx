@@ -453,6 +453,10 @@ function PayoutSettings({ token, profile, loading, onProfileUpdate }) {
           ...authHeaders(authToken),
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({
+          return_path: "/profile",
+          refresh_path: "/profile",
+        }),
         cache: "no-store",
       });
       const data = await response.json().catch(() => ({}));
