@@ -1733,7 +1733,7 @@ export default function AdminDashboard() {
                     ) : (
                       earningsEntries.map((row, idx) => (
                         <tr
-                          key={row.offer_id}
+                          key={row.ledger_id ?? row.offer_id}
                           className={`${idx % 2 ? "bg-white/[0.015]" : ""} border-b border-white/5`}
                         >
                           <td className="p-3 text-xs text-slate-400">{formatDateTime(row.date)}</td>

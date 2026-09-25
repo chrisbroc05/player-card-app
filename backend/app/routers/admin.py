@@ -18,17 +18,19 @@ from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import func
+from decimal import Decimal
+
+from sqlalchemy import String, cast, func
 from sqlalchemy.orm import Session, aliased
 
 from auth import ALGORITHM, SECRET_KEY
 from beta_config import beta_mode_active, get_beta_invite_code, set_beta_invite_code
-from credit_service import InsufficientCreditsError, TX_ANIMATION, TX_HIGHLIGHT, TX_WITHDRAWAL, deduct_credits
+from credit_service import TX_ANIMATION, TX_HIGHLIGHT, TX_WITHDRAWAL
 from card_cleanup import permanently_delete_card
 from card_repo import get_card_by_card_id
 from database import get_db
 from marketplace_repo import float_from_decimal, listing_active_filter
-from models import Card, CreditLedger, MarketplaceOffer, TradeOffer, User, utcnow
+from models import Card, CreditLedger, MarketplaceOffer, PlatformRevenueLedger, TradeOffer, User, utcnow
 from stripe_connect import configure_stripe_client, create_onboarding_link
 from utils.usage import get_generation_caps, get_platform_generation_count, get_user_generation_count
 from utils.rarity import (
@@ -177,20 +179,67 @@ def _iso(dt: datetime | None) -> str:
     return dt.isoformat()
 
 
+def _platform_revenue_earned_total(
+    db: Session,
+    *,
+    start_dt: datetime | None = None,
+) -> float:
+    """Sum of all platform revenue ledger credits (marketplace fees, etc.)."""
+    q = db.query(func.coalesce(func.sum(PlatformRevenueLedger.amount), 0)).filter(
+        PlatformRevenueLedger.amount > 0
+    )
+    if start_dt is not None:
+        q = q.filter(PlatformRevenueLedger.created_at >= start_dt)
+    return float_from_decimal(q.scalar())
+
+
+def _admin_royalties_withdrawn_total(db: Session, admin_user_id: int) -> float:
+    return float_from_decimal(
+        db.query(func.coalesce(func.sum(func.abs(CreditLedger.amount)), 0))
+        .filter(
+            CreditLedger.user_id == admin_user_id,
+            CreditLedger.transaction_type == TX_WITHDRAWAL,
+            CreditLedger.amount < 0,
+        )
+        .scalar()
+    )
+
+
+def _platform_revenue_withdrawable(db: Session, admin_user_id: int) -> float:
+    earned = _platform_revenue_earned_total(db)
+    withdrawn = _admin_royalties_withdrawn_total(db, admin_user_id)
+    return max(0.0, round(earned - withdrawn, 2))
+
+
+def _record_admin_royalty_withdrawal(
+    db: Session,
+    admin_user: User,
+    amount: float,
+    *,
+    payout_id: str,
+    note: str,
+) -> CreditLedger:
+    """Audit withdrawal in credit_ledger without changing admin credit_balance."""
+    row = CreditLedger(
+        user_id=admin_user.id,
+        amount=Decimal(str(-amount)).quantize(Decimal("0.01")),
+        balance_after=admin_user.credit_balance,
+        transaction_type=TX_WITHDRAWAL,
+        reference_id=payout_id,
+        note=note,
+        created_at=utcnow(),
+    )
+    db.add(row)
+    return row
+
+
 def _compute_financial_summary(db: Session) -> dict[str, float | int]:
     total_volume = float_from_decimal(
         db.query(func.coalesce(func.sum(CreditLedger.amount), 0))
         .filter(CreditLedger.transaction_type == "card_sale")
         .scalar()
     )
-    total_royalties = float_from_decimal(
-        db.query(func.coalesce(func.sum(MarketplaceOffer.royalty_amount), 0))
-        .filter(
-            MarketplaceOffer.status == "accepted",
-            MarketplaceOffer.royalty_amount > 0,
-        )
-        .scalar()
-    )
+    total_royalties = _platform_revenue_earned_total(db)
     total_credits_in_circulation = float_from_decimal(
         db.query(func.coalesce(func.sum(User.credit_balance), 0)).scalar()
     )
@@ -207,11 +256,7 @@ def _compute_financial_summary(db: Session) -> dict[str, float | int]:
         .filter(MarketplaceOffer.status == "accepted")
         .scalar()
     )
-    royalties_ledger_total = float_from_decimal(
-        db.query(func.coalesce(func.sum(CreditLedger.amount), 0))
-        .filter(CreditLedger.transaction_type == "royalty")
-        .scalar()
-    )
+    royalties_ledger_total = _platform_revenue_earned_total(db)
     total_animation_revenue = float_from_decimal(
         db.query(func.coalesce(func.sum(func.abs(CreditLedger.amount)), 0))
         .filter(CreditLedger.transaction_type == TX_ANIMATION)
@@ -782,81 +827,85 @@ def admin_financials_royalties(
     sort_desc = (sort or "desc").strip().lower() != "asc"
     search_q = (search or "").strip().lower()
 
-    base_filter = [
-        MarketplaceOffer.status == "accepted",
-        MarketplaceOffer.royalty_amount > 0,
-    ]
+    base_filter = [PlatformRevenueLedger.amount > 0]
     if start_dt is not None:
-        base_filter.append(func.coalesce(MarketplaceOffer.updated_at, MarketplaceOffer.created_at) >= start_dt)
-    total_royalties = float_from_decimal(
-        db.query(func.coalesce(func.sum(MarketplaceOffer.royalty_amount), 0))
-        .filter(*base_filter)
-        .scalar()
-    )
+        base_filter.append(PlatformRevenueLedger.created_at >= start_dt)
+    total_royalties = _platform_revenue_earned_total(db, start_dt=start_dt)
 
     BuyerUser = aliased(User, name="buyer_user")
     SellerUser = aliased(User, name="seller_user")
     rows_query = (
         db.query(
+            PlatformRevenueLedger,
             MarketplaceOffer,
             Card.player_name,
             Card.tier,
             SellerUser.display_name,
             BuyerUser.display_name,
         )
-        .join(Card, MarketplaceOffer.card_id == Card.card_id)
-        .join(SellerUser, MarketplaceOffer.seller_id == SellerUser.id)
-        .join(BuyerUser, MarketplaceOffer.buyer_id == BuyerUser.id)
+        .outerjoin(
+            MarketplaceOffer,
+            PlatformRevenueLedger.reference_id == cast(MarketplaceOffer.id, String),
+        )
+        .outerjoin(Card, MarketplaceOffer.card_id == Card.card_id)
+        .outerjoin(SellerUser, MarketplaceOffer.seller_id == SellerUser.id)
+        .outerjoin(BuyerUser, MarketplaceOffer.buyer_id == BuyerUser.id)
         .filter(*base_filter)
     )
     if search_q:
         like_term = f"%{search_q}%"
         rows_query = rows_query.filter(
-            func.lower(func.coalesce(Card.player_name, "")).like(like_term)
+            func.lower(func.coalesce(PlatformRevenueLedger.note, "")).like(like_term)
+            | func.lower(func.coalesce(Card.player_name, "")).like(like_term)
             | func.lower(func.coalesce(SellerUser.display_name, "")).like(like_term)
             | func.lower(func.coalesce(BuyerUser.display_name, "")).like(like_term)
         )
 
     total_count = int(rows_query.count())
     if sort_desc:
-        rows_query = rows_query.order_by(MarketplaceOffer.updated_at.desc(), MarketplaceOffer.id.desc())
+        rows_query = rows_query.order_by(
+            PlatformRevenueLedger.created_at.desc(),
+            PlatformRevenueLedger.id.desc(),
+        )
     else:
-        rows_query = rows_query.order_by(MarketplaceOffer.updated_at.asc(), MarketplaceOffer.id.asc())
+        rows_query = rows_query.order_by(
+            PlatformRevenueLedger.created_at.asc(),
+            PlatformRevenueLedger.id.asc(),
+        )
 
-    rows = (
-        rows_query
-        .offset(offset)
-        .limit(limit)
-        .all()
-    )
+    rows = rows_query.offset(offset).limit(limit).all()
 
     all_rows_for_running_total = (
-        db.query(MarketplaceOffer.id, MarketplaceOffer.royalty_amount)
-        .filter(MarketplaceOffer.status == "accepted", MarketplaceOffer.royalty_amount > 0)
-        .order_by(MarketplaceOffer.updated_at.asc(), MarketplaceOffer.id.asc())
+        db.query(PlatformRevenueLedger.id, PlatformRevenueLedger.amount)
+        .filter(PlatformRevenueLedger.amount > 0)
+        .order_by(PlatformRevenueLedger.created_at.asc(), PlatformRevenueLedger.id.asc())
         .all()
     )
-    running_total_by_offer_id: dict[int, float] = {}
+    running_total_by_ledger_id: dict[int, float] = {}
     running = 0.0
-    for offer_id, royalty_amount in all_rows_for_running_total:
-        running += float_from_decimal(royalty_amount)
-        running_total_by_offer_id[int(offer_id)] = round(running, 2)
+    for ledger_id, amount in all_rows_for_running_total:
+        running += float_from_decimal(amount)
+        running_total_by_ledger_id[int(ledger_id)] = round(running, 2)
 
-    entries = [
-        {
-            "offer_id": offer.id,
-            "card_id": offer.card_id,
-            "player_name": player_name or "",
-            "tier": tier or "",
-            "seller_display_name": seller_dn or "—",
-            "buyer_display_name": buyer_dn or "—",
-            "sale_amount": float_from_decimal(offer.offer_amount),
-            "royalty_amount": float_from_decimal(offer.royalty_amount),
-            "date": _iso(offer.updated_at or offer.created_at),
-            "running_total": running_total_by_offer_id.get(int(offer.id), 0.0),
-        }
-        for offer, player_name, tier, seller_dn, buyer_dn in rows
-    ]
+    entries = []
+    for revenue, offer, player_name, tier, seller_dn, buyer_dn in rows:
+        entries.append(
+            {
+                "ledger_id": revenue.id,
+                "offer_id": int(offer.id) if offer is not None else revenue.id,
+                "card_id": offer.card_id if offer is not None else "",
+                "player_name": player_name or "",
+                "tier": tier or "",
+                "seller_display_name": seller_dn or "—",
+                "buyer_display_name": buyer_dn or "—",
+                "sale_amount": float_from_decimal(offer.offer_amount) if offer is not None else 0.0,
+                "royalty_amount": float_from_decimal(revenue.amount),
+                "date": _iso(revenue.created_at),
+                "running_total": running_total_by_ledger_id.get(int(revenue.id), 0.0),
+                "source": revenue.source or "",
+                "note": revenue.note or "",
+            }
+        )
     return {
         "entries": entries,
         "total_royalties": total_royalties,
@@ -881,35 +930,12 @@ def admin_royalty_balance(
         raise
     now = datetime.now(timezone.utc)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    total_royalties_earned = float_from_decimal(
-        db.query(func.coalesce(func.sum(CreditLedger.amount), 0))
-        .filter(
-            CreditLedger.user_id == admin_user.id,
-            CreditLedger.transaction_type == "royalty",
-        )
-        .scalar()
-    )
-    this_month = float_from_decimal(
-        db.query(func.coalesce(func.sum(CreditLedger.amount), 0))
-        .filter(
-            CreditLedger.user_id == admin_user.id,
-            CreditLedger.transaction_type == "royalty",
-            CreditLedger.created_at >= month_start,
-        )
-        .scalar()
-    )
-    total_withdrawn = float_from_decimal(
-        db.query(func.coalesce(func.sum(func.abs(CreditLedger.amount)), 0))
-        .filter(
-            CreditLedger.user_id == admin_user.id,
-            CreditLedger.transaction_type == TX_WITHDRAWAL,
-            CreditLedger.amount < 0,
-        )
-        .scalar()
-    )
+    total_royalties_earned = _platform_revenue_earned_total(db)
+    this_month = _platform_revenue_earned_total(db, start_dt=month_start)
+    total_withdrawn = _admin_royalties_withdrawn_total(db, admin_user.id)
 
     pending_withdrawals = _platform_pending_withdrawal_total()
-    withdrawable_balance = float_from_decimal(admin_user.credit_balance)
+    withdrawable_balance = _platform_revenue_withdrawable(db, admin_user.id)
 
     return {
         "admin_user_id": admin_user.id,
@@ -959,11 +985,10 @@ def admin_earnings_monthly(
     oldest_start = month_starts_desc[-1]
 
     rows = (
-        db.query(MarketplaceOffer.updated_at, MarketplaceOffer.created_at, MarketplaceOffer.royalty_amount)
+        db.query(PlatformRevenueLedger.created_at, PlatformRevenueLedger.amount)
         .filter(
-            MarketplaceOffer.status == "accepted",
-            MarketplaceOffer.royalty_amount > 0,
-            func.coalesce(MarketplaceOffer.updated_at, MarketplaceOffer.created_at) >= oldest_start,
+            PlatformRevenueLedger.amount > 0,
+            PlatformRevenueLedger.created_at >= oldest_start,
         )
         .all()
     )
@@ -971,15 +996,15 @@ def admin_earnings_monthly(
     totals_by_month_key: dict[str, float] = {
         f"{dt.year:04d}-{dt.month:02d}": 0.0 for dt in month_starts_desc
     }
-    for updated_at, created_at, royalty_amount in rows:
-        eff = updated_at or created_at
+    for created_at, amount in rows:
+        eff = created_at
         if eff is None:
             continue
         if eff.tzinfo is None:
             eff = eff.replace(tzinfo=timezone.utc)
         key = f"{eff.year:04d}-{eff.month:02d}"
         if key in totals_by_month_key:
-            totals_by_month_key[key] += float_from_decimal(royalty_amount)
+            totals_by_month_key[key] += float_from_decimal(amount)
 
     points_desc = []
     for dt in month_starts_desc:
@@ -1006,14 +1031,14 @@ def admin_withdraw_royalties(
     admin_user = _platform_admin_user(db)
     admin_email = (os.environ.get("ADMIN_EMAIL") or admin_user.email or "").strip()
 
-    current_balance = float_from_decimal(admin_user.credit_balance)
-    if current_balance <= 0:
+    withdrawable_balance = _platform_revenue_withdrawable(db, admin_user.id)
+    if withdrawable_balance <= 0:
         raise HTTPException(status_code=400, detail="No withdrawable royalties available")
-    if current_balance < MIN_ROYALTY_WITHDRAWAL_DOLLARS:
+    if withdrawable_balance < MIN_ROYALTY_WITHDRAWAL_DOLLARS:
         raise HTTPException(
             status_code=400,
             detail=(
-                f"Minimum withdrawal is $1.00. Your current balance is ${current_balance:.2f}. "
+                f"Minimum withdrawal is $1.00. Your current balance is ${withdrawable_balance:.2f}. "
                 "Keep selling cards and come back when you have more to withdraw!"
             ),
         )
@@ -1023,7 +1048,7 @@ def admin_withdraw_royalties(
     except Exception as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    withdrawal_amount = current_balance
+    withdrawal_amount = withdrawable_balance
     amount_cents = int(round(withdrawal_amount * 100))
     now = datetime.now(timezone.utc)
     date_str = now.strftime("%Y-%m-%d")
@@ -1054,23 +1079,14 @@ def admin_withdraw_royalties(
     payout_status = _normalize_payout_status(payout.get("status"))
 
     try:
-        row = deduct_credits(
-            admin_user.id,
-            admin_user.credit_balance,
-            TX_WITHDRAWAL,
-            reference_id=payout_id,
+        _record_admin_royalty_withdrawal(
+            db,
+            admin_user,
+            withdrawal_amount,
+            payout_id=payout_id,
             note=f"Royalty withdrawal to bank — Stripe payout ID: {payout_id}",
-            db=db,
-            commit=False,
         )
         db.commit()
-    except InsufficientCreditsError:
-        db.rollback()
-        logger.error(
-            "Stripe payout %s succeeded but admin credit deduction failed due to insufficient balance",
-            payout_id,
-        )
-        raise HTTPException(status_code=400, detail="No withdrawable royalties available") from None
     except Exception as exc:
         db.rollback()
         logger.exception("Ledger update failed after Stripe payout %s", payout_id)
@@ -1079,10 +1095,11 @@ def admin_withdraw_royalties(
             detail=f"Withdrawal payout created but ledger update failed: {str(exc)}",
         ) from exc
 
+    new_withdrawable = _platform_revenue_withdrawable(db, admin_user.id)
     return {
         "success": True,
         "amount_withdrawn": withdrawal_amount,
-        "new_balance": float_from_decimal(row.balance_after),
+        "new_balance": new_withdrawable,
         "payout_id": payout_id,
         "payout_status": payout_status,
         "stripe_payout_url": _stripe_payout_dashboard_url(payout_id),
