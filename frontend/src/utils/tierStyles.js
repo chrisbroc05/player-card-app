@@ -30,15 +30,13 @@ export function vaultTierBadge(tier) {
 export function formatEdition(editionNumber, printRun) {
   const e = Number(editionNumber) || 1;
   const p = Number(printRun) || 1;
-  if (p <= 1) return "";
-  return `Copy ${e} of ${p}`;
+  return `${e} of ${p}`;
 }
 
 export function formatEditionShort(editionNumber, printRun) {
   const e = Number(editionNumber) || 1;
   const p = Number(printRun) || 1;
-  if (p <= 1) return "";
-  return `Copy ${e} of ${p}`;
+  return `${e} of ${p}`;
 }
 
 export function rarityDisplay(rarity) {

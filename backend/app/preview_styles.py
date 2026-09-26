@@ -23,15 +23,6 @@ PREVIEW_ART_STYLES: tuple[dict[str, str], ...] = (
             "bold graphic art style, dynamic composition"
         ),
     },
-    {
-        "index": 2,
-        "key": "painterly",
-        "label": "Painterly",
-        "suffix": (
-            "painterly artistic style, textured brushwork, warm tones, "
-            "illustrated sports card art style, slightly stylized"
-        ),
-    },
 )
 
 PAID_PREVIEW_COUNT = len(PREVIEW_ART_STYLES)

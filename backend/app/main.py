@@ -845,7 +845,7 @@ def generate_paid_card_previews(
     card_type: str = "static",
     animated: bool = False,
 ) -> list[dict]:
-    """Generate 3 paid preview variations (shared rarity) for user selection."""
+    """Generate 2 paid preview variations (Cinematic + Vivid, shared rarity) for user selection."""
     from card_pricing import normalize_card_type
     from preview_styles import PREVIEW_ART_STYLES
     from utils.usage import check_generation_cap

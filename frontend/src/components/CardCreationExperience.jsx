@@ -35,10 +35,10 @@ const LOADING_FUN_FACTS = [
 ];
 
 const PAID_MULTI_PREVIEW_BLURBS = [
-  "Generating 3 unique versions...",
+  "Generating 2 unique versions...",
   "Our AI is cooking up your options...",
   "Almost ready to pick your favorite...",
-  "3 versions incoming...",
+  "2 versions incoming...",
 ];
 
 function LoadingFunFacts({ messages = LOADING_FUN_FACTS }) {

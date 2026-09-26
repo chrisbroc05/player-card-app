@@ -2,6 +2,7 @@ import { API_BASE_URL } from "../config/api";
 import { isAnimatedCard } from "./animationCard";
 import { highlightVideoUrl, isHighlightCard } from "./highlightCard";
 import {
+  bannerEditionVariant,
   formatBannerEdition,
   tierPillLabel,
 } from "./cardBannerStyles";
@@ -349,6 +350,10 @@ async function drawCardToCanvas(card, cardImage) {
   const centerLabel = meta.templateName || "\u00A0";
   const tierLabel = tierPillLabel(tierKey);
   const edition = formatBannerEdition(card.edition_number ?? card.editionNumber, card.print_run ?? card.printRun);
+  const editionVariant = bannerEditionVariant(
+    card.edition_number ?? card.editionNumber,
+    card.print_run ?? card.printRun
+  );
   const rarity = card.rarity || card.rarity_key || "standard";
 
   const canvas = document.createElement("canvas");
@@ -452,8 +457,11 @@ async function drawCardToCanvas(card, cardImage) {
 
   if (edition) {
     ctx.textAlign = "right";
-    ctx.fillStyle = colors.text;
-    ctx.font = `500 13px "Barlow Condensed", sans-serif`;
+    ctx.fillStyle = editionVariant === "primary" ? "#c9a84c" : "rgba(255, 255, 255, 0.52)";
+    ctx.font =
+      editionVariant === "primary"
+        ? `700 14px "Barlow Condensed", sans-serif`
+        : `500 11px "Barlow Condensed", sans-serif`;
     ctx.fillText(edition, CARD_WIDTH - 20, pillY + 19);
   }
 

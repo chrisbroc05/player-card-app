@@ -700,7 +700,7 @@ export default function StudioPage() {
   }, [featuredDisplayCard, wizardPreviewCard, orderTier, specialTheme]);
 
   const activePreviewCount = Number(activeOrder?.preview_count ?? 0);
-  const activePreviewLimit = Number(activeOrder?.preview_limit ?? 3);
+  const activePreviewLimit = Number(activeOrder?.preview_limit ?? 2);
   const remainingPreviews = Math.max(0, activePreviewLimit - activePreviewCount);
   const isPreviewLimitReached = Boolean(activeOrder && activePreviewCount >= activePreviewLimit);
   const isOrderDelivered = (activeOrder?.status || "").toLowerCase() === "delivered";

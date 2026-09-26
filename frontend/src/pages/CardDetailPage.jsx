@@ -353,7 +353,7 @@ export default function CardDetailPage() {
                       Print Run
                     </h2>
                     <p className="mt-2 text-sm text-slate-200">
-                      This is Copy {displayCard?.edition_number ?? 1} of{" "}
+                      This is {displayCard?.edition_number ?? 1} of{" "}
                       {displayCard?.print_run ?? 1}
                     </p>
                     {isOwner && Number(displayCard?.copies_owned) > 1 ? (

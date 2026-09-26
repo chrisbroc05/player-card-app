@@ -25,8 +25,13 @@ const THEME_LABELS = {
 export function formatBannerEdition(editionNumber, printRun) {
   const e = Number(editionNumber) || 1;
   const p = Number(printRun) || 1;
-  if (p <= 1) return "";
-  return `Copy ${e} of ${p}`;
+  return `${e} of ${p}`;
+}
+
+/** primary = copy 1 (gold); secondary = copies 2+ (muted). */
+export function bannerEditionVariant(editionNumber, printRun) {
+  const e = Number(editionNumber) || 1;
+  return e === 1 ? "primary" : "secondary";
 }
 
 export function themeDisplayLabel(theme) {

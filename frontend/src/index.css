@@ -1971,6 +1971,26 @@
   font-variant-numeric: tabular-nums;
 }
 
+.card-banner__edition--primary {
+  color: #c9a84c !important;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.card-banner__edition--secondary {
+  color: rgba(255, 255, 255, 0.52) !important;
+  font-weight: 500;
+  font-size: 9px;
+}
+
+.card-banner--size-detail .card-banner__edition--primary {
+  font-size: 13px;
+}
+
+.card-banner--size-detail .card-banner__edition--secondary {
+  font-size: 10px;
+}
+
 /* Card shell — flexible media + fixed minimum banner height */
 .card-shell__media {
   position: relative;

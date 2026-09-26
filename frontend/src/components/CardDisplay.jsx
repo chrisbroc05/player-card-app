@@ -175,7 +175,11 @@ const CardDisplay = React.forwardRef(function CardDisplay(
           ) : null}
           {!selectionPreviewMode && meta.edition ? (
             <div className="card-banner__footer-col card-banner__footer-col--end banner-bottom-right">
-              <span className={`card-banner__edition ${bannerStyles.editionClass}`}>{meta.edition}</span>
+              <span
+                className={`card-banner__edition ${bannerStyles.editionClass} card-banner__edition--${meta.editionVariant || "primary"}`}
+              >
+                {meta.edition}
+              </span>
             </div>
           ) : (
             <div className="card-banner__footer-col card-banner__footer-col--end banner-bottom-right" aria-hidden />

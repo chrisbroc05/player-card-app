@@ -905,7 +905,7 @@ def _build_pending_session_payload(session_cards: list[Card], session_id: str) -
         "expires_at": expires_at.isoformat(),
         "draft": draft,
         "preview_count": len(previews),
-        "preview_limit": 3,
+        "preview_limit": 2,
         "previews": previews,
     }
 

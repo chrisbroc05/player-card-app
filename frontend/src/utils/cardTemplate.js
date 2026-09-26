@@ -1,5 +1,5 @@
 import { vaultTierBadge } from "./tierStyles";
-import { formatBannerEdition } from "./cardBannerStyles";
+import { bannerEditionVariant, formatBannerEdition } from "./cardBannerStyles";
 
 /** Standard trading card aspect ratio 2.5 × 3.5 */
 export const CARD_ASPECT_CLASS = "aspect-[5/7]";
@@ -97,7 +97,10 @@ export function resolveCardDisplayMeta(card) {
     rarityTemplate,
     card.template_name || card.templateName
   );
-  const edition = formatBannerEdition(card.edition_number, card.print_run);
+  const editionNumber = Number(card.edition_number ?? card.editionNumber) || 1;
+  const printRun = Number(card.print_run ?? card.printRun) || 1;
+  const edition = formatBannerEdition(editionNumber, printRun);
+  const editionVariant = bannerEditionVariant(editionNumber, printRun);
   const badge = vaultTierBadge(tier);
 
   const statsLine = [
@@ -119,6 +122,9 @@ export function resolveCardDisplayMeta(card) {
     templateName,
     templateTierKey: templateTierDataKey(tier),
     edition,
+    editionNumber,
+    printRun,
+    editionVariant,
     badge,
     frame: tierFrameStyles(tier),
     themeOverlay: themeOverlayClass(theme),
