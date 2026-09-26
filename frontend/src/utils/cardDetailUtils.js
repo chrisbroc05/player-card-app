@@ -36,6 +36,20 @@ export function normalizeCardForDisplay(card) {
   };
 }
 
+/** Strip pull rarity from preview cards on the paid selection screen. */
+export function maskCardRarityForSelection(card) {
+  if (!card || typeof card !== "object") return card;
+  return {
+    ...card,
+    rarity: "standard",
+    rarity_template: 1,
+    rarity_display_name: "",
+    template_name: "",
+    edition_number: null,
+    print_run: null,
+  };
+}
+
 export function safeMotionLabel(motionId) {
   if (motionId == null || motionId === "") return "";
   try {

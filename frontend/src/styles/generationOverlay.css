@@ -285,14 +285,14 @@
 
 .paid-preview-selection__item:hover,
 .paid-preview-selection__item:focus-within {
-  border-color: rgba(201, 168, 76, 0.55);
-  box-shadow: 0 0 28px rgba(201, 168, 76, 0.28);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.08);
   transform: translateY(-1px);
 }
 
 .paid-preview-selection__item--selected {
-  border-color: rgba(201, 168, 76, 0.75);
-  box-shadow: 0 0 32px rgba(201, 168, 76, 0.35);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 22px rgba(255, 255, 255, 0.1);
 }
 
 .paid-preview-selection__card-wrap {
@@ -311,8 +311,36 @@
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
-  color: #c9a84c;
+  color: rgba(255, 255, 255, 0.88);
   letter-spacing: 0.02em;
+}
+
+.paid-preview-selection__card-wrap .card-shell--selection-preview,
+.paid-preview-selection__card-wrap .card-display-container {
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  box-shadow: none !important;
+  animation: none !important;
+  filter: none !important;
+  --card-border: rgba(255, 255, 255, 0.14);
+  --card-glow: transparent;
+}
+
+.paid-preview-selection__card-wrap .card-player-inner-border {
+  display: none;
+}
+
+.paid-preview-selection__card-wrap .auto-signature,
+.paid-preview-selection__card-wrap .card-rarity-badge-slot,
+.paid-preview-selection__card-wrap .card-banner__edition {
+  display: none !important;
+}
+
+.paid-preview-selection__locking-message {
+  margin: 0.25rem 0 0;
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.78);
 }
 
 .paid-preview-selection__select-btn {

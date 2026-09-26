@@ -176,9 +176,11 @@ function ActivityRow({ item }) {
             {bannerStyles.tierPillLabel}
           </span>
           {themeLabel ? <span className="activity-row__theme">{themeLabel}</span> : null}
-          <span className="activity-row__edition" style={{ color: badge.accent }}>
-            {edition}
-          </span>
+          {edition ? (
+            <span className="activity-row__edition" style={{ color: badge.accent }}>
+              {edition}
+            </span>
+          ) : null}
         </div>
       </div>
 

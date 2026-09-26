@@ -98,9 +98,36 @@ def _fetch_image_bytes(image_url: str) -> bytes:
 GOLD_BORDER = (201, 168, 76, 255)  # #C9A84C
 DARK_BORDER = (18, 18, 22, 255)
 GOLD_TEXT = (201, 168, 76, 255)
-MUTED_TEXT = (255, 255, 255, 128)
+ONE_OF_ONE_TEXT = "1 OF 1"
+ONE_OF_ONE_TEXT_COLOR = (255, 68, 68, 255)  # #FF4444
 BORDER_WIDTH_RATIO = 0.028
 MIN_BORDER_PX = 6
+
+
+def _normalize_rarity(rarity: str | None) -> str:
+    return (rarity or "standard").strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def _apply_one_of_one_rarity_stamp(framed: Image.Image, *, border: int) -> Image.Image:
+    """Rarity-specific 1 OF 1 stamp baked into the card art (not copy numbering)."""
+    draw = ImageDraw.Draw(framed)
+    font_size = max(16, int(framed.width * 0.042))
+    font = _load_watermark_font(font_size)
+    bbox = draw.textbbox((0, 0), ONE_OF_ONE_TEXT, font=font)
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+    text_x = (framed.width - text_w) // 2
+    text_y = framed.height - border - text_h - max(4, border // 3)
+    draw.text((text_x, text_y), ONE_OF_ONE_TEXT, font=font, fill=ONE_OF_ONE_TEXT_COLOR)
+
+    star = "★"
+    star_size = max(14, int(font_size * 0.85))
+    star_font = _load_watermark_font(star_size)
+    star_bbox = draw.textbbox((0, 0), star, font=star_font)
+    star_w = star_bbox[2] - star_bbox[0]
+    draw.text((text_x - star_w - 6, text_y + 1), star, font=star_font, fill=GOLD_TEXT)
+
+    return framed
 
 
 def apply_edition_treatment(
@@ -108,10 +135,14 @@ def apply_edition_treatment(
     *,
     edition_number: int = 1,
     print_run: int = 1,
+    rarity: str | None = None,
 ) -> bytes:
-    """Bake copy-specific gold (1st) or dark (2+) border and edition numbering into the PNG."""
+    """Bake copy-specific gold (1st) or dark (2+) border into the PNG.
+
+    Copy numbering is shown in the card banner only. The one_of_one rarity tier
+    retains its dedicated 1 OF 1 stamp on the card image.
+    """
     edition = max(1, int(edition_number or 1))
-    total = max(edition, int(print_run or 1))
     img = Image.open(BytesIO(image_bytes)).convert("RGBA")
     w, h = img.size
     border = max(MIN_BORDER_PX, int(min(w, h) * BORDER_WIDTH_RATIO))
@@ -121,25 +152,8 @@ def apply_edition_treatment(
     framed = Image.new("RGBA", (w + border * 2, h + border * 2), border_color)
     framed.paste(img, (border, border))
 
-    draw = ImageDraw.Draw(framed)
-    label = f"{edition} of {total}"
-    font_size = max(16, int(framed.width * (0.042 if is_first_copy else 0.032)))
-    font = _load_watermark_font(font_size)
-    bbox = draw.textbbox((0, 0), label, font=font)
-    text_w = bbox[2] - bbox[0]
-    text_h = bbox[3] - bbox[1]
-    text_x = (framed.width - text_w) // 2
-    text_y = framed.height - border - text_h - max(4, border // 3)
-    fill = GOLD_TEXT if is_first_copy else MUTED_TEXT
-    draw.text((text_x, text_y), label, font=font, fill=fill)
-
-    if is_first_copy:
-        star = "★"
-        star_size = max(14, int(font_size * 0.85))
-        star_font = _load_watermark_font(star_size)
-        star_bbox = draw.textbbox((0, 0), star, font=star_font)
-        star_w = star_bbox[2] - star_bbox[0]
-        draw.text((text_x - star_w - 6, text_y + 1), star, font=star_font, fill=GOLD_TEXT)
+    if _normalize_rarity(rarity) == "one_of_one":
+        framed = _apply_one_of_one_rarity_stamp(framed, border=border)
 
     output = BytesIO()
     framed.save(output, format="PNG")
@@ -152,13 +166,15 @@ def finalize_card_image(
     card_id: str | None = None,
     edition_number: int = 1,
     print_run: int = 1,
+    rarity: str | None = None,
 ) -> str:
-    """Watermark + edition border/numbering, then upload final PNG."""
+    """Watermark + edition border, then upload final PNG."""
     logger.info(
-        "Finalize card image card_id=%s edition=%s/%s url=%s",
+        "Finalize card image card_id=%s edition=%s/%s rarity=%s url=%s",
         card_id,
         edition_number,
         print_run,
+        rarity,
         image_url,
     )
     image_bytes = _fetch_image_bytes(image_url)
@@ -167,6 +183,7 @@ def finalize_card_image(
         watermarked,
         edition_number=edition_number,
         print_run=print_run,
+        rarity=rarity,
     )
     safe_id = (card_id or "card").replace("/", "_")
     card_filename = f"{safe_id}-e{edition_number}-final-{uuid4().hex}.png"

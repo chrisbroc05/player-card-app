@@ -450,10 +450,12 @@ async function drawCardToCanvas(card, cardImage) {
     ctx.fillText(centerLabel, CARD_WIDTH / 2, pillY + 19);
   }
 
-  ctx.textAlign = "right";
-  ctx.fillStyle = colors.text;
-  ctx.font = `500 13px "Barlow Condensed", sans-serif`;
-  ctx.fillText(edition, CARD_WIDTH - 20, pillY + 19);
+  if (edition) {
+    ctx.textAlign = "right";
+    ctx.fillStyle = colors.text;
+    ctx.font = `500 13px "Barlow Condensed", sans-serif`;
+    ctx.fillText(edition, CARD_WIDTH - 20, pillY + 19);
+  }
 
   ctx.shadowColor = colors.glow;
   ctx.shadowBlur = 20;

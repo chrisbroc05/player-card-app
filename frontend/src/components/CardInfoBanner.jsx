@@ -98,11 +98,13 @@ export default function CardInfoBanner({ card, variant = "default", className = 
             {meta.theme}
           </span>
         ) : null}
-        <span
-          className={`tabular-nums text-slate-500 ${compact ? "text-[9px]" : "text-[10px] sm:text-[11px]"}`}
-        >
-          {meta.edition}
-        </span>
+        {meta.edition ? (
+          <span
+            className={`tabular-nums text-slate-500 ${compact ? "text-[9px]" : "text-[10px] sm:text-[11px]"}`}
+          >
+            {meta.edition}
+          </span>
+        ) : null}
       </div>
     </div>
   );

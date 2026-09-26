@@ -347,13 +347,13 @@ export default function CardDetailPage() {
 
                 <CardHistoryTimeline cardId={displayCard?.card_id} />
 
-                {copies.length > 0 ? (
+                {copies.length > 0 && Number(displayCard?.print_run) > 1 ? (
                   <div className="rounded-2xl border border-white/10 bg-cardBg p-4 sm:p-5">
                     <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">
                       Print Run
                     </h2>
                     <p className="mt-2 text-sm text-slate-200">
-                      This is card #{displayCard?.edition_number ?? 1} of{" "}
+                      This is Copy {displayCard?.edition_number ?? 1} of{" "}
                       {displayCard?.print_run ?? 1}
                     </p>
                     {isOwner && Number(displayCard?.copies_owned) > 1 ? (

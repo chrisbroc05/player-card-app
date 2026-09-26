@@ -1,6 +1,7 @@
 import React from "react";
 import CardImage from "./CardImage";
 import { formatMoney } from "../utils/marketplace";
+import { maskCardRarityForSelection } from "../utils/cardDetailUtils";
 
 export default function PaidPreviewSelectionPanel({
   previews = [],
@@ -12,17 +13,15 @@ export default function PaidPreviewSelectionPanel({
   repickPurchased = false,
   repickPrice = 1,
   previewToDisplayCard,
-  playerDisplayName = "",
-  teamName = "",
-  orderTier = "rookie",
-  specialTheme = null,
 }) {
+  const isLockingIn = selectingIndex !== null && selectingIndex !== undefined;
+
   return (
     <div className="paid-preview-selection">
       <header className="paid-preview-selection__header">
         <h2 className="paid-preview-selection__title">Choose Your Card</h2>
         <p className="paid-preview-selection__subtitle">
-          Pick your favorite version — each one is uniquely generated
+          Pick your favorite artwork — your rarity will be revealed after you choose
         </p>
       </header>
 
@@ -31,9 +30,10 @@ export default function PaidPreviewSelectionPanel({
           const previewIndex = preview.index ?? index;
           const isSelected = selectedPreviewIndex === previewIndex;
           const isSelecting = selectingIndex === previewIndex;
-          const displayCard = previewToDisplayCard
+          const rawDisplayCard = previewToDisplayCard
             ? previewToDisplayCard(preview)
             : preview;
+          const displayCard = maskCardRarityForSelection(rawDisplayCard);
 
           return (
             <article
@@ -43,11 +43,9 @@ export default function PaidPreviewSelectionPanel({
               <div className="paid-preview-selection__card-wrap">
                 <CardImage
                   card={displayCard}
-                  playerName={playerDisplayName}
-                  teamName={teamName}
-                  tier={orderTier}
-                  theme={specialTheme}
                   className="paid-preview-selection__card-image"
+                  selectionPreviewMode
+                  showRarityBadge={false}
                 />
               </div>
               <p className="paid-preview-selection__style-label">
@@ -56,11 +54,11 @@ export default function PaidPreviewSelectionPanel({
               <button
                 type="button"
                 className="btn-primary paid-preview-selection__select-btn"
-                disabled={Boolean(selectingIndex)}
+                disabled={isLockingIn}
                 onClick={() => onSelectPreview?.(previewIndex, preview)}
               >
                 {isSelecting
-                  ? `Locking in ${preview.style_label || "your card"}...`
+                  ? "Locking in your choice..."
                   : isSelected
                     ? "Selected"
                     : "Select This Version"}
@@ -75,7 +73,7 @@ export default function PaidPreviewSelectionPanel({
           <button
             type="button"
             className="btn-secondary paid-preview-selection__repick-btn"
-            disabled={repickLoading || Boolean(selectingIndex)}
+            disabled={repickLoading || isLockingIn}
             onClick={onRepick}
           >
             {repickLoading
@@ -83,6 +81,12 @@ export default function PaidPreviewSelectionPanel({
               : `Generate Another Version — ${formatMoney(repickPrice)}`}
           </button>
         </div>
+      ) : null}
+
+      {isLockingIn ? (
+        <p className="paid-preview-selection__locking-message" role="status" aria-live="polite">
+          Locking in your choice...
+        </p>
       ) : null}
     </div>
   );

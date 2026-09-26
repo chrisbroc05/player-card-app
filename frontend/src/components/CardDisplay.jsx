@@ -27,6 +27,8 @@ const CardDisplay = React.forwardRef(function CardDisplay(
     showAnimatedBadge = false,
     showHighlightBadge = false,
     showRarityBadge = true,
+    showAutoSignature = true,
+    selectionPreviewMode = false,
     animateSignature = false,
     isHighlight = false,
     inProgressOverlay = false,
@@ -56,7 +58,9 @@ const CardDisplay = React.forwardRef(function CardDisplay(
   const bannerStyles = getCardBannerStyles(tier, theme);
   const centerBannerLabel = templateName || "\u00A0";
   const showTemplateInBanner = size === "detail";
-  const showThemeIcon = shouldShowThemeIcon(rarity);
+  const displayRarity = selectionPreviewMode ? "standard" : rarity;
+  const displayTemplate = selectionPreviewMode ? 1 : rarityTemplate;
+  const showThemeIcon = !selectionPreviewMode && shouldShowThemeIcon(rarity);
   const rarityBadgeSize = size === "detail" ? "detail" : "thumb";
   const highlightStyles = isHighlight ? getHighlightCardStyles(tier, theme) : null;
   const frame = tierFrameStyles(tier);
@@ -69,9 +73,11 @@ const CardDisplay = React.forwardRef(function CardDisplay(
   const highlightMediaClass =
     highlightStyles?.mediaClass || "highlight-card__media highlight-card__media--rookie";
 
-  const frameClasses = isHighlight
-    ? `${highlightFrameClass} bg-black`
-    : `${frame.borderClass} ${frame.glowClass} ${frame.bgClass}`;
+  const frameClasses = selectionPreviewMode
+    ? "border border-white/15 bg-slate-950/90 shadow-none"
+    : isHighlight
+      ? `${highlightFrameClass} bg-black`
+      : `${frame.borderClass} ${frame.glowClass} ${frame.bgClass}`;
 
   const mediaWrapperClass = isHighlight
     ? `${highlightMediaClass} card-player-vignette relative h-full w-full overflow-hidden`
@@ -84,10 +90,10 @@ const CardDisplay = React.forwardRef(function CardDisplay(
     <div
       ref={ref}
       data-card-capture-id={captureId || undefined}
-      data-tier={templateTierKey}
-      data-template={String(rarityTemplate || 1)}
-      data-rarity={rarity || "standard"}
-      className={`card-display-container card-shell relative flex w-full min-w-[210px] min-h-0 flex-col overflow-hidden ${shellRadiusClass} ${CARD_ASPECT_CLASS} ${frameClasses} ${className}`}
+      data-tier={selectionPreviewMode ? "rookie" : templateTierKey}
+      data-template={String(displayTemplate || 1)}
+      data-rarity={displayRarity || "standard"}
+      className={`card-display-container card-shell relative flex w-full min-w-[210px] min-h-0 flex-col overflow-hidden ${shellRadiusClass} ${CARD_ASPECT_CLASS} ${frameClasses}${selectionPreviewMode ? " card-shell--selection-preview" : ""} ${className}`}
     >
       {!isHighlight && meta.themeOverlay ? (
         <div className={`pointer-events-none absolute inset-0 z-[4] ${meta.themeOverlay}`} aria-hidden />
@@ -102,12 +108,14 @@ const CardDisplay = React.forwardRef(function CardDisplay(
           {!isHighlight ? (
             <div className="card-player-inner-border pointer-events-none absolute inset-0" aria-hidden />
           ) : null}
-          <AutoSignature
-            playerName={meta.playerName}
-            rarity={rarity}
-            animate={animateSignature}
-          />
-          {showRarityBadge ? (
+          {showAutoSignature && !selectionPreviewMode ? (
+            <AutoSignature
+              playerName={meta.playerName}
+              rarity={rarity}
+              animate={animateSignature}
+            />
+          ) : null}
+          {showRarityBadge && !selectionPreviewMode ? (
             <div className="card-rarity-badge-slot">
               <RarityBadge rarity={rarity} size={rarityBadgeSize} />
             </div>
@@ -165,9 +173,13 @@ const CardDisplay = React.forwardRef(function CardDisplay(
               </span>
             </div>
           ) : null}
-          <div className="card-banner__footer-col card-banner__footer-col--end banner-bottom-right">
-            <span className={`card-banner__edition ${bannerStyles.editionClass}`}>{meta.edition}</span>
-          </div>
+          {!selectionPreviewMode && meta.edition ? (
+            <div className="card-banner__footer-col card-banner__footer-col--end banner-bottom-right">
+              <span className={`card-banner__edition ${bannerStyles.editionClass}`}>{meta.edition}</span>
+            </div>
+          ) : (
+            <div className="card-banner__footer-col card-banner__footer-col--end banner-bottom-right" aria-hidden />
+          )}
         </div>
       </div>
     </div>

@@ -131,6 +131,7 @@ export default function CardImage({
   showAnimatedBadge = true,
   showHighlightBadge = true,
   showRarityBadge = true,
+  selectionPreviewMode = false,
   animateSignature = false,
   showInProgressOverlay = true,
   showInfoBanner,
@@ -656,7 +657,9 @@ export default function CardImage({
         className={frameClassName}
         showAnimatedBadge={showAnimatedBadge && animatedActive}
         showHighlightBadge={showBadge}
-        showRarityBadge={showRarityBadge}
+        showRarityBadge={selectionPreviewMode ? false : showRarityBadge}
+        showAutoSignature={!selectionPreviewMode}
+        selectionPreviewMode={selectionPreviewMode}
         animateSignature={animateSignature}
         isHighlight={useHighlightShell}
         inProgressOverlay={inProgress}

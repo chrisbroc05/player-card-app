@@ -25,7 +25,8 @@ const THEME_LABELS = {
 export function formatBannerEdition(editionNumber, printRun) {
   const e = Number(editionNumber) || 1;
   const p = Number(printRun) || 1;
-  return `${e} of ${p}`;
+  if (p <= 1) return "";
+  return `Copy ${e} of ${p}`;
 }
 
 export function themeDisplayLabel(theme) {

@@ -484,6 +484,7 @@ def finalize_order_preview(
                 card_id=selected_card.card_id,
                 edition_number=1,
                 print_run=qty,
+                rarity=selected_card.rarity,
             )
             selected_card.image_url = watermarked_url
             selected_card.edition_number = 1
@@ -619,6 +620,7 @@ def expand_print_run_for_owner_image(
             card_id=nid,
             edition_number=edition,
             print_run=target_quantity,
+            rarity=template.rarity,
         )
         row = create_card_row(
             db,
