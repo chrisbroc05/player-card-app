@@ -7914,14 +7914,28 @@
   margin-bottom: 12px;
 }
 
+.single-list-modal__card-frame {
+  padding: 3px;
+  border-radius: 10px;
+}
+
+.single-list-modal__card-frame--gold {
+  border: 2px solid #c9a84c;
+  box-shadow: 0 0 16px rgba(201, 168, 76, 0.28);
+}
+
+.single-list-modal__card-frame--dark {
+  border: 2px solid rgba(255, 255, 255, 0.14);
+}
+
 .single-list-modal__card-image {
   display: block;
   width: 120px;
   height: 168px;
   object-fit: cover;
   object-position: center top;
-  border-radius: 8px;
-  border: 1px solid rgba(201, 168, 76, 0.3);
+  border-radius: 6px;
+  border: none;
 }
 
 .single-list-modal__card-placeholder {
@@ -7944,6 +7958,166 @@
   letter-spacing: 1px;
   text-transform: uppercase;
   color: #c9a84c;
+}
+
+.single-list-modal__edition {
+  margin: 6px 0 0;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.single-list-modal__edition--gold {
+  color: #c9a84c;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.single-list-modal__edition--muted {
+  color: rgba(255, 255, 255, 0.55);
+  font-weight: 500;
+}
+
+.marketplace-copy-picker {
+  text-align: center;
+}
+
+.marketplace-copy-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  width: 100%;
+  margin-top: 16px;
+}
+
+.marketplace-copy-picker__option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+.marketplace-copy-picker__option:hover,
+.marketplace-copy-picker__option:focus-visible {
+  border-color: rgba(255, 255, 255, 0.22);
+  transform: translateY(-1px);
+}
+
+.marketplace-copy-picker__option--selected {
+  border-color: rgba(201, 168, 76, 0.65);
+  box-shadow: 0 0 18px rgba(201, 168, 76, 0.18);
+}
+
+.marketplace-copy-picker__thumb {
+  width: 88px;
+  aspect-ratio: 5 / 7;
+  border-radius: 8px;
+  padding: 3px;
+  overflow: hidden;
+}
+
+.marketplace-copy-picker__thumb--gold {
+  border: 2px solid #c9a84c;
+  box-shadow: 0 0 14px rgba(201, 168, 76, 0.25);
+}
+
+.marketplace-copy-picker__thumb--dark {
+  border: 2px solid rgba(255, 255, 255, 0.14);
+}
+
+.marketplace-copy-picker__thumb img,
+.marketplace-copy-picker__thumb-placeholder {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  border-radius: 4px;
+}
+
+.marketplace-copy-picker__thumb-placeholder {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.marketplace-copy-picker__label {
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.62);
+  line-height: 1.25;
+}
+
+.marketplace-copy-picker__label--gold {
+  color: #c9a84c;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.marketplace-copy-picker__continue {
+  margin-top: 18px;
+}
+
+.marketplace-copy-picker__option--readonly {
+  cursor: default;
+  pointer-events: none;
+}
+
+.marketplace-copy-picker__checkbox {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.marketplace-copy-picker__option {
+  position: relative;
+}
+
+.marketplace-copy-picker__checkbox--checked {
+  border-color: rgba(201, 168, 76, 0.85);
+  background: rgba(201, 168, 76, 0.25);
+  color: #c9a84c;
+}
+
+.marketplace-list-mode {
+  text-align: center;
+}
+
+.marketplace-list-mode__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.marketplace-list-mode__secondary {
+  font-family: "Barlow Condensed", sans-serif;
+  font-weight: 700;
+}
+
+.marketplace-multi-list__grid {
+  margin-top: 12px;
+  margin-bottom: 4px;
+}
+
+.marketplace-multi-list__tile-wrap {
+  pointer-events: none;
 }
 
 .single-list-modal__section {

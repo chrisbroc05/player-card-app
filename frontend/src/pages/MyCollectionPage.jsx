@@ -76,6 +76,7 @@ export default function MyCollectionPage({ vaultView = false }) {
   const [permanentDeleteBusyId, setPermanentDeleteBusyId] = useState("");
   const [toast, setToast] = useState({ message: "", variant: "success" });
   const [listSuccessOpen, setListSuccessOpen] = useState(false);
+  const [listSuccessCount, setListSuccessCount] = useState(1);
   const [listingSheet, setListingSheet] = useState(null);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedCardIds, setSelectedCardIds] = useState(() => new Set());
@@ -950,12 +951,14 @@ export default function MyCollectionPage({ vaultView = false }) {
                         busy={marketplaceBusyId === card.card_id}
                         token={token}
                         connectProfile={connectProfile}
-                        onList={(price, isPriority) => listCardOnMarketplace(card.card_id, price, isPriority)}
-                        onUnlist={() => unlistCardFromMarketplace(card.card_id)}
-                        onListSuccess={() => setListSuccessOpen(true)}
-                        onOpenBulkList={(c) =>
-                          openListingFlow({ source: "collection", card: c })
+                        onList={(cardId, price, isPriority) =>
+                          listCardOnMarketplace(cardId, price, isPriority)
                         }
+                        onUnlist={() => unlistCardFromMarketplace(card.card_id)}
+                        onListSuccess={(count = 1) => {
+                          setListSuccessCount(count);
+                          setListSuccessOpen(true);
+                        }}
                       />
                     ) : null}
                     {!vaultView && showDelete ? (
@@ -1111,6 +1114,7 @@ export default function MyCollectionPage({ vaultView = false }) {
 
       <ListedSuccessModal
         open={listSuccessOpen}
+        count={listSuccessCount}
         variant="my-collection"
         onClose={() => setListSuccessOpen(false)}
         onViewMarketplace={() => {

@@ -8,8 +8,8 @@ import CardDetailHero from "../components/CardDetailHero";
 import ShareCard from "../components/ShareCard";
 import SendCard from "../components/SendCard";
 import ProfileLink from "../components/ProfileLink";
-import BulkMarketplaceListingSheet from "../components/BulkMarketplaceListingSheet";
 import MarketplaceListingActions from "../components/MarketplaceListingActions";
+import { filterListableCopies } from "../utils/marketplaceCopies";
 import { useAuth } from "../context/AuthContext";
 import CardHistoryTimeline from "../components/CardHistoryTimeline";
 import { vaultTierBadge } from "../utils/tierStyles";
@@ -53,7 +53,6 @@ export default function CardDetailPage() {
   const [card, setCard] = useState(null);
   const [copies, setCopies] = useState([]);
   const [listingInfo, setListingInfo] = useState(null);
-  const [listingSheetOpen, setListingSheetOpen] = useState(false);
   const [marketplaceBusy, setMarketplaceBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -134,6 +133,7 @@ export default function CardDetailPage() {
     () => (card ? normalizeCardForDisplay(card) : null),
     [card]
   );
+  const listableCopies = useMemo(() => filterListableCopies(copies), [copies]);
   const cardCaptureRef = useRef(null);
 
   const loadListingStatus = useCallback(async () => {
@@ -177,8 +177,9 @@ export default function CardDetailPage() {
     };
   }, [token]);
 
-  async function listCardOnMarketplace(askingPrice, isPriority = false) {
-    if (!token || !card?.card_id) return;
+  async function listCardOnMarketplace(cardId, askingPrice, isPriority = false) {
+    const targetCardId = cardId || card?.card_id;
+    if (!token || !targetCardId) return;
     setMarketplaceBusy(true);
     setError("");
     try {
@@ -186,7 +187,7 @@ export default function CardDetailPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          card_id: card.card_id,
+          card_id: targetCardId,
           asking_price: askingPrice,
           is_priority: Boolean(isPriority),
         }),
@@ -196,7 +197,7 @@ export default function CardDetailPage() {
       if (!res.ok) throw marketplaceListErrorFromDetail(data?.detail, "Could not list card.");
       setListingInfo((prev) => ({
         ...(prev || {}),
-        card_id: card.card_id,
+        card_id: targetCardId,
         asking_price: askingPrice,
         is_priority: Boolean(isPriority),
       }));
@@ -204,33 +205,6 @@ export default function CardDetailPage() {
       await Promise.all([refetchCard(), loadListingStatus()]);
     } catch (e) {
       setError(e.message || "Could not list card.");
-      throw e;
-    } finally {
-      setMarketplaceBusy(false);
-    }
-  }
-
-  async function bulkListOnMarketplace(cardId, quantity, askingPrice) {
-    if (!token) return;
-    setMarketplaceBusy(true);
-    setError("");
-    try {
-      const { res, unauthorized } = await authFetch(token, "/marketplace/bulk-list", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          card_id: cardId,
-          quantity,
-          asking_price: askingPrice,
-        }),
-      });
-      if (unauthorized) throw new Error("Session expired.");
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw marketplaceListErrorFromDetail(data?.detail, "Could not list copies.");
-      refreshNavBadges?.();
-      await Promise.all([refetchCard(), loadListingStatus()]);
-    } catch (e) {
-      setError(e.message || "Could not list copies.");
       throw e;
     } finally {
       setMarketplaceBusy(false);
@@ -413,6 +387,7 @@ export default function CardDetailPage() {
                     </p>
                     <MarketplaceListingActions
                       card={displayCard}
+                      copyOptions={listableCopies}
                       listingInfo={
                         (Number.isFinite(Number(displayCard?.copies_available))
                           ? Number(displayCard.copies_available)
@@ -438,7 +413,6 @@ export default function CardDetailPage() {
                       connectProfile={connectProfile}
                       onList={listCardOnMarketplace}
                       onUnlist={unlistCardFromMarketplace}
-                      onOpenBulkList={() => setListingSheetOpen(true)}
                       showContainerDivider={false}
                       className="mt-3"
                       listButtonLabel="List on Marketplace"
@@ -465,28 +439,6 @@ export default function CardDetailPage() {
           </ErrorBoundary>
         )}
       </main>
-
-      <BulkMarketplaceListingSheet
-        open={listingSheetOpen}
-        source="detail"
-        card={displayCard}
-        copiesOwned={displayCard?.copies_owned || 1}
-        copiesAvailable={
-          Number.isFinite(Number(displayCard?.copies_available))
-            ? Number(displayCard.copies_available)
-            : Math.max(
-                0,
-                Number(displayCard?.copies_owned || 1) - Number(displayCard?.copies_listed || 0)
-              )
-        }
-        busy={marketplaceBusy}
-        token={token}
-        connectProfile={connectProfile}
-        onClose={() => setListingSheetOpen(false)}
-        onConfirm={async ({ quantity, askingPrice }) => {
-          await bulkListOnMarketplace(displayCard.card_id, quantity, askingPrice);
-        }}
-      />
 
       <AppFooter />
     </div>
