@@ -6,6 +6,22 @@ function hasDisplayValue(value) {
   return String(value).trim().length > 0;
 }
 
+function SummaryRow({ label, value, subline }) {
+  return (
+    <div className="px-3 py-2.5">
+      <div className="flex items-start justify-between gap-4">
+        <span className="text-sm text-slate-400">{label}</span>
+        {value ? (
+          <span className="shrink-0 text-sm font-medium tabular-nums text-white">{value}</span>
+        ) : null}
+      </div>
+      {subline ? (
+        <p className="mt-1 text-[11px] leading-snug text-white/50">· {subline}</p>
+      ) : null}
+    </div>
+  );
+}
+
 function SummarySection({ title, rows }) {
   const visible = rows.filter(Boolean);
   if (!visible.length) return null;
@@ -13,14 +29,8 @@ function SummarySection({ title, rows }) {
     <div className="mt-4 first:mt-0">
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{title}</p>
       <dl className="mt-2 divide-y divide-white/5 rounded-lg border border-white/10 bg-cardBg/60">
-        {visible.map(({ label, value }) => (
-          <div
-            key={label}
-            className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 gap-y-0.5 px-3 py-2.5 sm:grid-cols-[140px_1fr]"
-          >
-            <dt className="text-sm text-slate-400">{label}</dt>
-            <dd className="text-sm font-medium text-white sm:text-right">{value}</dd>
-          </div>
+        {visible.map(({ label, value, subline }) => (
+          <SummaryRow key={label} label={label} value={value} subline={subline} />
         ))}
       </dl>
     </div>
@@ -42,28 +52,9 @@ function formatPackLabel(copies) {
   return copies === 1 ? "1 card" : `${copies} copies`;
 }
 
-function formatAnimationSummaryValue({
-  animateAtCheckout,
-  animationActionLabel,
-  animationScenarioLabel,
-  animatedFee,
-}) {
-  const fee = formatMoney(animatedFee);
-  const hasDetail = hasDisplayValue(animationActionLabel) || hasDisplayValue(animationScenarioLabel);
-
-  if (hasDetail) {
-    const detail = [animationActionLabel, animationScenarioLabel].filter(Boolean).join(" · ");
-    if (animateAtCheckout) {
-      return `${detail} (+${fee})`;
-    }
-    return detail;
-  }
-
-  if (animateAtCheckout) {
-    return `+${fee}`;
-  }
-
-  return null;
+function formatAnimationDetailSubline(animationActionLabel, animationScenarioLabel) {
+  const detail = [animationActionLabel, animationScenarioLabel].filter(hasDisplayValue).join(" · ");
+  return detail || null;
 }
 
 export default function GenerationCostSummary({
@@ -100,17 +91,14 @@ export default function GenerationCostSummary({
   const tierCardLabel = tierLabel ? `${tierLabel} Card` : "Card";
   const packLabel = formatPackLabel(copies);
 
-  const animationSummaryValue = showAnimatedLine
-    ? formatAnimationSummaryValue({
-        animateAtCheckout,
-        animationActionLabel,
-        animationScenarioLabel,
-        animatedFee,
-      })
-    : null;
-
   const animationSummaryLabel =
     isAnimated && !animateAtCheckout ? "Animation" : "Animated upgrade";
+  const animationDetailSubline = showAnimatedLine
+    ? formatAnimationDetailSubline(animationActionLabel, animationScenarioLabel)
+    : null;
+  const showAnimationCardRow =
+    showAnimatedLine && (animateAtCheckout || Boolean(animationDetailSubline));
+  const animationCardRowValue = animateAtCheckout ? `+${formatMoney(animatedFee)}` : null;
 
   const playerRows = [
     hasDisplayValue(playerName) && { label: "Player name", value: playerName },
@@ -122,11 +110,11 @@ export default function GenerationCostSummary({
 
   const cardRows = [
     { label: "Card type", value: cardTypeLabel },
-    showAnimatedLine &&
-      animationSummaryValue && {
-        label: animationSummaryLabel,
-        value: animationSummaryValue,
-      },
+    showAnimationCardRow && {
+      label: animationSummaryLabel,
+      value: animationCardRowValue,
+      subline: animationDetailSubline,
+    },
     { label: "Pack", value: packLabel },
     hasDisplayValue(tierLabel) && { label: "Tier", value: tierLabel },
     hasDisplayValue(themeLabel) && { label: "Theme", value: themeLabel },
