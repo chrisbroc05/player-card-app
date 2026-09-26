@@ -19,6 +19,7 @@ import HighlightProcessingScreen from "../components/HighlightProcessingScreen";
 import QuantitySelector from "../components/QuantitySelector";
 import PackSizeSelector from "../components/PackSizeSelector";
 import AnimatedUpgradeOption from "../components/AnimatedUpgradeOption";
+import AnimationActionPicker from "../components/AnimationActionPicker";
 import ActionCategoryStep from "../components/ActionCategoryStep";
 import HandednessStep from "../components/HandednessStep";
 import ScenarioSelectionStep, { SCENARIO_NONE_ID } from "../components/ScenarioSelectionStep";
@@ -805,6 +806,22 @@ export default function StudioPage() {
   function selectActionCategory(categoryId) {
     setActionCategory(categoryId);
     setActionStepError("");
+  }
+
+  function handleAnimationActionCategoryChange(categoryId) {
+    setActionCategory(categoryId);
+    setSelectedMotionId(klingMotionForCategory(categoryId) || "");
+    setSelectedScenarioId("");
+    setSelectedScenarioTitle("");
+    setAnimateCheckoutError("");
+    setActionStepError("");
+    setScenarioStepError("");
+  }
+
+  function handleAnimationScenarioSelect(scenarioId, scenarioTitle = "") {
+    selectScenario(scenarioId, scenarioTitle);
+    setAnimateCheckoutError("");
+    setScenarioStepError("");
   }
 
   function handleActionCategoryContinue() {
@@ -1999,7 +2016,8 @@ export default function StudioPage() {
         throwing_hand: null,
         batting_side: null,
         photo_notes: null,
-        animation_scenario_id: null,
+        animation_scenario_id:
+          (isAnimatedCardType || animateAtCheckout) && selectedScenarioId ? selectedScenarioId : null,
         add_ons: [],
       }),
     });
@@ -2096,6 +2114,10 @@ export default function StudioPage() {
       setAnimateCheckoutError("Select an action for your animation.");
       return;
     }
+    if ((isAnimatedCardType || animateAtCheckout) && !selectedScenarioId) {
+      setAnimateCheckoutError("Select the scenario that best matches your photo.");
+      return;
+    }
     setAnimateCheckoutError("");
 
     setIsCreating(true);
@@ -2120,6 +2142,8 @@ export default function StudioPage() {
           (isAnimatedCardType || animateAtCheckout) && actionCategory
             ? klingMotionForCategory(actionCategory) || null
             : null,
+        animation_scenario_id:
+          (isAnimatedCardType || animateAtCheckout) && selectedScenarioId ? selectedScenarioId : null,
       };
       if (highlightStaging) {
         checkoutPayload.highlight_staging_url = highlightStaging.staging_url;
@@ -3136,16 +3160,14 @@ export default function StudioPage() {
                       Pick the motion that best matches your photo — animation is included in your card price.
                     </p>
                     <div className="mt-4">
-                      <ActionCategoryStep
-                        value={actionCategory}
-                        onSelect={(cat) => {
-                          setActionCategory(cat);
-                          setAnimateCheckoutError("");
-                        }}
-                        onContinue={() => {}}
-                        error={animateCheckoutError}
+                      <AnimationActionPicker
+                        actionCategory={actionCategory}
+                        onActionCategoryChange={handleAnimationActionCategoryChange}
+                        selectedScenarioId={selectedScenarioId}
+                        onScenarioSelect={handleAnimationScenarioSelect}
+                        actionError={animateCheckoutError}
+                        scenarioError={animateCheckoutError}
                         tier={orderTier || "rookie"}
-                        hideContinue
                       />
                     </div>
                   </div>
@@ -3156,14 +3178,18 @@ export default function StudioPage() {
                     onEnabledChange={(next) => {
                       setAnimateAtCheckout(next);
                       setAnimateCheckoutError("");
-                      if (!next) setActionCategory("");
+                      if (!next) {
+                        setActionCategory("");
+                        setSelectedScenarioId("");
+                        setSelectedScenarioTitle("");
+                        setSelectedMotionId("");
+                      }
                     }}
                     animatedUpgradePrice={generationPricing?.animated_upgrade_price ?? 10}
                     actionCategory={actionCategory}
-                    onActionCategoryChange={(cat) => {
-                      setActionCategory(cat);
-                      setAnimateCheckoutError("");
-                    }}
+                    onActionCategoryChange={handleAnimationActionCategoryChange}
+                    selectedScenarioId={selectedScenarioId}
+                    onScenarioSelect={handleAnimationScenarioSelect}
                     disabled={Boolean(orderActionKey)}
                     error={animateCheckoutError}
                     tier={orderTier || "rookie"}

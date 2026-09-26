@@ -1,6 +1,6 @@
 import React from "react";
 import { formatMoney } from "../utils/marketplace";
-import ActionCategoryStep from "./ActionCategoryStep";
+import AnimationActionPicker from "./AnimationActionPicker";
 
 export default function AnimatedUpgradeOption({
   enabled,
@@ -8,6 +8,10 @@ export default function AnimatedUpgradeOption({
   animatedUpgradePrice = 10,
   actionCategory,
   onActionCategoryChange,
+  selectedScenarioId,
+  onScenarioSelect,
+  actionError,
+  scenarioError,
   disabled,
   error,
   tier = "rookie",
@@ -38,13 +42,14 @@ export default function AnimatedUpgradeOption({
 
       {enabled ? (
         <div className="mt-5 border-t border-white/10 pt-5">
-          <ActionCategoryStep
-            value={actionCategory}
-            onSelect={onActionCategoryChange}
-            onContinue={() => {}}
-            error={error}
+          <AnimationActionPicker
+            actionCategory={actionCategory}
+            onActionCategoryChange={onActionCategoryChange}
+            selectedScenarioId={selectedScenarioId}
+            onScenarioSelect={onScenarioSelect}
+            actionError={actionError || error}
+            scenarioError={scenarioError}
             tier={tier}
-            hideContinue
           />
         </div>
       ) : null}

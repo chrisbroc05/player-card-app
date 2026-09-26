@@ -713,6 +713,9 @@ def _start_paid_card_animation(db: Session, card_id: str, order: dict) -> None:
 
     motion_id = (order.get("selected_motion_id") or "").strip()
     action_category = (order.get("action_category") or "").strip() or None
+    scenario_id = (order.get("animation_scenario_id") or "").strip() or None
+    if scenario_id == "none":
+        scenario_id = None
     if not motion_id and action_category:
         motion_id = (kling_motion_for_action_category(action_category) or "").strip()
     if not motion_id:
@@ -729,6 +732,8 @@ def _start_paid_card_animation(db: Session, card_id: str, order: dict) -> None:
     orm.animation_motion = motion_id
     if action_category:
         orm.action_category = action_category
+    if scenario_id:
+        orm.animation_scenario_id = scenario_id
     orm.animation_requested_at = datetime.now(timezone.utc)
     orm.animation_completed_at = None
     orm.is_animated = False

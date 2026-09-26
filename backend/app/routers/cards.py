@@ -273,6 +273,7 @@ class CardCreationCheckoutBody(BaseModel):
     animated: bool = False
     action_category: str | None = Field(default=None, max_length=64)
     selected_motion_id: str | None = Field(default=None, max_length=64)
+    animation_scenario_id: str | None = Field(default=None, max_length=100)
     highlight_staging_url: str | None = Field(default=None, max_length=512)
     highlight_trim_start: float | None = None
     highlight_trim_end: float | None = None
@@ -390,6 +391,8 @@ def card_creation_checkout(
         order["action_category"] = body.action_category.strip()
     if body.selected_motion_id:
         order["selected_motion_id"] = body.selected_motion_id.strip()
+    if body.animation_scenario_id:
+        order["animation_scenario_id"] = body.animation_scenario_id.strip()
 
     highlight_staging = None
     if ct == "highlight":

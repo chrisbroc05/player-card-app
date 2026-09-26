@@ -19,6 +19,7 @@ export default function ScenarioSelectionStep({
   error = "",
   tier = "rookie",
   continueBusy = false,
+  hideContinue = false,
 }) {
   const [scenarios, setScenarios] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -157,7 +158,7 @@ export default function ScenarioSelectionStep({
         </div>
       )}
 
-      {value ? (
+      {value && !hideContinue ? (
         <button
           type="button"
           disabled={continueBusy}
