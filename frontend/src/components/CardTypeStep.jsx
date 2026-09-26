@@ -1,4 +1,5 @@
 import React from "react";
+import { WizardOptionCheckmark } from "./StudioWizardControls";
 
 const ICON_STATIC = (
   <svg className="h-10 w-10 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
@@ -18,6 +19,11 @@ const ICON_ANIMATED = (
   </svg>
 );
 
+const SELECTED_CARD_CLASS =
+  "border-[var(--color-border-gold)] bg-gold-subtle shadow-[0_0_28px_rgba(201,168,76,0.28)] ring-1 ring-[var(--color-border-gold)]";
+const UNSELECTED_CARD_CLASS =
+  "border-white/10 bg-cardBg2/40 opacity-50 hover:border-white/20 hover:opacity-70";
+
 export default function CardTypeStep({ value, onChange }) {
   const selected = value || "standard";
 
@@ -27,21 +33,18 @@ export default function CardTypeStep({ value, onChange }) {
       label: "Static",
       description: "A classic trading card with AI-generated artwork",
       icon: ICON_STATIC,
-      selectedClass: "border-white/25 bg-cardBg2 shadow-lg",
     },
     {
       id: "highlight",
       label: "Highlight",
       description: "Upload a video clip as your card background",
       icon: ICON_HIGHLIGHT,
-      selectedClass: "border-[var(--color-border-gold)] bg-gold-subtle shadow-[0_0_28px_rgba(45,212,191,0.22)]",
     },
     {
       id: "animated",
       label: "Animated",
       description: "Your static card brought to life with AI animation",
       icon: ICON_ANIMATED,
-      selectedClass: "border-violet-400/70 bg-violet-500/10 shadow-[0_0_28px_rgba(167,139,250,0.22)]",
     },
   ];
 
@@ -59,23 +62,16 @@ export default function CardTypeStep({ value, onChange }) {
               key={opt.id}
               type="button"
               onClick={() => onChange(opt.id)}
-              className={`rounded-2xl border p-5 text-left transition ${
-                isSel ? opt.selectedClass : "border-white/10 bg-cardBg2/50 opacity-80 hover:opacity-95"
+              className={`relative rounded-2xl border p-5 text-left transition ${
+                isSel ? SELECTED_CARD_CLASS : UNSELECTED_CARD_CLASS
               }`}
             >
-              <div className="mb-3">{opt.icon}</div>
-              <p
-                className={`text-base font-semibold ${
-                  isSel && opt.id === "highlight"
-                    ? "text-brand-gold-bright"
-                    : isSel && opt.id === "animated"
-                      ? "text-violet-100"
-                      : "text-white"
-                }`}
-              >
+              {isSel ? <WizardOptionCheckmark /> : null}
+              <div className={`mb-3 ${isSel ? "" : "opacity-80"}`}>{opt.icon}</div>
+              <p className={`text-base font-semibold ${isSel ? "text-brand-gold-bright" : "text-slate-300"}`}>
                 {opt.label}
               </p>
-              <p className="mt-1 text-sm text-slate-400">{opt.description}</p>
+              <p className={`mt-1 text-sm ${isSel ? "text-slate-300" : "text-slate-500"}`}>{opt.description}</p>
             </button>
           );
         })}

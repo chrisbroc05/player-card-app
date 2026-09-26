@@ -38,6 +38,34 @@ function TotalLine({ label, value, highlight = false }) {
   );
 }
 
+function formatPackLabel(copies) {
+  return copies === 1 ? "1 card" : `${copies} copies`;
+}
+
+function formatAnimationSummaryValue({
+  animateAtCheckout,
+  animationActionLabel,
+  animationScenarioLabel,
+  animatedFee,
+}) {
+  const fee = formatMoney(animatedFee);
+  const hasDetail = hasDisplayValue(animationActionLabel) || hasDisplayValue(animationScenarioLabel);
+
+  if (hasDetail) {
+    const detail = [animationActionLabel, animationScenarioLabel].filter(Boolean).join(" · ");
+    if (animateAtCheckout) {
+      return `${detail} (+${fee})`;
+    }
+    return detail;
+  }
+
+  if (animateAtCheckout) {
+    return `+${fee}`;
+  }
+
+  return null;
+}
+
 export default function GenerationCostSummary({
   playerName,
   teamName,
@@ -51,6 +79,8 @@ export default function GenerationCostSummary({
   copyQuantity = 1,
   pricing,
   animateAtCheckout = false,
+  animationActionLabel = "",
+  animationScenarioLabel = "",
   phase = "pay-upfront",
 }) {
   if (!pricing) return null;
@@ -68,6 +98,19 @@ export default function GenerationCostSummary({
 
   const cardTypeLabel = isHighlight ? "Highlight" : isAnimated ? "Animated" : "Static";
   const tierCardLabel = tierLabel ? `${tierLabel} Card` : "Card";
+  const packLabel = formatPackLabel(copies);
+
+  const animationSummaryValue = showAnimatedLine
+    ? formatAnimationSummaryValue({
+        animateAtCheckout,
+        animationActionLabel,
+        animationScenarioLabel,
+        animatedFee,
+      })
+    : null;
+
+  const animationSummaryLabel =
+    isAnimated && !animateAtCheckout ? "Animation" : "Animated upgrade";
 
   const playerRows = [
     hasDisplayValue(playerName) && { label: "Player name", value: playerName },
@@ -79,10 +122,22 @@ export default function GenerationCostSummary({
 
   const cardRows = [
     { label: "Card type", value: cardTypeLabel },
+    showAnimatedLine &&
+      animationSummaryValue && {
+        label: animationSummaryLabel,
+        value: animationSummaryValue,
+      },
+    { label: "Pack", value: packLabel },
     hasDisplayValue(tierLabel) && { label: "Tier", value: tierLabel },
     hasDisplayValue(themeLabel) && { label: "Theme", value: themeLabel },
-    { label: "Pack", value: `${copies} ${copies === 1 ? "copy" : "copies"}` },
   ];
+
+  const basePriceLabel =
+    phase === "pay-upfront" && !isHighlight && showAnimatedLine && animateAtCheckout
+      ? "Base price"
+      : isHighlight
+        ? `${tierLabel || "Card"} price`
+        : tierCardLabel;
 
   return (
     <div className="rounded-xl border border-white/10 bg-cardBg2 p-4 text-sm text-slate-300 sm:p-5">
@@ -97,7 +152,7 @@ export default function GenerationCostSummary({
         <div className="mt-2 rounded-lg border border-white/10 bg-cardBg/80 p-3">
           {isHighlight ? (
             <>
-              <TotalLine label={`${tierLabel || "Card"} price`} value={formatMoney(basePrice)} />
+              <TotalLine label={basePriceLabel} value={formatMoney(basePrice)} />
               <TotalLine
                 label="Highlight upgrade"
                 value={formatMoney(highlightFee || Number(pricing.highlight_card_price) || 5)}
@@ -105,10 +160,10 @@ export default function GenerationCostSummary({
             </>
           ) : (
             <>
-              <TotalLine label={tierCardLabel} value={formatMoney(basePrice)} />
+              <TotalLine label={basePriceLabel} value={formatMoney(basePrice)} />
               {showAnimatedLine ? (
                 <TotalLine
-                  label={isAnimated ? "Animated" : "Animated upgrade"}
+                  label={isAnimated && !animateAtCheckout ? "Animated" : "Animated upgrade"}
                   value={formatMoney(animatedFee)}
                 />
               ) : null}

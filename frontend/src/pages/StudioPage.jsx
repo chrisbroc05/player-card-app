@@ -43,6 +43,7 @@ import {
   StudioPhaseHeader,
   StudioWizardBack,
   StudioWizardContinue,
+  WizardOptionCheckmark,
 } from "../components/StudioWizardControls";
 import { getPhaseContinueLabel, getPhaseMeta } from "../utils/studioWizardPhases";
 import {
@@ -665,17 +666,23 @@ export default function StudioPage() {
   const canAffordRegenerate = creditBalance >= additionalPreviewCost;
   const regenerateShortfall = Math.max(0, additionalPreviewCost - creditBalance);
   const firstGenerateShortfall = Math.max(0, firstGenerateDue - creditBalance);
-  const motionDisplayName = useMemo(() => {
-    if (!isAnimatedCardType) return "";
-    if (
-      selectedScenarioTitle &&
-      selectedScenarioId &&
-      selectedScenarioId !== SCENARIO_NONE_ID
-    ) {
+  const showAnimationSummary = isAnimatedCardType || animateAtCheckout;
+  const animationActionLabel = useMemo(
+    () => (showAnimationSummary ? getActionCategory(actionCategory)?.label || "" : ""),
+    [showAnimationSummary, actionCategory],
+  );
+  const animationScenarioLabel = useMemo(() => {
+    if (!showAnimationSummary) return "";
+    if (selectedScenarioId && selectedScenarioId !== SCENARIO_NONE_ID && selectedScenarioTitle) {
       return selectedScenarioTitle;
     }
-    return getActionCategory(actionCategory)?.label || "";
-  }, [isAnimatedCardType, selectedScenarioTitle, selectedScenarioId, actionCategory]);
+    return "";
+  }, [showAnimationSummary, selectedScenarioId, selectedScenarioTitle]);
+  const motionDisplayName = useMemo(() => {
+    if (!showAnimationSummary) return "";
+    if (animationScenarioLabel) return animationScenarioLabel;
+    return animationActionLabel;
+  }, [showAnimationSummary, animationScenarioLabel, animationActionLabel]);
   const inCreationFlow = currentStep >= STEP_CARD_TYPE && currentStep <= STEP_REVIEW;
   const useFixedStudioLayout = !showWelcome && inCreationFlow && !animationLoadingCardId;
 
@@ -2918,7 +2925,7 @@ export default function StudioPage() {
                   disabled={!canAdvanceFromStep}
                   onClick={tryAdvanceStep}
                 >
-                  Choose Your Tier →
+                  {getPhaseContinueLabel(STEP_CARD_TYPE, { cardType })}
                 </StudioWizardContinue>
               </div>
             ) : null}
@@ -3015,14 +3022,21 @@ export default function StudioPage() {
                       }}
                       className={`group relative overflow-hidden rounded-xl border p-4 text-left transition-all duration-300 ${
                         orderTier === opt.value
-                          ? opt.active
+                          ? "border-[var(--color-border-gold)] bg-gold-subtle shadow-[0_0_28px_rgba(201,168,76,0.28)] ring-1 ring-[var(--color-border-gold)]"
                           : tierStepError
-                            ? `${opt.card} ring-1 ring-rose-500/40`
-                            : opt.card
+                            ? `${opt.card} opacity-55 ring-1 ring-rose-500/40`
+                            : `${opt.card} opacity-55 hover:opacity-75`
                       }`}
                     >
+                      {orderTier === opt.value ? <WizardOptionCheckmark /> : null}
                       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_0%,rgba(255,255,255,0.2),transparent_38%)] opacity-35 transition-opacity group-hover:opacity-55" />
-                      <p className="font-medium text-white">{opt.label}</p>
+                      <p
+                        className={`font-medium ${
+                          orderTier === opt.value ? "text-brand-gold-bright" : "text-slate-300"
+                        }`}
+                      >
+                        {opt.label}
+                      </p>
                       <p className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[11px] ${opt.pill}`}>
                         {opt.sub}
                       </p>
@@ -3039,7 +3053,7 @@ export default function StudioPage() {
                   disabled={!canAdvanceFromStep}
                   onClick={tryAdvanceStep}
                 >
-                  Continue →
+                  {getPhaseContinueLabel(STEP_TIER, { tierLabel: selectedTierLabel })}
                 </StudioWizardContinue>
               </div>
             ) : null}
@@ -3193,6 +3207,8 @@ export default function StudioPage() {
                   copyQuantity={copyQuantity}
                   pricing={generationPricing}
                   animateAtCheckout={animateAtCheckout && cardType === "standard"}
+                  animationActionLabel={animationActionLabel}
+                  animationScenarioLabel={animationScenarioLabel}
                   phase="pay-upfront"
                 />
                 {orderActionKey === "card-creation-return" ? (
@@ -3287,10 +3303,11 @@ export default function StudioPage() {
                       themeLabel={specialTheme ? selectedThemeLabel : ""}
                       isAnimated={isAnimatedCardType}
                       isHighlight={isHighlightCardType}
-                      motionName={motionDisplayName}
                       copyQuantity={copyQuantity}
                       pricing={generationPricing}
-                      creditBalance={creditBalance}
+                      animateAtCheckout={animateAtCheckout && cardType === "standard"}
+                      animationActionLabel={animationActionLabel}
+                      animationScenarioLabel={animationScenarioLabel}
                       phase="pre-generate"
                     />
 

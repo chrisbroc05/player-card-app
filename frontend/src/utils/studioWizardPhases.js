@@ -34,11 +34,28 @@ export function getPhaseMeta(step) {
   return STUDIO_PHASES.find((p) => p.id === phase) || STUDIO_PHASES[0];
 }
 
-export function getPhaseContinueLabel(step, { isReview = false } = {}) {
+export const WIZARD_STEP_CARD_TYPE = 1;
+export const WIZARD_STEP_TIER = 2;
+
+const CARD_TYPE_CONTINUE_LABELS = {
+  standard: "Static",
+  highlight: "Highlight",
+  animated: "Animated",
+};
+
+export function getPhaseContinueLabel(
+  step,
+  { isReview = false, cardType = "standard", tierLabel = "Rookie" } = {},
+) {
   const phase = getStudioPhase(step);
   if (isReview) return "Create My Card ⚡";
-  if (step === 1) return "Choose Your Tier →";
-  if (phase === 1) return "Continue →";
+  if (step === WIZARD_STEP_CARD_TYPE) {
+    const typeKey = cardType || "standard";
+    return `Continue with ${CARD_TYPE_CONTINUE_LABELS[typeKey] || "Static"} →`;
+  }
+  if (step === WIZARD_STEP_TIER) {
+    return `Continue with ${tierLabel || "Rookie"} →`;
+  }
   if (phase === 2) return "Add Your Photo →";
   return "Continue →";
 }
