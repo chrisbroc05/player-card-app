@@ -291,7 +291,7 @@ async def upload_creation_highlight_staging(
     """Stage highlight video before Stripe checkout (no credit charge — paid at checkout)."""
     from main import _get_order_or_404
 
-    order = _get_order_or_404(order_id)
+    order = _get_order_or_404(order_id, db, user_id=current_user.id)
     if (order.get("customer_email") or "").strip().lower() not in ("", current_user.email.lower()):
         if order.get("customer_name") != current_user.display_name:
             pass  # in-memory orders belong to session; rely on auth + order id
@@ -364,9 +364,9 @@ def card_creation_checkout(
 ):
     """Start Stripe Checkout for upfront card creation (includes all copies)."""
     from card_pricing import normalize_card_type
-    from main import _get_order_or_404
+    from main import _get_order_or_404, _upsert_in_memory_order
 
-    order = _get_order_or_404(body.order_id)
+    order = _get_order_or_404(body.order_id, db, user_id=current_user.id)
     ct = normalize_card_type(body.card_type)
     if ct == "animated":
         animated = True
@@ -402,6 +402,8 @@ def card_creation_checkout(
             "trim_start": body.highlight_trim_start if body.highlight_trim_start is not None else 0.0,
             "trim_end": body.highlight_trim_end,
         }
+
+    _upsert_in_memory_order(order, db=db, user_id=current_user.id)
 
     return begin_card_creation_checkout(
         db,

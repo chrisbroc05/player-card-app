@@ -932,5 +932,43 @@ def run_connect_marketplace_migrations(engine: Engine) -> None:
                     )
                 )
 
+        table_names = set(insp.get_table_names())
+        if "studio_orders" not in table_names:
+            logger.info("Migration: creating studio_orders")
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE IF NOT EXISTS studio_orders (
+                            id INTEGER PRIMARY KEY,
+                            user_id INTEGER NOT NULL REFERENCES users(id),
+                            payload JSON NOT NULL,
+                            created_at TIMESTAMPTZ DEFAULT NOW(),
+                            updated_at TIMESTAMPTZ DEFAULT NOW()
+                        )
+                        """
+                    )
+                )
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS ix_studio_orders_user_id "
+                        "ON studio_orders (user_id)"
+                    )
+                )
+            else:
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE studio_orders (
+                            id INTEGER PRIMARY KEY,
+                            user_id INTEGER NOT NULL,
+                            payload JSON NOT NULL,
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """
+                    )
+                )
+
     logger.info("Connect/marketplace migrations complete")
 

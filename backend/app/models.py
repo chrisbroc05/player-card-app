@@ -95,6 +95,20 @@ class ProcessedStripeEvent(Base):
     processed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class StudioOrder(Base):
+    """Persisted studio wizard order payload (survives redeploys / multi-instance)."""
+
+    __tablename__ = "studio_orders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
 class CardCreationCheckout(Base):
     __tablename__ = "card_creation_checkouts"
 

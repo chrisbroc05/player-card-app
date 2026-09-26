@@ -215,6 +215,7 @@ async def lifespan(_app: FastAPI):
     Base.metadata.create_all(bind=engine)
     run_schema_migrations_after_models(engine)
     run_connect_marketplace_migrations(engine)
+    _init_studio_order_counter()
     try:
         from marketplace_service import backfill_platform_revenue_ledger
         from database import SessionLocal
@@ -490,20 +491,55 @@ def _style_from_generated_card(result: dict) -> str:
     return mode
 
 
-def _get_order_or_404(order_id: int) -> dict:
+def _get_order_or_404(
+    order_id: int,
+    db: Session | None = None,
+    *,
+    user_id: int | None = None,
+) -> dict:
     for order in _orders:
         if order["id"] == order_id:
             return order
-    raise HTTPException(status_code=404, detail="Order not found")
+    if db is not None:
+        from studio_order_repo import load_studio_order
+
+        loaded = load_studio_order(db, order_id, user_id=user_id)
+        if loaded is not None:
+            _upsert_in_memory_order(loaded)
+            return loaded
+    raise HTTPException(status_code=404, detail=f"Order {order_id} not found")
 
 
-def _upsert_in_memory_order(order: dict) -> None:
+def _upsert_in_memory_order(
+    order: dict,
+    db: Session | None = None,
+    *,
+    user_id: int | None = None,
+) -> None:
     oid = int(order["id"])
     for i, existing in enumerate(_orders):
         if existing["id"] == oid:
             _orders[i] = order
-            return
-    _orders.append(order)
+            break
+    else:
+        _orders.append(order)
+    if db is not None and user_id is not None:
+        from studio_order_repo import save_studio_order
+
+        save_studio_order(db, user_id, order)
+
+
+def _init_studio_order_counter() -> None:
+    global _next_order_id
+    from studio_order_repo import max_studio_order_id
+
+    db = SessionLocal()
+    try:
+        db_max = max_studio_order_id(db)
+    finally:
+        db.close()
+    mem_max = max((int(o["id"]) for o in _orders), default=0)
+    _next_order_id = max(db_max, mem_max) + 1
 
 
 def _generate_order_card_internal(
@@ -783,7 +819,7 @@ def fulfill_paid_card_creation(
         order["card_type"] = "highlight"
     else:
         order["card_type"] = "standard"
-    _upsert_in_memory_order(order)
+    _upsert_in_memory_order(order, db=db, user_id=user_id)
 
     generated = _generate_order_card_internal(
         db,
@@ -808,7 +844,7 @@ def fulfill_paid_card_creation(
     if watermarked_url:
         order["final_card_url"] = watermarked_url
         card_id = selected_id or card_id
-    _upsert_in_memory_order(order)
+    _upsert_in_memory_order(order, db=db, user_id=user_id)
 
     qty = max(1, int(copy_quantity))
     if qty > 1:
@@ -2621,9 +2657,10 @@ def list_cards_for_player(
 @app.post("/orders", response_model=Order, status_code=201)
 def create_order(
     body: OrderCreate,
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Create a new in-memory order."""
+    """Create a studio order (persisted for paid checkout across redeploys)."""
     global _next_order_id
 
     order = Order(
@@ -2654,7 +2691,8 @@ def create_order(
         preview_count=0,
         preview_limit=_preview_limit_for_tier(body.tier),
     )
-    _orders.append(order.model_dump())
+    order_payload = order.model_dump()
+    _upsert_in_memory_order(order_payload, db=db, user_id=current_user.id)
     _next_order_id += 1
     return order
 
