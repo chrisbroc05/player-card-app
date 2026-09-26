@@ -38,7 +38,6 @@ import PlayerDetailsStep from "../components/PlayerDetailsStep";
 import PhotoNotesStep from "../components/PhotoNotesStep";
 import FacePhotoStep from "../components/FacePhotoStep";
 import StudioPhaseProgress from "../components/StudioPhaseProgress";
-import StudioLivePreview from "../components/StudioLivePreview";
 import StudioWelcomeScreen from "../components/StudioWelcomeScreen";
 import {
   StudioPhaseHeader,
@@ -375,10 +374,6 @@ export default function StudioPage() {
     if (uploadedPhotoUrl) return uploadedPhotoUrl;
     return imageFile ? URL.createObjectURL(imageFile) : "";
   }, [imageFile, uploadedPhotoUrl]);
-  const livePreviewPhotoUrl =
-    currentStep >= STEP_UPLOAD
-      ? imagePreviewUrl || uploadedPhotoUrl || facePhotoUrl || ""
-      : "";
   const phaseMeta = useMemo(() => getPhaseMeta(currentStep), [currentStep]);
   const generatedCardFullUrl = useMemo(() => toApiUrl(generatedCardUrl), [generatedCardUrl]);
   const playerDisplayName = playerNameFromForm(firstName, lastName, displayName);
@@ -2729,16 +2724,6 @@ export default function StudioPage() {
               }`}
             >
               <StudioPhaseProgress currentStep={currentStep} />
-              <StudioLivePreview
-                firstName={firstName}
-                lastName={lastName}
-                displayName={displayName}
-                position={position}
-                jerseyNumber={jerseyNumber}
-                teamName={teamName}
-                tier={orderTier}
-                photoUrl={livePreviewPhotoUrl}
-              />
             </div>
             <div className="studio-form-zone">
             {(message || error) ? (
