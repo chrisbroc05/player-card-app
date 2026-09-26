@@ -95,22 +95,93 @@ def _fetch_image_bytes(image_url: str) -> bytes:
         return response.content
 
 
-def watermark_and_reupload(image_url: str, *, card_id: str | None = None) -> str:
-    """
-    Download a card image, apply the watermark, and upload a new final PNG to storage.
-    Returns the new public URL.
-    """
-    logger.info("Watermark re-upload for card_id=%s url=%s", card_id, image_url)
+GOLD_BORDER = (201, 168, 76, 255)  # #C9A84C
+DARK_BORDER = (18, 18, 22, 255)
+GOLD_TEXT = (201, 168, 76, 255)
+MUTED_TEXT = (255, 255, 255, 128)
+BORDER_WIDTH_RATIO = 0.028
+MIN_BORDER_PX = 6
+
+
+def apply_edition_treatment(
+    image_bytes: bytes,
+    *,
+    edition_number: int = 1,
+    print_run: int = 1,
+) -> bytes:
+    """Bake copy-specific gold (1st) or dark (2+) border and edition numbering into the PNG."""
+    edition = max(1, int(edition_number or 1))
+    total = max(edition, int(print_run or 1))
+    img = Image.open(BytesIO(image_bytes)).convert("RGBA")
+    w, h = img.size
+    border = max(MIN_BORDER_PX, int(min(w, h) * BORDER_WIDTH_RATIO))
+    is_first_copy = edition == 1
+    border_color = GOLD_BORDER if is_first_copy else DARK_BORDER
+
+    framed = Image.new("RGBA", (w + border * 2, h + border * 2), border_color)
+    framed.paste(img, (border, border))
+
+    draw = ImageDraw.Draw(framed)
+    label = f"{edition} of {total}"
+    font_size = max(16, int(framed.width * (0.042 if is_first_copy else 0.032)))
+    font = _load_watermark_font(font_size)
+    bbox = draw.textbbox((0, 0), label, font=font)
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+    text_x = (framed.width - text_w) // 2
+    text_y = framed.height - border - text_h - max(4, border // 3)
+    fill = GOLD_TEXT if is_first_copy else MUTED_TEXT
+    draw.text((text_x, text_y), label, font=font, fill=fill)
+
+    if is_first_copy:
+        star = "★"
+        star_size = max(14, int(font_size * 0.85))
+        star_font = _load_watermark_font(star_size)
+        star_bbox = draw.textbbox((0, 0), star, font=star_font)
+        star_w = star_bbox[2] - star_bbox[0]
+        draw.text((text_x - star_w - 6, text_y + 1), star, font=star_font, fill=GOLD_TEXT)
+
+    output = BytesIO()
+    framed.save(output, format="PNG")
+    return output.getvalue()
+
+
+def finalize_card_image(
+    image_url: str,
+    *,
+    card_id: str | None = None,
+    edition_number: int = 1,
+    print_run: int = 1,
+) -> str:
+    """Watermark + edition border/numbering, then upload final PNG."""
+    logger.info(
+        "Finalize card image card_id=%s edition=%s/%s url=%s",
+        card_id,
+        edition_number,
+        print_run,
+        image_url,
+    )
     image_bytes = _fetch_image_bytes(image_url)
     watermarked = add_watermark(image_bytes)
-
-    safe_id = (card_id or "card").replace("/", "_")
-    card_filename = f"{safe_id}-final-{uuid4().hex}.png"
-
-    return save_bytes_to_storage(
+    treated = apply_edition_treatment(
         watermarked,
+        edition_number=edition_number,
+        print_run=print_run,
+    )
+    safe_id = (card_id or "card").replace("/", "_")
+    card_filename = f"{safe_id}-e{edition_number}-final-{uuid4().hex}.png"
+    return save_bytes_to_storage(
+        treated,
         r2_key=f"cards/{card_filename}",
         content_type="image/png",
         local_dir=app_data_root() / "cards",
         local_url_prefix="/media/cards",
     )
+
+
+def watermark_and_reupload(image_url: str, *, card_id: str | None = None) -> str:
+    """
+    Download a card image, apply the watermark, and upload a new final PNG to storage.
+    Returns the new public URL.
+    """
+    return finalize_card_image(image_url, card_id=card_id, edition_number=1, print_run=1)

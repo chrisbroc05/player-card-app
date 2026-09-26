@@ -34,27 +34,35 @@ const LOADING_FUN_FACTS = [
   "Black Label: 0.1% pull rate",
 ];
 
-function LoadingFunFacts() {
+const PAID_MULTI_PREVIEW_BLURBS = [
+  "Generating 3 unique versions...",
+  "Our AI is cooking up your options...",
+  "Almost ready to pick your favorite...",
+  "3 versions incoming...",
+];
+
+function LoadingFunFacts({ messages = LOADING_FUN_FACTS }) {
   const [index, setIndex] = useState(0);
   const [visible, setVisible] = useState(true);
+  const pool = messages.length ? messages : LOADING_FUN_FACTS;
 
   useEffect(() => {
     const interval = window.setInterval(() => {
       setVisible(false);
       window.setTimeout(() => {
-        setIndex((prev) => (prev + 1) % LOADING_FUN_FACTS.length);
+        setIndex((prev) => (prev + 1) % pool.length);
         setVisible(true);
       }, 280);
     }, 3000);
     return () => window.clearInterval(interval);
-  }, []);
+  }, [pool.length]);
 
   return (
     <p
       className={`loading-blurb cce-fun-fact${visible ? " cce-fun-fact--visible" : ""}`}
       aria-live="polite"
     >
-      {LOADING_FUN_FACTS[index]}
+      {pool[index]}
     </p>
   );
 }
@@ -144,7 +152,11 @@ function ForgeExperience({
   elapsedMs,
   generationComplete,
   templateName = "",
+  multiPreviewMode = false,
 }) {
+  const funFactMessages = multiPreviewMode
+    ? [...PAID_MULTI_PREVIEW_BLURBS, ...LOADING_FUN_FACTS]
+    : LOADING_FUN_FACTS;
   const theme = themeDisplayName(themeLabel);
   const phaseTexts = FORGE_PHASE_TEXT(theme, tierConfig.label);
   const rareLoadingHint = forgeLoadingMessage(rarity, elapsedMs, generationComplete);
@@ -232,7 +244,7 @@ function ForgeExperience({
       <ExperienceText text={displayText} visible={textVisible} />
       <div className="cce-loading-meta">
         <p className="cce-loading-tier-theme">{tierThemeLine}</p>
-        <LoadingFunFacts />
+        <LoadingFunFacts messages={funFactMessages} />
       </div>
     </>
   );
@@ -700,6 +712,7 @@ export default function CardCreationExperience({
   fullscreen = false,
   hint = "This usually takes 30–60 seconds. Please keep this page open.",
   extraWaitHint = "",
+  multiPreviewMode = false,
 }) {
   const tierConfig = normalizeExperienceTier(tier);
   const cssVars = tierCssVars(tierConfig);
@@ -858,6 +871,7 @@ export default function CardCreationExperience({
               elapsedMs={elapsedMs}
               generationComplete={revealReady}
               templateName={card?.template_name || ""}
+              multiPreviewMode={multiPreviewMode}
             />
           ) : null}
           {cardType === "highlight" ? (

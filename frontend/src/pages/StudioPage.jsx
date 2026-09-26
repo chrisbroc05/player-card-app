@@ -29,6 +29,7 @@ import AnimateCardConfirmModal from "../components/AnimateCardConfirmModal";
 import AnimatedCardChoiceModal from "../components/AnimatedCardChoiceModal";
 import AnimatedQuantityModal from "../components/AnimatedQuantityModal";
 import GenerationOverlay from "../components/GenerationOverlay";
+import PaidPreviewSelectionPanel from "../components/PaidPreviewSelectionPanel";
 import PreviewSelectionPanel from "../components/PreviewSelectionPanel";
 import ConfirmCardPanel from "../components/ConfirmCardPanel";
 import StartOverConfirmModal, { StartOverButton } from "../components/StartOverConfirmModal";
@@ -354,6 +355,16 @@ export default function StudioPage() {
   const [paidCreationFlowActive, setPaidCreationFlowActive] = useState(initialPaidReturn.active);
   const [paidCreationPolling, setPaidCreationPolling] = useState(initialPaidReturn.active);
   const [paidCreationRevealCard, setPaidCreationRevealCard] = useState(null);
+  const [paidCreationSessionId, setPaidCreationSessionId] = useState(
+    () => initialPaidReturn.sessionId || "",
+  );
+  const [paidCreationPreviews, setPaidCreationPreviews] = useState([]);
+  const [paidCreationPhase, setPaidCreationPhase] = useState(
+    initialPaidReturn.active ? "polling" : "idle",
+  );
+  const [paidCreationSelectingIndex, setPaidCreationSelectingIndex] = useState(null);
+  const [paidCreationRepickLoading, setPaidCreationRepickLoading] = useState(false);
+  const [paidCreationRepickPurchased, setPaidCreationRepickPurchased] = useState(false);
   const [photoStepError, setPhotoStepError] = useState("");
   const [detailsErrors, setDetailsErrors] = useState({});
   const [detailsShowErrors, setDetailsShowErrors] = useState(false);
@@ -1165,6 +1176,25 @@ export default function StudioPage() {
   }, [initialPaidReturn.active, restorePaidCreationContext]);
 
   useEffect(() => {
+    const repickCancelled = searchParams.get("card_creation_repick_cancelled");
+    if (repickCancelled === "true") {
+      setSearchParams({}, { replace: true });
+      setError("Repick payment was cancelled.");
+      return undefined;
+    }
+
+    const repickSuccess = searchParams.get("card_creation_repick_success");
+    const parentSessionId = (searchParams.get("parent_session_id") || "").trim();
+    if (repickSuccess === "true" && parentSessionId) {
+      setSearchParams({}, { replace: true });
+      const authToken =
+        token || (typeof window !== "undefined" ? localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) : "");
+      if (authToken) {
+        beginPaidRepickReturn(parentSessionId, authToken);
+      }
+      return undefined;
+    }
+
     const cancelled = searchParams.get("card_creation_cancelled");
     if (cancelled === "true") {
       setSearchParams({}, { replace: true });
@@ -2191,7 +2221,7 @@ export default function StudioPage() {
   async function pollCardCreationStatus(
     sessionId,
     authToken = token,
-    { maxAttempts = 90, intervalMs = 2000, onStatusUpdate = null } = {},
+    { maxAttempts = 90, intervalMs = 2000, onStatusUpdate = null, awaitSelection = true } = {},
   ) {
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       const res = await fetch(
@@ -2204,6 +2234,14 @@ export default function StudioPage() {
       }
       if (typeof onStatusUpdate === "function") {
         onStatusUpdate(data);
+      }
+      if (
+        awaitSelection &&
+        data.status === "awaiting_selection" &&
+        Array.isArray(data.previews) &&
+        data.previews.length >= 1
+      ) {
+        return data;
       }
       if (data.status === "completed" && data.result_card_id) {
         return data;
@@ -2220,6 +2258,22 @@ export default function StudioPage() {
     );
   }
 
+  function applyPaidCheckoutStatus(data, paidCardFallback) {
+    if (Array.isArray(data.previews) && data.previews.length) {
+      setPaidCreationPreviews(data.previews);
+      const anchor = data.previews[0];
+      setPaidCreationRevealCard((prev) =>
+        mergePaidCreationCardFromStatus(prev, { ...anchor, result_card_id: anchor.card_id }, paidCardFallback),
+      );
+    }
+    setPaidCreationRepickPurchased(Boolean(data.repick_purchased));
+    if (data.status === "awaiting_selection") {
+      setPaidCreationPhase("selecting");
+    } else if (data.status === "completed") {
+      setPaidCreationPhase("revealing");
+    }
+  }
+
   async function beginPaidCreationReturn(sessionId, authToken) {
     restorePaidCreationContext();
     setShowWelcome(false);
@@ -2227,6 +2281,8 @@ export default function StudioPage() {
     setReviewSubPhase("generate");
     setPaidCreationFlowActive(true);
     setPaidCreationPolling(true);
+    setPaidCreationPhase("polling");
+    setPaidCreationSessionId(sessionId);
     setGenerationOverlayOpen(true);
     setPackOpeningActive(true);
     setPreviewCompareOpen(false);
@@ -2236,6 +2292,7 @@ export default function StudioPage() {
     setGeneratedCardUrl("");
     setSavedCardDetail(null);
     setPaidCreationRevealCard(null);
+    setPaidCreationPreviews([]);
     setLatestGeneratedPreview(null);
 
     const paidCardFallback = paidCardFallbackFromPending(readPaidCreationPendingSnapshot(), {
@@ -2247,40 +2304,77 @@ export default function StudioPage() {
     });
 
     try {
-      let statusCard = null;
       const result = await pollCardCreationStatus(sessionId, authToken, {
-        onStatusUpdate: (data) => {
-          if (data.status !== "completed" || !data.result_card_id) return;
-          statusCard = mergePaidCreationCardFromStatus(statusCard, data, paidCardFallback);
-          setPaidCreationRevealCard(statusCard);
-          if (statusCard.image_url) {
-            setGeneratedCardUrl(statusCard.image_url);
-          }
-          if (statusCard.tier) {
-            setGeneratedTier(statusCard.tier);
-          }
-          setPreviewPollCardId(statusCard.card_id || "");
-        },
+        onStatusUpdate: (data) => applyPaidCheckoutStatus(data, paidCardFallback),
       });
-      statusCard = mergePaidCreationCardFromStatus(statusCard, result, paidCardFallback);
-      setPaidCreationRevealCard(statusCard);
-      if (statusCard?.image_url) {
-        setGeneratedCardUrl(statusCard.image_url);
-      }
-      if (statusCard?.tier) {
-        setGeneratedTier(statusCard.tier);
-      }
-      if (statusCard?.card_id) {
-        setPreviewPollCardId(statusCard.card_id);
+      applyPaidCheckoutStatus(result, paidCardFallback);
+
+      if (result.status === "awaiting_selection") {
+        return;
       }
 
-      const detail = await fetchCardDetailById(result.result_card_id, authToken);
-      const mergedCard = { ...(statusCard || {}), ...detail };
-      setPaidCreationRevealCard(mergedCard);
-      setSavedCardDetail(mergedCard);
-      setGeneratedCardUrl(mergedCard.image_url || "");
-      setGeneratedTier(mergedCard.tier || "base");
-      setPreviewPollCardId(mergedCard.card_id || "");
+      if (result.status === "completed" && result.result_card_id) {
+        const detail = await fetchCardDetailById(result.result_card_id, authToken);
+        setPaidCreationRevealCard(detail);
+        setSavedCardDetail(detail);
+        setGeneratedCardUrl(detail.image_url || "");
+        setGeneratedTier(detail.tier || "base");
+        setPreviewPollCardId(detail.card_id || "");
+        setPaidCreationPhase("revealing");
+        await Promise.all([fetchMyCards(), fetchOrders(), refreshUser(authToken)]);
+        invalidateCollectionCache();
+        try {
+          sessionStorage.removeItem(PAID_CREATION_PENDING_KEY);
+        } catch {
+          /* ignore storage errors */
+        }
+      }
+    } catch (err) {
+      setError(err.message || "Could not complete card creation.");
+      setGenerationOverlayOpen(false);
+      setPackOpeningActive(false);
+      setPaidCreationFlowActive(false);
+      setPaidCreationRevealCard(null);
+      setPaidCreationPhase("idle");
+      setReviewSubPhase("setup");
+    } finally {
+      setPaidCreationPolling(false);
+    }
+  }
+
+  async function handlePaidPreviewSelect(previewIndex) {
+    const authToken =
+      token || (typeof window !== "undefined" ? localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) : "");
+    if (!paidCreationSessionId || !authToken) return;
+
+    setPaidCreationSelectingIndex(previewIndex);
+    setError("");
+    try {
+      const res = await fetch(`${API_BASE_URL}/cards/creation-checkout/select-preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders(authToken) },
+        body: JSON.stringify({
+          session_id: paidCreationSessionId,
+          preview_index: previewIndex,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(formatApiError(data?.detail, "Could not lock in your preview."));
+      }
+
+      const chosen =
+        (data.previews || paidCreationPreviews).find((p) => Number(p.index) === Number(previewIndex)) ||
+        null;
+      const cardId = data.result_card_id || chosen?.card_id;
+      const detail = cardId ? await fetchCardDetailById(cardId, authToken) : chosen;
+      setPaidCreationRevealCard(detail);
+      setSavedCardDetail(detail);
+      setGeneratedCardUrl(detail?.image_url || chosen?.image_url || "");
+      setGeneratedTier(detail?.tier || chosen?.tier || "base");
+      setPreviewPollCardId(detail?.card_id || cardId || "");
+      setPaidCreationPhase("revealing");
+      setPackOpeningActive(true);
       await Promise.all([fetchMyCards(), fetchOrders(), refreshUser(authToken)]);
       invalidateCollectionCache();
       try {
@@ -2289,12 +2383,75 @@ export default function StudioPage() {
         /* ignore storage errors */
       }
     } catch (err) {
-      setError(err.message || "Could not complete card creation.");
-      setGenerationOverlayOpen(false);
-      setPackOpeningActive(false);
-      setPaidCreationFlowActive(false);
-      setPaidCreationRevealCard(null);
-      setReviewSubPhase("setup");
+      setError(err.message || "Could not lock in your preview.");
+    } finally {
+      setPaidCreationSelectingIndex(null);
+    }
+  }
+
+  async function handlePaidCreationRepick() {
+    const authToken =
+      token || (typeof window !== "undefined" ? localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) : "");
+    if (!paidCreationSessionId || !authToken || paidCreationRepickPurchased) return;
+
+    setPaidCreationRepickLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`${API_BASE_URL}/cards/creation-checkout/repick`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders(authToken) },
+        body: JSON.stringify({ session_id: paidCreationSessionId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(formatApiError(data?.detail, "Could not start repick checkout."));
+      }
+      try {
+        sessionStorage.setItem(
+          PAID_CREATION_PENDING_KEY,
+          JSON.stringify({
+            ...(readPaidCreationPendingSnapshot() || {}),
+            paidSessionId: paidCreationSessionId,
+          }),
+        );
+      } catch {
+        /* ignore storage errors */
+      }
+      window.location.href = data.checkout_url;
+    } catch (err) {
+      setError(err.message || "Could not start repick checkout.");
+      setPaidCreationRepickLoading(false);
+    }
+  }
+
+  async function beginPaidRepickReturn(parentSessionId, authToken) {
+    setPaidCreationFlowActive(true);
+    setPaidCreationPolling(true);
+    setPaidCreationPhase("polling");
+    setPaidCreationSessionId(parentSessionId);
+    setGenerationOverlayOpen(true);
+    setPackOpeningActive(true);
+    setError("");
+
+    const paidCardFallback = paidCardFallbackFromPending(readPaidCreationPendingSnapshot(), {
+      playerDisplayName,
+      teamName,
+      orderTier,
+      specialTheme,
+      isHighlightCardType,
+    });
+    const priorCount = paidCreationPreviews.length;
+
+    try {
+      const result = await pollCardCreationStatus(parentSessionId, authToken, {
+        onStatusUpdate: (data) => applyPaidCheckoutStatus(data, paidCardFallback),
+      });
+      applyPaidCheckoutStatus(result, paidCardFallback);
+      if ((result.previews || []).length <= priorCount && result.status === "awaiting_selection") {
+        /* repick webhook may still be running — one more short poll cycle handled above */
+      }
+    } catch (err) {
+      setError(err.message || "Could not load your extra preview.");
     } finally {
       setPaidCreationPolling(false);
     }
@@ -3755,18 +3912,48 @@ export default function StudioPage() {
           generationOverlayOpen &&
           (reviewSubPhase === "generate" || paidCreationFlowActive)
         }
-        view={!paidCreationFlowActive && previewCompareOpen ? "compare" : "experience"}
+        view={
+          paidCreationFlowActive && paidCreationPhase === "selecting"
+            ? "paid-select"
+            : !paidCreationFlowActive && previewCompareOpen
+              ? "compare"
+              : "experience"
+        }
         showCloseButton={!paidCreationFlowActive}
         onCloseRequest={() => setShowStartOverConfirm(true)}
+        paidSelectProps={{
+          previews: paidCreationPreviews,
+          selectingIndex: paidCreationSelectingIndex,
+          onSelectPreview: (previewIndex) => handlePaidPreviewSelect(previewIndex),
+          onRepick: handlePaidCreationRepick,
+          repickLoading: paidCreationRepickLoading,
+          repickPurchased: paidCreationRepickPurchased,
+          repickPrice: 1,
+          previewToDisplayCard: (preview) => ({
+            ...preview,
+            player_name: preview.player_name || playerDisplayName,
+            team_name: preview.team_name || teamName,
+            tier: preview.tier || orderTier || generatedTier,
+            theme: preview.special_theme || specialTheme,
+            special_theme: preview.special_theme || specialTheme,
+          }),
+          playerDisplayName,
+          teamName,
+          orderTier,
+          specialTheme,
+        }}
         cardCreationProps={{
-          active: packOpeningActive,
+          active: packOpeningActive && paidCreationPhase !== "selecting",
+          multiPreviewMode: paidCreationFlowActive && paidCreationPhase === "polling",
           cardType: isHighlightCardType ? "highlight" : isAnimatedCardType ? "animated" : "standard",
           tier: orderTier,
           theme: specialTheme ? selectedThemeLabel : "Default (no theme)",
           playerName: playerDisplayName,
           teamName: teamName,
           generationComplete: paidCreationFlowActive
-            ? !paidCreationPolling &&
+            ? paidCreationPhase === "revealing" &&
+              !paidCreationPolling &&
+              !paidCreationSelectingIndex &&
               Boolean(paidCreationDisplayCard?.image_url) &&
               Boolean(paidCreationDisplayCard?.rarity)
             : !isGenerating && Boolean(generatedCardUrl || selectedPreviewUrl),

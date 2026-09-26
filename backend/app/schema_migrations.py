@@ -866,6 +866,50 @@ def run_connect_marketplace_migrations(engine: Engine) -> None:
                             "BOOLEAN NOT NULL DEFAULT 0"
                         )
                     )
+            if "preview_urls" not in cc_cols:
+                logger.info("Migration: adding card_creation_checkouts.preview_urls")
+                if dialect == "postgresql":
+                    conn.execute(
+                        text(
+                            "ALTER TABLE card_creation_checkouts ADD COLUMN IF NOT EXISTS "
+                            "preview_urls JSON"
+                        )
+                    )
+                else:
+                    conn.execute(
+                        text("ALTER TABLE card_creation_checkouts ADD COLUMN preview_urls JSON")
+                    )
+            if "chosen_preview_index" not in cc_cols:
+                logger.info("Migration: adding card_creation_checkouts.chosen_preview_index")
+                if dialect == "postgresql":
+                    conn.execute(
+                        text(
+                            "ALTER TABLE card_creation_checkouts ADD COLUMN IF NOT EXISTS "
+                            "chosen_preview_index INTEGER"
+                        )
+                    )
+                else:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE card_creation_checkouts ADD COLUMN chosen_preview_index INTEGER"
+                        )
+                    )
+            if "repick_purchased" not in cc_cols:
+                logger.info("Migration: adding card_creation_checkouts.repick_purchased")
+                if dialect == "postgresql":
+                    conn.execute(
+                        text(
+                            "ALTER TABLE card_creation_checkouts ADD COLUMN IF NOT EXISTS "
+                            "repick_purchased BOOLEAN NOT NULL DEFAULT false"
+                        )
+                    )
+                else:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE card_creation_checkouts ADD COLUMN repick_purchased "
+                            "BOOLEAN NOT NULL DEFAULT 0"
+                        )
+                    )
 
         table_names = set(insp.get_table_names())
         if "card_creation_checkouts" not in table_names:

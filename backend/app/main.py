@@ -329,6 +329,7 @@ def _tier_player_portrait_prompt(
     caption: str | None = None,
     vault_tier: str | None = None,
     rarity_template: int | None = None,
+    art_style_suffix: str | None = None,
 ) -> str:
     """
     Portrait-only prompt — UI renders card frame, banner, and tier styling.
@@ -354,6 +355,7 @@ def _tier_player_portrait_prompt(
         else ""
     )
     caption_line = f" Subject details: {caption}. " if caption and variant == "text_generate" else ""
+    art_line = f"{art_style_suffix.strip()}. " if art_style_suffix and art_style_suffix.strip() else ""
 
     return (
         f"{_STYLE_ANCHOR} "
@@ -363,6 +365,7 @@ def _tier_player_portrait_prompt(
         "Professional youth baseball player portrait, centered, head and upper body fully visible, "
         "stadium or sports background, dramatic sports photography lighting, "
         f"{tier_style}, {theme_aesthetic}"
+        f"{art_line}"
         "photorealistic, no text, no overlays, no borders, no card frame, no typography, no nameplates. "
         "Clean portrait suitable for placement inside a trading card template."
     )
@@ -548,12 +551,19 @@ def _generate_order_card_internal(
     user_id: int,
     order: dict,
     skip_credit_billing: bool = False,
+    skip_preview_limit: bool = False,
+    art_style_suffix: str | None = None,
+    pulled_rarity: str | None = None,
+    pulled_template: int | None = None,
+    preview_style_key: str | None = None,
+    preview_style_label: str | None = None,
+    preview_style_index: int | None = None,
 ) -> GeneratedOrderCard:
     """Generate one preview card for an in-memory order (shared by HTTP and webhook fulfillment)."""
     order_id = int(order["id"])
     preview_count = int(order.get("preview_count", 0))
     preview_limit = int(order.get("preview_limit", _preview_limit_for_tier(order.get("tier", "rookie"))))
-    if preview_count >= preview_limit:
+    if not skip_preview_limit and preview_count >= preview_limit:
         raise HTTPException(status_code=400, detail="Preview limit reached")
 
     order_tier = str(order.get("tier", "rookie"))
@@ -598,14 +608,15 @@ def _generate_order_card_internal(
     card_tier = _order_tier_to_card_tier(order["tier"])
     vault_tier_val = _vault_tier_from_order_tier(str(order.get("tier", "rookie")))
     face_photo_raw = (order.get("face_photo_url") or "").strip() or None
-    new_card_id = next_collectible_card_id(db)
-    pulled_rarity, pulled_template = resolve_rarity_pull(
-        db,
-        card_id=new_card_id,
-        player_name=player_label,
-        tier=vault_tier_val,
-        logger=logger,
-    )
+    rarity_pull_id = next_collectible_card_id(db)
+    if pulled_rarity is None or pulled_template is None:
+        pulled_rarity, pulled_template = resolve_rarity_pull(
+            db,
+            card_id=rarity_pull_id,
+            player_name=player_label,
+            tier=vault_tier_val,
+            logger=logger,
+        )
 
     if card_type == "highlight":
         result = _generate_highlight_placeholder(
@@ -636,6 +647,7 @@ def _generate_order_card_internal(
                     vault_tier=vault_tier_val,
                     rarity_template=pulled_template,
                     apply_watermark=False,
+                    art_style_suffix=art_style_suffix,
                 )
             except Exception as exc:
                 logger.exception(
@@ -714,6 +726,9 @@ def _generate_order_card_internal(
         rarity_template=int(vault_rec.get("rarity_template") or 1),
         rarity_display_name=vault_rec.get("rarity_display_name") or "Base",
         template_name=vault_rec.get("template_name") or "Classic",
+        preview_style_key=preview_style_key,
+        preview_style_label=preview_style_label,
+        preview_style_index=preview_style_index,
     )
     order.setdefault("generated_cards", []).append(generated.model_dump())
     order["preview_count"] = preview_count + 1
@@ -785,68 +800,190 @@ def _start_paid_card_animation(db: Session, card_id: str, order: dict) -> None:
     thread.start()
 
 
-def fulfill_paid_card_creation(
-    db: Session,
-    *,
-    user_id: int,
-    order_snapshot: dict,
-    copy_quantity: int,
-    stripe_session_id: str,
-    amount_dollars: Decimal | float,
-    tier: str,
-    card_type: str = "static",
-    animated: bool = False,
-) -> str:
-    """
-    Generate, finalize, and mint copies after Stripe card-creation payment.
-    Returns the primary card_id added to the user's collection.
-    """
+def _paid_order_from_snapshot(order_snapshot: dict, card_type: str, animated: bool) -> dict:
     from card_pricing import normalize_card_type
-    from utils.usage import check_generation_cap
-
-    allowed, cap_message = check_generation_cap(db, user_id)
-    if not allowed:
-        raise ValueError(cap_message or "Generation limit reached")
 
     ct = normalize_card_type(card_type)
     if ct == "highlight":
         animated = False
     elif ct == "animated":
         animated = True
-
     order = dict(order_snapshot)
-    if ct == "highlight":
-        order["card_type"] = "highlight"
-    else:
-        order["card_type"] = "standard"
+    order["card_type"] = "highlight" if ct == "highlight" else "standard"
+    order["checkout_card_type"] = ct
+    order["checkout_animated"] = bool(animated or ct == "animated")
+    order.setdefault("generated_cards", [])
+    order["preview_count"] = 0
+    order["preview_limit"] = 99
+    return order, ct, animated
+
+
+def _preview_payload_from_generated(generated: GeneratedOrderCard) -> dict:
+    return {
+        "index": generated.preview_style_index,
+        "style_key": generated.preview_style_key,
+        "style_label": generated.preview_style_label,
+        "card_id": generated.card_id,
+        "image_url": generated.image_url,
+        "tier": generated.tier,
+        "player_name": generated.player_name,
+        "team_name": generated.team_name,
+        "rarity": generated.rarity,
+        "rarity_template": generated.rarity_template,
+        "rarity_display_name": generated.rarity_display_name,
+        "template_name": generated.template_name,
+        "special_theme": generated.special_theme,
+    }
+
+
+def generate_paid_card_previews(
+    db: Session,
+    *,
+    user_id: int,
+    order_snapshot: dict,
+    tier: str,
+    card_type: str = "static",
+    animated: bool = False,
+) -> list[dict]:
+    """Generate 3 paid preview variations (shared rarity) for user selection."""
+    from card_pricing import normalize_card_type
+    from preview_styles import PREVIEW_ART_STYLES
+    from utils.usage import check_generation_cap
+
+    allowed, cap_message = check_generation_cap(db, user_id)
+    if not allowed:
+        raise ValueError(cap_message or "Generation limit reached")
+
+    order, ct, animated = _paid_order_from_snapshot(order_snapshot, card_type, animated)
     _upsert_in_memory_order(order, db=db, user_id=user_id)
+
+    player_label = _player_display_name(
+        {
+            "first_name": order.get("player_first_name", ""),
+            "last_name": order.get("player_last_name", ""),
+            "display_name": order.get("player_display_name"),
+        }
+    )
+    vault_tier_val = _vault_tier_from_order_tier(str(order.get("tier", "rookie")))
+    rarity_pull_id = next_collectible_card_id(db)
+    pulled_rarity, pulled_template = resolve_rarity_pull(
+        db,
+        card_id=rarity_pull_id,
+        player_name=player_label,
+        tier=vault_tier_val,
+        logger=logger,
+    )
+
+    def _generate_style(style: dict) -> GeneratedOrderCard:
+        return _generate_order_card_internal(
+            db,
+            user_id=user_id,
+            order=order,
+            skip_credit_billing=True,
+            skip_preview_limit=True,
+            art_style_suffix=style["suffix"],
+            pulled_rarity=pulled_rarity,
+            pulled_template=pulled_template,
+            preview_style_key=style["key"],
+            preview_style_label=style["label"],
+            preview_style_index=int(style["index"]),
+        )
+
+    generated_cards: list[GeneratedOrderCard] = []
+    for style in PREVIEW_ART_STYLES:
+        generated_cards.append(_generate_style(style))
+    order["preview_count"] = len(generated_cards)
+    _upsert_in_memory_order(order, db=db, user_id=user_id)
+    return [_preview_payload_from_generated(g) for g in generated_cards]
+
+
+def generate_paid_repick_preview(
+    db: Session,
+    *,
+    user_id: int,
+    order_snapshot: dict,
+    existing_previews: list[dict],
+    tier: str,
+    card_type: str = "static",
+    animated: bool = False,
+) -> dict:
+    """Generate one additional preview after $1 repick (random unused style when possible)."""
+    from preview_styles import random_repick_style
+
+    order, _ct, _animated = _paid_order_from_snapshot(order_snapshot, card_type, animated)
+    order["generated_cards"] = []
+    for preview in existing_previews:
+        if preview.get("card_id"):
+            order["generated_cards"].append({"card_id": preview.get("card_id")})
+    order["preview_count"] = len(existing_previews)
+    _upsert_in_memory_order(order, db=db, user_id=user_id)
+
+    anchor = existing_previews[0] if existing_previews else {}
+    pulled_rarity = anchor.get("rarity") or "standard"
+    pulled_template = int(anchor.get("rarity_template") or 1)
+    used_keys = {str(p.get("style_key") or "") for p in existing_previews if p.get("style_key")}
+    style = random_repick_style(used_keys)
+    style = {**style, "index": len(existing_previews)}
 
     generated = _generate_order_card_internal(
         db,
         user_id=user_id,
         order=order,
         skip_credit_billing=True,
+        skip_preview_limit=True,
+        art_style_suffix=style["suffix"],
+        pulled_rarity=pulled_rarity,
+        pulled_template=pulled_template,
+        preview_style_key=style["key"],
+        preview_style_label=style["label"],
+        preview_style_index=int(style["index"]),
     )
-    final_url = generated.image_url
-    card_id = generated.card_id
-    order["final_card_url"] = final_url
-    order["delivered_at"] = datetime.now(timezone.utc).isoformat()
-    order["status"] = "delivered"
+    order["preview_count"] = len(existing_previews) + 1
+    _upsert_in_memory_order(order, db=db, user_id=user_id)
+    return _preview_payload_from_generated(generated)
 
-    generated_cards = order.get("generated_cards", [])
-    card_ids = [str(g.get("card_id") or "") for g in generated_cards if g.get("card_id")]
-    selected_id, watermarked_url = finalize_order_preview(
-        db,
-        owner_id=user_id,
-        final_image_url=final_url,
-        generated_card_ids=card_ids,
-    )
-    if watermarked_url:
-        order["final_card_url"] = watermarked_url
-        card_id = selected_id or card_id
+
+def finalize_paid_card_selection(
+    db: Session,
+    *,
+    user_id: int,
+    order_snapshot: dict,
+    preview_index: int,
+    copy_quantity: int,
+    stripe_session_id: str,
+    amount_dollars: Decimal | float,
+    tier: str,
+    card_type: str = "static",
+    animated: bool = False,
+    preview_card_id: str,
+    generated_card_ids: list[str],
+    final_image_url: str,
+) -> str:
+    """Finalize chosen preview, mint copies with edition treatment, and queue extras."""
+    from card_pricing import normalize_card_type
+
+    order, ct, animated = _paid_order_from_snapshot(order_snapshot, card_type, animated)
     _upsert_in_memory_order(order, db=db, user_id=user_id)
 
     qty = max(1, int(copy_quantity))
+    raw_portrait_url = final_image_url
+    preview_orm = get_card_by_card_id(db, preview_card_id)
+    if preview_orm and (preview_orm.image_url or "").strip():
+        raw_portrait_url = preview_orm.image_url
+
+    selected_id, watermarked_url = finalize_order_preview(
+        db,
+        owner_id=user_id,
+        final_image_url=raw_portrait_url,
+        generated_card_ids=generated_card_ids,
+        print_run=qty,
+    )
+    card_id = selected_id or preview_card_id
+    order["final_card_url"] = watermarked_url or raw_portrait_url
+    order["delivered_at"] = datetime.now(timezone.utc).isoformat()
+    order["status"] = "delivered"
+    _upsert_in_memory_order(order, db=db, user_id=user_id)
+
     if qty > 1:
         orm = get_card_by_card_id(db, card_id)
         if orm is None:
@@ -857,7 +994,12 @@ def fulfill_paid_card_creation(
             anchor=orm,
             target_quantity=qty,
         )
-        expand_print_run_for_owner_image(db, template=orm, target_quantity=qty)
+        expand_print_run_for_owner_image(
+            db,
+            template=orm,
+            target_quantity=qty,
+            source_portrait_url=raw_portrait_url,
+        )
 
     staging = order.get("highlight_staging")
     if ct == "highlight":
@@ -888,6 +1030,32 @@ def fulfill_paid_card_creation(
     )
     db.flush()
     return card_id
+
+
+def fulfill_paid_card_creation(
+    db: Session,
+    *,
+    user_id: int,
+    order_snapshot: dict,
+    copy_quantity: int,
+    stripe_session_id: str,
+    amount_dollars: Decimal | float,
+    tier: str,
+    card_type: str = "static",
+    animated: bool = False,
+) -> list[dict]:
+    """Generate paid preview variations after Stripe payment (selection happens later)."""
+    _ = copy_quantity
+    _ = stripe_session_id
+    _ = amount_dollars
+    return generate_paid_card_previews(
+        db,
+        user_id=user_id,
+        order_snapshot=order_snapshot,
+        tier=tier,
+        card_type=card_type,
+        animated=animated,
+    )
 
 
 def _order_tier_to_card_tier(order_tier: str) -> CardTier:
@@ -1127,6 +1295,7 @@ def _gpt_image_portrait_edit_bytes(
     face_path: Path | None = None,
     vault_tier: str | None = None,
     rarity_template: int | None = None,
+    art_style_suffix: str | None = None,
 ) -> bytes:
     """Portrait-only edit from the uploaded player photo — no card template."""
     player_f = _bytesio_image_file_for_edit(player_path, "player")
@@ -1136,6 +1305,7 @@ def _gpt_image_portrait_edit_bytes(
         special_theme=special_theme,
         vault_tier=vault_tier,
         rarity_template=rarity_template,
+        art_style_suffix=art_style_suffix,
     )
     image_inputs = [player_f]
     if face_path is not None:
@@ -1603,6 +1773,7 @@ def _generate_card_openai(
     vault_tier: str | None = None,
     rarity_template: int | None = None,
     apply_watermark: bool = True,
+    art_style_suffix: str | None = None,
 ) -> dict:
     """
     1) Prefer GPT Image edit on the player photo only (portrait — UI renders card chrome).
@@ -1635,6 +1806,7 @@ def _generate_card_openai(
                 face_path=face_source_path,
                 vault_tier=vault_tier,
                 rarity_template=rarity_template,
+                art_style_suffix=art_style_suffix,
             )
             logger.info("Card generation succeeded via gpt-image model=%s player_id=%s", model, player_id)
             break
@@ -1974,6 +2146,9 @@ class GeneratedOrderCard(BaseModel):
     rarity_template: int = Field(default=1, ge=1, le=5)
     rarity_display_name: str = Field(default="Base")
     template_name: str = Field(default="Classic")
+    preview_style_key: str | None = None
+    preview_style_label: str | None = None
+    preview_style_index: int | None = None
 
 
 class Order(OrderCreate):

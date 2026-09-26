@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import threading
 from decimal import Decimal
 
 from fastapi import HTTPException
@@ -13,7 +12,8 @@ from card_pricing import card_creation_quote, normalize_card_type, normalize_ord
 from card_repo import card_to_dict, get_card_by_card_id
 from models import CardCreationCheckout, User, utcnow
 from payments_config import require_payments_enabled
-from stripe_checkout import create_card_creation_checkout_session
+from preview_styles import CARD_CREATION_REPICK_PRICE
+from stripe_checkout import create_card_creation_checkout_session, create_card_creation_repick_session
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,11 @@ def _validate_copy_quantity(qty: int) -> int:
     if q < COPY_QTY_MIN or q > COPY_QTY_MAX:
         raise ValueError(f"Copy quantity must be between {COPY_QTY_MIN} and {COPY_QTY_MAX}.")
     return q
+
+
+def _preview_list(row: CardCreationCheckout) -> list[dict]:
+    previews = row.preview_urls if isinstance(row.preview_urls, list) else []
+    return [p for p in previews if isinstance(p, dict)]
 
 
 def begin_card_creation_checkout(
@@ -154,6 +159,7 @@ def get_card_creation_checkout_status(
     )
     if row is None:
         return {"status": "not_found"}
+    previews = _preview_list(row)
     payload = {
         "status": row.status,
         "checkout_id": row.id,
@@ -164,10 +170,21 @@ def get_card_creation_checkout_status(
         "animated": row.animated,
         "amount_dollars": float(row.amount_dollars),
         "result_card_id": row.result_card_id,
+        "chosen_preview_index": row.chosen_preview_index,
+        "repick_purchased": bool(row.repick_purchased),
+        "previews": previews,
+        "preview_count": len(previews),
         "error_message": row.error_message,
     }
-    if row.result_card_id and row.status in ("completed", "processing"):
+    if row.result_card_id and row.status == "completed":
         payload.update(_card_creation_result_fields(db, row.result_card_id))
+    elif previews and row.status == "awaiting_selection":
+        anchor = previews[0]
+        payload.setdefault("rarity", anchor.get("rarity") or "standard")
+        payload.setdefault("rarity_template", anchor.get("rarity_template") or 1)
+        payload.setdefault("rarity_display_name", anchor.get("rarity_display_name") or "Base")
+        payload.setdefault("player_name", anchor.get("player_name") or "")
+        payload.setdefault("team_name", anchor.get("team_name") or "")
     return payload
 
 
@@ -181,8 +198,6 @@ def fulfill_card_creation_from_webhook(db: Session, session: dict) -> None:
     card_type = normalize_card_type(metadata.get("card_type"))
     animated_raw = (metadata.get("animated") or "false").strip().lower()
     animated = card_type == "animated" or animated_raw in ("true", "1", "yes")
-    copy_quantity = int(metadata.get("copy_quantity") or 1)
-    amount = Decimal(str(metadata.get("amount_dollars") or "0"))
 
     row = None
     if checkout_id:
@@ -196,8 +211,12 @@ def fulfill_card_creation_from_webhook(db: Session, session: dict) -> None:
     if row is None:
         raise ValueError(f"Card creation checkout not found for session {session_id}")
 
-    if row.status == "completed":
-        logger.info("Card creation checkout %s already completed", row.id)
+    if row.status in ("completed", "awaiting_selection"):
+        logger.info("Card creation checkout %s already fulfilled (%s)", row.id, row.status)
+        return
+    if row.preview_urls and len(_preview_list(row)) >= 1:
+        row.status = "awaiting_selection"
+        logger.info("Card creation checkout %s previews already present", row.id)
         return
 
     if row.user_id != user_id:
@@ -209,30 +228,24 @@ def fulfill_card_creation_from_webhook(db: Session, session: dict) -> None:
     db.flush()
 
     try:
-        from main import fulfill_paid_card_creation
+        from main import generate_paid_card_previews
 
-        card_id = fulfill_paid_card_creation(
+        previews = generate_paid_card_previews(
             db,
             user_id=user_id,
             order_snapshot=row.order_snapshot,
-            copy_quantity=copy_quantity or row.copy_quantity,
-            stripe_session_id=session_id,
-            amount_dollars=amount or row.amount_dollars,
             tier=tier or row.tier,
             card_type=card_type or row.card_type,
             animated=animated or row.animated,
         )
-        row.result_card_id = card_id
-        row.status = "completed"
+        row.preview_urls = previews
+        row.status = "awaiting_selection"
         row.error_message = None
         logger.info(
-            "Card creation fulfilled checkout=%s user=%s card=%s type=%s animated=%s copies=%s",
+            "Card creation previews ready checkout=%s user=%s previews=%s",
             row.id,
             user_id,
-            card_id,
-            card_type or row.card_type,
-            animated or row.animated,
-            copy_quantity or row.copy_quantity,
+            len(previews),
         )
     except Exception as exc:
         logger.exception("Card creation fulfillment failed for checkout %s", row.id)
@@ -241,3 +254,185 @@ def fulfill_card_creation_from_webhook(db: Session, session: dict) -> None:
         raise
     finally:
         row.updated_at = utcnow()
+
+
+def fulfill_card_creation_repick_from_webhook(db: Session, session: dict) -> None:
+    metadata = session.get("metadata") or {}
+    session_id = (session.get("id") or "").strip()
+    parent_session_id = (metadata.get("parent_session_id") or "").strip()
+    user_id = int(metadata.get("user_id") or 0)
+    checkout_id = int(metadata.get("checkout_id") or 0)
+
+    row = None
+    if checkout_id:
+        row = db.query(CardCreationCheckout).filter(CardCreationCheckout.id == checkout_id).first()
+    if row is None and parent_session_id:
+        row = (
+            db.query(CardCreationCheckout)
+            .filter(
+                CardCreationCheckout.stripe_session_id == parent_session_id,
+                CardCreationCheckout.user_id == user_id,
+            )
+            .first()
+        )
+    if row is None:
+        raise ValueError(f"Repick parent checkout not found for session {parent_session_id}")
+
+    if row.repick_purchased:
+        logger.info("Repick already purchased for checkout %s", row.id)
+        return
+
+    row.repick_purchased = True
+    row.status = "processing"
+    row.updated_at = utcnow()
+    db.flush()
+
+    try:
+        from main import generate_paid_repick_preview
+
+        existing = _preview_list(row)
+        extra = generate_paid_repick_preview(
+            db,
+            user_id=user_id,
+            order_snapshot=row.order_snapshot,
+            existing_previews=existing,
+            tier=row.tier,
+            card_type=row.card_type,
+            animated=row.animated,
+        )
+        row.preview_urls = [*existing, extra]
+        row.status = "awaiting_selection"
+        row.error_message = None
+        record_repick_revenue(db, session_id=session_id, user_id=user_id)
+    except Exception as exc:
+        row.repick_purchased = False
+        row.status = "awaiting_selection"
+        row.error_message = str(exc)[:500]
+        raise
+    finally:
+        row.updated_at = utcnow()
+
+
+def record_repick_revenue(db: Session, *, session_id: str, user_id: int) -> None:
+    from marketplace_service import record_platform_revenue
+
+    amt = Decimal(str(CARD_CREATION_REPICK_PRICE)).quantize(Decimal("0.01"))
+    record_platform_revenue(
+        db,
+        amount=amt,
+        source="card_creation_repick",
+        reference_id=session_id,
+        note=f"Card creation repick — user {user_id}",
+    )
+
+
+def select_card_creation_preview(
+    db: Session,
+    *,
+    user_id: int,
+    session_id: str,
+    preview_index: int,
+) -> dict:
+    sid = (session_id or "").strip()
+    row = (
+        db.query(CardCreationCheckout)
+        .filter(
+            CardCreationCheckout.stripe_session_id == sid,
+            CardCreationCheckout.user_id == user_id,
+        )
+        .first()
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Checkout session not found")
+    if row.status not in ("awaiting_selection", "processing"):
+        raise HTTPException(status_code=400, detail="Checkout is not awaiting preview selection")
+
+    previews = _preview_list(row)
+    chosen = next((p for p in previews if int(p.get("index", -1)) == int(preview_index)), None)
+    if chosen is None:
+        raise HTTPException(status_code=400, detail="Invalid preview selection")
+
+    preview_card_id = (chosen.get("card_id") or "").strip()
+    if not preview_card_id:
+        raise HTTPException(status_code=400, detail="Selected preview is missing")
+
+    generated_card_ids = [str(p.get("card_id") or "") for p in previews if p.get("card_id")]
+    row.status = "processing"
+    row.chosen_preview_index = int(preview_index)
+    row.updated_at = utcnow()
+    db.flush()
+
+    try:
+        from main import finalize_paid_card_selection
+
+        result_card_id = finalize_paid_card_selection(
+            db,
+            user_id=user_id,
+            order_snapshot=row.order_snapshot,
+            preview_index=int(preview_index),
+            copy_quantity=row.copy_quantity,
+            stripe_session_id=sid,
+            amount_dollars=row.amount_dollars,
+            tier=row.tier,
+            card_type=row.card_type,
+            animated=row.animated,
+            preview_card_id=preview_card_id,
+            generated_card_ids=generated_card_ids,
+            final_image_url=chosen.get("image_url") or "",
+        )
+        row.result_card_id = result_card_id
+        row.status = "completed"
+        row.error_message = None
+    except Exception as exc:
+        row.status = "awaiting_selection"
+        row.chosen_preview_index = None
+        row.error_message = str(exc)[:500]
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    finally:
+        row.updated_at = utcnow()
+        db.commit()
+
+    result = get_card_creation_checkout_status(db, user_id=user_id, session_id=sid)
+    return result
+
+
+def begin_card_creation_repick_checkout(
+    db: Session,
+    *,
+    user: User,
+    session_id: str,
+) -> dict:
+    require_payments_enabled()
+    sid = (session_id or "").strip()
+    row = (
+        db.query(CardCreationCheckout)
+        .filter(
+            CardCreationCheckout.stripe_session_id == sid,
+            CardCreationCheckout.user_id == user.id,
+        )
+        .first()
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Checkout session not found")
+    if row.status != "awaiting_selection":
+        raise HTTPException(status_code=400, detail="Previews are not ready for repick")
+    if row.repick_purchased:
+        raise HTTPException(status_code=400, detail="Additional preview already purchased")
+
+    amount = Decimal(str(CARD_CREATION_REPICK_PRICE)).quantize(Decimal("0.01"))
+    try:
+        stripe_result = create_card_creation_repick_session(
+            purchaser_user_id=user.id,
+            amount_dollars=amount,
+            parent_session_id=sid,
+            checkout_id=row.id,
+        )
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    return {
+        "checkout_url": stripe_result["checkout_url"],
+        "session_id": stripe_result["session_id"],
+        "amount_dollars": float(amount),
+        "parent_session_id": sid,
+    }

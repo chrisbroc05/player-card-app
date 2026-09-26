@@ -163,3 +163,33 @@ def create_card_creation_checkout_session(
             "order_id": str(order_id),
         },
     )
+
+
+def create_card_creation_repick_session(
+    *,
+    purchaser_user_id: int,
+    amount_dollars: Decimal | float,
+    parent_session_id: str,
+    checkout_id: int,
+) -> dict[str, str]:
+    """Stripe checkout for one additional paid preview ($1)."""
+    amt = Decimal(str(amount_dollars)).quantize(Decimal("0.01"))
+    return _create_checkout_session(
+        purchaser_user_id=purchaser_user_id,
+        recipient_user_id=purchaser_user_id,
+        amount_dollars=amt,
+        fund_type="card_creation_repick",
+        product_name="Prospect Legends — Extra Preview",
+        product_description="Generate one more card preview variation",
+        success_path=(
+            "/studio?card_creation_repick_success=true"
+            f"&parent_session_id={parent_session_id}"
+            "&session_id={CHECKOUT_SESSION_ID}"
+        ),
+        cancel_path=f"/studio?card_creation_repick_cancelled=true&parent_session_id={parent_session_id}",
+        enforce_minimum=False,
+        extra_metadata={
+            "parent_session_id": parent_session_id,
+            "checkout_id": str(checkout_id),
+        },
+    )

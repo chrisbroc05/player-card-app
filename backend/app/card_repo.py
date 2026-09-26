@@ -441,6 +441,7 @@ def finalize_order_preview(
     owner_id: int,
     final_image_url: str,
     generated_card_ids: list[str],
+    print_run: int = 1,
 ) -> tuple[str | None, str | None]:
     """
     Promote the chosen preview to active; mark other order previews discarded.
@@ -472,16 +473,21 @@ def finalize_order_preview(
             card.status = "discarded"
 
     watermarked_url: str | None = None
+    qty = max(1, int(print_run or 1))
     if selected_id:
         selected_card = get_card_by_card_id(db, selected_id)
         if selected_card and (selected_card.image_url or "").strip():
-            from utils.watermark import watermark_and_reupload
+            from utils.watermark import finalize_card_image
 
-            watermarked_url = watermark_and_reupload(
+            watermarked_url = finalize_card_image(
                 selected_card.image_url,
                 card_id=selected_card.card_id,
+                edition_number=1,
+                print_run=qty,
             )
             selected_card.image_url = watermarked_url
+            selected_card.edition_number = 1
+            selected_card.print_run = qty
 
     db.commit()
     return selected_id, watermarked_url
@@ -582,6 +588,7 @@ def expand_print_run_for_owner_image(
     *,
     template: Card,
     target_quantity: int,
+    source_portrait_url: str | None = None,
 ) -> list[Card]:
     """
     Grow the owner's print run for this image to target_quantity (1–100).
@@ -598,11 +605,21 @@ def expand_print_run_for_owner_image(
     to_add = target_quantity - n
     for c in family:
         c.print_run = target_quantity
+    from utils.watermark import finalize_card_image
+
+    base_portrait_url = (source_portrait_url or template.image_url or "").strip()
+
     new_rows: list[Card] = []
     for k in range(to_add):
         edition = n + 1 + k
         nid = next_collectible_card_id(db)
         slug = nid.lower()
+        edition_url = finalize_card_image(
+            base_portrait_url,
+            card_id=nid,
+            edition_number=edition,
+            print_run=target_quantity,
+        )
         row = create_card_row(
             db,
             card_id=nid,
@@ -618,7 +635,7 @@ def expand_print_run_for_owner_image(
             rarity_template=int(getattr(template, "rarity_template", None) or 1),
             edition_number=edition,
             print_run=target_quantity,
-            image_url=template.image_url,
+            image_url=edition_url,
             shareable_slug=slug,
             style=template.style,
             special_theme=template.special_theme,

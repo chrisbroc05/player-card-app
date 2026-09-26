@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import CardCreationExperience from "./CardCreationExperience";
+import PaidPreviewSelectionPanel from "./PaidPreviewSelectionPanel";
 import PreviewSelectionPanel from "./PreviewSelectionPanel";
 import "../styles/generationOverlay.css";
 
@@ -10,6 +11,7 @@ export default function GenerationOverlay({
   onCloseRequest,
   cardCreationProps = null,
   compareProps = null,
+  paidSelectProps = null,
 }) {
   const [revealLanded, setRevealLanded] = useState(false);
 
@@ -60,6 +62,10 @@ export default function GenerationOverlay({
             fullscreen
             onRevealLanded={() => setRevealLanded(true)}
           />
+        ) : null}
+
+        {view === "paid-select" && paidSelectProps ? (
+          <PaidPreviewSelectionPanel {...paidSelectProps} />
         ) : null}
 
         {view === "compare" && compareProps ? (

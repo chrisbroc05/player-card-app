@@ -20,7 +20,12 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from animation_tasks import process_animation
-from card_creation_service import begin_card_creation_checkout, get_card_creation_checkout_status
+from card_creation_service import (
+    begin_card_creation_checkout,
+    begin_card_creation_repick_checkout,
+    get_card_creation_checkout_status,
+    select_card_creation_preview,
+)
 from card_pricing import animated_studio_total_price, animated_upgrade_price, generation_price_payload, highlight_card_price, normalize_order_tier
 from auth import get_current_user
 from card_cleanup import (
@@ -428,6 +433,44 @@ def card_creation_checkout_status(
         db,
         user_id=current_user.id,
         session_id=session_id,
+    )
+
+
+class SelectCreationPreviewBody(BaseModel):
+    session_id: str = Field(..., min_length=8, max_length=255)
+    preview_index: int = Field(..., ge=0, le=10)
+
+
+@router.post("/creation-checkout/select-preview")
+def card_creation_select_preview(
+    body: SelectCreationPreviewBody,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Lock in a paid preview variation and mint the final card."""
+    return select_card_creation_preview(
+        db,
+        user_id=current_user.id,
+        session_id=body.session_id.strip(),
+        preview_index=body.preview_index,
+    )
+
+
+class RepickCheckoutBody(BaseModel):
+    session_id: str = Field(..., min_length=8, max_length=255)
+
+
+@router.post("/creation-checkout/repick")
+def card_creation_repick_checkout(
+    body: RepickCheckoutBody,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Start $1 Stripe checkout for one additional preview variation."""
+    return begin_card_creation_repick_checkout(
+        db,
+        user=current_user,
+        session_id=body.session_id.strip(),
     )
 
 
