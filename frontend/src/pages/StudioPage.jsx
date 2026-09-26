@@ -50,7 +50,7 @@ import {
   getActionCategory,
   klingMotionForCategory,
 } from "../constants/actionCategories";
-import { API_BASE_URL, authHeaders, toApiUrl } from "../config/api";
+import { API_BASE_URL, AUTH_TOKEN_STORAGE_KEY, authHeaders, toApiUrl } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import { useSettings } from "../context/SettingsContext";
 import { useFeatures } from "../context/FeatureContext";
@@ -100,6 +100,68 @@ const ANIMATED_FLOW_STAGE = {
   STARTING_ANIMATION: "starting_animation",
   ANIMATING: "animating",
 };
+
+const PAID_CREATION_PENDING_KEY = "studio_card_creation_pending";
+
+function readPaidCreationReturnFromUrl() {
+  if (typeof window === "undefined") return { active: false, sessionId: "" };
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("card_creation_success") !== "true") return { active: false, sessionId: "" };
+  const sessionId = (params.get("session_id") || "").trim();
+  return { active: Boolean(sessionId), sessionId };
+}
+
+function readPaidCreationPendingSnapshot() {
+  try {
+    const raw = sessionStorage.getItem(PAID_CREATION_PENDING_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    return data && typeof data === "object" ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+function paidCardFallbackFromPending(pending, live = {}) {
+  const playerName =
+    (typeof pending?.displayName === "string" && pending.displayName.trim()) ||
+    [pending?.firstName, pending?.lastName].filter(Boolean).join(" ").trim() ||
+    live.playerDisplayName ||
+    "";
+  return {
+    playerName,
+    teamName: pending?.teamName || live.teamName || "",
+    orderTier: pending?.orderTier || live.orderTier || "",
+    specialTheme: pending?.specialTheme || live.specialTheme || "",
+    isHighlight: pending?.cardType === "highlight" || Boolean(live.isHighlightCardType),
+  };
+}
+
+function mergePaidCreationCardFromStatus(existing, status, fallback = {}) {
+  if (!status || (!status.result_card_id && !status.rarity && !status.image_url)) {
+    return existing;
+  }
+  return {
+    ...(existing || {}),
+    card_id: status.result_card_id || existing?.card_id || "",
+    image_url: status.image_url || existing?.image_url || "",
+    player_name: status.player_name || existing?.player_name || fallback.playerName || "",
+    team_name: status.team_name || existing?.team_name || fallback.teamName || "",
+    tier: status.tier || existing?.tier || fallback.orderTier || "rookie",
+    theme: existing?.theme || fallback.specialTheme || "",
+    special_theme: status.special_theme ?? existing?.special_theme ?? fallback.specialTheme ?? "",
+    rarity: status.rarity || existing?.rarity || "standard",
+    rarity_template: status.rarity_template ?? existing?.rarity_template ?? 1,
+    rarity_display_name: status.rarity_display_name || existing?.rarity_display_name || "Base",
+    template_name: status.template_name || existing?.template_name || "Classic",
+    edition_number: status.edition_number ?? existing?.edition_number ?? 1,
+    print_run: status.print_run ?? existing?.print_run ?? 1,
+    is_highlight: status.is_highlight ?? existing?.is_highlight ?? fallback.isHighlight ?? false,
+    highlight_video_url: status.highlight_video_url || existing?.highlight_video_url || "",
+    highlight_status: status.highlight_status || existing?.highlight_status || "",
+    animated_video_url: status.animated_video_url || existing?.animated_video_url || "",
+  };
+}
 
 function isAnimatedOnlyStep(step) {
   return (
@@ -216,12 +278,16 @@ function formatApiError(detail, fallback) {
 export default function StudioPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const initialPaidReturn = useMemo(() => readPaidCreationReturnFromUrl(), []);
   const { token, user, initializing, refreshUser } = useAuth();
   const { settings, settingsLoaded } = useSettings();
   const { showCelebration } = useNewCardCelebration();
   const { highlightCardPrice } = useFeatures();
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(() =>
+    initialPaidReturn.active ? STEP_REVIEW : STEP_CARD_TYPE,
+  );
   const [showWelcome, setShowWelcome] = useState(() => {
+    if (initialPaidReturn.active) return false;
     try {
       return sessionStorage.getItem("studio_welcome_dismissed") !== "1";
     } catch {
@@ -282,7 +348,12 @@ export default function StudioPage() {
   const [photoNotes, setPhotoNotes] = useState("");
   const [actionStepError, setActionStepError] = useState("");
   const [scenarioStepError, setScenarioStepError] = useState("");
-  const [reviewSubPhase, setReviewSubPhase] = useState("setup");
+  const [reviewSubPhase, setReviewSubPhase] = useState(() =>
+    initialPaidReturn.active ? "generate" : "setup",
+  );
+  const [paidCreationFlowActive, setPaidCreationFlowActive] = useState(initialPaidReturn.active);
+  const [paidCreationPolling, setPaidCreationPolling] = useState(initialPaidReturn.active);
+  const [paidCreationRevealCard, setPaidCreationRevealCard] = useState(null);
   const [photoStepError, setPhotoStepError] = useState("");
   const [detailsErrors, setDetailsErrors] = useState({});
   const [detailsShowErrors, setDetailsShowErrors] = useState(false);
@@ -299,8 +370,8 @@ export default function StudioPage() {
   const [showAnimatedFlowExplainer, setShowAnimatedFlowExplainer] = useState(false);
   const [showStartOverConfirm, setShowStartOverConfirm] = useState(false);
   const [startOverBusy, setStartOverBusy] = useState(false);
-  const [packOpeningActive, setPackOpeningActive] = useState(false);
-  const [generationOverlayOpen, setGenerationOverlayOpen] = useState(false);
+  const [packOpeningActive, setPackOpeningActive] = useState(initialPaidReturn.active);
+  const [generationOverlayOpen, setGenerationOverlayOpen] = useState(initialPaidReturn.active);
   const [previewConfigureOpen, setPreviewConfigureOpen] = useState(false);
   const [previewCompareOpen, setPreviewCompareOpen] = useState(false);
   const [animatedFlowStage, setAnimatedFlowStage] = useState(ANIMATED_FLOW_STAGE.IDLE);
@@ -493,6 +564,39 @@ export default function StudioPage() {
     }));
   }, []);
 
+  const paidCreationDisplayCard = useMemo(() => {
+    if (!paidCreationFlowActive) return null;
+    if (paidCreationRevealCard?.card_id || paidCreationRevealCard?.image_url) {
+      return paidCreationRevealCard;
+    }
+    if (savedCardDetail?.card_id || savedCardDetail?.image_url) {
+      return savedCardDetail;
+    }
+    if (!generatedCardUrl) return null;
+    return {
+      image_url: generatedCardUrl,
+      player_name: playerDisplayName,
+      team_name: teamName,
+      tier: orderTier || generatedTier || "rookie",
+      theme: specialTheme,
+      special_theme: specialTheme,
+      rarity: "standard",
+      rarity_template: 1,
+      rarity_display_name: "Base",
+      template_name: "Classic",
+    };
+  }, [
+    paidCreationFlowActive,
+    paidCreationRevealCard,
+    savedCardDetail,
+    generatedCardUrl,
+    playerDisplayName,
+    teamName,
+    orderTier,
+    generatedTier,
+    specialTheme,
+  ]);
+
   const featuredDisplayCard = useMemo(() => {
     if (savedCardDetail) {
       if (
@@ -683,8 +787,10 @@ export default function StudioPage() {
     if (animationScenarioLabel) return animationScenarioLabel;
     return animationActionLabel;
   }, [showAnimationSummary, animationScenarioLabel, animationActionLabel]);
-  const inCreationFlow = currentStep >= STEP_CARD_TYPE && currentStep <= STEP_REVIEW;
-  const useFixedStudioLayout = !showWelcome && inCreationFlow && !animationLoadingCardId;
+  const inCreationFlow =
+    paidCreationFlowActive || (currentStep >= STEP_CARD_TYPE && currentStep <= STEP_REVIEW);
+  const useFixedStudioLayout =
+    (!showWelcome && inCreationFlow && !animationLoadingCardId) || paidCreationFlowActive;
 
   const dismissWelcome = useCallback(() => {
     setShowWelcome(false);
@@ -1031,11 +1137,42 @@ export default function StudioPage() {
 
   const cardCreationReturnHandled = useRef("");
 
+  const restorePaidCreationContext = useCallback(() => {
+    const pending = readPaidCreationPendingSnapshot();
+    if (!pending) return;
+    if (pending.orderId) setCurrentOrderId(pending.orderId);
+    if (pending.copyQuantity) setCopyQuantity(Math.max(1, Number(pending.copyQuantity) || 1));
+    if (pending.cardType) setCardType(pending.cardType);
+    if (pending.orderTier) setOrderTier(pending.orderTier);
+    if (pending.specialTheme) setSpecialTheme(pending.specialTheme);
+    if (pending.firstName) setFirstName(pending.firstName);
+    if (pending.lastName) setLastName(pending.lastName);
+    if (typeof pending.displayName === "string") setDisplayName(pending.displayName);
+    if (pending.teamName) setTeamName(pending.teamName);
+    if (pending.position) setPosition(pending.position);
+    if (pending.jerseyNumber) setJerseyNumber(pending.jerseyNumber);
+    if (pending.gradYear) setGradYear(String(pending.gradYear));
+    if (pending.uploadedPhotoUrl) setUploadedPhotoUrl(pending.uploadedPhotoUrl);
+    if (typeof pending.animateAtCheckout === "boolean") {
+      setAnimateAtCheckout(pending.animateAtCheckout);
+    }
+  }, []);
+
   useEffect(() => {
-    if (!token || initializing) return undefined;
+    if (initialPaidReturn.active) {
+      restorePaidCreationContext();
+    }
+  }, [initialPaidReturn.active, restorePaidCreationContext]);
+
+  useEffect(() => {
     const cancelled = searchParams.get("card_creation_cancelled");
     if (cancelled === "true") {
       setSearchParams({}, { replace: true });
+      setPaidCreationFlowActive(false);
+      setPaidCreationPolling(false);
+      setPaidCreationRevealCard(null);
+      setGenerationOverlayOpen(false);
+      setPackOpeningActive(false);
       setCurrentStep(STEP_REVIEW);
       setReviewSubPhase("setup");
       setMessage("");
@@ -1043,14 +1180,31 @@ export default function StudioPage() {
       return undefined;
     }
     const success = searchParams.get("card_creation_success");
-    const sessionId = (searchParams.get("session_id") || "").trim();
-    if (success !== "true" || !sessionId) return undefined;
+    const sessionIdFromParams = (searchParams.get("session_id") || "").trim();
+    const sessionId =
+      sessionIdFromParams ||
+      (initialPaidReturn.active ? initialPaidReturn.sessionId : "");
+    if (success !== "true" && !initialPaidReturn.active) return undefined;
+    if (!sessionId) return undefined;
     if (cardCreationReturnHandled.current === sessionId) return undefined;
+
+    const authToken =
+      token || (typeof window !== "undefined" ? localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) : "");
+    if (!authToken) return undefined;
+
     cardCreationReturnHandled.current = sessionId;
-    setSearchParams({}, { replace: true });
-    completeCardCreationReturn(sessionId);
+    if (sessionIdFromParams) {
+      setSearchParams({}, { replace: true });
+    }
+    beginPaidCreationReturn(sessionId, authToken);
     return undefined;
-  }, [token, initializing, searchParams, setSearchParams]);
+  }, [
+    searchParams,
+    setSearchParams,
+    token,
+    initialPaidReturn.active,
+    initialPaidReturn.sessionId,
+  ]);
 
   useEffect(() => {
     if (!isAnimatedCardType && isAnimatedOnlyStep(currentStep)) {
@@ -2034,15 +2188,22 @@ export default function StudioPage() {
     handlePayAndGenerate();
   }
 
-  async function pollCardCreationStatus(sessionId, { maxAttempts = 90, intervalMs = 2000 } = {}) {
+  async function pollCardCreationStatus(
+    sessionId,
+    authToken = token,
+    { maxAttempts = 90, intervalMs = 2000, onStatusUpdate = null } = {},
+  ) {
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       const res = await fetch(
         `${API_BASE_URL}/cards/creation-checkout/status?session_id=${encodeURIComponent(sessionId)}`,
-        { headers: { ...authHeaders(token) } }
+        { headers: { ...authHeaders(authToken) } },
       );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(formatApiError(data?.detail, "Could not verify payment."));
+      }
+      if (typeof onStatusUpdate === "function") {
+        onStatusUpdate(data);
       }
       if (data.status === "completed" && data.result_card_id) {
         return data;
@@ -2059,33 +2220,93 @@ export default function StudioPage() {
     );
   }
 
-  async function completeCardCreationReturn(sessionId) {
+  async function beginPaidCreationReturn(sessionId, authToken) {
+    restorePaidCreationContext();
+    setShowWelcome(false);
     setCurrentStep(STEP_REVIEW);
-    setReviewSubPhase("setup");
-    setIsCreating(true);
-    setOrderActionKey("card-creation-return");
+    setReviewSubPhase("generate");
+    setPaidCreationFlowActive(true);
+    setPaidCreationPolling(true);
+    setGenerationOverlayOpen(true);
+    setPackOpeningActive(true);
+    setPreviewCompareOpen(false);
+    setPreviewConfigureOpen(false);
     setError("");
-    setMessage("Payment confirmed — generating your card...");
+    setMessage("");
+    setGeneratedCardUrl("");
+    setSavedCardDetail(null);
+    setPaidCreationRevealCard(null);
+    setLatestGeneratedPreview(null);
+
+    const paidCardFallback = paidCardFallbackFromPending(readPaidCreationPendingSnapshot(), {
+      playerDisplayName,
+      teamName,
+      orderTier,
+      specialTheme,
+      isHighlightCardType,
+    });
+
     try {
-      const result = await pollCardCreationStatus(sessionId);
-      const detail = await fetchCardDetailById(result.result_card_id);
-      await Promise.all([fetchMyCards(), fetchOrders(), refreshUser(token)]);
-      invalidateCollectionCache();
-      setReviewSubPhase("approve");
-      setMessage(
-        `Your card has been added to your collection${result.copy_quantity > 1 ? ` (${result.copy_quantity} copies)` : ""}.`
-      );
-      await showCelebration({
-        card: detail,
-        source: "created",
-        showAnimateUpsell: !isHighlightCardType && !result.animated,
+      let statusCard = null;
+      const result = await pollCardCreationStatus(sessionId, authToken, {
+        onStatusUpdate: (data) => {
+          if (data.status !== "completed" || !data.result_card_id) return;
+          statusCard = mergePaidCreationCardFromStatus(statusCard, data, paidCardFallback);
+          setPaidCreationRevealCard(statusCard);
+          if (statusCard.image_url) {
+            setGeneratedCardUrl(statusCard.image_url);
+          }
+          if (statusCard.tier) {
+            setGeneratedTier(statusCard.tier);
+          }
+          setPreviewPollCardId(statusCard.card_id || "");
+        },
       });
+      statusCard = mergePaidCreationCardFromStatus(statusCard, result, paidCardFallback);
+      setPaidCreationRevealCard(statusCard);
+      if (statusCard?.image_url) {
+        setGeneratedCardUrl(statusCard.image_url);
+      }
+      if (statusCard?.tier) {
+        setGeneratedTier(statusCard.tier);
+      }
+      if (statusCard?.card_id) {
+        setPreviewPollCardId(statusCard.card_id);
+      }
+
+      const detail = await fetchCardDetailById(result.result_card_id, authToken);
+      const mergedCard = { ...(statusCard || {}), ...detail };
+      setPaidCreationRevealCard(mergedCard);
+      setSavedCardDetail(mergedCard);
+      setGeneratedCardUrl(mergedCard.image_url || "");
+      setGeneratedTier(mergedCard.tier || "base");
+      setPreviewPollCardId(mergedCard.card_id || "");
+      await Promise.all([fetchMyCards(), fetchOrders(), refreshUser(authToken)]);
+      invalidateCollectionCache();
+      try {
+        sessionStorage.removeItem(PAID_CREATION_PENDING_KEY);
+      } catch {
+        /* ignore storage errors */
+      }
     } catch (err) {
       setError(err.message || "Could not complete card creation.");
+      setGenerationOverlayOpen(false);
+      setPackOpeningActive(false);
+      setPaidCreationFlowActive(false);
+      setPaidCreationRevealCard(null);
+      setReviewSubPhase("setup");
     } finally {
-      setIsCreating(false);
-      setOrderActionKey("");
+      setPaidCreationPolling(false);
     }
+  }
+
+  function handlePaidCreationViewCollection() {
+    setGenerationOverlayOpen(false);
+    setPackOpeningActive(false);
+    setPaidCreationFlowActive(false);
+    setPaidCreationRevealCard(null);
+    setReviewSubPhase("setup");
+    navigate("/my-collection");
   }
 
   async function uploadHighlightStaging(orderId) {
@@ -2166,8 +2387,23 @@ export default function StudioPage() {
       }
       try {
         sessionStorage.setItem(
-          "studio_card_creation_pending",
-          JSON.stringify({ orderId, copyQuantity, reviewSubPhase: "setup" })
+          PAID_CREATION_PENDING_KEY,
+          JSON.stringify({
+            orderId,
+            copyQuantity,
+            cardType,
+            orderTier,
+            specialTheme,
+            firstName,
+            lastName,
+            displayName,
+            teamName,
+            position,
+            jerseyNumber,
+            gradYear,
+            uploadedPhotoUrl,
+            animateAtCheckout: cardType === "standard" && animateAtCheckout,
+          }),
         );
       } catch {
         /* ignore storage errors */
@@ -2425,9 +2661,9 @@ export default function StudioPage() {
     }
   }
 
-  async function fetchCardDetailById(cardId) {
+  async function fetchCardDetailById(cardId, authToken = token) {
     const res = await fetch(`${API_BASE_URL}/cards/${encodeURIComponent(cardId)}`, {
-      headers: { ...authHeaders(token) },
+      headers: { ...authHeaders(authToken) },
     });
     if (!res.ok) throw new Error("Could not load card.");
     const detail = await res.json();
@@ -2745,7 +2981,7 @@ export default function StudioPage() {
               </div>
             ) : null}
 
-            {!user && currentStep >= STEP_TIER ? (
+            {!user && !paidCreationFlowActive && currentStep >= STEP_TIER ? (
               <StudioAuthGate
                 onBackToTiers={() => goToStep(STEP_TIER)}
                 backLabel="← Back to player details"
@@ -3211,14 +3447,6 @@ export default function StudioPage() {
                   animationScenarioLabel={animationScenarioLabel}
                   phase="pay-upfront"
                 />
-                {orderActionKey === "card-creation-return" ? (
-                  <div className="rounded-xl border bg-gold-subtle px-4 py-3 text-sm text-brand-gold">
-                    <p className="font-medium text-brand-gold-bright">{message || "Generating your card..."}</p>
-                    <p className="mt-1 text-xs text-brand-gold/90">
-                      Payment received — your card is being created. This usually takes under a minute.
-                    </p>
-                  </div>
-                ) : null}
                 {generationCap.blocked ? (
                   <GenerationCapNotice
                     usage={generationUsage}
@@ -3233,9 +3461,7 @@ export default function StudioPage() {
                     >
                       {orderActionKey === "pay-generate"
                         ? "Opening checkout..."
-                        : orderActionKey === "card-creation-return"
-                          ? "Generating your card..."
-                          : `Pay & Generate — ${formatMoney(
+                        : `Pay & Generate — ${formatMoney(
                               generationPricing?.card_creation_price ??
                                 generationPricing?.first_preview_price ??
                                 0
@@ -3525,9 +3751,12 @@ export default function StudioPage() {
       </main>
 
       <GenerationOverlay
-        open={generationOverlayOpen && reviewSubPhase === "generate"}
-        view={previewCompareOpen ? "compare" : "experience"}
-        showCloseButton
+        open={
+          generationOverlayOpen &&
+          (reviewSubPhase === "generate" || paidCreationFlowActive)
+        }
+        view={!paidCreationFlowActive && previewCompareOpen ? "compare" : "experience"}
+        showCloseButton={!paidCreationFlowActive}
         onCloseRequest={() => setShowStartOverConfirm(true)}
         cardCreationProps={{
           active: packOpeningActive,
@@ -3536,41 +3765,53 @@ export default function StudioPage() {
           theme: specialTheme ? selectedThemeLabel : "Default (no theme)",
           playerName: playerDisplayName,
           teamName: teamName,
-          generationComplete: !isGenerating && Boolean(generatedCardUrl || selectedPreviewUrl),
-          cardImageUrl: generatedCardUrl || selectedPreviewUrl,
-          card: featuredDisplayCard,
+          generationComplete: paidCreationFlowActive
+            ? !paidCreationPolling &&
+              Boolean(paidCreationDisplayCard?.image_url) &&
+              Boolean(paidCreationDisplayCard?.rarity)
+            : !isGenerating && Boolean(generatedCardUrl || selectedPreviewUrl),
+          cardImageUrl:
+            (paidCreationFlowActive ? paidCreationDisplayCard?.image_url : null) ||
+            generatedCardUrl ||
+            selectedPreviewUrl,
+          card: paidCreationFlowActive ? paidCreationDisplayCard : featuredDisplayCard,
           highlightCardId: highlightRevealCardId,
-          token: token || "",
+          token: token || localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) || "",
           onHighlightVideoReady: handleHighlightVideoReady,
-          onRevealComplete: handlePackOpeningComplete,
+          onRevealComplete: paidCreationFlowActive ? undefined : handlePackOpeningComplete,
           showPrimaryAction: true,
-          primaryActionLabel:
-            Math.max(displayPreviews.length, activePreviewCount) <= 1
+          primaryActionLabel: paidCreationFlowActive
+            ? "View in Collection"
+            : Math.max(displayPreviews.length, activePreviewCount) <= 1
               ? "Add to Collection"
               : "Compare & Choose Card",
-          onPrimaryAction: () => {
-            const previewTotal = Math.max(displayPreviews.length, activePreviewCount);
-            if (previewTotal <= 1) {
-              setGenerationOverlayOpen(false);
-              setPackOpeningActive(false);
-              setPreviewConfigureOpen(true);
-            } else {
-              setPackOpeningActive(false);
-              setPreviewCompareOpen(true);
-              setSelectedPreviewId("");
-              setSelectedPreviewUrl("");
-            }
-          },
-          onGenerateAnother: () => {
-            if (!canAffordRegenerate) {
-              setError(
-                `You need ${formatMoney(additionalPreviewCost)} to generate another preview.`
-              );
-              return;
-            }
-            setShowRegenerateConfirm(true);
-          },
-          onStartOver: () => setShowStartOverConfirm(true),
+          onPrimaryAction: paidCreationFlowActive
+            ? handlePaidCreationViewCollection
+            : () => {
+                const previewTotal = Math.max(displayPreviews.length, activePreviewCount);
+                if (previewTotal <= 1) {
+                  setGenerationOverlayOpen(false);
+                  setPackOpeningActive(false);
+                  setPreviewConfigureOpen(true);
+                } else {
+                  setPackOpeningActive(false);
+                  setPreviewCompareOpen(true);
+                  setSelectedPreviewId("");
+                  setSelectedPreviewUrl("");
+                }
+              },
+          onGenerateAnother: paidCreationFlowActive
+            ? undefined
+            : () => {
+                if (!canAffordRegenerate) {
+                  setError(
+                    `You need ${formatMoney(additionalPreviewCost)} to generate another preview.`,
+                  );
+                  return;
+                }
+                setShowRegenerateConfirm(true);
+              },
+          onStartOver: paidCreationFlowActive ? undefined : () => setShowStartOverConfirm(true),
         }}
         compareProps={{
           previews: displayPreviews,

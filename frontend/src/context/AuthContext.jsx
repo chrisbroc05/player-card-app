@@ -210,11 +210,14 @@ export function AuthProvider({ children }) {
     [applyAuthSession]
   );
 
+  const hasStoredToken = Boolean(token);
+
   const value = useMemo(
     () => ({
       token,
       user,
       initializing,
+      hasStoredToken,
       pendingIncomingTradesCount,
       pendingIncomingMarketplaceCount,
       refreshIncomingTradeCount,
@@ -230,6 +233,7 @@ export function AuthProvider({ children }) {
       token,
       user,
       initializing,
+      hasStoredToken,
       pendingIncomingTradesCount,
       pendingIncomingMarketplaceCount,
       refreshIncomingTradeCount,

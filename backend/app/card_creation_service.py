@@ -10,6 +10,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from card_pricing import card_creation_quote, normalize_card_type, normalize_order_tier
+from card_repo import card_to_dict, get_card_by_card_id
 from models import CardCreationCheckout, User, utcnow
 from payments_config import require_payments_enabled
 from stripe_checkout import create_card_creation_checkout_session
@@ -105,6 +106,35 @@ def begin_card_creation_checkout(
     }
 
 
+def _card_creation_result_fields(db: Session, card_id: str | None) -> dict:
+    """Rarity + display fields for the generated card (for checkout status polling)."""
+    cid = (card_id or "").strip()
+    if not cid:
+        return {}
+    orm = get_card_by_card_id(db, cid)
+    if orm is None:
+        return {}
+    data = card_to_dict(orm, db)
+    return {
+        "result_card_id": data.get("card_id") or cid,
+        "image_url": data.get("image_url") or "",
+        "player_name": data.get("player_name") or "",
+        "team_name": data.get("team_name") or "",
+        "tier": data.get("tier") or "rookie",
+        "rarity": data.get("rarity") or "standard",
+        "rarity_template": int(data.get("rarity_template") or 1),
+        "rarity_display_name": data.get("rarity_display_name") or "Base",
+        "template_name": data.get("template_name") or "Classic",
+        "edition_number": int(data.get("edition_number") or 1),
+        "print_run": int(data.get("print_run") or 1),
+        "special_theme": data.get("special_theme"),
+        "is_highlight": bool(data.get("is_highlight")),
+        "highlight_video_url": data.get("highlight_video_url"),
+        "highlight_status": data.get("highlight_status"),
+        "animated_video_url": data.get("animated_video_url"),
+    }
+
+
 def get_card_creation_checkout_status(
     db: Session,
     *,
@@ -124,7 +154,7 @@ def get_card_creation_checkout_status(
     )
     if row is None:
         return {"status": "not_found"}
-    return {
+    payload = {
         "status": row.status,
         "checkout_id": row.id,
         "order_id": row.order_id,
@@ -136,6 +166,9 @@ def get_card_creation_checkout_status(
         "result_card_id": row.result_card_id,
         "error_message": row.error_message,
     }
+    if row.result_card_id and row.status in ("completed", "processing"):
+        payload.update(_card_creation_result_fields(db, row.result_card_id))
+    return payload
 
 
 def fulfill_card_creation_from_webhook(db: Session, session: dict) -> None:

@@ -16,10 +16,18 @@ function useHideMobileChrome() {
 
 export default function AppHeader() {
   const location = useLocation();
-  const { user, logout, initializing, pendingIncomingTradesCount, pendingIncomingMarketplaceCount } =
-    useAuth();
+  const {
+    user,
+    logout,
+    initializing,
+    hasStoredToken,
+    pendingIncomingTradesCount,
+    pendingIncomingMarketplaceCount,
+  } = useAuth();
   const hideMobileChrome = useHideMobileChrome();
-  const showMobileNav = Boolean(user) && !hideMobileChrome;
+  const showAuthenticatedChrome = Boolean(user) || (initializing && hasStoredToken);
+  const showGuestChrome = !initializing && !user && !hasStoredToken;
+  const showMobileNav = showAuthenticatedChrome && !hideMobileChrome;
 
   const onStudio = location.pathname === "/" || location.pathname.startsWith("/studio");
   const onVault = location.pathname.startsWith("/my-collection") || location.pathname === "/vault";
@@ -67,22 +75,22 @@ export default function AppHeader() {
             <Link to="/" className={navClass(onStudio)}>
               Studio
             </Link>
-            {!initializing && !user ? (
+            {showGuestChrome ? (
               <Link to="/vault" className={navClass(onVault && !onMarketplace)}>
                 Vault
               </Link>
             ) : null}
-            {!initializing ? (
+            {!initializing || showAuthenticatedChrome ? (
               <Link to="/marketplace" className={`relative ${navClass(onMarketplace)}`}>
                 Free Agency Marketplace
-                {user && pendingIncomingMarketplaceCount > 0 ? (
+                {showAuthenticatedChrome && pendingIncomingMarketplaceCount > 0 ? (
                   <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[#ef4444] px-1 text-[10px] font-bold leading-none text-white shadow-sm">
                     {pendingIncomingMarketplaceCount > 9 ? "9+" : pendingIncomingMarketplaceCount}
                   </span>
                 ) : null}
               </Link>
             ) : null}
-            {!initializing && user ? (
+            {showAuthenticatedChrome ? (
               <>
                 <Link to="/my-collection" className={navClass(onMyCollection)}>
                   My Collection
@@ -125,13 +133,13 @@ export default function AppHeader() {
                     onProfile ? "text-white decoration-white/30" : ""
                   }`}
                 >
-                  {user.display_name}
+                  {user?.display_name || "Account"}
                 </Link>
                 <button type="button" onClick={handleLogout} className="btn-secondary px-3 py-2 text-xs sm:text-sm">
                   Logout
                 </button>
               </>
-            ) : !initializing ? (
+            ) : showGuestChrome ? (
               <>
                 <Link to="/register" className="btn-secondary px-3 py-2 text-xs sm:text-sm">
                   Sign Up
@@ -151,15 +159,19 @@ export default function AppHeader() {
             <Link to="/" className="mobile-header__logo-link" aria-label="Prospect Legends home">
               <img src="/prospect-legends-logo.png" alt="" className="mobile-header__logo" height={28} />
             </Link>
-            {user ? (
-              <Link to="/profile" className="mobile-header__username" title={user.display_name}>
-                {user.display_name}
+            {showAuthenticatedChrome ? (
+              <Link
+                to="/profile"
+                className="mobile-header__username"
+                title={user?.display_name || "Account"}
+              >
+                {user?.display_name || "Account"}
               </Link>
             ) : null}
           </div>
 
           <div className="mobile-header-right">
-            {user ? (
+            {showAuthenticatedChrome ? (
               <>
                 <Link to="/credits" className="credits-badge" title="Your marketplace balance">
                   <Coins className="credits-badge__icon" strokeWidth={2} aria-hidden />
@@ -182,11 +194,11 @@ export default function AppHeader() {
                   {hasNotifications ? <span className="notification-dot" aria-hidden /> : null}
                 </Link>
               </>
-            ) : (
+            ) : showGuestChrome ? (
               <Link to="/login" className="mobile-header__sign-in text-xs font-medium text-brand-gold">
                 Sign in
               </Link>
-            )}
+            ) : null}
           </div>
         </header>
       ) : null}
