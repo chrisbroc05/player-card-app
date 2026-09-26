@@ -25,11 +25,11 @@ services:
       - key: PYTHON_VERSION
         value: "3.11.11"
       - key: CARD_PRICE_ROOKIE
-        value: "2.50"
+        value: "3.00"
       - key: CARD_PRICE_ALLSTAR
-        value: "4.50"
+        value: "5.00"
       - key: CARD_PRICE_LEGENDS
-        value: "6.50"
+        value: "7.00"
 
   - type: web
     name: player-card-app

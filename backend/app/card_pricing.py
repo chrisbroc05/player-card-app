@@ -13,9 +13,9 @@ _TIER_ENV_KEYS: dict[str, str] = {
 }
 
 _TIER_DEFAULTS: dict[str, float] = {
-    "rookie": 2.50,
-    "all_star": 4.50,
-    "legends": 6.50,
+    "rookie": 3.00,
+    "all_star": 5.00,
+    "legends": 7.00,
 }
 
 _CARD_TIER_TO_ORDER: dict[str, str] = {

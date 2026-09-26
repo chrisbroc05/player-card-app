@@ -15,7 +15,7 @@ export const FAQ_SECTIONS = [
         id: "tier-difference",
         question: "What is the difference between tiers?",
         answer:
-          "Rookie ($2) is our entry level card with green styling. All-Star ($4) has blue premium styling. Legends ($6) is our top tier with gold effects. All tiers use the same AI generation quality — the tier affects the visual style and rarity.",
+          "Rookie ($3) is our entry level card with green styling. All-Star ($5) has blue premium styling. Legends ($7) is our top tier with gold effects. Animated cards add $10; highlight cards add $5. All tiers use the same AI generation quality — the tier affects the visual style and rarity.",
       },
       {
         id: "credits",

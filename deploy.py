@@ -20,9 +20,9 @@ Optional:
 Backend on Render should also set:
   PAYMENTS_ENABLED=false
     Gate credit/payment API routes until Stripe is wired (503 when false).
-  CARD_PRICE_ROOKIE=2.50
-  CARD_PRICE_ALLSTAR=4.50
-  CARD_PRICE_LEGENDS=6.50
+  CARD_PRICE_ROOKIE=3.00
+  CARD_PRICE_ALLSTAR=5.00
+  CARD_PRICE_LEGENDS=7.00
   ANIMATED_CARD_PRICE=10.00
     Animated card upgrade on first preview (Studio flow).
   HIGHLIGHT_CARD_PRICE=5.00
@@ -86,9 +86,9 @@ DEFAULT_BACKEND_SERVICE_ID = "srv-d7mi1l8g4nts73am8ka0"
 DEFAULT_FRONTEND_SERVICE_ID = "srv-d7mi6i1kh4rs73an84bg"
 
 BACKEND_PRICING_ENV: dict[str, str] = {
-    "CARD_PRICE_ROOKIE": "2.50",
-    "CARD_PRICE_ALLSTAR": "4.50",
-    "CARD_PRICE_LEGENDS": "6.50",
+    "CARD_PRICE_ROOKIE": "3.00",
+    "CARD_PRICE_ALLSTAR": "5.00",
+    "CARD_PRICE_LEGENDS": "7.00",
 }
 
 
