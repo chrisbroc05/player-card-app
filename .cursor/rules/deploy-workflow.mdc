@@ -1,0 +1,34 @@
+---
+description: Commit, push to GitHub, and deploy to Render in the correct order
+alwaysApply: true
+---
+
+# Commit → Push → Deploy Workflow
+
+Render builds from GitHub, not local files. `python3 deploy.py` only triggers a Render redeploy of whatever is on the connected repo (`origin/main`).
+
+## When the user asks to commit and/or deploy
+
+Run this sequence after changes are ready:
+
+1. **Commit** — stage relevant files only; never commit `future_legends.db`, `.env`, or credentials.
+2. **Push** — `git push origin main` (required before deploy will include new code).
+3. **Deploy** — `python3 deploy.py` from the repo root (needs `RENDER_API_KEY` in env or `.env`).
+
+If push to `main` is blocked by Cursor's protected-branch gate, retry with user approval (`request_smart_mode_approval: true`). Do not skip push and deploy anyway.
+
+## After commit only (no deploy requested)
+
+Still push to `origin/main` if the user expects GitHub to stay in sync, unless they explicitly say not to push.
+
+## Verify success
+
+- `git status` should show "up to date with 'origin/main'"
+- Report backend/frontend deploy IDs from `deploy.py` output
+- Frontend may finish after backend; note if still building on Render
+
+## Do not
+
+- Run `deploy.py` before a successful push when the goal is to ship new code
+- Assume a prior deploy uploaded local commits that were never pushed
+- Commit `future_legends.db`
