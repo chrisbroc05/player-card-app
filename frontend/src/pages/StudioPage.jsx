@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import BrandLogo from "../components/BrandLogo";
@@ -2307,26 +2308,44 @@ export default function StudioPage() {
     }
   }
 
-  async function beginPaidCreationReturn(sessionId, authToken) {
-    restorePaidCreationContext();
-    setShowWelcome(false);
-    setCurrentStep(STEP_REVIEW);
-    setReviewSubPhase("generate");
-    setPaidCreationFlowActive(true);
-    setPaidCreationPolling(true);
-    setPaidCreationPhase("polling");
-    setPaidCreationSessionId(sessionId);
-    setGenerationOverlayOpen(true);
-    setPackOpeningActive(true);
-    setPreviewCompareOpen(false);
-    setPreviewConfigureOpen(false);
-    setError("");
-    setMessage("");
-    setGeneratedCardUrl("");
-    setSavedCardDetail(null);
+  function activatePaidCreationLoadingUI(sessionId = "") {
+    flushSync(() => {
+      setShowWelcome(false);
+      setCurrentStep(STEP_REVIEW);
+      setReviewSubPhase("generate");
+      setPaidCreationFlowActive(true);
+      setPaidCreationPolling(true);
+      setPaidCreationPhase("polling");
+      if (sessionId) setPaidCreationSessionId(sessionId);
+      setGenerationOverlayOpen(true);
+      setPackOpeningActive(true);
+      setPreviewCompareOpen(false);
+      setPreviewConfigureOpen(false);
+      setError("");
+      setMessage("");
+      setGeneratedCardUrl("");
+      setSavedCardDetail(null);
+      setPaidCreationRevealCard(null);
+      setPaidCreationPreviews([]);
+      setLatestGeneratedPreview(null);
+    });
+  }
+
+  function resetPaidCreationLoadingUI() {
+    setGenerationOverlayOpen(false);
+    setPackOpeningActive(false);
+    setPaidCreationFlowActive(false);
+    setPaidCreationPolling(false);
+    setPaidCreationPhase("idle");
+    setPaidCreationSessionId("");
     setPaidCreationRevealCard(null);
     setPaidCreationPreviews([]);
-    setLatestGeneratedPreview(null);
+    setReviewSubPhase("setup");
+  }
+
+  async function beginPaidCreationReturn(sessionId, authToken) {
+    restorePaidCreationContext();
+    activatePaidCreationLoadingUI(sessionId);
 
     const paidCardFallback = paidCardFallbackFromPending(readPaidCreationPendingSnapshot(), {
       playerDisplayName,
@@ -2364,12 +2383,7 @@ export default function StudioPage() {
       }
     } catch (err) {
       setError(err.message || "Could not complete card creation.");
-      setGenerationOverlayOpen(false);
-      setPackOpeningActive(false);
-      setPaidCreationFlowActive(false);
-      setPaidCreationRevealCard(null);
-      setPaidCreationPhase("idle");
-      setReviewSubPhase("setup");
+      resetPaidCreationLoadingUI();
     } finally {
       setPaidCreationPolling(false);
     }
@@ -2533,6 +2547,8 @@ export default function StudioPage() {
     }
     setAnimateCheckoutError("");
 
+    const expectsInlineFreeCheckout = isFullyFreeTokenCheckout;
+
     setIsCreating(true);
     setOrderActionKey("pay-generate");
     setMessage("");
@@ -2543,6 +2559,31 @@ export default function StudioPage() {
       if (isHighlightCardType) {
         setMessage("Uploading highlight video...");
         highlightStaging = await uploadHighlightStaging(orderId);
+      }
+      const pendingSnapshot = {
+        orderId,
+        copyQuantity,
+        cardType,
+        orderTier,
+        specialTheme,
+        firstName,
+        lastName,
+        displayName,
+        teamName,
+        position,
+        jerseyNumber,
+        gradYear,
+        uploadedPhotoUrl,
+        animateAtCheckout: cardType === "standard" && animateAtCheckout,
+      };
+      try {
+        sessionStorage.setItem(PAID_CREATION_PENDING_KEY, JSON.stringify(pendingSnapshot));
+      } catch {
+        /* ignore storage errors */
+      }
+      if (expectsInlineFreeCheckout) {
+        restorePaidCreationContext();
+        activatePaidCreationLoadingUI();
       }
       const checkoutPayload = {
         order_id: orderId,
@@ -2573,27 +2614,6 @@ export default function StudioPage() {
       if (!res.ok) {
         throw new Error(formatApiError(data?.detail, "Could not start checkout."));
       }
-      const pendingSnapshot = {
-        orderId,
-        copyQuantity,
-        cardType,
-        orderTier,
-        specialTheme,
-        firstName,
-        lastName,
-        displayName,
-        teamName,
-        position,
-        jerseyNumber,
-        gradYear,
-        uploadedPhotoUrl,
-        animateAtCheckout: cardType === "standard" && animateAtCheckout,
-      };
-      try {
-        sessionStorage.setItem(PAID_CREATION_PENDING_KEY, JSON.stringify(pendingSnapshot));
-      } catch {
-        /* ignore storage errors */
-      }
       if (data.free_token_checkout && data.session_id) {
         setIsCreating(false);
         setOrderActionKey("");
@@ -2609,6 +2629,9 @@ export default function StudioPage() {
       setError(err.message || "Could not start payment.");
       setIsCreating(false);
       setOrderActionKey("");
+      if (expectsInlineFreeCheckout) {
+        resetPaidCreationLoadingUI();
+      }
     }
   }
 
@@ -3962,10 +3985,7 @@ export default function StudioPage() {
       </main>
 
       <GenerationOverlay
-        open={
-          generationOverlayOpen &&
-          (reviewSubPhase === "generate" || paidCreationFlowActive)
-        }
+        open={generationOverlayOpen && (paidCreationFlowActive || reviewSubPhase === "generate")}
         view={
           paidCreationFlowActive && paidCreationPhase === "selecting"
             ? "paid-select"
