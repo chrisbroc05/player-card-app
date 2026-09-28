@@ -770,6 +770,24 @@ export default function StudioPage() {
   ]);
 
   const creditBalance = Number(user?.credit_balance ?? 0);
+  const freeCardTokens = Math.max(0, Number(user?.free_card_tokens ?? 0));
+  const freeCardTokensGranted = Math.max(0, Number(user?.free_card_tokens_granted ?? freeCardTokens));
+  const showAnimatedUpgradeLine = isAnimatedCardType || (cardType === "standard" && animateAtCheckout);
+  const freeTokenCheckoutCharge = useMemo(() => {
+    if (!generationPricing) return 0;
+    if (freeCardTokens <= 0) {
+      return Number(generationPricing.card_creation_price ?? generationPricing.first_preview_price ?? 0);
+    }
+    const highlightFee = isHighlightCardType
+      ? Number(generationPricing.highlight_fee ?? generationPricing.highlight_card_price ?? 0)
+      : 0;
+    const animatedFee = showAnimatedUpgradeLine
+      ? Number(generationPricing.animated_fee ?? generationPricing.animated_upgrade_price ?? 0)
+      : 0;
+    return highlightFee + animatedFee;
+  }, [generationPricing, freeCardTokens, isHighlightCardType, showAnimatedUpgradeLine]);
+  const isFullyFreeTokenCheckout = freeCardTokens > 0 && freeTokenCheckoutCharge === 0;
+  const hasFreeTokenPerk = freeCardTokens > 0;
   const animatedUpgradeCost = Number(generationPricing?.animated_upgrade_price ?? 10);
   const additionalPreviewCost = Number(generationPricing?.additional_preview_price ?? 0);
   const copyPricingTiers = useMemo(
@@ -2539,31 +2557,36 @@ export default function StudioPage() {
       if (!res.ok) {
         throw new Error(formatApiError(data?.detail, "Could not start checkout."));
       }
-      if (!data.checkout_url) {
-        throw new Error("Checkout URL was not returned.");
-      }
+      const pendingSnapshot = {
+        orderId,
+        copyQuantity,
+        cardType,
+        orderTier,
+        specialTheme,
+        firstName,
+        lastName,
+        displayName,
+        teamName,
+        position,
+        jerseyNumber,
+        gradYear,
+        uploadedPhotoUrl,
+        animateAtCheckout: cardType === "standard" && animateAtCheckout,
+      };
       try {
-        sessionStorage.setItem(
-          PAID_CREATION_PENDING_KEY,
-          JSON.stringify({
-            orderId,
-            copyQuantity,
-            cardType,
-            orderTier,
-            specialTheme,
-            firstName,
-            lastName,
-            displayName,
-            teamName,
-            position,
-            jerseyNumber,
-            gradYear,
-            uploadedPhotoUrl,
-            animateAtCheckout: cardType === "standard" && animateAtCheckout,
-          }),
-        );
+        sessionStorage.setItem(PAID_CREATION_PENDING_KEY, JSON.stringify(pendingSnapshot));
       } catch {
         /* ignore storage errors */
+      }
+      if (data.free_token_checkout && data.session_id) {
+        setIsCreating(false);
+        setOrderActionKey("");
+        await beginPaidCreationReturn(data.session_id, token);
+        await refreshUser(token);
+        return;
+      }
+      if (!data.checkout_url) {
+        throw new Error("Checkout URL was not returned.");
       }
       window.location.href = data.checkout_url;
     } catch (err) {
@@ -3603,6 +3626,9 @@ export default function StudioPage() {
                   animationActionLabel={animationActionLabel}
                   animationScenarioLabel={animationScenarioLabel}
                   phase="pay-upfront"
+                  freeTokenApplied={hasFreeTokenPerk}
+                  freeCardTokensRemaining={freeCardTokens}
+                  freeCardTokensGranted={freeCardTokensGranted}
                 />
                 {generationCap.blocked ? (
                   <GenerationCapNotice
@@ -3612,17 +3638,23 @@ export default function StudioPage() {
                   />
                 ) : (
                   <>
+                    {hasFreeTokenPerk ? (
+                      <p className="text-center text-xs text-brand-gold/90 sm:text-left">
+                        Beta perk — 1 of your {freeCardTokensGranted || freeCardTokens} free cards
+                        {isFullyFreeTokenCheckout ? "" : " (covers base tier)"}
+                      </p>
+                    ) : null}
                     <StudioWizardContinue
                       onClick={requestGenerateFirstPreview}
                       disabled={!canCreateOrder || !generationPricing || Boolean(orderActionKey)}
                     >
                       {orderActionKey === "pay-generate"
-                        ? "Opening checkout..."
-                        : `Pay & Generate — ${formatMoney(
-                              generationPricing?.card_creation_price ??
-                                generationPricing?.first_preview_price ??
-                                0
-                            )}`}
+                        ? isFullyFreeTokenCheckout
+                          ? "Generating..."
+                          : "Opening checkout..."
+                        : isFullyFreeTokenCheckout
+                          ? `Generate Free Card (${freeCardTokens} remaining)`
+                          : `Pay & Generate — ${formatMoney(freeTokenCheckoutCharge)}`}
                     </StudioWizardContinue>
                     <GenerationDailyUsageHint usage={generationUsage} className="w-full basis-full text-center sm:text-left" />
                   </>

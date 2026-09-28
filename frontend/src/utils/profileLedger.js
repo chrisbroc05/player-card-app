@@ -102,6 +102,24 @@ export function profileTransactionMeta(row) {
     };
   }
 
+  if (type === "free_beta_card") {
+    return {
+      icon: "🎁",
+      dotClass: "profile-tx-dot--gold",
+      description: note || "Free Beta Card",
+      amountClass: "credit-ledger-row__amount--gold",
+    };
+  }
+
+  if (type === "card_creation") {
+    return {
+      icon: "•",
+      dotClass: "profile-tx-dot--gray",
+      description: note || "Card Created",
+      amountClass: "credit-ledger-row__amount--debit",
+    };
+  }
+
   if (type === "priority") {
     return {
       icon: "•",

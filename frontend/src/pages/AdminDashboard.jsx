@@ -1177,6 +1177,9 @@ export default function AdminDashboard() {
                       ["trades_sent", "Trades sent"],
                       ["trades_received", "Trades received"],
                       ["credit_balance", "Credit Balance"],
+                      ["free_card_tokens_granted", "Free tokens"],
+                      ["free_card_tokens_used", "Tokens used"],
+                      ["free_card_tokens_remaining", "Tokens left"],
                       ["created_at", "Member since"],
                     ].map(([key, label]) => (
                       <th key={key} className="p-3">
@@ -1192,7 +1195,7 @@ export default function AdminDashboard() {
                 <tbody>
                   {filteredSortedUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="p-6 text-center text-slate-500">
+                      <td colSpan={13} className="p-6 text-center text-slate-500">
                         No users found.
                       </td>
                     </tr>
@@ -1207,6 +1210,9 @@ export default function AdminDashboard() {
                         <td className="p-3 text-slate-300">{u.trades_sent}</td>
                         <td className="p-3 text-slate-300">{u.trades_received}</td>
                         <td className="p-3 tabular-nums text-slate-200">{formatMoney(u.credit_balance ?? 0)}</td>
+                        <td className="p-3 tabular-nums text-slate-300">{u.free_card_tokens_granted ?? 0}</td>
+                        <td className="p-3 tabular-nums text-slate-300">{u.free_card_tokens_used ?? 0}</td>
+                        <td className="p-3 tabular-nums text-slate-300">{u.free_card_tokens_remaining ?? 0}</td>
                         <td className="p-3 text-slate-500">{u.created_at?.slice(0, 10) || "—"}</td>
                         <td className="p-3">
                           {u.stripe_payouts_enabled ? (

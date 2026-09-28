@@ -131,6 +131,7 @@ def create_card_creation_checkout_session(
     checkout_id: int,
     order_id: int,
     animated: bool = False,
+    use_free_token: bool = False,
 ) -> dict[str, str]:
     """Create a Stripe Checkout session for upfront card creation (platform direct charge)."""
     amt = Decimal(str(amount_dollars)).quantize(Decimal("0.01"))
@@ -138,7 +139,14 @@ def create_card_creation_checkout_session(
     qty = max(1, int(copy_quantity))
     copy_word = "copy" if qty == 1 else "copies"
     ct = (card_type or "static").strip().lower()
-    if ct == "highlight":
+    if use_free_token:
+        if ct == "highlight":
+            label = f"{tier_label} Highlight upgrade — base covered by beta token"
+        elif ct == "animated" or animated:
+            label = f"{tier_label} Animation upgrade — base covered by beta token"
+        else:
+            label = f"{tier_label} Card upgrade — base covered by beta token"
+    elif ct == "highlight":
         label = f"{tier_label} Highlight — {qty} {copy_word} included"
     elif ct == "animated" or animated:
         label = f"{tier_label} Animated Card — {qty} {copy_word} included"
@@ -161,6 +169,7 @@ def create_card_creation_checkout_session(
             "animated": "true" if (animated or ct == "animated") else "false",
             "checkout_id": str(checkout_id),
             "order_id": str(order_id),
+            "use_free_token": "true" if use_free_token else "false",
         },
     )
 

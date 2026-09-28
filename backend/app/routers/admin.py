@@ -766,6 +766,13 @@ def admin_users(
             "trades_sent": sent_counts.get(u.id, 0),
             "trades_received": recv_counts.get(u.id, 0),
             "credit_balance": float_from_decimal(u.credit_balance),
+            "free_card_tokens_granted": int(getattr(u, "free_card_tokens_granted", 0) or 0),
+            "free_card_tokens_remaining": int(getattr(u, "free_card_tokens", 0) or 0),
+            "free_card_tokens_used": max(
+                0,
+                int(getattr(u, "free_card_tokens_granted", 0) or 0)
+                - int(getattr(u, "free_card_tokens", 0) or 0),
+            ),
             "stripe_payouts_enabled": bool(u.stripe_payouts_enabled),
         }
         for u in users

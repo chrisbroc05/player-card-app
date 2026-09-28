@@ -25,6 +25,7 @@ TX_PRIORITY = "priority"
 TX_WITHDRAWAL = "withdrawal"
 TX_REFUND = "refund"
 TX_CARD_CREATION = "card_creation"
+TX_FREE_BETA_CARD = "free_beta_card"
 
 VALID_TRANSACTION_TYPES = frozenset(
     {
@@ -40,6 +41,7 @@ VALID_TRANSACTION_TYPES = frozenset(
         TX_WITHDRAWAL,
         TX_REFUND,
         TX_CARD_CREATION,
+        TX_FREE_BETA_CARD,
     }
 )
 
@@ -429,11 +431,13 @@ def record_card_creation_payment(
     tier: str,
     copy_quantity: int,
     stripe_session_id: str,
-) -> CreditLedger:
+) -> CreditLedger | None:
     """Log upfront card creation payment (does not change credit balance)."""
+    amt = _decimal_amount(amount_dollars)
+    if amt <= Decimal("0.00"):
+        return None
     user = _lock_user(db, user_id)
     balance = _user_balance(user)
-    amt = _decimal_amount(amount_dollars)
     tier_label = (tier or "rookie").replace("_", " ").title()
     qty = max(1, int(copy_quantity))
     copy_word = "copy" if qty == 1 else "copies"
@@ -450,8 +454,31 @@ def record_card_creation_payment(
     )
 
 
+def record_free_beta_card_token_usage(
+    db: Session,
+    *,
+    user_id: int,
+    remaining: int,
+    reference_id: str | None,
+) -> CreditLedger:
+    """Log beta free card token usage (does not change credit balance)."""
+    user = _lock_user(db, user_id)
+    balance = _user_balance(user)
+    note = f"Free Beta Card — 1 token used ({max(0, int(remaining))} remaining)"
+    return _append_ledger_row(
+        db,
+        user_id=user_id,
+        amount=Decimal("0.00"),
+        balance_after=balance,
+        transaction_type=TX_FREE_BETA_CARD,
+        reference_id=(reference_id or "").strip() or None,
+        note=note,
+        balance_type="card",
+    )
+
+
 LEDGER_CATEGORY_TYPES: dict[str, frozenset[str]] = {
-    "credits": frozenset({TX_TOP_UP, TX_GIFT, TX_REFUND, TX_CARD_CREATION}),
+    "credits": frozenset({TX_TOP_UP, TX_GIFT, TX_REFUND, TX_CARD_CREATION, TX_FREE_BETA_CARD}),
     "marketplace": frozenset({TX_CARD_PURCHASE, TX_CARD_SALE, TX_ROYALTY}),
     "withdrawals": frozenset({TX_WITHDRAWAL}),
 }

@@ -10,6 +10,11 @@ from sqlalchemy.orm import Session
 
 from card_pricing import card_creation_quote, normalize_card_type, normalize_order_tier
 from card_repo import card_to_dict, get_card_by_card_id
+from free_card_token_service import (
+    card_creation_charge_with_free_token,
+    consume_free_card_token_after_success,
+    new_free_token_session_id,
+)
 from models import CardCreationCheckout, User, utcnow
 from payments_config import require_payments_enabled
 from preview_styles import CARD_CREATION_REPICK_PRICE
@@ -33,6 +38,63 @@ def _preview_list(row: CardCreationCheckout) -> list[dict]:
     return [p for p in previews if isinstance(p, dict)]
 
 
+def _generate_checkout_previews(
+    db: Session,
+    row: CardCreationCheckout,
+    *,
+    tier: str,
+    card_type: str,
+    animated: bool,
+) -> list[dict]:
+    from main import generate_paid_card_previews
+
+    return generate_paid_card_previews(
+        db,
+        user_id=row.user_id,
+        order_snapshot=row.order_snapshot,
+        tier=tier or row.tier,
+        card_type=card_type or row.card_type,
+        animated=animated or row.animated,
+    )
+
+
+def _run_checkout_preview_generation(
+    db: Session,
+    row: CardCreationCheckout,
+    *,
+    tier: str,
+    card_type: str,
+    animated: bool,
+) -> None:
+    row.status = "processing"
+    row.updated_at = utcnow()
+    db.flush()
+    try:
+        previews = _generate_checkout_previews(
+            db,
+            row,
+            tier=tier,
+            card_type=card_type,
+            animated=animated,
+        )
+        row.preview_urls = previews
+        row.status = "awaiting_selection"
+        row.error_message = None
+        logger.info(
+            "Card creation previews ready checkout=%s user=%s previews=%s",
+            row.id,
+            row.user_id,
+            len(previews),
+        )
+    except Exception as exc:
+        logger.exception("Card creation fulfillment failed for checkout %s", row.id)
+        row.status = "failed"
+        row.error_message = str(exc)[:500]
+        raise
+    finally:
+        row.updated_at = utcnow()
+
+
 def begin_card_creation_checkout(
     db: Session,
     *,
@@ -44,8 +106,7 @@ def begin_card_creation_checkout(
     animated: bool = False,
     highlight_staging: dict | None = None,
 ) -> dict:
-    """Persist checkout state and return Stripe Checkout URL."""
-    require_payments_enabled()
+    """Persist checkout state and return Stripe Checkout URL or free-token session."""
     qty = _validate_copy_quantity(copy_quantity)
     tier = normalize_order_tier(order_snapshot.get("tier"))
     ct = normalize_card_type(card_type)
@@ -53,8 +114,22 @@ def begin_card_creation_checkout(
         animated = False
     elif ct == "animated":
         animated = True
-    quote = card_creation_quote(tier, card_type=ct, animated=animated)
-    amount = Decimal(str(quote["total"])).quantize(Decimal("0.01"))
+
+    locked_user = db.query(User).filter(User.id == user.id).with_for_update().first()
+    if locked_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    free_tokens_available = int(getattr(locked_user, "free_card_tokens", 0) or 0)
+    quote_data = card_creation_charge_with_free_token(
+        tier,
+        card_type=ct,
+        animated=animated,
+        free_tokens_available=free_tokens_available,
+    )
+    use_free_token = bool(quote_data.get("free_token_applied"))
+    charge_amount = Decimal(str(quote_data["charge_total"])).quantize(Decimal("0.01"))
+
+    if charge_amount > Decimal("0.00") or not use_free_token:
+        require_payments_enabled()
 
     snapshot = dict(order_snapshot)
     if ct == "highlight":
@@ -67,29 +142,71 @@ def begin_card_creation_checkout(
         snapshot["highlight_staging"] = highlight_staging
 
     checkout = CardCreationCheckout(
-        user_id=user.id,
+        user_id=locked_user.id,
         order_id=order_id,
         order_snapshot=snapshot,
         tier=tier,
         card_type=ct,
         animated=bool(animated),
         copy_quantity=qty,
-        amount_dollars=amount,
+        amount_dollars=charge_amount,
+        paid_with_free_token=use_free_token,
         status="pending",
     )
     db.add(checkout)
     db.flush()
 
+    quote = card_creation_quote(tier, card_type=ct, animated=animated)
+    response_quote = {
+        **quote,
+        "free_token_applied": use_free_token,
+        "base_covered_by_token": bool(quote_data.get("base_covered_by_token")),
+        "charge_total": float(charge_amount),
+    }
+
+    if use_free_token and charge_amount == Decimal("0.00"):
+        session_id = new_free_token_session_id(checkout.id)
+        checkout.stripe_session_id = session_id
+        db.commit()
+        db.refresh(checkout)
+        try:
+            _run_checkout_preview_generation(
+                db,
+                checkout,
+                tier=tier,
+                card_type=ct,
+                animated=animated,
+            )
+            db.commit()
+            db.refresh(checkout)
+        except Exception as exc:
+            db.commit()
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+        return {
+            "checkout_id": checkout.id,
+            "checkout_url": None,
+            "session_id": session_id,
+            "amount_dollars": 0.0,
+            "free_token_checkout": True,
+            "free_card_tokens_remaining": free_tokens_available,
+            "tier": tier,
+            "card_type": ct,
+            "animated": bool(animated),
+            "copy_quantity": qty,
+            "quote": response_quote,
+        }
+
     try:
         stripe_result = create_card_creation_checkout_session(
-            purchaser_user_id=user.id,
-            amount_dollars=amount,
+            purchaser_user_id=locked_user.id,
+            amount_dollars=charge_amount,
             tier=tier,
             card_type=ct,
             copy_quantity=qty,
             checkout_id=checkout.id,
             order_id=order_id,
             animated=bool(animated),
+            use_free_token=use_free_token,
         )
     except (ValueError, RuntimeError) as exc:
         db.rollback()
@@ -102,12 +219,15 @@ def begin_card_creation_checkout(
         "checkout_id": checkout.id,
         "checkout_url": stripe_result["checkout_url"],
         "session_id": stripe_result["session_id"],
-        "amount_dollars": float(amount),
+        "amount_dollars": float(charge_amount),
+        "free_token_checkout": False,
+        "free_token_applied": use_free_token,
+        "free_card_tokens_remaining": free_tokens_available,
         "tier": tier,
         "card_type": ct,
         "animated": bool(animated),
         "copy_quantity": qty,
-        "quote": quote,
+        "quote": response_quote,
     }
 
 
@@ -169,6 +289,7 @@ def get_card_creation_checkout_status(
         "card_type": row.card_type,
         "animated": row.animated,
         "amount_dollars": float(row.amount_dollars),
+        "paid_with_free_token": bool(row.paid_with_free_token),
         "result_card_id": row.result_card_id,
         "chosen_preview_index": row.chosen_preview_index,
         "repick_purchased": bool(row.repick_purchased),
@@ -223,35 +344,17 @@ def fulfill_card_creation_from_webhook(db: Session, session: dict) -> None:
         raise ValueError("Checkout user mismatch")
 
     row.stripe_session_id = session_id or row.stripe_session_id
-    row.status = "processing"
     row.updated_at = utcnow()
     db.flush()
 
     try:
-        from main import generate_paid_card_previews
-
-        previews = generate_paid_card_previews(
+        _run_checkout_preview_generation(
             db,
-            user_id=user_id,
-            order_snapshot=row.order_snapshot,
+            row,
             tier=tier or row.tier,
             card_type=card_type or row.card_type,
             animated=animated or row.animated,
         )
-        row.preview_urls = previews
-        row.status = "awaiting_selection"
-        row.error_message = None
-        logger.info(
-            "Card creation previews ready checkout=%s user=%s previews=%s",
-            row.id,
-            user_id,
-            len(previews),
-        )
-    except Exception as exc:
-        logger.exception("Card creation fulfillment failed for checkout %s", row.id)
-        row.status = "failed"
-        row.error_message = str(exc)[:500]
-        raise
     finally:
         row.updated_at = utcnow()
 
@@ -379,10 +482,12 @@ def select_card_creation_preview(
             preview_card_id=preview_card_id,
             generated_card_ids=generated_card_ids,
             final_image_url=chosen.get("image_url") or "",
+            paid_with_free_token=bool(row.paid_with_free_token),
         )
         row.result_card_id = result_card_id
         row.status = "completed"
         row.error_message = None
+        consume_free_card_token_after_success(db, user_id=user_id, checkout=row)
     except Exception as exc:
         row.status = "awaiting_selection"
         row.chosen_preview_index = None

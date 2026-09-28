@@ -1014,5 +1014,63 @@ def run_connect_marketplace_migrations(engine: Engine) -> None:
                     )
                 )
 
+        if "users" in table_names:
+            ucols = {c["name"] for c in insp.get_columns("users")}
+            if "free_card_tokens" not in ucols:
+                logger.info("Migration: adding users.free_card_tokens")
+                if dialect == "postgresql":
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS "
+                            "free_card_tokens INTEGER NOT NULL DEFAULT 0"
+                        )
+                    )
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS "
+                            "free_card_tokens_granted INTEGER NOT NULL DEFAULT 0"
+                        )
+                    )
+                else:
+                    conn.execute(
+                        text("ALTER TABLE users ADD COLUMN free_card_tokens INTEGER NOT NULL DEFAULT 0")
+                    )
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ADD COLUMN free_card_tokens_granted "
+                            "INTEGER NOT NULL DEFAULT 0"
+                        )
+                    )
+        if "card_creation_checkouts" in table_names:
+            cc_cols = {c["name"] for c in insp.get_columns("card_creation_checkouts")}
+            if "paid_with_free_token" not in cc_cols:
+                logger.info("Migration: adding card_creation_checkouts.paid_with_free_token")
+                if dialect == "postgresql":
+                    conn.execute(
+                        text(
+                            "ALTER TABLE card_creation_checkouts ADD COLUMN IF NOT EXISTS "
+                            "paid_with_free_token BOOLEAN NOT NULL DEFAULT FALSE"
+                        )
+                    )
+                    conn.execute(
+                        text(
+                            "ALTER TABLE card_creation_checkouts ADD COLUMN IF NOT EXISTS "
+                            "free_token_consumed BOOLEAN NOT NULL DEFAULT FALSE"
+                        )
+                    )
+                else:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE card_creation_checkouts ADD COLUMN "
+                            "paid_with_free_token BOOLEAN NOT NULL DEFAULT 0"
+                        )
+                    )
+                    conn.execute(
+                        text(
+                            "ALTER TABLE card_creation_checkouts ADD COLUMN "
+                            "free_token_consumed BOOLEAN NOT NULL DEFAULT 0"
+                        )
+                    )
+
     logger.info("Connect/marketplace migrations complete")
 

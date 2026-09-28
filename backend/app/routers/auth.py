@@ -235,6 +235,8 @@ class UserProfileResponse(BaseModel):
     parent_email: str | None = Field(default=None)
     credit_balance: float = 0.0
     marketplace_balance: float = 0.0
+    free_card_tokens: int = 0
+    free_card_tokens_granted: int = 0
     stripe_connect_account_id: str | None = Field(default=None)
     stripe_account_status: str | None = Field(default=None)
     stripe_onboarding_complete: bool = False
@@ -352,6 +354,8 @@ def get_profile(
         parent_email=user.parent_email,
         credit_balance=float_from_decimal(user.credit_balance),
         marketplace_balance=float_from_decimal(getattr(user, "marketplace_balance", None) or 0),
+        free_card_tokens=int(getattr(user, "free_card_tokens", 0) or 0),
+        free_card_tokens_granted=int(getattr(user, "free_card_tokens_granted", 0) or 0),
         stripe_connect_account_id=user.stripe_account_id,
         stripe_account_status=user.stripe_account_status,
         stripe_onboarding_complete=bool(user.stripe_onboarding_complete),
@@ -775,6 +779,11 @@ def google_complete(body: GoogleCompleteBody, db: Session = Depends(get_db)):
         google_name=google_name,
         google_id=google_id,
     )
+    from free_card_token_service import grant_signup_free_card_tokens
+
+    grant_signup_free_card_tokens(db, user)
+    db.commit()
+    db.refresh(user)
     token = create_access_token({"sub": user.email})
     return {
         "access_token": token,

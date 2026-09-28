@@ -73,4 +73,6 @@ def auth_user_payload(user: User) -> dict:
         "display_name": user.display_name,
         "created_at": created.isoformat(),
         "credit_balance": float(user.credit_balance or 0),
+        "free_card_tokens": int(getattr(user, "free_card_tokens", 0) or 0),
+        "free_card_tokens_granted": int(getattr(user, "free_card_tokens_granted", 0) or 0),
     }

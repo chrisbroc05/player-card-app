@@ -25,6 +25,8 @@ class User(Base):
     google_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     parent_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
     credit_balance: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("0.00"), nullable=False)
+    free_card_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    free_card_tokens_granted: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     marketplace_balance: Mapped[Decimal] = mapped_column(
         Numeric(10, 2), default=Decimal("0.00"), nullable=False
     )
@@ -122,6 +124,8 @@ class CardCreationCheckout(Base):
     animated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     copy_quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     amount_dollars: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    paid_with_free_token: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    free_token_consumed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
     result_card_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     preview_urls: Mapped[list | None] = mapped_column(JSON, nullable=True)

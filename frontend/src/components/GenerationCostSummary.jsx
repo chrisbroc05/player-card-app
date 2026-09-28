@@ -73,6 +73,9 @@ export default function GenerationCostSummary({
   animationActionLabel = "",
   animationScenarioLabel = "",
   phase = "pay-upfront",
+  freeTokenApplied = false,
+  freeCardTokensRemaining = 0,
+  freeCardTokensGranted = 0,
 }) {
   if (!pricing) return null;
 
@@ -81,11 +84,12 @@ export default function GenerationCostSummary({
   const highlightFee = Number(pricing.highlight_fee) || 0;
   const animatedFee = Number(pricing.animated_fee ?? pricing.animated_upgrade_price) || 0;
   const showAnimatedLine = isAnimated || animateAtCheckout;
-  const total =
-    phase === "pay-upfront"
-      ? Number(pricing.card_creation_price) ||
-        basePrice + (isHighlight ? highlightFee : 0) + (showAnimatedLine ? animatedFee : 0)
-      : 0;
+  const fullTotal =
+    Number(pricing.card_creation_price) ||
+    basePrice + (isHighlight ? highlightFee : 0) + (showAnimatedLine ? animatedFee : 0);
+  const tokenCoversBase = freeTokenApplied && freeCardTokensRemaining > 0;
+  const upgradeTotal = (isHighlight ? highlightFee : 0) + (showAnimatedLine ? animatedFee : 0);
+  const total = phase === "pay-upfront" ? (tokenCoversBase ? upgradeTotal : fullTotal) : 0;
 
   const cardTypeLabel = isHighlight ? "Highlight" : isAnimated ? "Animated" : "Static";
   const tierCardLabel = tierLabel ? `${tierLabel} Card` : "Card";
@@ -140,7 +144,10 @@ export default function GenerationCostSummary({
         <div className="mt-2 rounded-lg border border-white/10 bg-cardBg/80 p-3">
           {isHighlight ? (
             <>
-              <TotalLine label={basePriceLabel} value={formatMoney(basePrice)} />
+              <TotalLine
+                label={basePriceLabel}
+                value={tokenCoversBase ? "Free (beta token)" : formatMoney(basePrice)}
+              />
               <TotalLine
                 label="Highlight upgrade"
                 value={formatMoney(highlightFee || Number(pricing.highlight_card_price) || 5)}
@@ -148,7 +155,10 @@ export default function GenerationCostSummary({
             </>
           ) : (
             <>
-              <TotalLine label={basePriceLabel} value={formatMoney(basePrice)} />
+              <TotalLine
+                label={basePriceLabel}
+                value={tokenCoversBase ? "Free (beta token)" : formatMoney(basePrice)}
+              />
               {showAnimatedLine ? (
                 <TotalLine
                   label={isAnimated && !animateAtCheckout ? "Animated" : "Animated upgrade"}
@@ -157,6 +167,12 @@ export default function GenerationCostSummary({
               ) : null}
             </>
           )}
+          {tokenCoversBase && freeCardTokensGranted > 0 ? (
+            <p className="py-1 text-[11px] text-brand-gold/85">
+              Beta perk — base tier covered ({freeCardTokensRemaining} token
+              {freeCardTokensRemaining === 1 ? "" : "s"} remaining)
+            </p>
+          ) : null}
           <div className="mt-2 flex justify-between gap-4 border-t border-white/10 pt-2">
             <span className="font-semibold text-white">Total</span>
             <span className="text-base font-bold tabular-nums text-brand-gold">{formatMoney(total)}</span>

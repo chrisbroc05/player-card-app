@@ -88,7 +88,7 @@ from card_repo import (  # noqa: E402
     pending_session_cards,
 )
 from database import SessionLocal, engine, get_db  # noqa: E402
-from beta_config import get_beta_invite_code  # noqa: E402
+from beta_config import get_beta_invite_code, invite_code_grants_free_tokens  # noqa: E402
 from models import Base, User  # noqa: E402
 from marketplace_jobs import run_marketplace_expiration_pass  # noqa: E402
 from marketplace_scheduler import (
@@ -958,6 +958,7 @@ def finalize_paid_card_selection(
     preview_card_id: str,
     generated_card_ids: list[str],
     final_image_url: str,
+    paid_with_free_token: bool = False,
 ) -> str:
     """Finalize chosen preview, mint copies with edition treatment, and queue extras."""
     from card_pricing import normalize_card_type
@@ -1013,21 +1014,30 @@ def finalize_paid_card_selection(
     amt = Decimal(str(amount_dollars)).quantize(Decimal("0.01"))
     tier_label = (tier or "rookie").replace("_", " ").title()
     type_label = "Highlight" if ct == "highlight" else "Animated" if ct == "animated" or animated else "Static"
-    record_platform_revenue(
-        db,
-        amount=amt,
-        source="card_creation",
-        reference_id=stripe_session_id,
-        note=f"Card creation — {type_label} {tier_label} ({qty} copies)",
-    )
-    record_card_creation_payment(
-        db,
-        user_id=user_id,
-        amount_dollars=amt,
-        tier=tier,
-        copy_quantity=qty,
-        stripe_session_id=stripe_session_id,
-    )
+    if amt > Decimal("0.00"):
+        record_platform_revenue(
+            db,
+            amount=amt,
+            source="card_creation",
+            reference_id=stripe_session_id,
+            note=f"Card creation — {type_label} {tier_label} ({qty} copies)",
+        )
+        record_card_creation_payment(
+            db,
+            user_id=user_id,
+            amount_dollars=amt,
+            tier=tier,
+            copy_quantity=qty,
+            stripe_session_id=stripe_session_id,
+        )
+    elif not paid_with_free_token:
+        record_platform_revenue(
+            db,
+            amount=amt,
+            source="card_creation",
+            reference_id=stripe_session_id,
+            note=f"Card creation — {type_label} {tier_label} ({qty} copies)",
+        )
     db.flush()
     return card_id
 
@@ -2304,6 +2314,8 @@ class UserPublic(BaseModel):
     created_at: str
     credit_balance: float = 0.0
     marketplace_balance: float = 0.0
+    free_card_tokens: int = 0
+    free_card_tokens_granted: int = 0
 
 
 class AuthTokenResponse(BaseModel):
@@ -2323,6 +2335,8 @@ def _user_public(user: User) -> UserPublic:
         created_at=created.isoformat(),
         credit_balance=float_from_decimal(user.credit_balance),
         marketplace_balance=float_from_decimal(getattr(user, "marketplace_balance", None) or 0),
+        free_card_tokens=int(getattr(user, "free_card_tokens", 0) or 0),
+        free_card_tokens_granted=int(getattr(user, "free_card_tokens_granted", 0) or 0),
     )
 
 
@@ -2401,6 +2415,11 @@ def auth_register(body: RegisterBody, db: Session = Depends(get_db)):
         parent_email=parent_email,
     )
     db.add(user)
+    db.flush()
+    if required_invite is not None and invite_code_grants_free_tokens(body.invite_code):
+        from free_card_token_service import grant_signup_free_card_tokens
+
+        grant_signup_free_card_tokens(db, user)
     db.commit()
     db.refresh(user)
     send_welcome_email(user.email, user.display_name, parent_email=user.parent_email)

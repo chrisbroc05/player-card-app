@@ -34,3 +34,20 @@ def set_beta_invite_code(new_code: str) -> str:
 
 def beta_mode_active() -> bool:
     return get_beta_invite_code() is not None
+
+
+def beta_signup_free_card_token_count() -> int:
+    """Free card creation tokens granted when a user redeems the beta invite code."""
+    try:
+        return max(0, int(os.environ.get("BETA_FREE_CARD_TOKENS", "5")))
+    except ValueError:
+        return 5
+
+
+def invite_code_grants_free_tokens(invite_code: str | None) -> bool:
+    """True when the provided invite code matches the active beta invite code."""
+    required = get_beta_invite_code()
+    if not required:
+        return False
+    provided = (invite_code or "").strip()
+    return bool(provided) and provided.casefold() == required.casefold()
