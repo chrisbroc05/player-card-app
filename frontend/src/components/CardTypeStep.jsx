@@ -54,7 +54,7 @@ export default function CardTypeStep({ value, onChange }) {
         <h3 className="text-lg font-semibold text-white">Choose Your Card Type</h3>
         <p className="mt-1 text-sm text-slate-400">Pick how you want your player card to look.</p>
       </div>
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-3">
         {options.map((opt) => {
           const isSel = selected === opt.id;
           return (

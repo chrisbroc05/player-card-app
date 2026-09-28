@@ -27,6 +27,7 @@ export default function MarketplaceCopyPicker({
     <ListingModal
       isOpen={open}
       onClose={onClose}
+      size="wide"
       ariaLabelledby="marketplace-copy-picker-title"
       debugLabel={isMulti ? "marketplace-copy-multi-picker" : "marketplace-copy-picker"}
     >

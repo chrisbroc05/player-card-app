@@ -14,6 +14,7 @@ export default function MarketplaceListingModeChooser({
     <ListingModal
       isOpen={open}
       onClose={onClose}
+      size="medium"
       ariaLabelledby="marketplace-list-mode-title"
       debugLabel="marketplace-list-mode"
     >

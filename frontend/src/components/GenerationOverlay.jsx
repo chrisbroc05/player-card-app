@@ -54,7 +54,13 @@ export default function GenerationOverlay({
       ) : null}
 
       <div
-        className={`generation-overlay__body${view === "compare" ? " generation-overlay__body--compare" : " reveal-content"}`}
+        className={
+          view === "compare"
+            ? "generation-overlay__body generation-overlay__body--compare"
+            : view === "paid-select"
+              ? "generation-overlay__body generation-overlay__body--compare generation-overlay__body--paid-select"
+              : "generation-overlay__body reveal-content"
+        }
       >
         {view === "experience" && cardCreationProps ? (
           <CardCreationExperience

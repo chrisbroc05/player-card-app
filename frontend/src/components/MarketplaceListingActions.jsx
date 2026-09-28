@@ -352,6 +352,7 @@ function MultiCopyListingModal({
     <ListingModal
       isOpen={open}
       onClose={onClose}
+      size="wide"
       ariaLabelledby="multi-list-title"
       debugLabel="multi-copy-list"
     >
@@ -498,6 +499,7 @@ function SingleCardListingModal({ open, card, busy, token, connectProfile, onClo
     <ListingModal
       isOpen={open}
       onClose={handleClose}
+      size="medium"
       ariaLabelledby="single-list-player-name"
       debugLabel="single-list"
     >

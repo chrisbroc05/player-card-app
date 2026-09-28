@@ -556,6 +556,7 @@ export default function MarketplaceMyListingsPage() {
       <ListingModal
         isOpen={Boolean(editPriceGroup)}
         onClose={() => setEditPriceGroup(null)}
+        size="medium"
         ariaLabelledby="edit-price-title"
         debugLabel="edit-listing-price"
       >
@@ -594,6 +595,7 @@ export default function MarketplaceMyListingsPage() {
       <ListingModal
         isOpen={Boolean(unlistSomeGroup)}
         onClose={() => setUnlistSomeGroup(null)}
+        size="medium"
         ariaLabelledby="unlist-some-title"
         debugLabel="unlist-some-copies"
       >
@@ -1085,7 +1087,7 @@ function UnlistAllConfirmModal({ open, group, busy, onClose, onConfirm }) {
       isOpen={open}
       onClose={onClose}
       ariaLabelledby="unlist-all-confirm-title"
-      maxWidth="340px"
+      maxWidth="480px"
     >
       <ConfirmationCardThumbnail card={group} className="unlist-all-confirm-thumb" />
       <div className="unlist-all-confirm-body">
@@ -1212,6 +1214,7 @@ function DeclineOfferConfirmModal({ open, payload, actionBusy, onCancel, onConfi
     <MarketplaceModalShell
       open={open}
       zIndex={73}
+      variant="centered"
       ariaLabelledBy="decline-offer-confirm-title"
       onBackdropClick={onCancel}
     >
@@ -1250,7 +1253,13 @@ function AcceptOfferSuccessModal({ open, payload, onGoProfile, onBackListings })
   if (!open || !payload) return null;
   const { listing, isTrade, net, newBalance } = payload;
   return (
-    <MarketplaceModalShell open={open} zIndex={74} borderClass="border-[var(--color-success)]/30" ariaLabelledBy="accept-offer-success-title">
+    <MarketplaceModalShell
+      open={open}
+      zIndex={74}
+      variant="centered"
+      borderClass="border-[var(--color-success)]/30"
+      ariaLabelledBy="accept-offer-success-title"
+    >
       <MarketplaceModalContent>
         <MarketplaceModalSuccessIcon />
         <h3 id="accept-offer-success-title" className="mt-4 text-center text-xl font-semibold text-white sm:text-2xl">

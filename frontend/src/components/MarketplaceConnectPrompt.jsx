@@ -77,7 +77,7 @@ export default function MarketplaceConnectPrompt({
 
   return (
     <div className={`rounded-xl border p-4 ${compact ? "text-sm" : ""}`}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3 sm:flex-nowrap sm:items-center">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Stripe Connect</p>
           <span className={`mt-2 inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${statusClass}`}>

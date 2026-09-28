@@ -5,46 +5,22 @@ import { createPortal } from "react-dom";
 const LISTING_OVERLAY_Z_INDEX = 999999;
 const LISTING_CONTENT_Z_INDEX = 1000000;
 
-const OVERLAY_STYLE = {
-  position: "fixed",
-  top: 0,
-  left: 0,
-  width: "100%",
-  height: "100%",
-  zIndex: LISTING_OVERLAY_Z_INDEX,
-  backgroundColor: "rgba(0,0,0,0.8)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "20px",
-  boxSizing: "border-box",
-};
-
-const CONTENT_STYLE = {
-  background: "#161616",
-  border: "1px solid rgba(201,168,76,0.4)",
-  borderRadius: "16px",
-  padding: "20px",
-  width: "100%",
-  maxWidth: "340px",
-  maxHeight: "75vh",
-  overflowY: "auto",
-  position: "relative",
-  zIndex: LISTING_CONTENT_Z_INDEX,
-  margin: "auto",
-  boxSizing: "border-box",
-  WebkitOverflowScrolling: "touch",
+const SIZE_CLASS = {
+  default: "listing-modal-dialog",
+  medium: "listing-modal-dialog listing-modal-dialog--medium",
+  wide: "listing-modal-dialog listing-modal-dialog--wide",
 };
 
 /**
  * Centered listing popup — always portaled to document.body.
+ * @param {"default"|"medium"|"wide"} size — responsive max-width (mobile stays 340px)
  * @param {string} [debugLabel] — logs in dev to verify portal version is active
  */
 export default function ListingModal({
   isOpen,
   onClose,
   children,
-  maxWidth = "340px",
+  size = "default",
   ariaLabelledby,
   debugLabel = "listing-modal",
 }) {
@@ -62,12 +38,18 @@ export default function ListingModal({
 
   if (!isOpen) return null;
 
-  const contentStyle = maxWidth === "340px" ? CONTENT_STYLE : { ...CONTENT_STYLE, maxWidth };
+  const dialogClass = SIZE_CLASS[size] || SIZE_CLASS.default;
 
   return createPortal(
-    <div style={OVERLAY_STYLE} role="presentation" onClick={onClose}>
+    <div
+      className="listing-modal-overlay"
+      style={{ zIndex: LISTING_OVERLAY_Z_INDEX }}
+      role="presentation"
+      onClick={onClose}
+    >
       <div
-        style={contentStyle}
+        className={dialogClass}
+        style={{ zIndex: LISTING_CONTENT_Z_INDEX }}
         role="dialog"
         aria-modal="true"
         aria-labelledby={ariaLabelledby}

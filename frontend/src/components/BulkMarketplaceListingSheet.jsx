@@ -369,6 +369,7 @@ export default function BulkMarketplaceListingSheet({
       <ListingModal
         isOpen={open && !confirmOpen}
         onClose={resetAndClose}
+        size="wide"
         ariaLabelledby="bulk-list-title"
         debugLabel={debugSource}
       >

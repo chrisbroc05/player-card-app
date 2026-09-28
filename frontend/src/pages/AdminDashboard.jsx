@@ -1165,7 +1165,7 @@ export default function AdminDashboard() {
             </div>
             {loading.users ? <p className="text-sm text-slate-400">Loading users…</p> : null}
             <div className="overflow-x-auto rounded-xl border border-white/10 bg-cardBg">
-              <table className="w-full min-w-[720px] text-left text-sm">
+              <table className="admin-users-table w-full min-w-[720px] text-left text-sm">
                 <thead className="border-b border-white/10 bg-cardBg2 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
                     {[

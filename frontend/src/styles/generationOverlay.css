@@ -16,10 +16,22 @@
     calc(24px + env(safe-area-inset-top, 0px)),
     calc(50vh - 300px)
   );
-  padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px));
   overflow-x: hidden;
   overflow-y: auto;
   box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .generation-overlay {
+    padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (min-width: 769px) {
+  .generation-overlay {
+    padding-bottom: 32px;
+    justify-content: center;
+  }
 }
 
 .generation-overlay__close {
@@ -102,13 +114,28 @@
   max-width: min(960px, 100%);
   justify-content: flex-start;
   padding-top: 2.5rem;
-  padding-bottom: calc(var(--pill-nav-height, 100px) + 24px);
   overflow-x: hidden;
   overflow-y: auto;
   width: 100%;
   flex: 1;
   min-height: 0;
   margin: 0;
+}
+
+@media (max-width: 768px) {
+  .generation-overlay__body--compare {
+    padding-bottom: calc(var(--pill-nav-height, 100px) + 24px);
+  }
+
+  .generation-overlay .preview-selection--compare {
+    padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (min-width: 769px) {
+  .generation-overlay__body--compare {
+    padding-bottom: 32px;
+  }
 }
 
 .overlay-card-container {
@@ -229,10 +256,6 @@
 
 .generation-overlay .preview-selection {
   width: 100%;
-}
-
-.generation-overlay .preview-selection--compare {
-  padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px));
 }
 
 .generation-overlay .comparison-action-bar {
@@ -357,4 +380,46 @@
 .paid-preview-selection__repick-btn {
   width: 100%;
   max-width: 320px;
+}
+
+@media (min-width: 768px) {
+  .generation-overlay__body--paid-select {
+    max-width: min(960px, 100%);
+    width: 100%;
+  }
+
+  .paid-preview-selection {
+    max-width: min(920px, 100%);
+  }
+
+  .paid-preview-selection__list {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: stretch;
+    gap: 1.25rem;
+  }
+
+  .paid-preview-selection__item {
+    flex: 1 1 280px;
+    max-width: 320px;
+  }
+
+  .paid-preview-selection__repick-btn {
+    max-width: 420px;
+  }
+
+  .reveal-content {
+    max-width: min(960px, 100%);
+  }
+
+  .reveal-card-wrapper {
+    width: min(300px, calc(100vw - 96px));
+  }
+
+  .generation-overlay .overlay-card-container,
+  .generation-overlay .reveal-card-wrapper {
+    width: min(300px, calc(100vw - 96px));
+    max-width: min(300px, calc(100vw - 96px));
+  }
 }

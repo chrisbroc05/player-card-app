@@ -3525,7 +3525,7 @@ export default function StudioPage() {
             ) : null}
 
             {currentStep === STEP_REVIEW && reviewSubPhase === "setup" ? (
-              <div className="grid gap-8">
+              <div className="studio-review-pay grid gap-8">
                 <div>
                   <h3 className="text-lg font-semibold text-white">Review & Pay</h3>
                   <p className="mt-1 text-sm text-slate-400">
@@ -3563,11 +3563,6 @@ export default function StudioPage() {
                     </ExpandableCardView>
                   </div>
                 ) : null}
-                <PackSizeSelector
-                  disabled={Boolean(orderActionKey)}
-                  value={copyQuantity}
-                  onChange={setCopyQuantity}
-                />
                 {isAnimatedCardType ? (
                   <div className="rounded-2xl border border-white/10 bg-[#111111]/90 p-4 sm:p-5">
                     <p className="text-sm font-semibold text-white">Choose your animation action</p>
@@ -3610,26 +3605,33 @@ export default function StudioPage() {
                     tier={orderTier || "rookie"}
                   />
                 ) : null}
-                <GenerationCostSummary
-                  playerName={playerDisplayName}
-                  teamName={teamName}
-                  position={position}
-                  jerseyNumber={jerseyNumber}
-                  gradYear={gradYear}
-                  tierLabel={selectedTierLabel}
-                  themeLabel={specialTheme ? selectedThemeLabel : ""}
-                  isHighlight={isHighlightCardType}
-                  isAnimated={isAnimatedCardType}
-                  copyQuantity={copyQuantity}
-                  pricing={generationPricing}
-                  animateAtCheckout={animateAtCheckout && cardType === "standard"}
-                  animationActionLabel={animationActionLabel}
-                  animationScenarioLabel={animationScenarioLabel}
-                  phase="pay-upfront"
-                  freeTokenApplied={hasFreeTokenPerk}
-                  freeCardTokensRemaining={freeCardTokens}
-                  freeCardTokensGranted={freeCardTokensGranted}
-                />
+                <div className="studio-review-pay__split">
+                  <PackSizeSelector
+                    disabled={Boolean(orderActionKey)}
+                    value={copyQuantity}
+                    onChange={setCopyQuantity}
+                  />
+                  <GenerationCostSummary
+                    playerName={playerDisplayName}
+                    teamName={teamName}
+                    position={position}
+                    jerseyNumber={jerseyNumber}
+                    gradYear={gradYear}
+                    tierLabel={selectedTierLabel}
+                    themeLabel={specialTheme ? selectedThemeLabel : ""}
+                    isHighlight={isHighlightCardType}
+                    isAnimated={isAnimatedCardType}
+                    copyQuantity={copyQuantity}
+                    pricing={generationPricing}
+                    animateAtCheckout={animateAtCheckout && cardType === "standard"}
+                    animationActionLabel={animationActionLabel}
+                    animationScenarioLabel={animationScenarioLabel}
+                    phase="pay-upfront"
+                    freeTokenApplied={hasFreeTokenPerk}
+                    freeCardTokensRemaining={freeCardTokens}
+                    freeCardTokensGranted={freeCardTokensGranted}
+                  />
+                </div>
                 {generationCap.blocked ? (
                   <GenerationCapNotice
                     usage={generationUsage}
