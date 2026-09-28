@@ -1177,9 +1177,9 @@ export default function AdminDashboard() {
                       ["trades_sent", "Trades sent"],
                       ["trades_received", "Trades received"],
                       ["credit_balance", "Credit Balance"],
-                      ["free_card_tokens_granted", "Free tokens"],
+                      ["free_card_tokens_granted", "Tokens granted"],
                       ["free_card_tokens_used", "Tokens used"],
-                      ["free_card_tokens_remaining", "Tokens left"],
+                      ["free_card_tokens_remaining", "Tokens remaining"],
                       ["created_at", "Member since"],
                     ].map(([key, label]) => (
                       <th key={key} className="p-3">

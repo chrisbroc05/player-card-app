@@ -28,23 +28,34 @@ def card_creation_charge_with_free_token(
     card_type: str = "static",
     animated: bool = False,
     free_tokens_available: int,
+    copy_quantity: int = 1,
 ) -> dict:
-    """Compute Stripe charge when a free token covers the base tier price."""
+    """
+    Compute Stripe charge when free tokens may cover the base tier price.
+
+    Each token covers one copy. Tokens apply only when copy_quantity <= available
+    tokens (no mixing free tokens and payment in one order).
+    """
     quote = card_creation_quote(tier, card_type=card_type, animated=animated)
     tokens = max(0, int(free_tokens_available or 0))
-    if tokens <= 0:
+    qty = max(1, int(copy_quantity or 1))
+
+    if tokens <= 0 or qty > tokens:
         return {
             **quote,
             "free_token_applied": False,
             "base_covered_by_token": False,
             "charge_total": quote["total"],
+            "tokens_to_consume": 0,
         }
+
     charge = round(float(quote.get("highlight_fee", 0)) + float(quote.get("animated_fee", 0)), 2)
     return {
         **quote,
         "free_token_applied": True,
         "base_covered_by_token": True,
         "charge_total": charge,
+        "tokens_to_consume": qty,
     }
 
 
@@ -58,22 +69,24 @@ def consume_free_card_token_after_success(
     user_id: int,
     checkout: CardCreationCheckout,
 ) -> int | None:
-    """Deduct one free token after card generation completes successfully."""
+    """Deduct free tokens equal to copy_quantity after card generation completes."""
     if not checkout.paid_with_free_token or checkout.free_token_consumed:
         return None
+    tokens_to_use = max(1, int(checkout.copy_quantity or 1))
     user = db.query(User).filter(User.id == user_id).with_for_update().first()
     if user is None:
         raise ValueError(f"User not found: {user_id}")
     remaining = int(getattr(user, "free_card_tokens", 0) or 0)
-    if remaining <= 0:
-        raise ValueError("No free card tokens remaining")
-    user.free_card_tokens = remaining - 1
+    if remaining < tokens_to_use:
+        raise ValueError("Not enough free card tokens remaining")
+    user.free_card_tokens = remaining - tokens_to_use
     checkout.free_token_consumed = True
     checkout.updated_at = utcnow()
     new_remaining = user.free_card_tokens
     record_free_beta_card_token_usage(
         db,
         user_id=user_id,
+        tokens_used=tokens_to_use,
         remaining=new_remaining,
         reference_id=checkout.stripe_session_id or str(checkout.id),
     )

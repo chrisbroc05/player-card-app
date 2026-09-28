@@ -105,6 +105,7 @@ def begin_card_creation_checkout(
     card_type: str = "static",
     animated: bool = False,
     highlight_staging: dict | None = None,
+    force_paid_checkout: bool = False,
 ) -> dict:
     """Persist checkout state and return Stripe Checkout URL or free-token session."""
     qty = _validate_copy_quantity(copy_quantity)
@@ -119,11 +120,13 @@ def begin_card_creation_checkout(
     if locked_user is None:
         raise HTTPException(status_code=404, detail="User not found")
     free_tokens_available = int(getattr(locked_user, "free_card_tokens", 0) or 0)
+    effective_free_tokens = 0 if force_paid_checkout else free_tokens_available
     quote_data = card_creation_charge_with_free_token(
         tier,
         card_type=ct,
         animated=animated,
-        free_tokens_available=free_tokens_available,
+        free_tokens_available=effective_free_tokens,
+        copy_quantity=qty,
     )
     use_free_token = bool(quote_data.get("free_token_applied"))
     charge_amount = Decimal(str(quote_data["charge_total"])).quantize(Decimal("0.01"))
@@ -157,11 +160,16 @@ def begin_card_creation_checkout(
     db.flush()
 
     quote = card_creation_quote(tier, card_type=ct, animated=animated)
+    tokens_to_consume = int(quote_data.get("tokens_to_consume") or 0) if use_free_token else 0
     response_quote = {
         **quote,
         "free_token_applied": use_free_token,
         "base_covered_by_token": bool(quote_data.get("base_covered_by_token")),
         "charge_total": float(charge_amount),
+        "tokens_to_consume": tokens_to_consume,
+        "free_card_tokens_remaining_after": max(0, free_tokens_available - tokens_to_consume)
+        if use_free_token
+        else free_tokens_available,
     }
 
     if use_free_token and charge_amount == Decimal("0.00"):
@@ -188,7 +196,8 @@ def begin_card_creation_checkout(
             "session_id": session_id,
             "amount_dollars": 0.0,
             "free_token_checkout": True,
-            "free_card_tokens_remaining": free_tokens_available,
+            "free_card_tokens_remaining": max(0, free_tokens_available - tokens_to_consume),
+            "tokens_to_consume": tokens_to_consume,
             "tier": tier,
             "card_type": ct,
             "animated": bool(animated),
@@ -223,6 +232,7 @@ def begin_card_creation_checkout(
         "free_token_checkout": False,
         "free_token_applied": use_free_token,
         "free_card_tokens_remaining": free_tokens_available,
+        "tokens_to_consume": tokens_to_consume,
         "tier": tier,
         "card_type": ct,
         "animated": bool(animated),

@@ -60,22 +60,61 @@ class FreeCardTokenTests(unittest.TestCase):
         self.assertEqual(user.free_card_tokens, 5)
         self.assertEqual(user.free_card_tokens_granted, 5)
 
-    def test_charge_with_free_token_covers_base_only(self) -> None:
-        static_quote = card_creation_charge_with_free_token(
+    def test_charge_with_free_token_covers_base_per_copy(self) -> None:
+        single = card_creation_charge_with_free_token(
+            normalize_order_tier("rookie"),
+            card_type="static",
+            animated=False,
+            free_tokens_available=5,
+            copy_quantity=1,
+        )
+        self.assertTrue(single["free_token_applied"])
+        self.assertEqual(single["charge_total"], 0.0)
+        self.assertEqual(single["tokens_to_consume"], 1)
+
+        five_pack = card_creation_charge_with_free_token(
+            normalize_order_tier("rookie"),
+            card_type="static",
+            animated=False,
+            free_tokens_available=5,
+            copy_quantity=5,
+        )
+        self.assertTrue(five_pack["free_token_applied"])
+        self.assertEqual(five_pack["charge_total"], 0.0)
+        self.assertEqual(five_pack["tokens_to_consume"], 5)
+
+        three_of_five = card_creation_charge_with_free_token(
+            normalize_order_tier("rookie"),
+            card_type="static",
+            animated=False,
+            free_tokens_available=5,
+            copy_quantity=3,
+        )
+        self.assertTrue(three_of_five["free_token_applied"])
+        self.assertEqual(three_of_five["tokens_to_consume"], 3)
+
+    def test_charge_rejects_pack_larger_than_tokens(self) -> None:
+        quote = card_creation_charge_with_free_token(
             normalize_order_tier("rookie"),
             card_type="static",
             animated=False,
             free_tokens_available=3,
+            copy_quantity=10,
         )
-        self.assertTrue(static_quote["free_token_applied"])
-        self.assertEqual(static_quote["charge_total"], 0.0)
+        self.assertFalse(quote["free_token_applied"])
+        self.assertEqual(quote["tokens_to_consume"], 0)
+        self.assertGreater(quote["charge_total"], 0.0)
 
+    def test_charge_with_free_token_covers_base_only_for_upgrades(self) -> None:
         animated_quote = card_creation_charge_with_free_token(
             normalize_order_tier("rookie"),
             card_type="static",
             animated=True,
             free_tokens_available=3,
+            copy_quantity=1,
         )
+        self.assertTrue(animated_quote["free_token_applied"])
+        self.assertEqual(animated_quote["tokens_to_consume"], 1)
         self.assertEqual(animated_quote["charge_total"], 10.0)
 
         highlight_quote = card_creation_charge_with_free_token(
@@ -83,7 +122,10 @@ class FreeCardTokenTests(unittest.TestCase):
             card_type="highlight",
             animated=False,
             free_tokens_available=3,
+            copy_quantity=1,
         )
+        self.assertTrue(highlight_quote["free_token_applied"])
+        self.assertEqual(highlight_quote["tokens_to_consume"], 1)
         self.assertEqual(highlight_quote["charge_total"], 5.0)
 
     def test_consume_token_after_success_logs_ledger(self) -> None:
@@ -91,7 +133,7 @@ class FreeCardTokenTests(unittest.TestCase):
             email="consume@example.com",
             display_name="Consume User",
             hashed_password="x",
-            free_card_tokens=2,
+            free_card_tokens=5,
             free_card_tokens_granted=5,
         )
         self.db.add(user)
@@ -105,7 +147,7 @@ class FreeCardTokenTests(unittest.TestCase):
             tier="rookie",
             card_type="static",
             animated=False,
-            copy_quantity=1,
+            copy_quantity=3,
             amount_dollars=Decimal("0.00"),
             paid_with_free_token=True,
             stripe_session_id="free_token_test_1",
@@ -123,14 +165,14 @@ class FreeCardTokenTests(unittest.TestCase):
         self.db.commit()
         self.db.refresh(user)
 
-        self.assertEqual(remaining, 1)
-        self.assertEqual(user.free_card_tokens, 1)
+        self.assertEqual(remaining, 2)
+        self.assertEqual(user.free_card_tokens, 2)
         self.assertTrue(checkout.free_token_consumed)
 
         rows = get_ledger(self.db, user.id, limit=10)
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["transaction_type"], TX_FREE_BETA_CARD)
-        self.assertIn("1 token used (1 remaining)", rows[0]["note"])
+        self.assertIn("3 tokens used (2 remaining)", rows[0]["note"])
 
 
 if __name__ == "__main__":

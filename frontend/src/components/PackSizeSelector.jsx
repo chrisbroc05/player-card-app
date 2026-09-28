@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   clampCopyQuantity,
   copyQuantityError,
@@ -19,10 +19,16 @@ export default function PackSizeSelector({
   value = 1,
   onChange,
   currentRun = 1,
+  freeCardTokensRemaining = 0,
+  usePaidCheckout = false,
+  onUsePaidCheckout,
 }) {
   const [mode, setMode] = useState("preset");
   const [customInput, setCustomInput] = useState("");
   const maxQty = maxCopyTarget(currentRun);
+  const hasFreeTokens = freeCardTokensRemaining > 0 && !usePaidCheckout;
+  const freeTokenCap = hasFreeTokens ? freeCardTokensRemaining : maxQty;
+  const effectiveMaxQty = hasFreeTokens ? Math.min(maxQty, freeTokenCap) : maxQty;
 
   const effectiveQty =
     mode === "custom" && isValidCopyQuantity(customInput, currentRun)
@@ -30,6 +36,13 @@ export default function PackSizeSelector({
       : mode === "custom"
         ? null
         : clampCopyQuantity(value, currentRun);
+
+  useEffect(() => {
+    if (!hasFreeTokens) return;
+    if (value > freeTokenCap) {
+      onChange?.(clampCopyQuantity(Math.max(1, freeTokenCap), currentRun));
+    }
+  }, [hasFreeTokens, freeTokenCap, value, currentRun, onChange]);
 
   useEffect(() => {
     if (mode !== "preset") return;
@@ -40,6 +53,7 @@ export default function PackSizeSelector({
   }, [mode, value]);
 
   function selectPreset(q) {
+    if (hasFreeTokens && q > freeTokenCap) return;
     setMode("preset");
     setCustomInput("");
     onChange?.(clampCopyQuantity(q, currentRun));
@@ -59,9 +73,10 @@ export default function PackSizeSelector({
       return;
     }
     const n = Number(digits);
-    if (n > maxQty) {
-      onChange?.(clampCopyQuantity(maxQty, currentRun));
-      setCustomInput(String(maxQty));
+    const cap = effectiveMaxQty;
+    if (n > cap) {
+      onChange?.(clampCopyQuantity(cap, currentRun));
+      setCustomInput(String(cap));
       return;
     }
     setCustomInput(digits);
@@ -70,10 +85,25 @@ export default function PackSizeSelector({
     }
   }
 
-  const customError =
-    mode === "custom" && customInput !== "" ? copyQuantityError(customInput, currentRun) : null;
+  const customError = useMemo(() => {
+    if (mode !== "custom" || customInput === "") return null;
+    const baseError = copyQuantityError(customInput, currentRun);
+    if (baseError) return baseError;
+    if (hasFreeTokens && Number(customInput) > freeTokenCap) {
+      return `You only have ${freeTokenCap} free card${freeTokenCap === 1 ? "" : "s"} remaining.`;
+    }
+    return null;
+  }, [mode, customInput, currentRun, hasFreeTokens, freeTokenCap]);
 
   const confirmationQty = effectiveQty ?? value;
+
+  const tokenHelperLine = useMemo(() => {
+    if (!hasFreeTokens || !confirmationQty) return null;
+    if (confirmationQty >= freeCardTokensRemaining) {
+      return "This will use all of your remaining free cards";
+    }
+    return `This will use ${confirmationQty} of your ${freeCardTokensRemaining} remaining free cards`;
+  }, [hasFreeTokens, confirmationQty, freeCardTokensRemaining]);
 
   return (
     <div className="rounded-2xl border border-white/10 bg-[#111111]/90 p-4 sm:p-5">
@@ -82,16 +112,29 @@ export default function PackSizeSelector({
         Your tier price includes the card design plus all copies.
       </p>
 
+      {hasFreeTokens ? (
+        <p className="mt-3 text-sm font-medium text-brand-gold">
+          You have {freeCardTokensRemaining} free card{freeCardTokensRemaining === 1 ? "" : "s"} remaining
+        </p>
+      ) : null}
+
+      {usePaidCheckout && freeCardTokensRemaining > 0 ? (
+        <p className="mt-3 text-sm text-slate-300">
+          Paying standard price — your free cards will not be used on this order.
+        </p>
+      ) : null}
+
       <div className="mt-5 flex flex-wrap gap-2">
         {PRESET_OPTIONS.filter((opt) => opt.value <= maxQty).map((opt) => {
           const isSel = mode === "preset" && value === opt.value;
+          const blockedByTokens = hasFreeTokens && opt.value > freeTokenCap;
           return (
             <button
               key={opt.value}
               type="button"
-              disabled={disabled}
+              disabled={disabled || blockedByTokens}
               onClick={() => selectPreset(opt.value)}
-              className={`min-h-[44px] rounded-full border px-4 py-2 text-sm font-semibold transition disabled:opacity-50 ${
+              className={`min-h-[44px] rounded-full border px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
                 isSel
                   ? "border-2 border-[#ffd700] bg-[#ffd70011] text-[#ffd700]"
                   : "border border-[#2a2a2a] bg-[#1a1a1a] text-white hover:border-white/25"
@@ -124,7 +167,7 @@ export default function PackSizeSelector({
             id="pack-custom-qty"
             type="number"
             min={COPY_QUANTITY_MIN}
-            max={maxQty}
+            max={effectiveMaxQty}
             inputMode="numeric"
             placeholder="Enter quantity"
             value={customInput}
@@ -144,6 +187,35 @@ export default function PackSizeSelector({
           <span className="font-semibold text-brand-gold">{confirmationQty}</span>{" "}
           {confirmationQty === 1 ? "copy" : "copies"} of this card
         </p>
+      ) : null}
+
+      {tokenHelperLine ? (
+        <p className="mt-2 text-sm text-brand-gold/90">{tokenHelperLine}</p>
+      ) : null}
+
+      {hasFreeTokens && typeof onUsePaidCheckout === "function" ? (
+        <p className="mt-4 text-xs text-slate-400">
+          You have {freeCardTokensRemaining} free cards remaining. Choose a pack size of{" "}
+          {freeCardTokensRemaining} or less to use your free cards, or{" "}
+          <button
+            type="button"
+            className="font-medium text-brand-gold underline underline-offset-2 hover:text-brand-gold-bright"
+            onClick={() => onUsePaidCheckout(true)}
+          >
+            pay for the full pack
+          </button>
+          .
+        </p>
+      ) : null}
+
+      {usePaidCheckout && typeof onUsePaidCheckout === "function" ? (
+        <button
+          type="button"
+          className="mt-3 text-xs font-medium text-brand-gold underline underline-offset-2 hover:text-brand-gold-bright"
+          onClick={() => onUsePaidCheckout(false)}
+        >
+          Use free cards instead
+        </button>
       ) : null}
     </div>
   );

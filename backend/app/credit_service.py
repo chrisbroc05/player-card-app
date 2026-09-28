@@ -458,13 +458,17 @@ def record_free_beta_card_token_usage(
     db: Session,
     *,
     user_id: int,
+    tokens_used: int = 1,
     remaining: int,
     reference_id: str | None,
 ) -> CreditLedger:
     """Log beta free card token usage (does not change credit balance)."""
     user = _lock_user(db, user_id)
     balance = _user_balance(user)
-    note = f"Free Beta Card — 1 token used ({max(0, int(remaining))} remaining)"
+    used = max(1, int(tokens_used or 1))
+    left = max(0, int(remaining))
+    token_word = "token" if used == 1 else "tokens"
+    note = f"Free Beta Card — {used} {token_word} used ({left} remaining)"
     return _append_ledger_row(
         db,
         user_id=user_id,

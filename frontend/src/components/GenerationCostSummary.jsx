@@ -75,7 +75,6 @@ export default function GenerationCostSummary({
   phase = "pay-upfront",
   freeTokenApplied = false,
   freeCardTokensRemaining = 0,
-  freeCardTokensGranted = 0,
 }) {
   if (!pricing) return null;
 
@@ -87,7 +86,9 @@ export default function GenerationCostSummary({
   const fullTotal =
     Number(pricing.card_creation_price) ||
     basePrice + (isHighlight ? highlightFee : 0) + (showAnimatedLine ? animatedFee : 0);
-  const tokenCoversBase = freeTokenApplied && freeCardTokensRemaining > 0;
+  const tokenCoversBase = freeTokenApplied && copies <= freeCardTokensRemaining;
+  const tokensUsed = tokenCoversBase ? copies : 0;
+  const tokensAfterOrder = tokenCoversBase ? Math.max(0, freeCardTokensRemaining - tokensUsed) : freeCardTokensRemaining;
   const upgradeTotal = (isHighlight ? highlightFee : 0) + (showAnimatedLine ? animatedFee : 0);
   const total = phase === "pay-upfront" ? (tokenCoversBase ? upgradeTotal : fullTotal) : 0;
 
@@ -146,7 +147,7 @@ export default function GenerationCostSummary({
             <>
               <TotalLine
                 label={basePriceLabel}
-                value={tokenCoversBase ? "Free (beta token)" : formatMoney(basePrice)}
+                value={tokenCoversBase ? "Free (beta tokens)" : formatMoney(basePrice)}
               />
               <TotalLine
                 label="Highlight upgrade"
@@ -157,7 +158,7 @@ export default function GenerationCostSummary({
             <>
               <TotalLine
                 label={basePriceLabel}
-                value={tokenCoversBase ? "Free (beta token)" : formatMoney(basePrice)}
+                value={tokenCoversBase ? "Free (beta tokens)" : formatMoney(basePrice)}
               />
               {showAnimatedLine ? (
                 <TotalLine
@@ -167,11 +168,17 @@ export default function GenerationCostSummary({
               ) : null}
             </>
           )}
-          {tokenCoversBase && freeCardTokensGranted > 0 ? (
-            <p className="py-1 text-[11px] text-brand-gold/85">
-              Beta perk — base tier covered ({freeCardTokensRemaining} token
-              {freeCardTokensRemaining === 1 ? "" : "s"} remaining)
-            </p>
+          {tokenCoversBase ? (
+            <>
+              <TotalLine
+                label="Free Beta Cards"
+                value={`-${tokensUsed} token${tokensUsed === 1 ? "" : "s"}`}
+              />
+              <TotalLine
+                label="Remaining after this order"
+                value={`${tokensAfterOrder} token${tokensAfterOrder === 1 ? "" : "s"}`}
+              />
+            </>
           ) : null}
           <div className="mt-2 flex justify-between gap-4 border-t border-white/10 pt-2">
             <span className="font-semibold text-white">Total</span>

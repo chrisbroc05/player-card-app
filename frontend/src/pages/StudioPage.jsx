@@ -391,6 +391,7 @@ export default function StudioPage() {
   const [previewPollCardId, setPreviewPollCardId] = useState("");
   const [addCollectionLoading, setAddCollectionLoading] = useState(false);
   const [copyQuantity, setCopyQuantity] = useState(1);
+  const [forcePaidCheckout, setForcePaidCheckout] = useState(false);
   const [animateAtCheckout, setAnimateAtCheckout] = useState(false);
   const [animateCheckoutError, setAnimateCheckoutError] = useState("");
   const [pendingSession, setPendingSession] = useState(null);
@@ -773,9 +774,12 @@ export default function StudioPage() {
   const freeCardTokens = Math.max(0, Number(user?.free_card_tokens ?? 0));
   const freeCardTokensGranted = Math.max(0, Number(user?.free_card_tokens_granted ?? freeCardTokens));
   const showAnimatedUpgradeLine = isAnimatedCardType || (cardType === "standard" && animateAtCheckout);
+  const freeTokenEligible =
+    freeCardTokens > 0 && !forcePaidCheckout && copyQuantity <= freeCardTokens;
+  const tokensToUse = freeTokenEligible ? copyQuantity : 0;
   const freeTokenCheckoutCharge = useMemo(() => {
     if (!generationPricing) return 0;
-    if (freeCardTokens <= 0) {
+    if (!freeTokenEligible) {
       return Number(generationPricing.card_creation_price ?? generationPricing.first_preview_price ?? 0);
     }
     const highlightFee = isHighlightCardType
@@ -785,9 +789,20 @@ export default function StudioPage() {
       ? Number(generationPricing.animated_fee ?? generationPricing.animated_upgrade_price ?? 0)
       : 0;
     return highlightFee + animatedFee;
-  }, [generationPricing, freeCardTokens, isHighlightCardType, showAnimatedUpgradeLine]);
-  const isFullyFreeTokenCheckout = freeCardTokens > 0 && freeTokenCheckoutCharge === 0;
+  }, [generationPricing, freeTokenEligible, isHighlightCardType, showAnimatedUpgradeLine]);
+  const isFullyFreeTokenCheckout = freeTokenEligible && freeTokenCheckoutCharge === 0;
   const hasFreeTokenPerk = freeCardTokens > 0;
+
+  useEffect(() => {
+    if (freeCardTokens <= 0) setForcePaidCheckout(false);
+  }, [freeCardTokens]);
+
+  function handleUsePaidCheckout(paid) {
+    setForcePaidCheckout(paid);
+    if (!paid && copyQuantity > freeCardTokens) {
+      setCopyQuantity(Math.max(1, freeCardTokens));
+    }
+  }
   const animatedUpgradeCost = Number(generationPricing?.animated_upgrade_price ?? 10);
   const additionalPreviewCost = Number(generationPricing?.additional_preview_price ?? 0);
   const copyPricingTiers = useMemo(
@@ -2532,6 +2547,7 @@ export default function StudioPage() {
       const checkoutPayload = {
         order_id: orderId,
         copy_quantity: copyQuantity,
+        force_paid_checkout: forcePaidCheckout,
         card_type: isHighlightCardType ? "highlight" : isAnimatedCardType ? "animated" : "static",
         animated: isAnimatedCardType || animateAtCheckout,
         action_category:
@@ -3610,6 +3626,9 @@ export default function StudioPage() {
                     disabled={Boolean(orderActionKey)}
                     value={copyQuantity}
                     onChange={setCopyQuantity}
+                    freeCardTokensRemaining={freeCardTokens}
+                    usePaidCheckout={forcePaidCheckout}
+                    onUsePaidCheckout={handleUsePaidCheckout}
                   />
                   <GenerationCostSummary
                     playerName={playerDisplayName}
@@ -3627,9 +3646,8 @@ export default function StudioPage() {
                     animationActionLabel={animationActionLabel}
                     animationScenarioLabel={animationScenarioLabel}
                     phase="pay-upfront"
-                    freeTokenApplied={hasFreeTokenPerk}
+                    freeTokenApplied={freeTokenEligible}
                     freeCardTokensRemaining={freeCardTokens}
-                    freeCardTokensGranted={freeCardTokensGranted}
                   />
                 </div>
                 {generationCap.blocked ? (
@@ -3640,9 +3658,9 @@ export default function StudioPage() {
                   />
                 ) : (
                   <>
-                    {hasFreeTokenPerk ? (
+                    {freeTokenEligible ? (
                       <p className="text-center text-xs text-brand-gold/90 sm:text-left">
-                        Beta perk — 1 of your {freeCardTokensGranted || freeCardTokens} free cards
+                        Beta perk — {tokensToUse} of your {freeCardTokensGranted || freeCardTokens} free cards
                         {isFullyFreeTokenCheckout ? "" : " (covers base tier)"}
                       </p>
                     ) : null}
@@ -3655,7 +3673,9 @@ export default function StudioPage() {
                           ? "Generating..."
                           : "Opening checkout..."
                         : isFullyFreeTokenCheckout
-                          ? `Generate Free Card (${freeCardTokens} remaining)`
+                          ? tokensToUse === freeCardTokens
+                            ? `Generate Free Card (uses all ${freeCardTokens} remaining)`
+                            : `Generate Free Card (${tokensToUse} of ${freeCardTokens} remaining)`
                           : `Pay & Generate — ${formatMoney(freeTokenCheckoutCharge)}`}
                     </StudioWizardContinue>
                     <GenerationDailyUsageHint usage={generationUsage} className="w-full basis-full text-center sm:text-left" />

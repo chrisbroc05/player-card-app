@@ -282,6 +282,7 @@ class CardCreationCheckoutBody(BaseModel):
     highlight_staging_url: str | None = Field(default=None, max_length=512)
     highlight_trim_start: float | None = None
     highlight_trim_end: float | None = None
+    force_paid_checkout: bool = False
 
 
 @router.post("/creation-highlight-staging")
@@ -419,6 +420,7 @@ def card_creation_checkout(
         card_type=ct,
         animated=animated,
         highlight_staging=highlight_staging,
+        force_paid_checkout=body.force_paid_checkout,
     )
 
 
