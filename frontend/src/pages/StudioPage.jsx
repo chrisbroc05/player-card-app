@@ -2589,6 +2589,8 @@ export default function StudioPage() {
         order_id: orderId,
         copy_quantity: copyQuantity,
         force_paid_checkout: forcePaidCheckout,
+        player_image_url: uploadedPhotoUrl || null,
+        face_photo_url: facePhotoUrl.trim() || null,
         card_type: isHighlightCardType ? "highlight" : isAnimatedCardType ? "animated" : "static",
         animated: isAnimatedCardType || animateAtCheckout,
         action_category:

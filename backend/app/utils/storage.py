@@ -134,11 +134,32 @@ def storage_key_from_url(url: str | None) -> str | None:
     return None
 
 
+def r2_object_exists(key: str) -> bool:
+    client = get_r2_client()
+    if not client:
+        return False
+    object_key = key.lstrip("/")
+    try:
+        client.head_object(Bucket=R2_BUCKET_NAME, Key=object_key)
+        return True
+    except Exception as exc:
+        code = ""
+        response = getattr(exc, "response", None)
+        if isinstance(response, dict):
+            code = str(response.get("Error", {}).get("Code", ""))
+        if code in ("404", "NoSuchKey", "NotFound"):
+            return False
+        logger.warning("R2 head_object failed for key %s: %s", object_key, exc)
+        return False
+
+
 def fetch_r2_object_bytes(key: str) -> bytes:
     client = get_r2_client()
     if not client:
         raise RuntimeError("R2 is not configured")
     object_key = key.lstrip("/")
+    if not r2_object_exists(object_key):
+        raise ValueError(f"R2 object not found: {object_key}")
     response = client.get_object(Bucket=R2_BUCKET_NAME, Key=object_key)
     return response["Body"].read()
 
@@ -154,16 +175,36 @@ def fetch_bytes_from_storage_url(url: str) -> bytes:
         if key:
             try:
                 return fetch_r2_object_bytes(key)
+            except ValueError:
+                raise
             except Exception as exc:
                 logger.warning("R2 get_object failed for key %s (%s): %s", key, s, exc)
 
     if s.startswith("http://") or s.startswith("https://"):
-        with httpx.Client(timeout=60.0, follow_redirects=True) as client:
-            resp = client.get(s)
-            resp.raise_for_status()
-            return resp.content
+        try:
+            with httpx.Client(timeout=60.0, follow_redirects=True) as client:
+                resp = client.get(s)
+                resp.raise_for_status()
+                return resp.content
+        except httpx.HTTPError as exc:
+            raise ValueError(f"Could not fetch image from storage: {s}") from exc
 
     raise ValueError(f"Could not fetch image from storage: {s}")
+
+
+def resolve_optional_source_image_path(
+    image_url: str | None,
+    upload_dir: Path,
+) -> tuple[Path | None, bool]:
+    """Resolve an optional reference image; return (None, False) when missing."""
+    s = (image_url or "").strip()
+    if not s:
+        return None, False
+    try:
+        return resolve_source_image_path(s, upload_dir)
+    except (ValueError, OSError) as exc:
+        logger.warning("Optional image could not be resolved (%s): %s", s, exc)
+        return None, False
 
 
 def _write_bytes_to_temp_file(data: bytes, suffix: str) -> tuple[Path, bool]:

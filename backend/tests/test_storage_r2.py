@@ -68,6 +68,19 @@ class ResolveSourceImagePathTests(unittest.TestCase):
         mock_fetch.assert_called_once_with("uploads/missing-local.jpg")
         path.unlink(missing_ok=True)
 
+    @patch("utils.storage.fetch_r2_object_bytes")
+    def test_optional_face_photo_missing_returns_none(self, mock_fetch: MagicMock) -> None:
+        from utils.storage import resolve_optional_source_image_path
+
+        mock_fetch.side_effect = ValueError("R2 object not found: uploads/face/temp_x.jpg")
+        url = "https://pub-cb37d7e679bb4b33ac276ef1c3cfeb96.r2.dev/uploads/face/temp_x.jpg"
+
+        with patch("utils.storage.is_r2_configured", return_value=True):
+            path, is_temp = resolve_optional_source_image_path(url, Path("/tmp/uploads"))
+
+        self.assertIsNone(path)
+        self.assertFalse(is_temp)
+
 
 class FetchBytesFromStorageUrlTests(unittest.TestCase):
     @patch("utils.storage.fetch_r2_object_bytes")

@@ -631,10 +631,15 @@ def _generate_order_card_internal(
         face_path: Path | None = None
         face_is_temp = False
         if face_photo_raw:
-            try:
-                face_path, face_is_temp = resolve_source_image_path(face_photo_raw, UPLOAD_DIR)
-            except ValueError as exc:
-                logger.warning("Face photo could not be resolved for order %s: %s", order_id, exc)
+            from utils.storage import resolve_optional_source_image_path
+
+            face_path, face_is_temp = resolve_optional_source_image_path(face_photo_raw, UPLOAD_DIR)
+            if face_path is None:
+                logger.warning(
+                    "Face photo unavailable for order %s; continuing without face reference (%s)",
+                    order_id,
+                    face_photo_raw,
+                )
         try:
             try:
                 result = _generate_card_openai(
@@ -3067,11 +3072,11 @@ async def upload_image(
     filename = f"{uuid4().hex}{ext}"
     r2_key = f"uploads/{filename}"
 
-    from utils.storage import is_r2_configured, upload_file_to_r2
+    from utils.storage import is_r2_configured, r2_object_exists, upload_file_to_r2
 
     if is_r2_configured():
         public_url = upload_file_to_r2(data, r2_key, content_type)
-        if not public_url:
+        if not public_url or not r2_object_exists(r2_key):
             raise HTTPException(
                 status_code=503,
                 detail="Could not upload your photo to storage. Please try again in a moment.",
@@ -3114,11 +3119,11 @@ async def upload_face_image(
     r2_key = f"uploads/face/{filename}"
     face_local_dir = UPLOAD_DIR / "face"
 
-    from utils.storage import is_r2_configured, upload_file_to_r2
+    from utils.storage import is_r2_configured, r2_object_exists, upload_file_to_r2
 
     if is_r2_configured():
         public_url = upload_file_to_r2(data, r2_key, content_type)
-        if not public_url:
+        if not public_url or not r2_object_exists(r2_key):
             raise HTTPException(
                 status_code=503,
                 detail="Could not upload your face photo to storage. Please try again in a moment.",

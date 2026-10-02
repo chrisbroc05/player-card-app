@@ -283,6 +283,8 @@ class CardCreationCheckoutBody(BaseModel):
     highlight_trim_start: float | None = None
     highlight_trim_end: float | None = None
     force_paid_checkout: bool = False
+    player_image_url: str | None = Field(default=None, max_length=2000)
+    face_photo_url: str | None = Field(default=None, max_length=2000)
 
 
 @router.post("/creation-highlight-staging")
@@ -399,6 +401,10 @@ def card_creation_checkout(
         order["selected_motion_id"] = body.selected_motion_id.strip()
     if body.animation_scenario_id:
         order["animation_scenario_id"] = body.animation_scenario_id.strip()
+    if body.player_image_url:
+        order["player_image_url"] = body.player_image_url.strip()
+    if body.face_photo_url is not None:
+        order["face_photo_url"] = body.face_photo_url.strip() or None
 
     highlight_staging = None
     if ct == "highlight":
