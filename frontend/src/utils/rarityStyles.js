@@ -44,6 +44,28 @@ export function shouldShowRarityBadge(rarity) {
   return normalizeRarityKey(rarity) !== RARITY_KEYS.STANDARD;
 }
 
+/** ~1 in 6 foil/refractor pulls get the animated rainbow shimmer (stable per card_id). */
+const SHIMMER_BONUS_MODULO = 6;
+
+function stableCardHash(cardId) {
+  const id = String(cardId || "").trim();
+  if (!id) return 0;
+  let hash = 0;
+  for (let i = 0; i < id.length; i += 1) {
+    hash = (Math.imul(31, hash) + id.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+export function cardHasRainbowShimmer(card) {
+  if (!card || typeof card !== "object") return false;
+  if (card.shimmer_bonus === true) return true;
+  if (card.shimmer_bonus === false) return false;
+  const key = normalizeRarityKey(card.rarity);
+  if (key !== RARITY_KEYS.FOIL && key !== RARITY_KEYS.REFRACTOR) return false;
+  return stableCardHash(card.card_id || card.id) % SHIMMER_BONUS_MODULO === 0;
+}
+
 /** Foil gets enhanced reveal but no badge on card */
 export function getRevealTier(rarity) {
   return normalizeRarityKey(rarity);

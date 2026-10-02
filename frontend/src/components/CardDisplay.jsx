@@ -11,7 +11,7 @@ import {
 } from "../utils/cardTemplate";
 import { bannerNameModifier, getCardBannerStyles } from "../utils/cardBannerStyles";
 import { getHighlightCardStyles } from "../utils/highlightCardStyles";
-import { shouldShowThemeIcon } from "../utils/rarityStyles";
+import { cardHasRainbowShimmer, shouldShowThemeIcon } from "../utils/rarityStyles";
 import ThemeVideoIcon from "./ThemeVideoIcon";
 
 /**
@@ -61,6 +61,7 @@ const CardDisplay = React.forwardRef(function CardDisplay(
   const displayRarity = selectionPreviewMode ? "standard" : rarity;
   const displayTemplate = selectionPreviewMode ? 1 : rarityTemplate;
   const showThemeIcon = !selectionPreviewMode && shouldShowThemeIcon(rarity);
+  const hasRainbowShimmer = !selectionPreviewMode && cardHasRainbowShimmer(card);
   const rarityBadgeSize = size === "detail" ? "detail" : "thumb";
   const highlightStyles = isHighlight ? getHighlightCardStyles(tier, theme) : null;
   const frame = tierFrameStyles(tier);
@@ -93,7 +94,8 @@ const CardDisplay = React.forwardRef(function CardDisplay(
       data-tier={selectionPreviewMode ? "rookie" : templateTierKey}
       data-template={String(displayTemplate || 1)}
       data-rarity={displayRarity || "standard"}
-      className={`card-display-container card-shell relative flex w-full min-w-[210px] min-h-0 flex-col overflow-hidden ${shellRadiusClass} ${CARD_ASPECT_CLASS} ${frameClasses}${selectionPreviewMode ? " card-shell--selection-preview" : ""} ${className}`}
+      data-shimmer={hasRainbowShimmer ? "true" : "false"}
+      className={`card-display-container card-shell relative flex w-full min-w-[210px] min-h-0 flex-col overflow-hidden ${shellRadiusClass} ${CARD_ASPECT_CLASS} ${frameClasses}${selectionPreviewMode ? " card-shell--selection-preview" : ""}${hasRainbowShimmer ? " card-shell--rainbow-shimmer" : ""} ${className}`}
     >
       {!isHighlight && meta.themeOverlay ? (
         <div className={`pointer-events-none absolute inset-0 z-[4] ${meta.themeOverlay}`} aria-hidden />

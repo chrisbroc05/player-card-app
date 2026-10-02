@@ -1514,7 +1514,7 @@
 
 [data-tier="rookie"][data-template="5"] {
   --card-border: #c9a84c;
-  animation: prizm-border 3s linear infinite;
+  --card-glow: rgba(201, 168, 76, 0.4);
 }
 
 [data-tier="all_star"][data-template="1"] {
@@ -1554,7 +1554,7 @@
 
 [data-tier="legends"][data-template="3"] {
   --card-border: #ffd700;
-  animation: holo-border 4s linear infinite;
+  --card-glow: rgba(255, 215, 0, 0.6);
 }
 
 [data-tier="legends"][data-template="4"] {
@@ -1567,7 +1567,7 @@
   --card-glow: rgba(128, 0, 128, 0.5);
 }
 
-@keyframes prizm-border {
+@keyframes card-rainbow-shimmer {
   0% {
     filter: hue-rotate(0deg);
   }
@@ -1576,15 +1576,9 @@
   }
 }
 
-@keyframes holo-border {
-  0% {
-    filter: hue-rotate(0deg) brightness(1.2);
-  }
-  50% {
-    filter: hue-rotate(180deg) brightness(1.4);
-  }
-  100% {
-    filter: hue-rotate(360deg) brightness(1.2);
+@media (prefers-reduced-motion: no-preference) {
+  .card-shell--rainbow-shimmer {
+    animation: card-rainbow-shimmer 3s linear infinite;
   }
 }
 

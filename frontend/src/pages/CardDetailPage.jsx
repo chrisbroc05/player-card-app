@@ -14,7 +14,7 @@ import { useAuth } from "../context/AuthContext";
 import CardHistoryTimeline from "../components/CardHistoryTimeline";
 import { vaultTierBadge } from "../utils/tierStyles";
 import { templateDisplayName } from "../utils/cardTemplate";
-import { normalizeRarityKey } from "../utils/rarityStyles";
+import { normalizeRarityKey, rarityDisplayLabel } from "../utils/rarityStyles";
 import RarityBadge from "../components/RarityBadge";
 import { isAnimatedCard } from "../utils/animationCard";
 import { isHighlightCard } from "../utils/highlightCard";
@@ -283,17 +283,22 @@ export default function CardDetailPage() {
                     </span>
                   </p>
                 ) : null}
-                <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-                  <RarityBadge rarity={displayCard?.rarity} size="detail" />
-                  <span className="text-sm font-medium text-slate-300">
-                    {templateDisplayName(
-                      displayCard?.tier,
-                      displayCard?.rarity_template,
-                      displayCard?.template_name
-                    )}
-                  </span>
-                  {isAnimatedCard(displayCard) ? <AnimatedBadge /> : null}
-                  {isHighlightCard(displayCard) ? <HighlightBadge /> : null}
+                <div className="flex flex-col items-center gap-2 sm:items-start">
+                  <p className="text-lg font-bold tracking-wide text-white">
+                    {rarityDisplayLabel(displayCard?.rarity, displayCard?.rarity_display_name)}
+                  </p>
+                  <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                    <RarityBadge rarity={displayCard?.rarity} size="detail" />
+                    <span className="text-sm font-medium text-slate-300">
+                      {templateDisplayName(
+                        displayCard?.tier,
+                        displayCard?.rarity_template,
+                        displayCard?.template_name
+                      )}
+                    </span>
+                    {isAnimatedCard(displayCard) ? <AnimatedBadge /> : null}
+                    {isHighlightCard(displayCard) ? <HighlightBadge /> : null}
+                  </div>
                 </div>
 
                 {normalizeRarityKey(displayCard?.rarity) === "one_of_one" ? (
