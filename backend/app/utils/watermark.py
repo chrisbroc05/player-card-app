@@ -7,10 +7,9 @@ from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
 
-import httpx
 from PIL import Image, ImageDraw, ImageFont
 
-from utils.storage import app_data_root, local_path_from_media_url, save_bytes_to_storage
+from utils.storage import app_data_root, fetch_bytes_from_storage_url, local_path_from_media_url, save_bytes_to_storage
 
 logger = logging.getLogger(__name__)
 
@@ -89,10 +88,7 @@ def _fetch_image_bytes(image_url: str) -> bytes:
     if local_path is not None and local_path.is_file():
         return local_path.read_bytes()
 
-    with httpx.Client(timeout=60.0, follow_redirects=True) as client:
-        response = client.get(image_url)
-        response.raise_for_status()
-        return response.content
+    return fetch_bytes_from_storage_url(image_url)
 
 
 GOLD_BORDER = (201, 168, 76, 255)  # #C9A84C
