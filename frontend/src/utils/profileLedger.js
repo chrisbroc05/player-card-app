@@ -31,11 +31,10 @@ export function profileTransactionMeta(row) {
   }
 
   if (type === "withdrawal") {
-    const method = note.includes("bank") ? "Bank Transfer" : "Payout";
     return {
       icon: "⬇️",
       dotClass: "profile-tx-dot--gold",
-      description: `Withdrawal — ${method}`,
+      description: "Withdrawal to bank account",
       amountClass: "credit-ledger-row__amount--gold",
     };
   }

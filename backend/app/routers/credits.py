@@ -212,6 +212,7 @@ def credits_withdraw(
             raise HTTPException(status_code=400, detail="Insufficient marketplace balance") from None
 
         new_balance = float_from_decimal(row.balance_after)
+        withdrawable = compute_marketplace_withdrawable(db, current_user.id)
 
         background_tasks.add_task(
             send_withdrawal_confirmation_email,
@@ -224,6 +225,7 @@ def credits_withdraw(
 
         return {
             "marketplace_balance": new_balance,
+            "marketplace_withdrawable": float_from_decimal(withdrawable),
             "payout_id": payout_id,
             "message": "Withdrawal initiated — funds will arrive per your bank's payout schedule.",
         }

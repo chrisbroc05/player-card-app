@@ -13,6 +13,7 @@ import {
   minCreditPurchaseLabel,
 } from "../utils/credits";
 import { updateLastActive } from "../utils/activityTracker";
+import { API_BASE_URL } from "../config/api";
 
 const PRESET_AMOUNTS = [10, 20, 50, 100];
 const LEDGER_PAGE_SIZE = 10;
@@ -37,6 +38,10 @@ function ledgerTypeIcon(type) {
 }
 
 function ledgerDescription(row) {
+  const type = (row?.transaction_type || "").toLowerCase();
+  if (type === "withdrawal") {
+    return "Withdrawal to bank account";
+  }
   const note = (row?.note || "").trim();
   if (note) return note;
   return txTypeLabel(row?.transaction_type);
@@ -54,7 +59,7 @@ function txTypeLabel(type) {
     animation: "Animation",
     highlight: "Highlight video",
     priority: "Priority listing",
-    withdrawal: "Withdrawal",
+    withdrawal: "Withdrawal to bank",
     refund: "Refund",
     card_creation: "Card Created",
   };
@@ -195,6 +200,7 @@ export default function CreditsPage() {
   const [withdrawErrorOpen, setWithdrawErrorOpen] = useState(false);
   const [withdrawErrorModalMessage, setWithdrawErrorModalMessage] = useState("");
   const [withdrawSuccessData, setWithdrawSuccessData] = useState(null);
+  const [withdrawDashboardBusy, setWithdrawDashboardBusy] = useState(false);
   const [payoutsEnabled, setPayoutsEnabled] = useState(false);
   const [chargesEnabled, setChargesEnabled] = useState(false);
   const [connectProfile, setConnectProfile] = useState(null);
@@ -511,12 +517,28 @@ export default function CreditsPage() {
         );
       }
       const newBalance = Number(data.marketplace_balance ?? data.credit_balance);
-      setMarketplaceBalance(Number.isFinite(newBalance) ? newBalance : balance - n);
+      const newWithdrawable =
+        data.marketplace_withdrawable != null
+          ? Number(data.marketplace_withdrawable)
+          : Math.max(0, withdrawableBalance - n);
+      if (Number.isFinite(newBalance)) {
+        setMarketplaceBalance(newBalance);
+      } else {
+        setMarketplaceBalance(Math.max(0, balance - n));
+      }
+      if (Number.isFinite(newWithdrawable)) {
+        setMarketplaceWithdrawable(Math.max(0, newWithdrawable));
+      } else {
+        setMarketplaceWithdrawable(Math.max(0, withdrawableBalance - n));
+      }
       setWithdrawAmount("");
-      await Promise.all([refreshUser?.(), loadLedger()]);
+      await Promise.all([refreshUser?.(), loadLedger(), loadBalancesAndProfile()]);
       setWithdrawSuccessData({
         amount: n,
-        newBalance: Number.isFinite(newBalance) ? newBalance : balance - n,
+        newBalance: Number.isFinite(newBalance) ? newBalance : Math.max(0, balance - n),
+        newWithdrawable: Number.isFinite(newWithdrawable)
+          ? Math.max(0, newWithdrawable)
+          : Math.max(0, withdrawableBalance - n),
       });
       setWithdrawSuccessOpen(true);
     } catch (e) {
@@ -528,6 +550,35 @@ export default function CreditsPage() {
       setWithdrawErrorOpen(true);
     } finally {
       setWithdrawBusy(false);
+    }
+  }
+
+  async function openStripeExpressDashboard() {
+    if (!token) return;
+    setWithdrawDashboardBusy(true);
+    try {
+      const { res, unauthorized } = await authFetch(token, "/connect/dashboard-link", {
+        method: "POST",
+      });
+      if (unauthorized) {
+        setWithdrawErrorModalMessage("Session expired. Please sign in again.");
+        setWithdrawErrorOpen(true);
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(formatApiError(data?.detail, "Could not open Stripe dashboard."));
+      }
+      if (data.url) {
+        window.open(data.url, "_blank", "noopener,noreferrer");
+        return;
+      }
+      throw new Error("No dashboard URL returned.");
+    } catch (e) {
+      setWithdrawErrorModalMessage(e.message || "Could not open Stripe dashboard.");
+      setWithdrawErrorOpen(true);
+    } finally {
+      setWithdrawDashboardBusy(false);
     }
   }
 
@@ -816,36 +867,42 @@ export default function CreditsPage() {
             aria-labelledby="withdraw-success-title"
             aria-modal="true"
           >
-            <h3 id="withdraw-success-title" className="text-center text-lg font-semibold text-white">
-              Withdrawal Initiated! 🎉
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/15 text-2xl">
+              ✓
+            </div>
+            <h3 id="withdraw-success-title" className="mt-4 text-center text-lg font-semibold text-white">
+              Withdrawal initiated!
             </h3>
             <p className="mt-3 text-center text-sm leading-relaxed text-slate-300">
-              Your withdrawal of {formatMoney(withdrawSuccessData.amount)} has been sent to your
-              connected bank account.
+              {formatMoney(withdrawSuccessData.amount)} is on its way to your bank. Funds typically
+              arrive in 2–3 business days. You&apos;ll get a confirmation email shortly.
             </p>
-            <p className="mt-4 text-center text-3xl font-bold tabular-nums text-brand-gold">
-              {formatMoney(withdrawSuccessData.amount)}
+            <p className="mt-4 text-center text-xs font-medium uppercase tracking-wide text-slate-500">
+              Available to withdraw now
             </p>
-            <p className="mt-4 text-center text-xs leading-relaxed text-slate-500">
-              Funds typically arrive within 2-3 business days. You will receive a confirmation email
-              shortly.
+            <p className="mt-1 text-center text-2xl font-bold tabular-nums text-brand-gold">
+              {formatMoney(withdrawSuccessData.newWithdrawable ?? withdrawSuccessData.newBalance)}
             </p>
-            <p className="mt-4 text-center text-sm text-slate-300">
-              Your new marketplace balance:{" "}
-              <span className="font-semibold tabular-nums text-white">
-                {formatMoney(withdrawSuccessData.newBalance)}
-              </span>
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                setWithdrawSuccessOpen(false);
-                setWithdrawSuccessData(null);
-              }}
-              className="mt-6 min-h-[48px] w-full rounded-xl btn-primary font-semibold text-slate-950"
-            >
-              Done
-            </button>
+            <div className="mt-6 flex flex-col gap-2">
+              <button
+                type="button"
+                disabled={withdrawDashboardBusy}
+                onClick={openStripeExpressDashboard}
+                className="min-h-[48px] w-full rounded-xl btn-primary font-semibold text-slate-950 disabled:opacity-50"
+              >
+                {withdrawDashboardBusy ? "Opening Stripe…" : "View payout in Stripe Express"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setWithdrawSuccessOpen(false);
+                  setWithdrawSuccessData(null);
+                }}
+                className="min-h-[44px] w-full rounded-xl border border-white/20 font-semibold text-slate-200"
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

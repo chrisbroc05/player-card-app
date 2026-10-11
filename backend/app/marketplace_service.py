@@ -626,7 +626,7 @@ def initiate_marketplace_withdrawal(
         amt,
         TX_WITHDRAWAL,
         reference_id=None,
-        note="Marketplace withdrawal initiated — pending Stripe payout",
+        note="Withdrawal to bank account",
     )
 
     logger.info(
@@ -644,7 +644,7 @@ def initiate_marketplace_withdrawal(
     )
     payout_id = getattr(payout, "id", None) or ""
     row.reference_id = payout_id
-    row.note = f"Marketplace withdrawal to bank (payout {payout_id})"
+    row.note = "Withdrawal to bank account"
     logger.info("WITHDRAW payout created: payout_id=%s user=%s", payout_id, user.id)
     return row, payout_id
 
