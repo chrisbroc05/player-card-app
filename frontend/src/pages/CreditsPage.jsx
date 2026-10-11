@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Navigate, useSearchParams } from "react-router-dom";
+import { Navigate, useLocation, useSearchParams } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import MarketplaceConnectPrompt from "../components/MarketplaceConnectPrompt";
@@ -178,6 +178,7 @@ function CreditLedgerRow({ row }) {
 
 export default function CreditsPage() {
   const { user, token, initializing, refreshUser } = useAuth();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedAmount, setSelectedAmount] = useState(20);
   const [customAmount, setCustomAmount] = useState("");
@@ -439,6 +440,21 @@ export default function CreditsPage() {
     }
   }, [searchParams, setSearchParams, refreshUser, loadLedger, loadBalancesAndProfile]);
 
+  useEffect(() => {
+    if (location.hash !== "#withdraw") return undefined;
+    if (profileLoading) return undefined;
+
+    const scrollToWithdraw = () => {
+      const el = document.getElementById("withdraw");
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    };
+
+    const t = window.setTimeout(scrollToWithdraw, 50);
+    return () => window.clearTimeout(t);
+  }, [location.hash, profileLoading]);
+
   function openWithdrawConfirm() {
     setWithdrawError("");
     const n = parsedWithdrawAmount;
@@ -597,30 +613,7 @@ export default function CreditsPage() {
           </div>
         ) : null}
 
-        <section className="mb-8 rounded-2xl border border-white/10 bg-cardBg p-5">
-          <h2 className="text-lg font-semibold text-white">Load Marketplace Funds</h2>
-          <p className="mt-1 text-sm text-slate-400">
-            Add spending balance for marketplace purchases. No bank connection required.
-          </p>
-          <LoadAmountPicker
-            selectedAmount={selectedAmount}
-            onSelectPreset={selectPresetAmount}
-            customAmount={customAmount}
-            onCustomChange={changeCustomAmount}
-            disabled={paymentsDisabled || marketplaceCheckoutBusy}
-          />
-
-          <button
-            type="button"
-            disabled={paymentsDisabled || marketplaceCheckoutBusy || !checkoutAmountValid}
-            onClick={startMarketplaceCheckout}
-            className="mt-5 min-h-[48px] w-full rounded-xl btn-primary font-semibold text-slate-950 disabled:opacity-50"
-          >
-            {loadMarketplaceButtonLabel}
-          </button>
-        </section>
-
-        <section id="withdraw" className="mb-8 rounded-2xl border border-white/10 bg-cardBg p-5">
+        <section id="withdraw" className="mb-8 scroll-focus-target rounded-2xl border border-white/10 bg-cardBg p-5">
           <h2 className="text-lg font-semibold text-white">Withdraw Marketplace Earnings</h2>
           {profileLoading ? (
             <div className="mt-6 flex justify-center py-6">
@@ -629,8 +622,8 @@ export default function CreditsPage() {
           ) : withdrawableBalance <= 0 ? (
             <p className="mt-3 text-sm text-slate-400">
               {balance > 0
-                ? "Your marketplace balance is for buying cards. Sale earnings available for bank withdrawal will appear here after you sell on the marketplace."
-                : "You have no marketplace earnings to withdraw. Sell cards on the marketplace to earn funds."}
+                ? "Your marketplace balance is for buying cards. Bank withdrawals only include sale earnings."
+                : "You have no earnings to withdraw yet. Sell cards on the marketplace to earn funds."}
             </p>
           ) : (
             <>
@@ -710,6 +703,29 @@ export default function CreditsPage() {
               </p>
             </>
           )}
+        </section>
+
+        <section className="mb-8 rounded-2xl border border-white/10 bg-cardBg p-5">
+          <h2 className="text-lg font-semibold text-white">Load Marketplace Funds</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Add spending balance for marketplace purchases. No bank connection required.
+          </p>
+          <LoadAmountPicker
+            selectedAmount={selectedAmount}
+            onSelectPreset={selectPresetAmount}
+            customAmount={customAmount}
+            onCustomChange={changeCustomAmount}
+            disabled={paymentsDisabled || marketplaceCheckoutBusy}
+          />
+
+          <button
+            type="button"
+            disabled={paymentsDisabled || marketplaceCheckoutBusy || !checkoutAmountValid}
+            onClick={startMarketplaceCheckout}
+            className="mt-5 min-h-[48px] w-full rounded-xl btn-primary font-semibold text-slate-950 disabled:opacity-50"
+          >
+            {loadMarketplaceButtonLabel}
+          </button>
         </section>
 
         <section className="rounded-2xl border border-white/10 bg-cardBg p-5">

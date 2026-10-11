@@ -25,13 +25,13 @@ from sqlalchemy.orm import Session, aliased
 
 from auth import ALGORITHM, SECRET_KEY
 from beta_config import beta_mode_active, get_beta_invite_code, set_beta_invite_code
-from credit_service import TX_ANIMATION, TX_HIGHLIGHT, TX_WITHDRAWAL
+from credit_service import TX_ANIMATION, TX_CARD_SALE, TX_HIGHLIGHT, TX_WITHDRAWAL
 from card_cleanup import permanently_delete_card
 from card_repo import get_card_by_card_id
 from database import get_db
 from marketplace_repo import float_from_decimal, listing_active_filter
 from models import Card, CreditLedger, MarketplaceOffer, PlatformRevenueLedger, TradeOffer, User, utcnow
-from marketplace_service import backfill_platform_revenue_ledger
+from marketplace_service import add_marketplace_balance, backfill_platform_revenue_ledger
 from stripe_connect import configure_stripe_client, create_onboarding_link
 from utils.usage import get_generation_caps, get_platform_generation_count, get_user_generation_count
 from utils.rarity import (
@@ -159,6 +159,14 @@ class AdminLoginResponse(BaseModel):
 class AdminInviteCodesResponse(BaseModel):
     current_code: str
     beta_mode_active: bool
+
+
+class AdminGrantMarketplaceEarningBody(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    email: str = Field(..., min_length=3, max_length=320)
+    amount_dollars: float = Field(..., gt=0, le=10_000)
+    note: str | None = Field(default=None, max_length=500)
 
 
 class AdminInviteCodesUpdateBody(BaseModel):
@@ -456,6 +464,40 @@ def admin_login(body: AdminLoginBody):
         )
 
     return AdminLoginResponse(access_token=create_admin_access_token())
+
+
+@router.post("/marketplace/grant-earning")
+def admin_grant_marketplace_earning(
+    body: AdminGrantMarketplaceEarningBody,
+    db: Session = Depends(get_db),
+    _admin: dict[str, Any] = Depends(require_admin),
+):
+    """Credit marketplace balance as a card_sale ledger entry (QA / support)."""
+    email = body.email.strip().lower()
+    user = db.query(User).filter(User.email == email).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    amt = Decimal(str(body.amount_dollars)).quantize(Decimal("0.01"))
+    note = (body.note or "").strip() or "Admin grant — marketplace sale earning (QA)"
+    row = add_marketplace_balance(
+        db,
+        user.id,
+        amt,
+        TX_CARD_SALE,
+        reference_id="admin_grant",
+        note=note,
+    )
+    db.commit()
+    db.refresh(user)
+    return {
+        "success": True,
+        "user_id": user.id,
+        "email": user.email,
+        "amount_dollars": float_from_decimal(amt),
+        "marketplace_balance": float_from_decimal(user.marketplace_balance),
+        "ledger_balance_after": float_from_decimal(row.balance_after),
+    }
 
 
 @router.get("/stats")
