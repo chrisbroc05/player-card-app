@@ -32,7 +32,7 @@ from database import get_db
 from marketplace_repo import float_from_decimal, listing_active_filter
 from models import Card, CreditLedger, MarketplaceOffer, PlatformRevenueLedger, TradeOffer, User, utcnow
 from marketplace_service import add_marketplace_balance, backfill_platform_revenue_ledger
-from stripe_connect import configure_stripe_client, create_onboarding_link
+from stripe_connect import configure_stripe_client, create_onboarding_link, reset_user_stripe_connect
 from utils.usage import get_generation_caps, get_platform_generation_count, get_user_generation_count
 from utils.rarity import (
     RARE_PULL_TIERS,
@@ -167,6 +167,13 @@ class AdminGrantMarketplaceEarningBody(BaseModel):
     email: str = Field(..., min_length=3, max_length=320)
     amount_dollars: float = Field(..., gt=0, le=10_000)
     note: str | None = Field(default=None, max_length=500)
+
+
+class AdminResetConnectBody(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    email: str = Field(..., min_length=3, max_length=320)
+    delete_stripe_account: bool = True
 
 
 class AdminInviteCodesUpdateBody(BaseModel):
@@ -497,6 +504,31 @@ def admin_grant_marketplace_earning(
         "amount_dollars": float_from_decimal(amt),
         "marketplace_balance": float_from_decimal(user.marketplace_balance),
         "ledger_balance_after": float_from_decimal(row.balance_after),
+    }
+
+
+@router.post("/marketplace/reset-connect")
+def admin_reset_marketplace_connect(
+    body: AdminResetConnectBody,
+    db: Session = Depends(get_db),
+    _admin: dict[str, Any] = Depends(require_admin),
+):
+    """Clear Stripe Connect onboarding state for a user (QA / support)."""
+    email = body.email.strip().lower()
+    user = db.query(User).filter(User.email == email).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    result = reset_user_stripe_connect(
+        db,
+        user,
+        delete_stripe_account=body.delete_stripe_account,
+    )
+    return {
+        "success": True,
+        "user_id": user.id,
+        "email": user.email,
+        **result,
     }
 
 

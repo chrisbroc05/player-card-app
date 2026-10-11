@@ -192,6 +192,45 @@ def sync_connect_account_status(db: Session, user: User) -> dict[str, bool | str
     return connect_status_payload(user)
 
 
+def reset_user_stripe_connect(
+    db: Session,
+    user: User,
+    *,
+    delete_stripe_account: bool = True,
+) -> dict[str, str | bool | None]:
+    """
+    Clear Connect fields on the user so onboarding can start fresh.
+    Optionally deletes the linked Express account in Stripe (recommended in test mode).
+    """
+    old_id = (user.stripe_account_id or "").strip() or None
+    deleted = False
+    if old_id and delete_stripe_account:
+        try:
+            _configure_stripe()
+            stripe.Account.delete(old_id)
+            deleted = True
+            logger.info("Deleted Stripe Connect account %s for user %s", old_id, user.id)
+        except Exception as exc:
+            logger.warning(
+                "Could not delete Stripe Connect account %s for user %s: %s",
+                old_id,
+                user.id,
+                exc,
+            )
+
+    user.stripe_account_id = None
+    user.stripe_account_status = None
+    user.stripe_onboarding_complete = False
+    user.stripe_charges_enabled = False
+    user.stripe_payouts_enabled = False
+    db.commit()
+    db.refresh(user)
+    return {
+        "previous_stripe_account_id": old_id,
+        "stripe_account_deleted": deleted,
+    }
+
+
 def create_dashboard_link(user: User) -> str:
     """Return Stripe Express dashboard login URL."""
     if not user.stripe_account_id:
