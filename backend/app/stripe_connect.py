@@ -33,12 +33,44 @@ def configure_stripe_client() -> None:
     _configure_stripe()
 
 
+def _individual_prefill(user: User) -> dict:
+    """Prefill Express individual onboarding from the app user profile."""
+    individual: dict = {"email": user.email}
+    name = (getattr(user, "display_name", None) or "").strip()
+    if name:
+        parts = name.split(None, 1)
+        individual["first_name"] = parts[0]
+        if len(parts) > 1:
+            individual["last_name"] = parts[1]
+    return individual
+
+
+def _apply_individual_express_defaults(account_id: str, user: User) -> None:
+    """Ensure Express accounts use individual (not business) onboarding before Stripe collects KYC."""
+    try:
+        account = stripe.Account.retrieve(account_id)
+        if bool(getattr(account, "details_submitted", False)):
+            return
+        stripe.Account.modify(
+            account_id,
+            business_type="individual",
+            individual=_individual_prefill(user),
+        )
+    except Exception as exc:
+        logger.warning(
+            "Could not pre-set individual business type on Connect account %s: %s",
+            account_id,
+            exc,
+        )
+
+
 def ensure_connect_account(db: Session, user: User) -> str:
     """Create or return existing Stripe Express Connect account id."""
+    _configure_stripe()
     if user.stripe_account_id:
+        _apply_individual_express_defaults(user.stripe_account_id, user)
         return user.stripe_account_id
 
-    _configure_stripe()
     frontend = (os.environ.get("FRONTEND_URL") or "").strip().rstrip("/")
     if not frontend:
         raise RuntimeError("FRONTEND_URL is not configured")
@@ -47,6 +79,8 @@ def ensure_connect_account(db: Session, user: User) -> str:
         type="express",
         country="US",
         email=user.email,
+        business_type="individual",
+        individual=_individual_prefill(user),
         business_profile={"url": frontend},
         capabilities={
             "card_payments": {"requested": True},
@@ -89,6 +123,7 @@ def create_onboarding_link(
     safe_return = _safe_return_path(return_path)
     safe_refresh = _safe_return_path(refresh_path, safe_return)
 
+    _apply_individual_express_defaults(stripe_account_id, user)
     account = stripe.Account.retrieve(stripe_account_id)
     details_submitted = bool(getattr(account, "details_submitted", False))
     link_type = "account_update" if details_submitted else "account_onboarding"
