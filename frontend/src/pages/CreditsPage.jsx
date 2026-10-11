@@ -198,6 +198,7 @@ export default function CreditsPage() {
   const [chargesEnabled, setChargesEnabled] = useState(false);
   const [connectProfile, setConnectProfile] = useState(null);
   const [marketplaceBalance, setMarketplaceBalance] = useState(0);
+  const [marketplaceWithdrawable, setMarketplaceWithdrawable] = useState(0);
   const [profileLoading, setProfileLoading] = useState(true);
   const [marketplaceCheckoutBusy, setMarketplaceCheckoutBusy] = useState(false);
   const [error, setError] = useState("");
@@ -205,6 +206,10 @@ export default function CreditsPage() {
   const [connectFlowReset, setConnectFlowReset] = useState(0);
 
   const balance = marketplaceBalance;
+  const withdrawableBalance =
+    Number.isFinite(marketplaceWithdrawable) && marketplaceWithdrawable >= 0
+      ? marketplaceWithdrawable
+      : balance;
 
   const parsedWithdrawAmount = useMemo(() => {
     const n = Number(withdrawAmount);
@@ -214,7 +219,7 @@ export default function CreditsPage() {
   const withdrawValid =
     parsedWithdrawAmount != null &&
     parsedWithdrawAmount >= 5 &&
-    parsedWithdrawAmount <= balance;
+    parsedWithdrawAmount <= withdrawableBalance;
 
   const resolvedAmount = useMemo(() => {
     if (selectedAmount != null) return selectedAmount;
@@ -347,7 +352,13 @@ export default function CreditsPage() {
       }
       if (balRes.res.ok) {
         const balData = await balRes.res.json().catch(() => ({}));
-        setMarketplaceBalance(Number(balData.marketplace_balance) || 0);
+        const mpBal = Number(balData.marketplace_balance) || 0;
+        const mpWithdraw =
+          balData.marketplace_withdrawable != null
+            ? Number(balData.marketplace_withdrawable)
+            : mpBal;
+        setMarketplaceBalance(mpBal);
+        setMarketplaceWithdrawable(Number.isFinite(mpWithdraw) ? mpWithdraw : mpBal);
       }
       if (profileRes.res.ok) {
         const data = await profileRes.res.json().catch(() => ({}));
@@ -435,8 +446,8 @@ export default function CreditsPage() {
       setWithdrawError("Minimum withdrawal is $5.00");
       return;
     }
-    if (n > balance) {
-      setWithdrawError("Insufficient marketplace balance");
+    if (n > withdrawableBalance) {
+      setWithdrawError("Insufficient withdrawable earnings");
       return;
     }
     if (!payoutsEnabled) {
@@ -449,7 +460,7 @@ export default function CreditsPage() {
   async function submitWithdrawal() {
     if (!token) return;
     const n = parsedWithdrawAmount;
-    if (n == null || n < 5 || n > balance) return;
+    if (n == null || n < 5 || n > withdrawableBalance) return;
 
     setWithdrawConfirmOpen(false);
     setWithdrawBusy(true);
@@ -615,9 +626,11 @@ export default function CreditsPage() {
             <div className="mt-6 flex justify-center py-6">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-[var(--color-gold-primary)]" />
             </div>
-          ) : balance <= 0 ? (
+          ) : withdrawableBalance <= 0 ? (
             <p className="mt-3 text-sm text-slate-400">
-              You have no marketplace balance to withdraw. Sell cards on the marketplace to earn funds.
+              {balance > 0
+                ? "Your marketplace balance is for buying cards. Sale earnings available for bank withdrawal will appear here after you sell on the marketplace."
+                : "You have no marketplace earnings to withdraw. Sell cards on the marketplace to earn funds."}
             </p>
           ) : (
             <>
@@ -625,7 +638,9 @@ export default function CreditsPage() {
                 Send sale earnings to your bank. Loaded spending balance stays in the marketplace for purchases.
               </p>
               <p className="mt-4 text-xs font-medium uppercase tracking-wide text-slate-500">Available balance</p>
-              <p className="mt-1 text-3xl font-bold tabular-nums text-brand-gold">{formatMoney(balance)}</p>
+              <p className="mt-1 text-3xl font-bold tabular-nums text-brand-gold">
+                {formatMoney(withdrawableBalance)}
+              </p>
 
               {withdrawError ? (
                 <div className="mt-4 rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
@@ -642,7 +657,7 @@ export default function CreditsPage() {
                   <input
                     type="number"
                     min="5"
-                    max={balance}
+                    max={withdrawableBalance}
                     step="0.01"
                     disabled={paymentsDisabled || withdrawBusy}
                     value={withdrawAmount}
@@ -654,8 +669,8 @@ export default function CreditsPage() {
                         return;
                       }
                       const n = Number(raw);
-                      if (Number.isFinite(n) && n > balance) {
-                        setWithdrawError("Amount cannot exceed your balance");
+                      if (Number.isFinite(n) && n > withdrawableBalance) {
+                        setWithdrawError("Amount cannot exceed withdrawable earnings");
                       } else {
                         setWithdrawError("");
                       }
@@ -666,7 +681,7 @@ export default function CreditsPage() {
                   />
                 </div>
                 <p className="mt-1 text-xs text-slate-500">
-                  Minimum $5.00 · Maximum {formatMoney(balance)}
+                  Minimum $5.00 · Maximum {formatMoney(withdrawableBalance)}
                 </p>
               </div>
 

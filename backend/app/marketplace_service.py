@@ -71,11 +71,67 @@ def _append_marketplace_ledger(
     return row
 
 
+def _latest_marketplace_ledger_balance(db: Session, user_id: int) -> Decimal | None:
+    """Most recent balance_after on marketplace ledger rows, if any."""
+    latest = (
+        db.query(CreditLedger.balance_after)
+        .filter(
+            CreditLedger.user_id == user_id,
+            CreditLedger.balance_type == BALANCE_TYPE_MARKETPLACE,
+        )
+        .order_by(CreditLedger.id.desc())
+        .limit(1)
+        .scalar()
+    )
+    if latest is None:
+        return None
+    return _decimal_amount(latest)
+
+
+def sync_user_marketplace_balance_from_ledger(db: Session, user: User) -> Decimal:
+    """
+    Align users.marketplace_balance with the marketplace credit_ledger trail.
+    Fixes drift for accounts that transacted before balance sync was consistent.
+    """
+    ledger_bal = _latest_marketplace_ledger_balance(db, user.id)
+    if ledger_bal is None:
+        return _marketplace_balance(user)
+
+    stored = _marketplace_balance(user)
+    if ledger_bal != stored:
+        logger.info(
+            "Reconciling marketplace_balance for user %s: stored=%s ledger=%s",
+            user.id,
+            stored,
+            ledger_bal,
+        )
+        user.marketplace_balance = ledger_bal
+        db.commit()
+        db.refresh(user)
+    return ledger_bal
+
+
+def compute_marketplace_withdrawable(db: Session, user_id: int) -> Decimal:
+    """
+    Amount the user can send to their bank: marketplace pool capped by
+    sale earnings minus prior withdrawals (loaded spending funds excluded).
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise UserNotFoundError(f"User not found: {user_id}")
+
+    balance = sync_user_marketplace_balance_from_ledger(db, user)
+    sales = _decimal_amount(_seller_sale_earnings_cents(db, user_id)) / Decimal("100")
+    withdrawn = _decimal_amount(_seller_withdrawn_cents(db, user_id)) / Decimal("100")
+    earnings_left = max(Decimal("0.00"), sales - withdrawn)
+    return min(balance, earnings_left)
+
+
 def get_marketplace_balance(db: Session, user_id: int) -> Decimal:
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         raise UserNotFoundError(f"User not found: {user_id}")
-    return _marketplace_balance(user)
+    return sync_user_marketplace_balance_from_ledger(db, user)
 
 
 def add_marketplace_balance(

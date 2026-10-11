@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import logging
 import os
 import re
+import secrets
 import time
 import urllib.parse
 from decimal import Decimal
@@ -67,17 +71,51 @@ def build_google_flow() -> Flow:
     return flow
 
 
-def store_oauth_state(state: str) -> None:
-    _purge_expired(_oauth_states)
-    _oauth_states[state] = time.time() + _PENDING_TTL_SECONDS
+def _state_signing_key() -> bytes:
+    key = (os.environ.get("SECRET_KEY") or "dev-insecure-change-me-use-env-on-render").strip()
+    return key.encode("utf-8")
+
+
+def mint_oauth_state() -> str:
+    """Create a signed OAuth state (works across Render instances without shared memory)."""
+    nonce = secrets.token_urlsafe(16)
+    ts = int(time.time())
+    payload = f"{nonce}.{ts}"
+    sig = hmac.new(_state_signing_key(), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    raw = f"{payload}.{sig}".encode("utf-8")
+    return base64.urlsafe_b64encode(raw).decode("utf-8").rstrip("=")
 
 
 def consume_oauth_state(state: str | None) -> bool:
+    """Validate signed OAuth state (also accepts legacy in-memory states during rollout)."""
     _purge_expired(_oauth_states)
     if not state:
         return False
-    expires = _oauth_states.pop(state, None)
-    return expires is not None and expires >= time.time()
+
+    legacy_expires = _oauth_states.pop(state, None)
+    if legacy_expires is not None and legacy_expires >= time.time():
+        return True
+
+    try:
+        padded = state + "=" * (-len(state) % 4)
+        decoded = base64.urlsafe_b64decode(padded.encode("utf-8")).decode("utf-8")
+        nonce, ts_str, sig = decoded.rsplit(".", 2)
+        payload = f"{nonce}.{ts_str}"
+        expected = hmac.new(_state_signing_key(), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected):
+            return False
+        ts = int(ts_str)
+        if time.time() - ts > _PENDING_TTL_SECONDS:
+            return False
+        return True
+    except Exception:
+        return False
+
+
+def store_oauth_state(state: str) -> None:
+    """Legacy no-op: state is self-validating when minted via mint_oauth_state."""
+    _purge_expired(_oauth_states)
+    _oauth_states[state] = time.time() + _PENDING_TTL_SECONDS
 
 
 def store_pending_google_signup(token: str, payload: dict[str, Any]) -> None:

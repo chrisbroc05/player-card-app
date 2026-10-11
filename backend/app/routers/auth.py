@@ -51,6 +51,7 @@ from webauthn.helpers.structs import (
 )
 from webauthn.helpers.options_to_json import options_to_json
 from marketplace_repo import float_from_decimal
+from marketplace_service import sync_user_marketplace_balance_from_ledger
 from stripe_connect import sync_connect_account_status
 from beta_config import get_beta_invite_code
 from google_oauth import (
@@ -61,8 +62,8 @@ from google_oauth import (
     google_invite_redirect,
     google_oauth_configured,
     google_success_redirect,
+    mint_oauth_state,
     pop_pending_google_signup,
-    store_oauth_state,
     store_pending_google_signup,
     validate_beta_invite_code,
 )
@@ -329,6 +330,8 @@ def get_profile(
     if user.stripe_account_id:
         sync_connect_account_status(db, user)
 
+    marketplace_bal = sync_user_marketplace_balance_from_ledger(db, user)
+
     kpis = compute_profile_kpis(db, user)
 
     rarest_out: RarestCardOut | None = None
@@ -353,7 +356,7 @@ def get_profile(
         email=user.email,
         parent_email=user.parent_email,
         credit_balance=float_from_decimal(user.credit_balance),
-        marketplace_balance=float_from_decimal(getattr(user, "marketplace_balance", None) or 0),
+        marketplace_balance=float_from_decimal(marketplace_bal),
         free_card_tokens=int(getattr(user, "free_card_tokens", 0) or 0),
         free_card_tokens_granted=int(getattr(user, "free_card_tokens_granted", 0) or 0),
         stripe_connect_account_id=user.stripe_account_id,
@@ -450,28 +453,40 @@ def delete_account(
     return {"success": True}
 
 
-def _sum_abs_ledger(db: Session, user_id: int, transaction_type: str) -> Decimal:
-    total = (
-        db.query(func.coalesce(func.sum(func.abs(CreditLedger.amount)), 0))
-        .filter(
-            CreditLedger.user_id == user_id,
-            CreditLedger.transaction_type == transaction_type,
-        )
-        .scalar()
+def _sum_abs_ledger(
+    db: Session,
+    user_id: int,
+    transaction_type: str,
+    *,
+    balance_type: str | None = None,
+) -> Decimal:
+    q = db.query(func.coalesce(func.sum(func.abs(CreditLedger.amount)), 0)).filter(
+        CreditLedger.user_id == user_id,
+        CreditLedger.transaction_type == transaction_type,
     )
+    bt = (balance_type or "").strip()
+    if bt:
+        q = q.filter(CreditLedger.balance_type == bt)
+    total = q.scalar()
     return Decimal(str(total or 0))
 
 
-def _sum_positive_ledger(db: Session, user_id: int, transaction_type: str) -> Decimal:
-    total = (
-        db.query(func.coalesce(func.sum(CreditLedger.amount), 0))
-        .filter(
-            CreditLedger.user_id == user_id,
-            CreditLedger.transaction_type == transaction_type,
-            CreditLedger.amount > 0,
-        )
-        .scalar()
+def _sum_positive_ledger(
+    db: Session,
+    user_id: int,
+    transaction_type: str,
+    *,
+    balance_type: str | None = None,
+) -> Decimal:
+    q = db.query(func.coalesce(func.sum(CreditLedger.amount), 0)).filter(
+        CreditLedger.user_id == user_id,
+        CreditLedger.transaction_type == transaction_type,
+        CreditLedger.amount > 0,
     )
+    bt = (balance_type or "").strip()
+    if bt:
+        q = q.filter(CreditLedger.balance_type == bt)
+    total = q.scalar()
     return Decimal(str(total or 0))
 
 
@@ -500,8 +515,12 @@ def get_profile_financials(
 ):
     return ProfileFinancialsResponse(
         total_spent_on_cards=float_from_decimal(_sum_abs_ledger(db, user.id, TX_GENERATION)),
-        total_earned_from_sales=float_from_decimal(_sum_positive_ledger(db, user.id, TX_CARD_SALE)),
-        total_withdrawn=float_from_decimal(_sum_abs_ledger(db, user.id, TX_WITHDRAWAL)),
+        total_earned_from_sales=float_from_decimal(
+            _sum_positive_ledger(db, user.id, TX_CARD_SALE, balance_type="marketplace")
+        ),
+        total_withdrawn=float_from_decimal(
+            _sum_abs_ledger(db, user.id, TX_WITHDRAWAL, balance_type="marketplace")
+        ),
         current_balance=float_from_decimal(user.credit_balance),
         total_animated_cards_cost=float_from_decimal(_sum_abs_ledger(db, user.id, TX_ANIMATION)),
         total_highlight_cards_cost=float_from_decimal(_sum_abs_ledger(db, user.id, TX_HIGHLIGHT)),
@@ -682,11 +701,11 @@ def google_login():
     if not google_oauth_configured():
         raise HTTPException(status_code=503, detail="Google sign in is not configured")
     flow = build_google_flow()
-    authorization_url, state = flow.authorization_url(
+    state = mint_oauth_state()
+    authorization_url, _unused_state = flow.authorization_url(
         access_type="offline",
-        include_granted_scopes="true",
+        state=state,
     )
-    store_oauth_state(state)
     return RedirectResponse(authorization_url)
 
 
@@ -697,6 +716,7 @@ def google_callback(
     db: Session = Depends(get_db),
 ):
     if not consume_oauth_state(state):
+        logger.warning("Google OAuth callback rejected: invalid or expired state")
         return google_error_redirect()
     try:
         flow = build_google_flow()

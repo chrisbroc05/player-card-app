@@ -21,6 +21,7 @@ from email_service import send_withdrawal_confirmation_email
 from marketplace_repo import float_from_decimal
 from marketplace_service import (
     InsufficientMarketplaceBalanceError,
+    compute_marketplace_withdrawable,
     get_marketplace_balance,
     initiate_marketplace_withdrawal,
 )
@@ -63,9 +64,11 @@ def credits_balance(
     require_payments_enabled()
     card_bal = get_balance(db, user.id)
     marketplace_bal = get_marketplace_balance(db, user.id)
+    withdrawable = compute_marketplace_withdrawable(db, user.id)
     return {
         "credit_balance": float_from_decimal(card_bal),
         "marketplace_balance": float_from_decimal(marketplace_bal),
+        "marketplace_withdrawable": float_from_decimal(withdrawable),
     }
 
 
