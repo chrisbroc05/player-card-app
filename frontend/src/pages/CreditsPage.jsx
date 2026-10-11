@@ -341,8 +341,9 @@ export default function CreditsPage() {
   }, [token, applyConnectStatus]);
 
   const loadBalancesAndProfile = useCallback(async () => {
-    if (!token) return;
+    if (!token) return null;
     setProfileLoading(true);
+    let snapshot = null;
     try {
       const [connectRes, balRes, profileRes] = await Promise.all([
         authFetch(token, "/connect/status"),
@@ -366,6 +367,10 @@ export default function CreditsPage() {
             : mpBal;
         setMarketplaceBalance(mpBal);
         setMarketplaceWithdrawable(Number.isFinite(mpWithdraw) ? mpWithdraw : mpBal);
+        snapshot = {
+          marketplaceBalance: mpBal,
+          marketplaceWithdrawable: Number.isFinite(mpWithdraw) ? mpWithdraw : mpBal,
+        };
       }
       if (profileRes.res.ok) {
         const data = await profileRes.res.json().catch(() => ({}));
@@ -380,6 +385,7 @@ export default function CreditsPage() {
     } finally {
       setProfileLoading(false);
     }
+    return snapshot;
   }, [token, applyConnectStatus]);
 
   useEffect(() => {
@@ -487,6 +493,37 @@ export default function CreditsPage() {
     setWithdrawConfirmOpen(false);
     setWithdrawBusy(true);
     try {
+      const { res: freshBalRes, unauthorized: balUnauthorized } = await authFetch(
+        token,
+        "/credits/balance"
+      );
+      if (balUnauthorized) {
+        setWithdrawErrorModalMessage("Session expired. Please sign in again.");
+        setWithdrawErrorOpen(true);
+        return;
+      }
+      if (freshBalRes.ok) {
+        const freshBal = await freshBalRes.json().catch(() => ({}));
+        const freshWithdrawable =
+          freshBal.marketplace_withdrawable != null
+            ? Number(freshBal.marketplace_withdrawable)
+            : Number(freshBal.marketplace_balance) || 0;
+        const freshBalance = Number(freshBal.marketplace_balance) || 0;
+        if (Number.isFinite(freshWithdrawable)) {
+          setMarketplaceWithdrawable(Math.max(0, freshWithdrawable));
+        }
+        if (Number.isFinite(freshBalance)) {
+          setMarketplaceBalance(Math.max(0, freshBalance));
+        }
+        if (n > freshWithdrawable) {
+          setWithdrawErrorModalMessage(
+            "That amount exceeds your current withdrawable balance. It was updated after your last withdrawal — please try again."
+          );
+          setWithdrawErrorOpen(true);
+          return;
+        }
+      }
+
       const { res, unauthorized } = await authFetch(token, "/credits/withdraw", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -88,7 +88,12 @@ def _latest_marketplace_ledger_balance(db: Session, user_id: int) -> Decimal | N
     return _decimal_amount(latest)
 
 
-def sync_user_marketplace_balance_from_ledger(db: Session, user: User) -> Decimal:
+def sync_user_marketplace_balance_from_ledger(
+    db: Session,
+    user: User,
+    *,
+    commit_reconcile: bool = True,
+) -> Decimal:
     """
     Align users.marketplace_balance with the marketplace credit_ledger trail.
     Fixes drift for accounts that transacted before balance sync was consistent.
@@ -106,9 +111,26 @@ def sync_user_marketplace_balance_from_ledger(db: Session, user: User) -> Decima
             ledger_bal,
         )
         user.marketplace_balance = ledger_bal
-        db.commit()
-        db.refresh(user)
+        if commit_reconcile:
+            db.commit()
+            db.refresh(user)
     return ledger_bal
+
+
+def _marketplace_withdrawable_for_user(
+    db: Session,
+    user: User,
+    *,
+    commit_reconcile: bool = True,
+) -> Decimal:
+    """Withdrawable amount for a user row (optionally without committing reconciliation)."""
+    balance = sync_user_marketplace_balance_from_ledger(
+        db, user, commit_reconcile=commit_reconcile
+    )
+    sales = _decimal_amount(_seller_sale_earnings_cents(db, user.id)) / Decimal("100")
+    withdrawn = _decimal_amount(_seller_withdrawn_cents(db, user.id)) / Decimal("100")
+    earnings_left = max(Decimal("0.00"), sales - withdrawn)
+    return min(balance, earnings_left)
 
 
 def compute_marketplace_withdrawable(db: Session, user_id: int) -> Decimal:
@@ -120,11 +142,7 @@ def compute_marketplace_withdrawable(db: Session, user_id: int) -> Decimal:
     if user is None:
         raise UserNotFoundError(f"User not found: {user_id}")
 
-    balance = sync_user_marketplace_balance_from_ledger(db, user)
-    sales = _decimal_amount(_seller_sale_earnings_cents(db, user_id)) / Decimal("100")
-    withdrawn = _decimal_amount(_seller_withdrawn_cents(db, user_id)) / Decimal("100")
-    earnings_left = max(Decimal("0.00"), sales - withdrawn)
-    return min(balance, earnings_left)
+    return _marketplace_withdrawable_for_user(db, user, commit_reconcile=True)
 
 
 def get_marketplace_balance(db: Session, user_id: int) -> Decimal:
@@ -588,6 +606,18 @@ def initiate_marketplace_withdrawal(
     amt = _decimal_amount(amount)
     if amt < Decimal("5.00"):
         raise ValueError("Minimum withdrawal is $5.00")
+
+    user = _lock_user(db, user.id)
+    withdrawable = _marketplace_withdrawable_for_user(db, user, commit_reconcile=False)
+    if amt > withdrawable:
+        logger.warning(
+            "WITHDRAW rejected insufficient withdrawable: user=%s amount=$%s withdrawable=$%s balance=$%s",
+            user.id,
+            amt,
+            withdrawable,
+            _marketplace_balance(user),
+        )
+        raise InsufficientMarketplaceBalanceError("Insufficient marketplace balance")
 
     sync_connect_account_status(db, user)
     stripe_account_id = (user.stripe_account_id or "").strip()
