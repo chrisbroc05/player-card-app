@@ -16,6 +16,10 @@ STATUS_PENDING = "pending"
 STATUS_ACTIVE = "active"
 STATUS_RESTRICTED = "restricted"
 
+# Digital goods / marketplace sellers — Stripe MCC (see CONNECT_EXPRESS_MCC to override).
+DEFAULT_CONNECT_EXPRESS_MCC = "5999"
+ALLOWED_CONNECT_MCC = frozenset({"5999", "7994"})
+
 
 def _stripe_secret_key() -> str:
     key = (os.environ.get("STRIPE_SECRET_KEY") or "").strip()
@@ -33,6 +37,34 @@ def configure_stripe_client() -> None:
     _configure_stripe()
 
 
+def _platform_website_url() -> str:
+    frontend = (os.environ.get("FRONTEND_URL") or "").strip().rstrip("/")
+    if not frontend:
+        raise RuntimeError("FRONTEND_URL is not configured")
+    return frontend
+
+
+def _connect_express_mcc() -> str:
+    raw = (os.environ.get("CONNECT_EXPRESS_MCC") or DEFAULT_CONNECT_EXPRESS_MCC).strip()
+    if raw in ALLOWED_CONNECT_MCC:
+        return raw
+    logger.warning("Invalid CONNECT_EXPRESS_MCC=%s; using %s", raw, DEFAULT_CONNECT_EXPRESS_MCC)
+    return DEFAULT_CONNECT_EXPRESS_MCC
+
+
+def _express_business_profile() -> dict[str, str]:
+    """Pre-fill Express 'business details' (industry MCC + website) for individual marketplace sellers."""
+    profile: dict[str, str] = {
+        "url": _platform_website_url(),
+        "mcc": _connect_express_mcc(),
+    }
+    product = (os.environ.get("CONNECT_EXPRESS_PRODUCT_DESCRIPTION") or "").strip()
+    if not product:
+        product = "Selling digital trading cards on the Prospect Legends marketplace"
+    profile["product_description"] = product[:200]
+    return profile
+
+
 def _individual_prefill(user: User) -> dict:
     """Prefill Express individual onboarding from the app user profile."""
     individual: dict = {"email": user.email}
@@ -46,7 +78,7 @@ def _individual_prefill(user: User) -> dict:
 
 
 def _apply_individual_express_defaults(account_id: str, user: User) -> None:
-    """Ensure Express accounts use individual (not business) onboarding before Stripe collects KYC."""
+    """Ensure Express accounts use individual onboarding with MCC + website pre-filled before KYC."""
     try:
         account = stripe.Account.retrieve(account_id)
         if bool(getattr(account, "details_submitted", False)):
@@ -55,10 +87,11 @@ def _apply_individual_express_defaults(account_id: str, user: User) -> None:
             account_id,
             business_type="individual",
             individual=_individual_prefill(user),
+            business_profile=_express_business_profile(),
         )
     except Exception as exc:
         logger.warning(
-            "Could not pre-set individual business type on Connect account %s: %s",
+            "Could not pre-set individual Express defaults on Connect account %s: %s",
             account_id,
             exc,
         )
@@ -71,9 +104,6 @@ def ensure_connect_account(db: Session, user: User) -> str:
         _apply_individual_express_defaults(user.stripe_account_id, user)
         return user.stripe_account_id
 
-    frontend = (os.environ.get("FRONTEND_URL") or "").strip().rstrip("/")
-    if not frontend:
-        raise RuntimeError("FRONTEND_URL is not configured")
     logger.info("Creating Stripe Connect Express account for user %s", user.id)
     account = stripe.Account.create(
         type="express",
@@ -81,6 +111,7 @@ def ensure_connect_account(db: Session, user: User) -> str:
         email=user.email,
         business_type="individual",
         individual=_individual_prefill(user),
+        business_profile=_express_business_profile(),
         capabilities={
             "card_payments": {"requested": True},
             "transfers": {"requested": True},
