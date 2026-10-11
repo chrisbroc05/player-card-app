@@ -17,7 +17,6 @@ from card_repo import get_card_by_card_id
 from copy_limits import validate_bulk_list_quantity
 from marketplace_service import (
     InsufficientMarketplaceBalanceError,
-    require_seller_onboarding_complete,
     settle_marketplace_cash_sale,
 )
 from database import get_db
@@ -277,7 +276,6 @@ def marketplace_list(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    require_seller_onboarding_complete(db, current_user)
     card = _resolve_card(db, body.card_id)
     if card.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="You do not own this card")
@@ -348,7 +346,6 @@ def marketplace_bulk_list(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    require_seller_onboarding_complete(db, current_user)
     anchor = _resolve_card(db, body.card_id)
     if anchor.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="You do not own this card")

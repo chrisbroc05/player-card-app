@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import ConfirmationCardThumbnail from "./ConfirmationCardThumbnail";
 import ListingModal from "./ListingModal";
-import MarketplaceConnectPrompt from "./MarketplaceConnectPrompt";
 import { toApiUrl } from "../config/api";
 import { formatMoney, PLATFORM_ROYALTY_RATE } from "../utils/marketplace";
 import { MAX_COPIES_LISTED_AT_ONCE, parseCopyLimitError } from "../utils/copyPricing";
@@ -110,9 +109,6 @@ function ListingFormBody({
   totals,
   effectiveQty,
   error,
-  connectGateActive,
-  token,
-  connectProfile,
   busy,
   onClose,
   onOpenConfirm,
@@ -227,9 +223,6 @@ function ListingFormBody({
       </div>
 
       {error ? <p className="bulk-list-sheet__error">{error}</p> : null}
-      {connectGateActive ? (
-        <MarketplaceConnectPrompt profile={connectProfile} token={token} compact requireSellReady />
-      ) : null}
 
       <button
         type="button"
@@ -274,8 +267,6 @@ export default function BulkMarketplaceListingSheet({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [successCount, setSuccessCount] = useState(null);
   const [error, setError] = useState("");
-  const [connectGateActive, setConnectGateActive] = useState(false);
-
   useEffect(() => {
     if (!open) return;
     setQuantity(isSelectMode ? Math.max(1, listableSelected.length) : 1);
@@ -283,7 +274,6 @@ export default function BulkMarketplaceListingSheet({
     setConfirmOpen(false);
     setSuccessCount(null);
     setError("");
-    setConnectGateActive(false);
   }, [open, isSelectMode, listableSelected.length]);
 
   const effectiveQty = isSelectMode ? listableSelected.length : quantity;
@@ -331,9 +321,7 @@ export default function BulkMarketplaceListingSheet({
       if (limit?.correctedQuantity) {
         setQuantity(Math.min(maxQty, limit.correctedQuantity));
         setError(limit.warning);
-        setConnectGateActive(false);
       } else {
-        setConnectGateActive(Boolean(err?.connectRequired));
         setError(err?.message || "Could not list copies.");
       }
       setConfirmOpen(false);
@@ -388,9 +376,6 @@ export default function BulkMarketplaceListingSheet({
           totals={totals}
           effectiveQty={effectiveQty}
           error={error}
-          connectGateActive={connectGateActive}
-          token={token}
-          connectProfile={connectProfile}
           busy={busy}
           onClose={resetAndClose}
           onOpenConfirm={() => setConfirmOpen(true)}

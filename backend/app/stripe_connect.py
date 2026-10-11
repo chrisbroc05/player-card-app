@@ -81,7 +81,6 @@ def ensure_connect_account(db: Session, user: User) -> str:
         email=user.email,
         business_type="individual",
         individual=_individual_prefill(user),
-        business_profile={"url": frontend},
         capabilities={
             "card_payments": {"requested": True},
             "transfers": {"requested": True},

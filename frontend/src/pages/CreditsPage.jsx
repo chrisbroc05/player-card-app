@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, Navigate, useSearchParams } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import MarketplaceConnectPrompt from "../components/MarketplaceConnectPrompt";
 import { useAuth } from "../context/AuthContext";
-import { authFetch, formatApiError } from "../utils/authFetch";
+import { authFetch, connectRequiredFromDetail, formatApiError } from "../utils/authFetch";
 import { formatMoney } from "../utils/marketplace";
 import {
   MIN_CREDIT_LOAD,
@@ -202,6 +202,7 @@ export default function CreditsPage() {
   const [marketplaceCheckoutBusy, setMarketplaceCheckoutBusy] = useState(false);
   const [error, setError] = useState("");
   const [banner, setBanner] = useState("");
+  const [connectFlowReset, setConnectFlowReset] = useState(0);
 
   const balance = marketplaceBalance;
 
@@ -377,6 +378,8 @@ export default function CreditsPage() {
     if (connect !== "complete" && connect !== "refresh") return undefined;
     if (!token || initializing) return undefined;
 
+    setConnectFlowReset((n) => n + 1);
+
     let cancelled = false;
     (async () => {
       setProfileLoading(true);
@@ -388,10 +391,11 @@ export default function CreditsPage() {
         loadLedger(),
       ]);
       if (cancelled) return;
+      setConnectFlowReset((n) => n + 1);
       setBanner(
         connect === "complete"
-          ? "Stripe connected successfully! You can load marketplace funds and withdraw earnings."
-          : "Please finish Stripe verification to enable marketplace payouts."
+          ? "Bank account connected — you can withdraw marketplace earnings below."
+          : "Please finish bank verification to complete your withdrawal setup."
       );
       setSearchParams({}, { replace: true });
     })();
@@ -435,6 +439,10 @@ export default function CreditsPage() {
       setWithdrawError("Insufficient marketplace balance");
       return;
     }
+    if (!payoutsEnabled) {
+      setWithdrawError("Connect a bank account below before withdrawing.");
+      return;
+    }
     setWithdrawConfirmOpen(true);
   }
 
@@ -462,6 +470,12 @@ export default function CreditsPage() {
         throw new Error(formatApiError(data?.detail, "Payments not yet enabled"));
       }
       if (!res.ok) {
+        const connectMsg = connectRequiredFromDetail(data?.detail);
+        if (connectMsg) {
+          setWithdrawError(connectMsg);
+          await loadBalancesAndProfile();
+          return;
+        }
         throw new Error(
           formatApiError(
             data?.detail,
@@ -575,7 +589,7 @@ export default function CreditsPage() {
         <section className="mb-8 rounded-2xl border border-white/10 bg-cardBg p-5">
           <h2 className="text-lg font-semibold text-white">Load Marketplace Funds</h2>
           <p className="mt-1 text-sm text-slate-400">
-            Add spending balance for marketplace purchases. Requires a Stripe Connect account (Express).
+            Add spending balance for marketplace purchases. No bank connection required.
           </p>
           <LoadAmountPicker
             selectedAmount={selectedAmount}
@@ -585,14 +599,6 @@ export default function CreditsPage() {
             disabled={paymentsDisabled || marketplaceCheckoutBusy}
           />
 
-          <div className="mt-4">
-            <MarketplaceConnectPrompt
-              profile={connectProfile}
-              token={token}
-              compact
-              returnPath="/credits"
-            />
-          </div>
           <button
             type="button"
             disabled={paymentsDisabled || marketplaceCheckoutBusy || !checkoutAmountValid}
@@ -613,13 +619,12 @@ export default function CreditsPage() {
             <p className="mt-3 text-sm text-slate-400">
               You have no marketplace balance to withdraw. Sell cards on the marketplace to earn funds.
             </p>
-          ) : payoutsEnabled ? (
+          ) : (
             <>
               <p className="mt-1 text-sm text-slate-400">
-                Payout from your Stripe Express account to your linked bank. Timing follows Stripe&apos;s payout
-                schedule (typically 2–7 business days in test mode).
+                Send sale earnings to your bank. Loaded spending balance stays in the marketplace for purchases.
               </p>
-              <p className="mt-4 text-xs font-medium uppercase tracking-wide text-slate-500">Available to withdraw</p>
+              <p className="mt-4 text-xs font-medium uppercase tracking-wide text-slate-500">Available balance</p>
               <p className="mt-1 text-3xl font-bold tabular-nums text-brand-gold">{formatMoney(balance)}</p>
 
               {withdrawError ? (
@@ -665,6 +670,18 @@ export default function CreditsPage() {
                 </p>
               </div>
 
+              {!payoutsEnabled ? (
+                <div className="mt-5">
+                  <MarketplaceConnectPrompt
+                    profile={connectProfile}
+                    token={token}
+                    compact
+                    returnPath="/credits"
+                    connectFlowReset={connectFlowReset}
+                  />
+                </div>
+              ) : null}
+
               <button
                 type="button"
                 disabled={paymentsDisabled || withdrawBusy || !withdrawValid}
@@ -674,27 +691,8 @@ export default function CreditsPage() {
                 {withdrawBusy ? "Processing withdrawal…" : "Withdraw to Bank"}
               </button>
               <p className="mt-3 text-center text-xs text-slate-500">
-                Funds typically arrive in 2-3 business days
+                Funds typically arrive in 2–7 business days
               </p>
-            </>
-          ) : (
-            <>
-              <MarketplaceConnectPrompt
-                profile={connectProfile}
-                token={token}
-                compact
-                requireSellReady
-                returnPath="/credits"
-              />
-              <p className="mt-3 text-sm text-slate-400">
-                Complete Stripe onboarding to withdraw marketplace earnings to your bank.
-              </p>
-              <Link
-                to="/profile"
-                className="mt-5 flex min-h-[48px] w-full items-center justify-center rounded-xl btn-secondary font-semibold"
-              >
-                Manage payout settings
-              </Link>
             </>
           )}
         </section>

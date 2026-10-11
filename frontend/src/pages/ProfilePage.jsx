@@ -16,6 +16,10 @@ import { useAuth } from "../context/AuthContext";
 import { useSettings } from "../context/SettingsContext";
 import { performLogout } from "../utils/logout";
 import { formatMoney } from "../utils/marketplace";
+import {
+  markStripeConnectRedirectPending,
+  useResetStripeConnectBusy,
+} from "../utils/stripeConnectUi";
 function formatApiError(detail, fallback) {
   if (!detail) return fallback;
   if (typeof detail === "string") return detail;
@@ -141,6 +145,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [connectBanner, setConnectBanner] = useState("");
+  const [connectFlowReset, setConnectFlowReset] = useState(0);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [financials, setFinancials] = useState(null);
   const [financialsLoading, setFinancialsLoading] = useState(true);
@@ -201,10 +206,12 @@ export default function ProfilePage() {
     const connect = searchParams.get("connect");
     if (connect === "complete") {
       setConnectBanner("success");
+      setConnectFlowReset((n) => n + 1);
       loadProfile();
       setSearchParams({}, { replace: true });
     } else if (connect === "refresh") {
       setConnectBanner("refresh");
+      setConnectFlowReset((n) => n + 1);
       setSearchParams({}, { replace: true });
     }
   }, [searchParams, setSearchParams, loadProfile]);
@@ -346,6 +353,7 @@ export default function ProfilePage() {
                 profile={profile}
                 loading={loading}
                 onProfileUpdate={updateProfileFields}
+                connectFlowReset={connectFlowReset}
               />
             </section>
 
@@ -374,11 +382,13 @@ export default function ProfilePage() {
   );
 }
 
-function PayoutSettings({ token, profile, loading, onProfileUpdate }) {
+function PayoutSettings({ token, profile, loading, onProfileUpdate, connectFlowReset = 0 }) {
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const autoRefreshed = useRef(false);
+
+  useResetStripeConnectBusy(setBusy, connectFlowReset);
 
   const chargesEnabled =
     profile?.stripe_charges_enabled === true || profile?.charges_enabled === true;
@@ -445,7 +455,6 @@ function PayoutSettings({ token, profile, loading, onProfileUpdate }) {
     }
     setError("");
     setBusy(true);
-    let redirecting = false;
     try {
       const response = await fetch(`${API_BASE_URL}/connect/onboarding-link`, {
         method: "POST",
@@ -467,7 +476,7 @@ function PayoutSettings({ token, profile, loading, onProfileUpdate }) {
         throw new Error(formatApiError(data?.detail, "Could not start bank connection."));
       }
       if (data.url) {
-        redirecting = true;
+        markStripeConnectRedirectPending();
         window.location.assign(data.url);
         return;
       }
@@ -475,7 +484,7 @@ function PayoutSettings({ token, profile, loading, onProfileUpdate }) {
     } catch (err) {
       setError(err?.message || "Request failed");
     } finally {
-      if (!redirecting) setBusy(false);
+      setBusy(false);
     }
   }
 
@@ -563,16 +572,9 @@ function PayoutSettings({ token, profile, loading, onProfileUpdate }) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-400">
-        Connect your bank account to receive payments when you sell cards.
+        Bank setup happens when you withdraw marketplace earnings from the Credits page. You can list and sell cards
+        without connecting a bank first.
       </p>
-      <button
-        type="button"
-        disabled={busy}
-        onClick={startOnboarding}
-        className="min-h-[44px] rounded-xl btn-primary px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
-      >
-        {busy ? "Redirecting…" : "Connect Bank Account"}
-      </button>
       {error ? <p className="text-sm text-rose-300">{error}</p> : null}
     </div>
   );

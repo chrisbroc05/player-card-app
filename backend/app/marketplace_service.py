@@ -9,6 +9,7 @@ from decimal import Decimal
 
 import stripe
 from fastapi import HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from credit_service import TX_CARD_PURCHASE, TX_CARD_SALE, TX_REFUND, TX_TOP_UP, TX_WITHDRAWAL
@@ -287,6 +288,96 @@ def _decimal_to_cents(amount: Decimal) -> int:
     return int((amount * Decimal("100")).quantize(Decimal("1")))
 
 
+def _seller_sale_earnings_cents(db: Session, user_id: int) -> int:
+    """Sum of marketplace card_sale credits (positive amounts) for a seller."""
+    total = (
+        db.query(func.coalesce(func.sum(CreditLedger.amount), 0))
+        .filter(
+            CreditLedger.user_id == user_id,
+            CreditLedger.balance_type == BALANCE_TYPE_MARKETPLACE,
+            CreditLedger.transaction_type == TX_CARD_SALE,
+        )
+        .scalar()
+    )
+    return _decimal_to_cents(_decimal_amount(total or 0))
+
+
+def _seller_withdrawn_cents(db: Session, user_id: int) -> int:
+    """Sum of completed marketplace withdrawals (ledger stores negative amounts)."""
+    total = (
+        db.query(func.coalesce(func.sum(func.abs(CreditLedger.amount)), 0))
+        .filter(
+            CreditLedger.user_id == user_id,
+            CreditLedger.balance_type == BALANCE_TYPE_MARKETPLACE,
+            CreditLedger.transaction_type == TX_WITHDRAWAL,
+        )
+        .scalar()
+    )
+    return _decimal_to_cents(_decimal_amount(total or 0))
+
+
+def _transfer_platform_to_connect(*, stripe_account_id: str, amount_cents: int, user_id: int) -> None:
+    if amount_cents <= 0:
+        return
+    configure_stripe_client()
+    stripe.Transfer.create(
+        amount=amount_cents,
+        currency="usd",
+        destination=stripe_account_id,
+        description="Marketplace sale earnings — withdrawal",
+        metadata={"user_id": str(user_id), "purpose": "withdrawal_sync"},
+    )
+
+
+def _sync_connect_balance_for_withdrawal(
+    db: Session,
+    user: User,
+    *,
+    amount_cents: int,
+    stripe_account_id: str,
+) -> None:
+    """
+    Move deferred sale proceeds from the platform to the seller Connect account
+    so payouts only draw from sale earnings (not loaded spending balance).
+    """
+    available_cents = _connect_available_cents(stripe_account_id)
+    if amount_cents <= available_cents:
+        return
+
+    sale_total_cents = _seller_sale_earnings_cents(db, user.id)
+    withdrawn_cents = _seller_withdrawn_cents(db, user.id)
+    max_earnings_left_cents = max(0, sale_total_cents - withdrawn_cents)
+    if amount_cents > max_earnings_left_cents:
+        available_dollars = Decimal(str(available_cents)) / Decimal("100")
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Only sale earnings can be withdrawn to your bank "
+                f"(${float_from_decimal(available_dollars):.2f} currently in your payout account). "
+                "Funds you loaded for marketplace purchases stay in your spending balance."
+            ),
+        )
+
+    shortfall_cents = amount_cents - available_cents
+    untransferred_cents = max(0, sale_total_cents - withdrawn_cents - available_cents)
+    transfer_cents = min(shortfall_cents, untransferred_cents)
+    if transfer_cents <= 0:
+        available_dollars = Decimal(str(available_cents)) / Decimal("100")
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Only sale earnings in your connected Stripe account can be withdrawn "
+                f"(${float_from_decimal(available_dollars):.2f} available). "
+                "Funds loaded for marketplace purchases stay in your spending balance."
+            ),
+        )
+    _transfer_platform_to_connect(
+        stripe_account_id=stripe_account_id,
+        amount_cents=transfer_cents,
+        user_id=user.id,
+    )
+
+
 def _connect_available_cents(stripe_account_id: str) -> int:
     """USD cents currently available on a connected Express account (from prior sale transfers)."""
     configure_stripe_client()
@@ -375,17 +466,10 @@ def settle_marketplace_cash_sale(
         raise InsufficientMarketplaceBalanceError("Buyer has insufficient marketplace balance")
 
     stripe_account_id = (seller.stripe_account_id or "").strip()
-    if not stripe_account_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Seller has not connected a Stripe account. Sale cannot complete.",
-        )
-
-    if not bool(getattr(seller, "stripe_charges_enabled", False)):
-        raise HTTPException(
-            status_code=400,
-            detail="Seller must complete Stripe onboarding before receiving marketplace payments.",
-        )
+    seller_charges_enabled = bool(getattr(seller, "stripe_charges_enabled", False))
+    if stripe_account_id and not seller_charges_enabled:
+        sync_connect_account_status(db, seller)
+        seller_charges_enabled = bool(getattr(seller, "stripe_charges_enabled", False))
 
     buyer_row = deduct_marketplace_balance(
         db,
@@ -416,14 +500,16 @@ def settle_marketplace_cash_sale(
     )
 
     offer.royalty_amount = fee
-    transfer_id = _create_sale_transfer(
-        seller=seller,
-        offer=offer,
-        card=card,
-        net_amount=net,
-        fee_amount=fee,
-        gross_amount=gross,
-    )
+    transfer_id = None
+    if stripe_account_id and seller_charges_enabled:
+        transfer_id = _create_sale_transfer(
+            seller=seller,
+            offer=offer,
+            card=card,
+            net_amount=net,
+            fee_amount=fee,
+            gross_amount=gross,
+        )
 
     return (
         buyer,
@@ -448,19 +534,23 @@ def initiate_marketplace_withdrawal(
         raise ValueError("Minimum withdrawal is $5.00")
 
     sync_connect_account_status(db, user)
-    if not user.stripe_payouts_enabled:
-        raise HTTPException(
-            status_code=400,
-            detail="Complete Stripe onboarding and connect a bank account before withdrawing.",
-        )
     stripe_account_id = (user.stripe_account_id or "").strip()
-    if not stripe_account_id:
+    if not stripe_account_id or not user.stripe_payouts_enabled:
         raise HTTPException(
-            status_code=400,
-            detail="No Stripe Connect account. Connect your account before withdrawing.",
+            status_code=403,
+            detail={
+                "code": "stripe_connect_required",
+                "message": "Connect a bank account to withdraw marketplace earnings.",
+            },
         )
 
     amount_cents = _decimal_to_cents(amt)
+    _sync_connect_balance_for_withdrawal(
+        db,
+        user,
+        amount_cents=amount_cents,
+        stripe_account_id=stripe_account_id,
+    )
     available_cents = _connect_available_cents(stripe_account_id)
     if amount_cents > available_cents:
         available_dollars = Decimal(str(available_cents)) / Decimal("100")

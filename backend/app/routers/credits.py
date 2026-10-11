@@ -23,7 +23,6 @@ from marketplace_service import (
     InsufficientMarketplaceBalanceError,
     get_marketplace_balance,
     initiate_marketplace_withdrawal,
-    require_connect_account_for_marketplace,
 )
 from models import User
 from parent_email_utils import parent_email_for_notify
@@ -140,9 +139,8 @@ def marketplace_checkout(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Load marketplace spending balance (requires Stripe Connect account)."""
+    """Load marketplace spending balance (platform checkout — no Connect required)."""
     require_payments_enabled()
-    require_connect_account_for_marketplace(db, user)
 
     amt = Decimal(str(body.amount_dollars)).quantize(Decimal("0.01"))
     if amt < Decimal(str(MIN_CREDIT_LOAD)):
@@ -157,7 +155,6 @@ def marketplace_checkout(
         if recipient is None:
             raise HTTPException(status_code=404, detail="Recipient user not found")
         recipient_id = recipient.id
-        require_connect_account_for_marketplace(db, recipient)
 
     try:
         checkout_url = create_marketplace_checkout_session(

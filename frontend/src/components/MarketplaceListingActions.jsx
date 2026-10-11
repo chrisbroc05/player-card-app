@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 import ListingModal from "./ListingModal";
-import MarketplaceConnectPrompt from "./MarketplaceConnectPrompt";
 import MarketplaceCopyPicker from "./MarketplaceCopyPicker";
 import MarketplaceCopyTile, { copyListingLabel } from "./MarketplaceCopyTile";
 import MarketplaceListingModeChooser from "./MarketplaceListingModeChooser";
@@ -300,13 +299,11 @@ function MultiCopyListingModal({
 }) {
   const [price, setPrice] = useState("");
   const [localError, setLocalError] = useState("");
-  const [connectGateActive, setConnectGateActive] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setPrice("");
     setLocalError("");
-    setConnectGateActive(false);
   }, [open, copies.map((c) => c.card_id).join(",")]);
 
   const priceNum = Number(price);
@@ -341,7 +338,6 @@ function MultiCopyListingModal({
       setPrice("");
       onListSuccess?.(count);
     } catch (err) {
-      setConnectGateActive(Boolean(err.connectRequired));
       setLocalError(err.message || "Could not list copies.");
     }
   }
@@ -408,9 +404,6 @@ function MultiCopyListingModal({
         </div>
 
         {localError ? <p className="bulk-list-sheet__error">{localError}</p> : null}
-        {connectGateActive ? (
-          <MarketplaceConnectPrompt profile={connectProfile} token={token} compact requireSellReady />
-        ) : null}
 
         <button
           type="submit"
@@ -435,13 +428,11 @@ function MultiCopyListingModal({
 function SingleCardListingModal({ open, card, busy, token, connectProfile, onClose, onList, onListSuccess }) {
   const [price, setPrice] = useState("");
   const [localError, setLocalError] = useState("");
-  const [connectGateActive, setConnectGateActive] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setPrice("");
     setLocalError("");
-    setConnectGateActive(false);
   }, [open, card?.card_id]);
 
   const priceNum = Number(price);
@@ -488,7 +479,6 @@ function SingleCardListingModal({ open, card, busy, token, connectProfile, onClo
       setPrice("");
       onListSuccess?.();
     } catch (err) {
-      setConnectGateActive(Boolean(err.connectRequired));
       setLocalError(err.message || "Could not list card.");
     }
   }
@@ -563,16 +553,6 @@ function SingleCardListingModal({ open, card, busy, token, connectProfile, onClo
         </div>
 
         {localError ? <p className="bulk-list-sheet__error">{localError}</p> : null}
-        {connectGateActive ? (
-          <div className="single-list-modal__section">
-            <MarketplaceConnectPrompt
-              profile={connectProfile}
-              token={token}
-              compact
-              requireSellReady
-            />
-          </div>
-        ) : null}
 
         <button
           type="submit"

@@ -10,7 +10,6 @@ import CardImage from "../components/CardImage";
 import TradeCardPicker from "../components/TradeCardPicker";
 import TradeCardsThumbRow from "../components/TradeCardsThumbRow";
 import { useAuth } from "../context/AuthContext";
-import MarketplaceConnectPrompt from "../components/MarketplaceConnectPrompt";
 import { authFetch, formatApiError, marketplaceListErrorFromDetail } from "../utils/authFetch";
 import {
   counterOfferButtonLabel,
@@ -61,8 +60,6 @@ export default function MarketplaceMyListingsPage() {
   const [incoming, setIncoming] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [connectGateActive, setConnectGateActive] = useState(false);
-  const [connectProfile, setConnectProfile] = useState(null);
   const [actionKey, setActionKey] = useState("");
   const [relistBusyId, setRelistBusyId] = useState("");
   const [unlistBusyId, setUnlistBusyId] = useState("");
@@ -121,24 +118,6 @@ export default function MarketplaceMyListingsPage() {
     if (!token || initializing) return;
     load();
   }, [token, initializing, load]);
-
-  useEffect(() => {
-    if (!token || initializing) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const { res } = await authFetch(token, "/auth/profile");
-        if (!cancelled && res.ok) {
-          setConnectProfile(await res.json().catch(() => null));
-        }
-      } catch {
-        if (!cancelled) setConnectProfile(null);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [token, initializing]);
 
   const location = useLocation();
   useEffect(() => {
@@ -329,7 +308,6 @@ export default function MarketplaceMyListingsPage() {
       if (!res.ok) throw marketplaceListErrorFromDetail(data?.detail, "Relist failed.");
       await load({ silent: true });
     } catch (e) {
-      setConnectGateActive(Boolean(e.connectRequired));
       setError(e.message || "Relist failed.");
     } finally {
       setRelistBusyId("");
@@ -440,11 +418,8 @@ export default function MarketplaceMyListingsPage() {
         </div>
         <MarketplaceSubNav />
         {error ? (
-          <div className="mb-6 space-y-3">
-            <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{error}</div>
-            {connectGateActive ? (
-              <MarketplaceConnectPrompt profile={connectProfile} token={token} requireSellReady />
-            ) : null}
+          <div className="mb-6 rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+            {error}
           </div>
         ) : null}
         {initializing || loading ? (

@@ -425,8 +425,8 @@ export default function SettingsPage() {
               />
               <SettingsLinkRow
                 label="Connected Bank Account"
-                value={stripeConnected ? "Connected" : "Not connected"}
-                to="/profile#payout-settings"
+                value={stripeConnected ? "Connected" : "Set up when withdrawing"}
+                to={stripeConnected ? "/profile#payout-settings" : "/credits#withdraw"}
               />
               <SettingsLinkRow
                 label="Notification Email"

@@ -13,19 +13,20 @@ export function formatApiError(detail, fallback) {
 
 /** Build an Error from a marketplace list/connect API detail payload. */
 export function marketplaceListErrorFromDetail(detail, fallback = "Could not list card.") {
-  if (
-    detail &&
-    typeof detail === "object" &&
-    detail.code === "stripe_onboarding_incomplete"
-  ) {
-    const err = new Error(detail.message || "Complete Stripe onboarding to sell on the marketplace.");
-    err.connectRequired = true;
-    err.connectCode = detail.code;
-    return err;
-  }
   const err = new Error(formatApiError(detail, fallback));
   err.connectRequired = false;
   return err;
+}
+
+/** Parse withdrawal / connect errors that should trigger bank onboarding. */
+export function connectRequiredFromDetail(detail) {
+  if (detail && typeof detail === "object" && detail.code === "stripe_connect_required") {
+    return detail.message || "Connect a bank account to withdraw marketplace earnings.";
+  }
+  if (typeof detail === "string" && /connect.*bank|stripe onboarding/i.test(detail)) {
+    return detail;
+  }
+  return null;
 }
 
 /**
