@@ -66,7 +66,12 @@ def google_oauth_configured() -> bool:
 
 
 def build_google_flow() -> Flow:
-    flow = Flow.from_client_config(_google_client_config(), scopes=GOOGLE_SCOPES)
+    """Web client with secret — PKCE disabled so callback works on any app instance."""
+    flow = Flow.from_client_config(
+        _google_client_config(),
+        scopes=GOOGLE_SCOPES,
+        autogenerate_code_verifier=False,
+    )
     flow.redirect_uri = google_redirect_uri()
     return flow
 
