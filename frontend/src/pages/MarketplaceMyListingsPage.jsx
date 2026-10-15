@@ -67,7 +67,7 @@ export default function MarketplaceMyListingsPage() {
   const [counterAmount, setCounterAmount] = useState("");
   const [counterTradeCardIds, setCounterTradeCardIds] = useState([]);
   const [counterBusyId, setCounterBusyId] = useState(null);
-  const [reviewCardId, setReviewCardId] = useState("");
+  const [reviewContext, setReviewContext] = useState(null);
   const [acceptConfirm, setAcceptConfirm] = useState(null);
   const [declineConfirm, setDeclineConfirm] = useState(null);
   const [acceptSuccess, setAcceptSuccess] = useState(null);
@@ -122,11 +122,20 @@ export default function MarketplaceMyListingsPage() {
   const location = useLocation();
   useEffect(() => {
     const reviewFromNav = location.state?.reviewCardId;
-    if (reviewFromNav) {
-      setReviewCardId(String(reviewFromNav));
-      window.history.replaceState({}, document.title);
+    if (!reviewFromNav || listings.length === 0) return;
+    const id = String(reviewFromNav);
+    const listing = listings.find((l) => l.card_id === id);
+    if (listing) {
+      setReviewContext({ listing, cardIds: [id] });
     }
-  }, [location.state?.reviewCardId]);
+    window.history.replaceState({}, document.title);
+  }, [location.state?.reviewCardId, listings]);
+
+  const openReviewOffers = useCallback((listingRow) => {
+    const cardIds = reviewCardIdsFromListingRow(listingRow);
+    if (!cardIds.length) return;
+    setReviewContext({ listing: listingRow, cardIds });
+  }, []);
 
   async function offerAction(offerId, action) {
     if (!token) return;
@@ -352,18 +361,13 @@ export default function MarketplaceMyListingsPage() {
     return Array.from(map.values());
   }, [listings]);
 
-  function sortedOffersForCard(cardId) {
-    const rows = [...(offersByCard[cardId] || [])];
-    rows.sort((a, b) => {
-      const diff = Number(b.offer_amount || 0) - Number(a.offer_amount || 0);
-      if (Math.abs(diff) > 0.0001) return diff;
-      return String(b.created_at || "").localeCompare(String(a.created_at || ""));
-    });
-    return rows;
-  }
-
-  const activeReviewListing = reviewCardId ? listingsByCard[reviewCardId] || null : null;
-  const activeReviewOffers = reviewCardId ? sortedOffersForCard(reviewCardId) : [];
+  const activeReviewListing = reviewContext?.listing ?? null;
+  const activeReviewCardIds = reviewContext?.cardIds ?? [];
+  const activeReviewOffers =
+    activeReviewCardIds.length > 0
+      ? mergeSortedOffersForCardIds(offersByCard, activeReviewCardIds)
+      : [];
+  const activeReviewMultiCopy = activeReviewCardIds.length > 1;
 
   async function confirmAcceptOffer() {
     if (!acceptConfirm) return;
@@ -396,7 +400,7 @@ export default function MarketplaceMyListingsPage() {
       newBalance,
     });
     setAcceptConfirm(null);
-    setReviewCardId("");
+    setReviewContext(null);
   }
 
   async function confirmDeclineOffer() {
@@ -446,7 +450,7 @@ export default function MarketplaceMyListingsPage() {
                 <GroupedMyListingRow
                   key={`${group.image_url}-${group.asking_price}-${group.card_id}`}
                   group={group}
-                  onReviewOffers={setReviewCardId}
+                  onReviewOffers={openReviewOffers}
                   onEditPrice={(g) => {
                     setEditPriceGroup(g);
                     setEditPriceValue(String(g.asking_price ?? ""));
@@ -462,7 +466,7 @@ export default function MarketplaceMyListingsPage() {
                 <MyListingRow
                   key={group.card_id}
                   listing={group}
-                  onReviewOffers={setReviewCardId}
+                  onReviewOffers={openReviewOffers}
                   onRelist={relist}
                   onUnlist={unlistListing}
                   relistBusyId={relistBusyId}
@@ -477,6 +481,8 @@ export default function MarketplaceMyListingsPage() {
         open={Boolean(activeReviewListing)}
         listing={activeReviewListing}
         offers={activeReviewOffers}
+        multiCopyReview={activeReviewMultiCopy}
+        excludeCounterCardIds={activeReviewCardIds}
         counterFormOfferId={counterFormOfferId}
         setCounterFormOfferId={setCounterFormOfferId}
         counterAmount={counterAmount}
@@ -488,15 +494,25 @@ export default function MarketplaceMyListingsPage() {
         declineNoticeOfferId={declineNoticeOfferId}
         token={token}
         onClose={() => {
-          setReviewCardId("");
+          setReviewContext(null);
           setCounterFormOfferId(null);
           setCounterAmount("");
           setCounterTradeCardIds([]);
           setDeclineNoticeOfferId(null);
         }}
         onSendCounter={sendCounter}
-        onRequestAccept={(offer, listingRow) => setAcceptConfirm({ offer, listing: listingRow })}
-        onRequestDecline={(offer, listingRow) => setDeclineConfirm({ offer, listing: listingRow })}
+        onRequestAccept={(offer) =>
+          setAcceptConfirm({
+            offer,
+            listing: listingsByCard[offer.card_id] || activeReviewListing,
+          })
+        }
+        onRequestDecline={(offer) =>
+          setDeclineConfirm({
+            offer,
+            listing: listingsByCard[offer.card_id] || activeReviewListing,
+          })
+        }
       />
 
       <AcceptOfferConfirmModal
@@ -635,6 +651,48 @@ function netSellerProceeds(askingPrice) {
   return Math.round((price - computeRoyaltyPreview(price)) * 100) / 100;
 }
 
+function isCardTradeOffer(offer) {
+  return (offer?.offer_type || "cash") === "card_trade";
+}
+
+/** Card trades first, then cash by amount, then newest. */
+function compareIncomingOffers(a, b) {
+  const aTrade = isCardTradeOffer(a);
+  const bTrade = isCardTradeOffer(b);
+  if (aTrade !== bTrade) return aTrade ? -1 : 1;
+  if (aTrade && bTrade) {
+    const cardDiff =
+      (b.trade_cards_offered?.length || 0) - (a.trade_cards_offered?.length || 0);
+    if (cardDiff !== 0) return cardDiff;
+  } else {
+    const diff = Number(b.offer_amount || 0) - Number(a.offer_amount || 0);
+    if (Math.abs(diff) > 0.0001) return diff;
+  }
+  return String(b.created_at || "").localeCompare(String(a.created_at || ""));
+}
+
+function reviewCardIdsFromListingRow(row) {
+  if (Array.isArray(row?.card_ids) && row.card_ids.length > 0) {
+    return [...row.card_ids];
+  }
+  if (row?.card_id) return [row.card_id];
+  return [];
+}
+
+function mergeSortedOffersForCardIds(offersByCard, cardIds) {
+  const seen = new Set();
+  const rows = [];
+  for (const id of cardIds) {
+    for (const o of offersByCard[id] || []) {
+      if (seen.has(o.offer_id)) continue;
+      seen.add(o.offer_id);
+      rows.push(o);
+    }
+  }
+  rows.sort(compareIncomingOffers);
+  return rows;
+}
+
 function GroupedMyListingRow({ group, onReviewOffers, onEditPrice, onUnlistAll, onUnlistSome, bulkBusy }) {
   const badge = vaultTierBadge(group.tier);
   const tierKey = normalizeTierKey(group.tier);
@@ -674,7 +732,7 @@ function GroupedMyListingRow({ group, onReviewOffers, onEditPrice, onUnlistAll, 
             <button
               type="button"
               className="my-listings-v2__btn my-listings-v2__btn--primary"
-              onClick={() => onReviewOffers(group.card_id)}
+              onClick={() => onReviewOffers(group)}
             >
               {offerCount} offer{offerCount === 1 ? "" : "s"}
             </button>
@@ -791,7 +849,7 @@ function MyListingRow({ listing, onReviewOffers, onRelist, onUnlist, relistBusyI
             {hasOffers ? (
               <button
                 type="button"
-                onClick={() => onReviewOffers(listing.card_id)}
+                onClick={() => onReviewOffers(listing)}
                 className="my-listings-v2__offers-badge"
               >
                 {offerCount} active offer{offerCount === 1 ? "" : "s"}
@@ -808,7 +866,7 @@ function MyListingRow({ listing, onReviewOffers, onRelist, onUnlist, relistBusyI
           <button
             type="button"
             disabled={!hasOffers}
-            onClick={() => hasOffers && onReviewOffers(listing.card_id)}
+            onClick={() => hasOffers && onReviewOffers(listing)}
             className="my-listings-v2__btn my-listings-v2__btn--primary"
           >
             {hasOffers ? "Manage Offers" : "No Offers Yet"}
@@ -834,6 +892,8 @@ function OfferReviewModal({
   open,
   listing,
   offers,
+  multiCopyReview = false,
+  excludeCounterCardIds = [],
   counterFormOfferId,
   setCounterFormOfferId,
   counterAmount,
@@ -889,9 +949,17 @@ function OfferReviewModal({
           <div className="offer-review-listing__details">
             <p className="text-base font-semibold text-white">{listing.player_name}</p>
             <p className="text-sm text-slate-400">{listing.team_name}</p>
-            <p className="mt-1 font-mono text-xs text-brand-gold/80">{listing.card_id}</p>
+            {multiCopyReview ? (
+              <p className="mt-1 text-xs text-slate-400">
+                Offers across {excludeCounterCardIds.length} listed cop
+                {excludeCounterCardIds.length === 1 ? "y" : "ies"}
+              </p>
+            ) : (
+              <p className="mt-1 font-mono text-xs text-brand-gold/80">{listing.card_id}</p>
+            )}
             <p className="mt-2 text-sm text-amber-200">
-              {offers.length} active offer{offers.length === 1 ? "" : "s"} (highest cash offer first)
+              {offers.length} active offer{offers.length === 1 ? "" : "s"} (card trades first, then highest
+              cash)
             </p>
           </div>
         </div>
@@ -912,6 +980,9 @@ function OfferReviewModal({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-medium text-white">{offer.buyer_display_name}</p>
+                    {multiCopyReview && offer.card_id ? (
+                      <p className="font-mono text-[11px] text-brand-gold/85">For listing {offer.card_id}</p>
+                    ) : null}
                     {isTrade ? (
                       <>
                         <p className="text-sm font-semibold text-amber-200">
@@ -966,7 +1037,11 @@ function OfferReviewModal({
                             token={token}
                             selectedIds={counterTradeCardIds}
                             onSelectedIdsChange={setCounterTradeCardIds}
-                            excludeCardIds={[listing.card_id]}
+                            excludeCardIds={
+                              excludeCounterCardIds.length > 0
+                                ? excludeCounterCardIds
+                                : [listing.card_id]
+                            }
                             pickerLabel="Cards you are willing to trade to the buyer"
                           />
                         </>
@@ -1015,7 +1090,7 @@ function OfferReviewModal({
                       <button
                         type="button"
                         disabled={actionKey === `accept-${offer.offer_id}`}
-                        onClick={() => onRequestAccept(offer, listing)}
+                        onClick={() => onRequestAccept(offer)}
                         className="btn-primary disabled:opacity-50"
                       >
                         {actionKey === `accept-${offer.offer_id}` ? "Accepting…" : "Accept"}
@@ -1035,7 +1110,7 @@ function OfferReviewModal({
                       <button
                         type="button"
                         disabled={actionKey === `decline-${offer.offer_id}`}
-                        onClick={() => onRequestDecline(offer, listing)}
+                        onClick={() => onRequestDecline(offer)}
                         className="btn-danger disabled:opacity-50"
                       >
                         {actionKey === `decline-${offer.offer_id}` ? "Declining…" : "Decline"}
@@ -1146,10 +1221,29 @@ function AcceptOfferConfirmModal({ open, payload, actionBusy, onBack, onConfirm 
                 <dd>{offer.buyer_display_name}</dd>
               </div>
               {isTrade ? (
-                <div className="accept-offer-confirm-modal__detail-row">
-                  <dt>You receive</dt>
-                  <dd>Trade cards added to your collection</dd>
-                </div>
+                <>
+                  <div className="accept-offer-confirm-modal__detail-row">
+                    <dt>You receive</dt>
+                    <dd>
+                      {(offer.trade_cards_offered || []).length} card
+                      {(offer.trade_cards_offered || []).length === 1 ? "" : "s"} from the buyer
+                    </dd>
+                  </div>
+                  {(offer.trade_cards_offered || []).length > 0 ? (
+                    <div className="accept-offer-confirm-modal__detail-row accept-offer-confirm-modal__detail-row--stack">
+                      <dt className="sr-only">Cards you receive</dt>
+                      <dd className="w-full">
+                        <TradeCardsThumbRow cards={offer.trade_cards_offered} />
+                      </dd>
+                    </div>
+                  ) : null}
+                  {offer.card_id ? (
+                    <div className="accept-offer-confirm-modal__detail-row">
+                      <dt>You send</dt>
+                      <dd className="font-mono text-xs text-slate-300">{offer.card_id}</dd>
+                    </div>
+                  ) : null}
+                </>
               ) : (
                 <>
                   <div className="accept-offer-confirm-modal__detail-row">
