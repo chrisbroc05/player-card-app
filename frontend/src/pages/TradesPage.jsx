@@ -3,11 +3,13 @@ import { Link, Navigate } from "react-router-dom";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import CardImage from "../components/CardImage";
+import TradeCardsThumbRow from "../components/TradeCardsThumbRow";
 import { cardMediaFrameClass, cardPlaysVideoOnHover } from "../utils/highlightCard";
 import { API_BASE_URL, authHeaders } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import { useNewCardCelebration } from "../context/NewCardCelebrationContext";
 import { vaultTierBadge, formatEditionShort, rarityDisplay } from "../utils/tierStyles";
+import { formatMoney, offerExpiresLabel, offerExpiresLineClass } from "../utils/marketplace";
 import { ActivityHistorySection } from "../components/ActivityHistory";
 import ProfileLink from "../components/ProfileLink";
 
@@ -35,11 +37,27 @@ function tierImageGlow(tier) {
   return "shadow-[0_0_26px_rgba(255,69,0,0.35)] border-orange-500/50";
 }
 
+function isMarketplaceCardTrade(offer) {
+  return (offer?.offer_type || "cash") === "card_trade";
+}
+
+function compareMarketplaceIncoming(a, b) {
+  const aTrade = isMarketplaceCardTrade(a);
+  const bTrade = isMarketplaceCardTrade(b);
+  if (aTrade !== bTrade) return aTrade ? -1 : 1;
+  if (!aTrade && !bTrade) {
+    const diff = Number(b.offer_amount || 0) - Number(a.offer_amount || 0);
+    if (Math.abs(diff) > 0.0001) return diff;
+  }
+  return String(b.created_at || "").localeCompare(String(a.created_at || ""));
+}
+
 export default function TradesPage() {
-  const { token, user, initializing, refreshIncomingTradeCount } = useAuth();
+  const { token, user, initializing, refreshNavBadges } = useAuth();
   const { showCelebration } = useNewCardCelebration();
   const [incoming, setIncoming] = useState([]);
   const [outgoing, setOutgoing] = useState([]);
+  const [marketplaceIncoming, setMarketplaceIncoming] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionKey, setActionKey] = useState("");
@@ -73,22 +91,28 @@ export default function TradesPage() {
     setLoading(true);
     setError("");
     try {
-      const [incRes, outRes] = await Promise.all([
+      const [incRes, outRes, mpRes] = await Promise.all([
         fetch(`${API_BASE_URL}/trades/incoming`, { headers: { ...authHeaders(token) } }),
         fetch(`${API_BASE_URL}/trades/outgoing`, { headers: { ...authHeaders(token) } }),
+        fetch(`${API_BASE_URL}/marketplace/incoming-offers`, { headers: { ...authHeaders(token) } }),
       ]);
-      if (!incRes.ok || !outRes.ok) throw new Error("Could not load trades.");
+      if (!incRes.ok || !outRes.ok || !mpRes.ok) throw new Error("Could not load trades.");
       const inc = await incRes.json();
       const out = await outRes.json();
+      const mp = await mpRes.json();
       setIncoming(Array.isArray(inc) ? inc : []);
       setOutgoing(Array.isArray(out) ? out : []);
+      const mpRows = Array.isArray(mp) ? [...mp] : [];
+      mpRows.sort(compareMarketplaceIncoming);
+      setMarketplaceIncoming(mpRows);
     } catch (e) {
       setError(e.message || "Failed to load.");
     } finally {
       setLoading(false);
     }
     await loadActivity();
-  }, [token, loadActivity]);
+    refreshNavBadges?.();
+  }, [token, loadActivity, refreshNavBadges]);
 
   useEffect(() => {
     if (!token || initializing) return;
@@ -97,15 +121,21 @@ export default function TradesPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (window.location.hash === "#activity-history") {
-      const el = document.getElementById("activity-history");
-      if (el) {
-        window.requestAnimationFrame(() => {
-          el.scrollIntoView({ behavior: "smooth", block: "start" });
-        });
-      }
+    const hash = window.location.hash;
+    const targetId =
+      hash === "#activity-history"
+        ? "activity-history"
+        : hash === "#marketplace-offers"
+          ? "marketplace-offers"
+          : null;
+    if (!targetId) return;
+    const el = document.getElementById(targetId);
+    if (el) {
+      window.requestAnimationFrame(() => {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
     }
-  }, [loading, activityLoading]);
+  }, [loading, activityLoading, marketplaceIncoming.length]);
 
   async function postTradeAction(tradeId, path) {
     if (!token) return;
@@ -128,7 +158,7 @@ export default function TradesPage() {
         });
       }
       await load();
-      refreshIncomingTradeCount?.();
+      refreshNavBadges?.();
     } catch (e) {
       setError(e.message || "Action failed.");
     } finally {
@@ -146,8 +176,11 @@ export default function TradesPage() {
 
       <main className="mx-auto w-full max-w-5xl px-3 py-8 sm:px-6 lg:px-8">
         <div className="mb-8">
-          <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Trades</h1>
-          <p className="mt-2 text-sm text-slate-400">Incoming offers and cards you&apos;ve offered to others.</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Offers &amp; Trades</h1>
+          <p className="mt-2 text-sm text-slate-400">
+            Marketplace offers on your listings, direct card sends from other players, and cards you&apos;ve offered
+            to others.
+          </p>
         </div>
 
         {error ? (
@@ -160,13 +193,106 @@ export default function TradesPage() {
           </div>
         ) : (
           <div className="space-y-12">
+            <section id="marketplace-offers">
+              <h2 className="mb-4 border-b border-white/10 pb-2 text-lg font-semibold text-white">
+                Marketplace offers on your listings
+              </h2>
+              {marketplaceIncoming.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-white/15 bg-cardBg/40 px-4 py-10 text-center text-sm text-slate-500">
+                  No pending marketplace offers
+                </p>
+              ) : (
+                <ul className="space-y-5">
+                  {marketplaceIncoming.map((offer) => {
+                    const isTrade = isMarketplaceCardTrade(offer);
+                    const offeredCards = offer.trade_cards_offered || [];
+                    const counterCards = offer.trade_cards_counter || [];
+                    const awaitingBuyer = offer.counter_status === "pending";
+                    const listingCard = {
+                      card_id: offer.card_id,
+                      player_name: offer.player_name,
+                      image_url: offer.image_url,
+                    };
+                    return (
+                      <li
+                        key={`mp-${offer.offer_id}`}
+                        className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-cardBg p-4 shadow-lg sm:flex-row sm:items-stretch"
+                      >
+                        <div className="mx-auto w-40 shrink-0 overflow-hidden rounded-xl border-2 border-white/15 bg-black/30 sm:mx-0 sm:w-44">
+                          <CardImage
+                            card={listingCard}
+                            alt={offer.player_name}
+                            frameClassName={cardMediaFrameClass(listingCard)}
+                            playOnHover={cardPlaysVideoOnHover(listingCard)}
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <p className="text-lg font-semibold text-white">{offer.player_name}</p>
+                          <p className="font-mono text-xs text-brand-gold/85">{offer.card_id}</p>
+                          <p className="text-sm text-slate-300">
+                            From{" "}
+                            <ProfileLink
+                              displayName={offer.buyer_display_name}
+                              className="profile-link profile-link--inline font-medium text-amber-100/95"
+                              prefixAt={false}
+                            />
+                          </p>
+                          {isTrade ? (
+                            <>
+                              <p className="text-sm font-semibold text-amber-200">
+                                Card trade — {offeredCards.length} card{offeredCards.length === 1 ? "" : "s"}{" "}
+                                offered
+                              </p>
+                              <TradeCardsThumbRow cards={offeredCards} />
+                            </>
+                          ) : (
+                            <p className="text-lg font-semibold text-brand-gold">
+                              Cash offer {formatMoney(offer.offer_amount)}
+                            </p>
+                          )}
+                          {offer.message ? (
+                            <p className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-slate-200">
+                              {offer.message}
+                            </p>
+                          ) : null}
+                          {offer.days_remaining != null && offer.expires_at ? (
+                            <p className={`text-xs ${offerExpiresLineClass(offer.days_remaining)}`}>
+                              {offerExpiresLabel(offer.days_remaining)}
+                            </p>
+                          ) : null}
+                          {awaitingBuyer ? (
+                            <p className="rounded-lg border bg-gold-subtle px-3 py-2 text-sm text-brand-gold">
+                              You countered — waiting for the buyer to respond
+                              {isTrade && counterCards.length > 0 ? (
+                                <TradeCardsThumbRow cards={counterCards} className="mt-2" />
+                              ) : null}
+                            </p>
+                          ) : null}
+                          <p className="text-xs text-slate-500">{relativeSentLabel(offer.created_at)}</p>
+                          <div className="flex flex-wrap gap-2 pt-2">
+                            <Link
+                              to="/marketplace/my-listings"
+                              state={{ reviewCardId: offer.card_id }}
+                              className="inline-flex min-h-[42px] flex-1 items-center justify-center rounded-xl btn-primary px-4 py-2 text-sm font-semibold text-slate-950 sm:flex-none"
+                            >
+                              Review &amp; respond
+                            </Link>
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+
             <section>
               <h2 className="mb-4 border-b border-white/10 pb-2 text-lg font-semibold text-white">
-                Cards Being Sent To You
+                Direct card sends to you
               </h2>
               {incoming.length === 0 ? (
                 <p className="rounded-xl border border-dashed border-white/15 bg-cardBg/40 px-4 py-10 text-center text-sm text-slate-500">
-                  No incoming trade offers
+                  No incoming direct trade offers
                 </p>
               ) : (
                 <ul className="space-y-5">

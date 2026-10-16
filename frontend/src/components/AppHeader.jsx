@@ -39,7 +39,8 @@ export default function AppHeader() {
   const onSettings = location.pathname.startsWith("/settings");
   const onCredits = location.pathname.startsWith("/credits");
 
-  const hasNotifications = pendingIncomingTradesCount + pendingIncomingMarketplaceCount > 0;
+  const pendingOffersAndTradesCount = pendingIncomingTradesCount + pendingIncomingMarketplaceCount;
+  const hasNotifications = pendingOffersAndTradesCount > 0;
   const marketplaceBalance = Number(user?.marketplace_balance ?? 0);
 
   function handleLogout() {
@@ -96,10 +97,10 @@ export default function AppHeader() {
                   My Collection
                 </Link>
                 <Link to="/trades" className={`relative ${navClass(onTrades)}`}>
-                  Trades
-                  {pendingIncomingTradesCount > 0 ? (
+                  Offers &amp; Trades
+                  {pendingOffersAndTradesCount > 0 ? (
                     <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[#ef4444] px-1 text-[10px] font-bold leading-none text-white shadow-sm">
-                      {pendingIncomingTradesCount > 9 ? "9+" : pendingIncomingTradesCount}
+                      {pendingOffersAndTradesCount > 9 ? "9+" : pendingOffersAndTradesCount}
                     </span>
                   ) : null}
                 </Link>
@@ -188,7 +189,9 @@ export default function AppHeader() {
                 <Link
                   to="/trades"
                   className={`mobile-header__bell${hasNotifications ? " mobile-header__bell--active" : ""}`}
-                  aria-label={hasNotifications ? "Trades and offers — new activity" : "Trades and offers"}
+                  aria-label={
+                    hasNotifications ? "Offers and trades — new activity" : "Offers and trades inbox"
+                  }
                 >
                   <Bell className="h-5 w-5" strokeWidth={2} aria-hidden />
                   {hasNotifications ? <span className="notification-dot" aria-hidden /> : null}
