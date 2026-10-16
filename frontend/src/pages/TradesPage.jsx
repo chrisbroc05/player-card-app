@@ -10,6 +10,7 @@ import { useAuth } from "../context/AuthContext";
 import { useNewCardCelebration } from "../context/NewCardCelebrationContext";
 import { vaultTierBadge, formatEditionShort, rarityDisplay } from "../utils/tierStyles";
 import { formatMoney, offerExpiresLabel, offerExpiresLineClass } from "../utils/marketplace";
+import { CARD_ASPECT } from "../utils/cardImageStyles";
 import { ActivityHistorySection } from "../components/ActivityHistory";
 import ProfileLink from "../components/ProfileLink";
 
@@ -39,6 +40,93 @@ function tierImageGlow(tier) {
 
 function isMarketplaceCardTrade(offer) {
   return (offer?.offer_type || "cash") === "card_trade";
+}
+
+const MARKETPLACE_OFFER_CARD_FRAME = `relative w-full ${CARD_ASPECT}`;
+
+function MarketplaceOfferInboxRow({ offer }) {
+  const isTrade = isMarketplaceCardTrade(offer);
+  const offeredCards = offer.trade_cards_offered || [];
+  const counterCards = offer.trade_cards_counter || [];
+  const awaitingBuyer = offer.counter_status === "pending";
+  const listingCard = {
+    card_id: offer.card_id,
+    player_name: offer.player_name,
+    image_url: offer.image_url,
+  };
+
+  return (
+    <li className="overflow-hidden rounded-2xl border border-white/10 bg-cardBg p-5 shadow-lg sm:p-6">
+      <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-8">
+        <div className="mx-auto flex w-full max-w-[12rem] shrink-0 flex-col items-center md:mx-0">
+          <div className="w-full rounded-xl border-2 border-white/15 bg-black/35 p-2 shadow-inner">
+            <CardImage
+              card={listingCard}
+              alt={offer.player_name}
+              frameClassName={MARKETPLACE_OFFER_CARD_FRAME}
+              playOnHover={cardPlaysVideoOnHover(listingCard)}
+            />
+          </div>
+          <p className="mt-2 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+            Your listing
+          </p>
+        </div>
+
+        <div className="flex min-w-0 flex-1 flex-col items-center space-y-2.5 text-center md:items-start md:text-left">
+          <div className="w-full space-y-1">
+            <p className="text-lg font-semibold text-white">{offer.player_name}</p>
+            <p className="font-mono text-xs text-brand-gold/85">{offer.card_id}</p>
+          </div>
+          <p className="text-sm text-slate-300">
+            From{" "}
+            <ProfileLink
+              displayName={offer.buyer_display_name}
+              className="profile-link profile-link--inline font-medium text-amber-100/95"
+              prefixAt={false}
+            />
+          </p>
+          {isTrade ? (
+            <div className="w-full max-w-md space-y-2">
+              <p className="text-sm font-semibold text-amber-200">
+                Card trade — {offeredCards.length} card{offeredCards.length === 1 ? "" : "s"} offered
+              </p>
+              <TradeCardsThumbRow cards={offeredCards} className="justify-center md:justify-start" />
+            </div>
+          ) : (
+            <p className="text-lg font-semibold text-brand-gold">Cash offer {formatMoney(offer.offer_amount)}</p>
+          )}
+          {offer.message ? (
+            <p className="w-full max-w-md rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-left text-sm text-slate-200">
+              {offer.message}
+            </p>
+          ) : null}
+          {offer.days_remaining != null && offer.expires_at ? (
+            <p className={`text-xs ${offerExpiresLineClass(offer.days_remaining)}`}>
+              {offerExpiresLabel(offer.days_remaining)}
+            </p>
+          ) : null}
+          {awaitingBuyer ? (
+            <div className="w-full max-w-md rounded-lg border bg-gold-subtle px-3 py-2 text-left text-sm text-brand-gold">
+              You countered — waiting for the buyer to respond
+              {isTrade && counterCards.length > 0 ? (
+                <TradeCardsThumbRow cards={counterCards} className="mt-2 justify-center md:justify-start" />
+              ) : null}
+            </div>
+          ) : null}
+          <p className="text-xs text-slate-500">{relativeSentLabel(offer.created_at)}</p>
+          <div className="flex w-full max-w-xs justify-center pt-1 md:max-w-none md:justify-start">
+            <Link
+              to="/marketplace/my-listings"
+              state={{ reviewCardId: offer.card_id }}
+              className="inline-flex min-h-[42px] w-full items-center justify-center rounded-xl btn-primary px-5 py-2 text-sm font-semibold text-slate-950 md:w-auto"
+            >
+              Review &amp; respond
+            </Link>
+          </div>
+        </div>
+      </div>
+    </li>
+  );
 }
 
 function compareMarketplaceIncoming(a, b) {
@@ -203,85 +291,9 @@ export default function TradesPage() {
                 </p>
               ) : (
                 <ul className="space-y-5">
-                  {marketplaceIncoming.map((offer) => {
-                    const isTrade = isMarketplaceCardTrade(offer);
-                    const offeredCards = offer.trade_cards_offered || [];
-                    const counterCards = offer.trade_cards_counter || [];
-                    const awaitingBuyer = offer.counter_status === "pending";
-                    const listingCard = {
-                      card_id: offer.card_id,
-                      player_name: offer.player_name,
-                      image_url: offer.image_url,
-                    };
-                    return (
-                      <li
-                        key={`mp-${offer.offer_id}`}
-                        className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-cardBg p-4 shadow-lg sm:flex-row sm:items-stretch"
-                      >
-                        <div className="mx-auto w-40 shrink-0 overflow-hidden rounded-xl border-2 border-white/15 bg-black/30 sm:mx-0 sm:w-44">
-                          <CardImage
-                            card={listingCard}
-                            alt={offer.player_name}
-                            frameClassName={cardMediaFrameClass(listingCard)}
-                            playOnHover={cardPlaysVideoOnHover(listingCard)}
-                          />
-                        </div>
-                        <div className="min-w-0 flex-1 space-y-2">
-                          <p className="text-lg font-semibold text-white">{offer.player_name}</p>
-                          <p className="font-mono text-xs text-brand-gold/85">{offer.card_id}</p>
-                          <p className="text-sm text-slate-300">
-                            From{" "}
-                            <ProfileLink
-                              displayName={offer.buyer_display_name}
-                              className="profile-link profile-link--inline font-medium text-amber-100/95"
-                              prefixAt={false}
-                            />
-                          </p>
-                          {isTrade ? (
-                            <>
-                              <p className="text-sm font-semibold text-amber-200">
-                                Card trade — {offeredCards.length} card{offeredCards.length === 1 ? "" : "s"}{" "}
-                                offered
-                              </p>
-                              <TradeCardsThumbRow cards={offeredCards} />
-                            </>
-                          ) : (
-                            <p className="text-lg font-semibold text-brand-gold">
-                              Cash offer {formatMoney(offer.offer_amount)}
-                            </p>
-                          )}
-                          {offer.message ? (
-                            <p className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-slate-200">
-                              {offer.message}
-                            </p>
-                          ) : null}
-                          {offer.days_remaining != null && offer.expires_at ? (
-                            <p className={`text-xs ${offerExpiresLineClass(offer.days_remaining)}`}>
-                              {offerExpiresLabel(offer.days_remaining)}
-                            </p>
-                          ) : null}
-                          {awaitingBuyer ? (
-                            <p className="rounded-lg border bg-gold-subtle px-3 py-2 text-sm text-brand-gold">
-                              You countered — waiting for the buyer to respond
-                              {isTrade && counterCards.length > 0 ? (
-                                <TradeCardsThumbRow cards={counterCards} className="mt-2" />
-                              ) : null}
-                            </p>
-                          ) : null}
-                          <p className="text-xs text-slate-500">{relativeSentLabel(offer.created_at)}</p>
-                          <div className="flex flex-wrap gap-2 pt-2">
-                            <Link
-                              to="/marketplace/my-listings"
-                              state={{ reviewCardId: offer.card_id }}
-                              className="inline-flex min-h-[42px] flex-1 items-center justify-center rounded-xl btn-primary px-4 py-2 text-sm font-semibold text-slate-950 sm:flex-none"
-                            >
-                              Review &amp; respond
-                            </Link>
-                          </div>
-                        </div>
-                      </li>
-                    );
-                  })}
+                  {marketplaceIncoming.map((offer) => (
+                    <MarketplaceOfferInboxRow key={`mp-${offer.offer_id}`} offer={offer} />
+                  ))}
                 </ul>
               )}
             </section>
