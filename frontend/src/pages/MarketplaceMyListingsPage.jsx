@@ -8,7 +8,9 @@ import ConfirmationCardThumbnail from "../components/ConfirmationCardThumbnail";
 import MarketplaceSubNav from "../components/MarketplaceSubNav";
 import CardImage from "../components/CardImage";
 import TradeCardPicker from "../components/TradeCardPicker";
+import ExpandableCardView from "../components/ExpandableCardView";
 import TradeCardsThumbRow from "../components/TradeCardsThumbRow";
+import { CARD_IMAGE_FRAME_OFFER_REVIEW } from "../utils/cardImageStyles";
 import { useAuth } from "../context/AuthContext";
 import { authFetch, formatApiError, marketplaceListErrorFromDetail } from "../utils/authFetch";
 import {
@@ -480,6 +482,7 @@ export default function MarketplaceMyListingsPage() {
       <OfferReviewModal
         open={Boolean(activeReviewListing)}
         listing={activeReviewListing}
+        listingsByCard={listingsByCard}
         offers={activeReviewOffers}
         multiCopyReview={activeReviewMultiCopy}
         excludeCounterCardIds={activeReviewCardIds}
@@ -888,9 +891,58 @@ function MyListingRow({ listing, onReviewOffers, onRelist, onUnlist, relistBusyI
   );
 }
 
+function listingForOffer(offer, fallbackListing, listingsByCard) {
+  const row = listingsByCard?.[offer.card_id];
+  if (row) return row;
+  if (fallbackListing) {
+    return { ...fallbackListing, card_id: offer.card_id || fallbackListing.card_id };
+  }
+  return null;
+}
+
+function OfferReviewCardPreview({ card, token, size = "listing" }) {
+  if (!card) return null;
+  const slotClass =
+    size === "offered" ? "offer-review-card-slot offer-review-card-slot--offered" : "offer-review-card-slot";
+  return (
+    <ExpandableCardView
+      card={card}
+      alt={card.player_name}
+      token={token}
+      className={slotClass}
+    >
+      <CardImage
+        card={card}
+        alt={card.player_name}
+        frameClassName={CARD_IMAGE_FRAME_OFFER_REVIEW}
+        infoBannerVariant="compact"
+        showInfoBanner
+        playOnHover
+      />
+    </ExpandableCardView>
+  );
+}
+
+function OfferReviewOfferedCards({ cards, token }) {
+  if (!cards?.length) return null;
+  const count = cards.length;
+  const gridClass =
+    count <= 2
+      ? "offer-review-offered-cards offer-review-offered-cards--few"
+      : "offer-review-offered-cards offer-review-offered-cards--many";
+  return (
+    <div className={gridClass}>
+      {cards.map((c) => (
+        <OfferReviewCardPreview key={c.card_id} card={c} token={token} size="offered" />
+      ))}
+    </div>
+  );
+}
+
 function OfferReviewModal({
   open,
   listing,
+  listingsByCard = {},
   offers,
   multiCopyReview = false,
   excludeCounterCardIds = [],
@@ -926,7 +978,17 @@ function OfferReviewModal({
               <h2 id="review-offers-title" className="text-xl font-semibold text-white">
                 Review Offers
               </h2>
-              <p className="mt-1 text-sm text-slate-400">Incoming offers for {listing.player_name}</p>
+              <p className="mt-1 text-sm text-slate-400">{listing.player_name}</p>
+              <p className="mt-0.5 text-xs text-slate-500">
+                {offers.length} active offer{offers.length === 1 ? "" : "s"} · card trades first, then highest
+                cash
+              </p>
+              {multiCopyReview ? (
+                <p className="mt-1 text-xs text-slate-500">
+                  Across {excludeCounterCardIds.length} listed cop
+                  {excludeCounterCardIds.length === 1 ? "y" : "ies"}
+                </p>
+              ) : null}
             </div>
             <button type="button" onClick={onClose} className="btn-ghost min-h-[40px] px-3 text-sm">
               Close
@@ -935,193 +997,190 @@ function OfferReviewModal({
         </div>
 
         <div className="offer-review-modal__scroll">
-        <div className="offer-review-listing mt-4">
-          <div className="offer-review-listing__card">
-            <CardImage
-              card={listing}
-              alt={listing.player_name}
-              frameClassName="w-full"
-              infoBannerVariant="compact"
-              showInfoBanner
-              playOnHover
-            />
-          </div>
-          <div className="offer-review-listing__details">
-            <p className="text-base font-semibold text-white">{listing.player_name}</p>
-            <p className="text-sm text-slate-400">{listing.team_name}</p>
-            {multiCopyReview ? (
-              <p className="mt-1 text-xs text-slate-400">
-                Offers across {excludeCounterCardIds.length} listed cop
-                {excludeCounterCardIds.length === 1 ? "y" : "ies"}
-              </p>
-            ) : (
-              <p className="mt-1 font-mono text-xs text-brand-gold/80">{listing.card_id}</p>
-            )}
-            <p className="mt-2 text-sm text-amber-200">
-              {offers.length} active offer{offers.length === 1 ? "" : "s"} (card trades first, then highest
-              cash)
-            </p>
-          </div>
-        </div>
-
-        <ul className="mt-4 space-y-3">
           {declineNoticeOfferId ? (
-            <li className="rounded-lg border bg-success-subtle px-3 py-2 text-sm font-medium text-success">
+            <div className="mt-3 rounded-lg border bg-success-subtle px-3 py-2 text-sm font-medium text-success">
               Offer declined
-            </li>
+            </div>
           ) : null}
-          {offers.map((offer) => {
-            const isTrade = (offer.offer_type || "cash") === "card_trade";
-            const offeredCards = offer.trade_cards_offered || [];
-            const counterCards = offer.trade_cards_counter || [];
-            const submittedAt = offer.created_at ? new Date(offer.created_at).toLocaleString() : "—";
-            return (
-              <li key={offer.offer_id} className="rounded-xl border border-white/10 bg-cardBg2 p-3 sm:p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-medium text-white">{offer.buyer_display_name}</p>
-                    {multiCopyReview && offer.card_id ? (
-                      <p className="font-mono text-[11px] text-brand-gold/85">For listing {offer.card_id}</p>
+
+          <ul className="offer-review-offer-list">
+            {offers.map((offer) => {
+              const isTrade = (offer.offer_type || "cash") === "card_trade";
+              const offeredCards = offer.trade_cards_offered || [];
+              const counterCards = offer.trade_cards_counter || [];
+              const submittedAt = offer.created_at ? new Date(offer.created_at).toLocaleString() : "—";
+              const offerListing = listingForOffer(offer, listing, listingsByCard);
+              const listingCardId = offerListing?.card_id || offer.card_id;
+
+              return (
+                <li key={offer.offer_id} className="offer-review-offer">
+                  <p className="offer-review-offer__buyer">{offer.buyer_display_name}</p>
+                  {multiCopyReview && offer.card_id ? (
+                    <p className="offer-review-offer__listing-id">For listing {offer.card_id}</p>
+                  ) : null}
+
+                  <div className="offer-review-trade-block">
+                    <p className="offer-review-trade-block__label">Your listing</p>
+                    <OfferReviewCardPreview card={offerListing} token={token} />
+                    <p className="offer-review-trade-block__name">{offerListing?.player_name || listing.player_name}</p>
+                    {listingCardId ? (
+                      <p className="offer-review-trade-block__id">{listingCardId}</p>
                     ) : null}
+
+                    <div className="offer-review-trade-divider" aria-hidden>
+                      <span className="offer-review-trade-divider__line" />
+                      <span className="offer-review-trade-divider__text">
+                        {isTrade ? "↔ Trade offer" : "↔ Cash offer"}
+                      </span>
+                      <span className="offer-review-trade-divider__line" />
+                    </div>
+
                     {isTrade ? (
                       <>
-                        <p className="text-sm font-semibold text-amber-200">
-                          Card Trade Offer — {offeredCards.length} card{offeredCards.length === 1 ? "" : "s"} offered
+                        <p className="offer-review-trade-block__offer-head">
+                          {offeredCards.length} card{offeredCards.length === 1 ? "" : "s"} offered
                         </p>
-                        <TradeCardsThumbRow cards={offeredCards} className="mt-2" />
+                        <OfferReviewOfferedCards cards={offeredCards} token={token} />
+                        <p className="offer-review-trade-block__tap-hint">Tap a card to inspect full size</p>
                       </>
                     ) : (
-                      <>
-                        <p className="text-lg font-semibold text-brand-gold">{formatMoney(offer.offer_amount)}</p>
-                        <p className="text-xs text-slate-500">Royalty: {formatMoney(offer.royalty_amount)}</p>
-                      </>
-                    )}
-                    {offer.message ? <p className="mt-1 text-xs text-slate-400">Message: “{offer.message}”</p> : null}
-                    <p className="mt-1 text-xs text-slate-500">Submitted: {submittedAt}</p>
-                    {offer.status === "pending" && offer.days_remaining != null && offer.expires_at ? (
-                      <p className={`mt-2 text-xs ${offerExpiresLineClass(offer.days_remaining)}`}>
-                        {offerExpiresLabel(offer.days_remaining)}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-
-                {offer.counter_status === "pending" ? (
-                  <div className="mt-3 rounded-lg border bg-gold-subtle px-3 py-2 text-sm text-brand-gold">
-                    {isTrade ? (
-                      <>
-                        <p className="font-medium text-white">Counter sent — awaiting buyer response</p>
-                        <TradeCardsThumbRow cards={counterCards} className="mt-2" />
-                      </>
-                    ) : (
-                      <>
-                        <p>
-                          Counter sent:{" "}
-                          <span className="font-semibold text-white">{formatMoney(offer.counter_amount)}</span>
+                      <div className="offer-review-cash-offer">
+                        <p className="offer-review-cash-offer__amount">{formatMoney(offer.offer_amount)}</p>
+                        <p className="offer-review-cash-offer__royalty">
+                          Royalty {formatMoney(offer.royalty_amount)}
                         </p>
-                        <p className="mt-1 text-xs text-slate-400">Awaiting buyer response</p>
-                      </>
+                      </div>
                     )}
                   </div>
-                ) : null}
 
-                {offer.counter_status == null ? (
-                  counterFormOfferId === offer.offer_id ? (
-                    <div className="mt-3 space-y-2 rounded-lg border border-white/15 bg-cardBg p-3">
+                  {offer.message ? (
+                    <p className="offer-review-offer__message">“{offer.message}”</p>
+                  ) : null}
+                  <p className="offer-review-offer__meta">Submitted {submittedAt}</p>
+                  {offer.status === "pending" && offer.days_remaining != null && offer.expires_at ? (
+                    <p className={`offer-review-offer__meta ${offerExpiresLineClass(offer.days_remaining)}`}>
+                      {offerExpiresLabel(offer.days_remaining)}
+                    </p>
+                  ) : null}
+
+                  {offer.counter_status === "pending" ? (
+                    <div className="offer-review-counter-notice">
                       {isTrade ? (
                         <>
-                          <p className="text-xs font-medium text-slate-400">
-                            Select cards from your collection to send to the buyer
-                          </p>
-                          <TradeCardPicker
-                            token={token}
-                            selectedIds={counterTradeCardIds}
-                            onSelectedIdsChange={setCounterTradeCardIds}
-                            excludeCardIds={
-                              excludeCounterCardIds.length > 0
-                                ? excludeCounterCardIds
-                                : [listing.card_id]
-                            }
-                            pickerLabel="Cards you are willing to trade to the buyer"
-                          />
+                          <p className="font-medium text-white">Counter sent — awaiting buyer</p>
+                          <OfferReviewOfferedCards cards={counterCards} token={token} />
                         </>
                       ) : (
                         <>
-                          <label className="text-xs font-medium text-slate-400">Your counter amount ($)</label>
-                          <input
-                            type="number"
-                            min="1"
-                            step="0.01"
-                            value={counterAmount}
-                            onChange={(e) => setCounterAmount(e.target.value)}
-                            className="min-h-[40px] w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-white"
-                            placeholder="1.00"
-                          />
-                          <p className="text-xs text-slate-500">Buyer will see your counter and can accept or decline</p>
+                          <p>
+                            Counter sent:{" "}
+                            <span className="font-semibold text-white">{formatMoney(offer.counter_amount)}</span>
+                          </p>
+                          <p className="mt-1 text-xs text-slate-400">Awaiting buyer response</p>
                         </>
                       )}
-                      <div className="offer-review-offer-actions offer-review-offer-actions--pair">
+                    </div>
+                  ) : null}
+
+                  {offer.counter_status == null ? (
+                    counterFormOfferId === offer.offer_id ? (
+                      <div className="offer-review-counter-form">
+                        {isTrade ? (
+                          <>
+                            <p className="text-xs font-medium text-slate-400">
+                              Select cards from your collection to send to the buyer
+                            </p>
+                            <TradeCardPicker
+                              token={token}
+                              selectedIds={counterTradeCardIds}
+                              onSelectedIdsChange={setCounterTradeCardIds}
+                              excludeCardIds={
+                                excludeCounterCardIds.length > 0
+                                  ? excludeCounterCardIds
+                                  : [listing.card_id]
+                              }
+                              pickerLabel="Cards you are willing to trade to the buyer"
+                            />
+                          </>
+                        ) : (
+                          <>
+                            <label className="text-xs font-medium text-slate-400">Your counter amount ($)</label>
+                            <input
+                              type="number"
+                              min="1"
+                              step="0.01"
+                              value={counterAmount}
+                              onChange={(e) => setCounterAmount(e.target.value)}
+                              className="min-h-[40px] w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-white"
+                              placeholder="1.00"
+                            />
+                            <p className="text-xs text-slate-500">
+                              Buyer will see your counter and can accept or decline
+                            </p>
+                          </>
+                        )}
+                        <div className="offer-review-offer-actions offer-review-offer-actions--pair">
+                          <button
+                            type="button"
+                            disabled={counterBusyId === offer.offer_id || (isTrade && counterTradeCardIds.length < 1)}
+                            onClick={() => onSendCounter(offer)}
+                            className="btn-primary offer-review-action-btn disabled:opacity-50"
+                          >
+                            {counterBusyId === offer.offer_id
+                              ? "Sending…"
+                              : counterOfferButtonLabel(counterAmount)}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={counterBusyId === offer.offer_id}
+                            onClick={() => {
+                              setCounterFormOfferId(null);
+                              setCounterAmount("");
+                              setCounterTradeCardIds([]);
+                            }}
+                            className="btn-ghost offer-review-action-btn disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="offer-review-offer-actions">
                         <button
                           type="button"
-                          disabled={counterBusyId === offer.offer_id || (isTrade && counterTradeCardIds.length < 1)}
-                          onClick={() => onSendCounter(offer)}
-                          className="btn-primary disabled:opacity-50"
+                          disabled={actionKey === `accept-${offer.offer_id}`}
+                          onClick={() => onRequestAccept(offer)}
+                          className="btn-primary offer-review-action-btn disabled:opacity-50"
                         >
-                          {counterBusyId === offer.offer_id
-                            ? "Sending…"
-                            : counterOfferButtonLabel(counterAmount)}
+                          {actionKey === `accept-${offer.offer_id}` ? "Accepting…" : "Accept"}
                         </button>
                         <button
                           type="button"
-                          disabled={counterBusyId === offer.offer_id}
+                          disabled={actionKey.startsWith("accept-") || actionKey.startsWith("decline-")}
                           onClick={() => {
-                            setCounterFormOfferId(null);
+                            setCounterFormOfferId(offer.offer_id);
                             setCounterAmount("");
                             setCounterTradeCardIds([]);
                           }}
-                          className="btn-ghost disabled:opacity-50"
+                          className="btn-secondary offer-review-action-btn disabled:opacity-50"
                         >
-                          Cancel
+                          Counter
+                        </button>
+                        <button
+                          type="button"
+                          disabled={actionKey === `decline-${offer.offer_id}`}
+                          onClick={() => onRequestDecline(offer)}
+                          className="btn-danger offer-review-action-btn offer-review-action-btn--decline disabled:opacity-50"
+                        >
+                          {actionKey === `decline-${offer.offer_id}` ? "Declining…" : "Decline"}
                         </button>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="offer-review-offer-actions mt-3">
-                      <button
-                        type="button"
-                        disabled={actionKey === `accept-${offer.offer_id}`}
-                        onClick={() => onRequestAccept(offer)}
-                        className="btn-primary disabled:opacity-50"
-                      >
-                        {actionKey === `accept-${offer.offer_id}` ? "Accepting…" : "Accept"}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={actionKey.startsWith("accept-") || actionKey.startsWith("decline-")}
-                        onClick={() => {
-                          setCounterFormOfferId(offer.offer_id);
-                          setCounterAmount("");
-                          setCounterTradeCardIds([]);
-                        }}
-                        className="btn-secondary disabled:opacity-50"
-                      >
-                        Counter
-                      </button>
-                      <button
-                        type="button"
-                        disabled={actionKey === `decline-${offer.offer_id}`}
-                        onClick={() => onRequestDecline(offer)}
-                        className="btn-danger disabled:opacity-50"
-                      >
-                        {actionKey === `decline-${offer.offer_id}` ? "Declining…" : "Decline"}
-                      </button>
-                    </div>
-                  )
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
+                    )
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
         </div>
       </div>
     </MarketplaceModalShell>

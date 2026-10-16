@@ -6628,40 +6628,211 @@
   -webkit-overflow-scrolling: touch;
 }
 
+.offer-review-offer-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  list-style: none;
+  padding: 0;
+}
+
+.offer-review-offer {
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 14px 14px 12px;
+  text-align: center;
+}
+
+.offer-review-offer__buyer {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.offer-review-offer__listing-id {
+  margin-top: 4px;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: rgba(212, 175, 55, 0.85);
+}
+
+.offer-review-offer__message {
+  margin-top: 10px;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.offer-review-offer__meta {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.offer-review-trade-block {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.offer-review-trade-block__label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.offer-review-trade-block__name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.offer-review-trade-block__id {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: rgba(212, 175, 55, 0.85);
+  word-break: break-all;
+}
+
+.offer-review-trade-block__offer-head {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fcd34d;
+}
+
+.offer-review-trade-block__tap-hint {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.offer-review-trade-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 280px;
+  margin: 8px 0 4px;
+}
+
+.offer-review-trade-divider__line {
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.offer-review-trade-divider__text {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.offer-review-card-slot {
+  width: 42%;
+  max-width: 148px;
+  min-width: 0;
+  margin: 0 auto;
+}
+
+.offer-review-card-slot--offered {
+  width: 5.75rem;
+  max-width: 132px;
+}
+
+.offer-review-card-slot .card-display-container,
+.offer-review-card-slot .card-shell {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+.offer-review-offered-cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+}
+
+.offer-review-offered-cards--many .offer-review-card-slot--offered {
+  width: 4.75rem;
+  max-width: 108px;
+}
+
+.offer-review-cash-offer {
+  margin-top: 4px;
+}
+
+.offer-review-cash-offer__amount {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-gold-primary, #d4af37);
+}
+
+.offer-review-cash-offer__royalty {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.offer-review-counter-notice {
+  margin-top: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  background: rgba(212, 175, 55, 0.08);
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #fcd34d;
+  text-align: center;
+}
+
+.offer-review-counter-form {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.2);
+  padding: 12px;
+  text-align: left;
+}
+
 .offer-review-offer-actions {
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  padding: 12px 0 4px;
-  background: linear-gradient(to top, var(--bg-primary) 80%, rgba(15, 23, 42, 0));
-}
-
-.offer-review-offer-actions .btn-primary,
-.offer-review-offer-actions .btn-secondary,
-.offer-review-offer-actions .btn-danger,
-.offer-review-offer-actions .btn-ghost {
-  min-height: 44px;
-  width: 100%;
-  font-size: 13px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .offer-review-offer-actions--pair {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-@media (max-width: 480px) {
-  .offer-review-offer-actions:not(.offer-review-offer-actions--pair) {
-    grid-template-columns: 1fr;
-  }
+.offer-review-action-btn {
+  min-height: 44px;
+  max-height: 48px;
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
 }
 
-@media (max-width: 639px) {
-  .offer-review-offer-actions {
-    padding-bottom: 8px;
-  }
+.offer-review-action-btn--decline {
+  border-width: 1px;
+  background: transparent;
 }
 
 .accept-offer-confirm-modal {
@@ -6750,41 +6921,7 @@
   min-height: 48px;
 }
 
-/* Manage Offers modal — full card visibility */
-.offer-review-listing {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
-  padding: 16px;
-}
-
-.offer-review-listing__card {
-  width: 100%;
-  max-width: 200px;
-  flex-shrink: 0;
-  overflow: visible;
-}
-
-.offer-review-listing__details {
-  width: 100%;
-  text-align: center;
-}
-
 @media (min-width: 640px) {
-  .offer-review-listing {
-    flex-direction: row;
-    align-items: flex-start;
-    text-align: left;
-  }
-
-  .offer-review-listing__details {
-    text-align: left;
-  }
-
   .my-offers-card__thumb-link {
     max-width: 220px;
   }

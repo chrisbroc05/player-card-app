@@ -36,6 +36,9 @@ export const CARD_IMAGE_MEDIA_DETAIL = "card-image";
 
 export const CARD_IMAGE_FRAME_MODAL = `relative w-full min-w-[210px] max-w-[280px] ${CARD_ASPECT}`;
 
+/** Constrained slots (modals, thumbs) — no 210px floor so cards scale to the wrapper */
+export const CARD_IMAGE_FRAME_OFFER_REVIEW = `relative w-full min-w-0 min-h-0 max-w-full ${CARD_ASPECT}`;
+
 export const CARD_IMAGE_FRAME_LISTING_ROW = "relative h-full w-full min-w-0 max-w-full";
 
 export const CARD_IMAGE_FRAME_SM = `relative w-full min-w-[210px] min-h-0 max-w-[140px] ${CARD_ASPECT}`;
