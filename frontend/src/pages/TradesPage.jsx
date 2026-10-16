@@ -79,10 +79,10 @@ function MarketplaceOfferInboxRow({ offer }) {
   const listingCard = listingCardFromOffer(offer);
 
   return (
-    <li className="overflow-hidden rounded-2xl border border-white/10 bg-cardBg p-5 shadow-lg sm:p-6">
-      <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-8">
-        <div className="mx-auto flex w-full max-w-[12rem] shrink-0 flex-col items-center md:mx-0">
-          <div className="w-full rounded-xl border-2 border-white/15 bg-black/35 p-2 shadow-inner">
+    <li className="rounded-2xl border border-white/10 bg-cardBg p-5 shadow-lg sm:p-6">
+      <div className="flex flex-col gap-8 md:flex-row md:items-start md:gap-10">
+        <div className="mx-auto flex w-full max-w-[12rem] shrink-0 flex-col items-center pt-0.5 md:mx-0">
+          <div className="w-full rounded-xl border-2 border-white/15 bg-black/35 p-2.5 shadow-inner">
             <CardImage
               card={listingCard}
               alt={listingCard.player_name || offer.player_name}
@@ -92,12 +92,12 @@ function MarketplaceOfferInboxRow({ offer }) {
               infoBannerVariant="compact"
             />
           </div>
-          <p className="mt-2 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+          <p className="mt-3 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
             Your listing
           </p>
         </div>
 
-        <div className="flex min-w-0 flex-1 flex-col items-center space-y-2.5 text-center md:items-start md:text-left">
+        <div className="flex min-w-0 flex-1 flex-col items-center space-y-3.5 text-center md:items-start md:text-left md:space-y-4">
           <div className="w-full space-y-1">
             <p className="text-lg font-semibold text-white">{offer.player_name}</p>
             <p className="font-mono text-xs text-brand-gold/85">{offer.card_id}</p>
@@ -111,11 +111,11 @@ function MarketplaceOfferInboxRow({ offer }) {
             />
           </p>
           {isTrade ? (
-            <div className="w-full max-w-md space-y-2">
+            <div className="w-full max-w-lg space-y-3 pt-1">
               <p className="text-sm font-semibold text-amber-200">
                 Card trade — {offeredCards.length} card{offeredCards.length === 1 ? "" : "s"} offered
               </p>
-              <TradeCardsThumbRow cards={offeredCards} className="justify-center md:justify-start" />
+              <TradeCardsThumbRow cards={offeredCards} variant="inbox" />
             </div>
           ) : (
             <p className="text-lg font-semibold text-brand-gold">Cash offer {formatMoney(offer.offer_amount)}</p>
@@ -134,7 +134,7 @@ function MarketplaceOfferInboxRow({ offer }) {
             <div className="w-full max-w-md rounded-lg border bg-gold-subtle px-3 py-2 text-left text-sm text-brand-gold">
               You countered — waiting for the buyer to respond
               {isTrade && counterCards.length > 0 ? (
-                <TradeCardsThumbRow cards={counterCards} className="mt-2 justify-center md:justify-start" />
+                <TradeCardsThumbRow cards={counterCards} variant="inbox" className="mt-3" />
               ) : null}
             </div>
           ) : null}
@@ -245,7 +245,7 @@ export default function TradesPage() {
     const el = document.getElementById(targetId);
     if (el) {
       window.requestAnimationFrame(() => {
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        el.scrollIntoView({ behavior: "smooth", block: "nearest" });
       });
     }
   }, [loading, activityLoading, marketplaceIncoming.length]);
@@ -306,7 +306,7 @@ export default function TradesPage() {
           </div>
         ) : (
           <div className="space-y-12">
-            <section id="marketplace-offers">
+            <section id="marketplace-offers" className="scroll-mt-28 pt-1">
               <h2 className="mb-4 border-b border-white/10 pb-2 text-lg font-semibold text-white">
                 Marketplace offers on your listings
               </h2>
