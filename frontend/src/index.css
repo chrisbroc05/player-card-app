@@ -2925,6 +2925,10 @@
   transform: scale(1.1);
 }
 
+.card-expand-modal--portal {
+  z-index: 200;
+}
+
 @keyframes highlight-gem-sparkle {
   0%,
   100% {
@@ -6617,7 +6621,85 @@
 }
 
 .offer-review-modal__header {
+  position: relative;
+  z-index: 2;
   flex-shrink: 0;
+  margin: -4px -4px 0;
+  padding: 4px 4px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-card, var(--bg-primary));
+  text-align: center;
+}
+
+.offer-review-modal__header-inner {
+  position: relative;
+  padding-right: 72px;
+}
+
+.offer-review-modal__close {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+.marketplace-modal-panel--centered > .offer-review-modal,
+.marketplace-modal-panel--centered > .accept-offer-confirm-modal,
+.marketplace-modal-panel--centered > .accept-offer-success-modal {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
+}
+
+/* Trade / offer modals — fixed-aspect card previews */
+.trade-flow-card-slot {
+  width: 170px;
+  max-width: 46vw;
+  min-width: 0;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.trade-flow-card-slot--listing {
+  width: 170px;
+}
+
+.trade-flow-card-slot--offered {
+  width: 150px;
+}
+
+.trade-flow-card-slot--offered.trade-flow-card-slot--large {
+  width: 170px;
+}
+
+.trade-flow-card-slot .card-display-container,
+.trade-flow-card-slot .card-shell {
+  min-width: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.trade-flow-card-slot .card-media-bg--rookie,
+.trade-flow-card-slot .card-media-bg--allstar,
+.trade-flow-card-slot .card-media-bg--legends,
+.trade-flow-card-slot .card-image {
+  background-color: #0a0a0f;
+}
+
+.trade-flow-card-slot .card-image {
+  object-fit: cover;
+}
+
+.trade-flow-offered-cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.trade-flow-offered-cards--many .trade-flow-card-slot--offered {
+  width: 132px;
 }
 
 .offer-review-modal__scroll {
@@ -6735,38 +6817,13 @@
   color: var(--text-secondary);
 }
 
-.offer-review-card-slot {
-  width: 42%;
-  max-width: 148px;
-  min-width: 0;
-  margin: 0 auto;
-}
-
-.offer-review-card-slot--offered {
-  width: 5.75rem;
-  max-width: 132px;
-}
-
-.offer-review-card-slot .card-display-container,
-.offer-review-card-slot .card-shell {
-  min-width: 0;
-  width: 100%;
-  max-width: 100%;
-}
-
 .offer-review-offered-cards {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
-  max-width: 320px;
   margin: 0 auto;
-}
-
-.offer-review-offered-cards--many .offer-review-card-slot--offered {
-  width: 4.75rem;
-  max-width: 108px;
 }
 
 .offer-review-cash-offer {
@@ -6845,6 +6902,10 @@
 
 .accept-offer-confirm-modal__header {
   flex-shrink: 0;
+  z-index: 2;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-card, var(--bg-primary));
   text-align: center;
 }
 
@@ -6854,23 +6915,31 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  padding-top: 16px;
+  padding: 12px 0 4px;
+  text-align: center;
 }
 
-.accept-offer-confirm-modal__card {
+.accept-offer-confirm-modal__trade-stack {
   display: flex;
-  justify-content: center;
-  width: 100%;
-  max-width: 168px;
-  margin: 0 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.accept-offer-confirm-modal__trade-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
 }
 
 .accept-offer-confirm-modal__summary {
-  margin-top: 16px;
+  margin-top: 12px;
   border-radius: 12px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.03);
-  padding: 16px;
+  padding: 12px 14px;
   text-align: center;
 }
 
@@ -6913,12 +6982,85 @@
   margin-top: 0;
   padding-top: 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  background: var(--bg-primary);
+  background: var(--color-bg-card, var(--bg-primary));
 }
 
 .accept-offer-confirm-modal__actions .btn-primary,
 .accept-offer-confirm-modal__actions .btn-ghost {
-  min-height: 48px;
+  min-height: 44px;
+  max-height: 48px;
+}
+
+.accept-offer-success-modal {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
+}
+
+.accept-offer-success-modal__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 8px 0 12px;
+}
+
+.accept-offer-trade-complete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px 14px;
+  width: 100%;
+  margin-top: 16px;
+  padding: 14px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.accept-offer-trade-complete__col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.accept-offer-trade-complete__arrow {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.accept-offer-trade-complete__caption {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.accept-offer-trade-complete__name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  max-width: 150px;
+}
+
+.accept-offer-success-modal__actions {
+  flex-shrink: 0;
+  margin-top: 0;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-card, var(--bg-primary));
 }
 
 @media (min-width: 640px) {

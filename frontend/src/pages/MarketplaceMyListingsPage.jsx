@@ -521,6 +521,7 @@ export default function MarketplaceMyListingsPage() {
       <AcceptOfferConfirmModal
         open={Boolean(acceptConfirm)}
         payload={acceptConfirm}
+        token={token}
         actionBusy={Boolean(acceptConfirm && actionKey === `accept-${acceptConfirm.offer.offer_id}`)}
         onBack={() => setAcceptConfirm(null)}
         onConfirm={confirmAcceptOffer}
@@ -900,10 +901,28 @@ function listingForOffer(offer, fallbackListing, listingsByCard) {
   return null;
 }
 
-function OfferReviewCardPreview({ card, token, size = "listing" }) {
+function tradeFlowSlotClass({ role = "listing", offeredCount = 1 } = {}) {
+  if (role === "listing") return "trade-flow-card-slot trade-flow-card-slot--listing";
+  const large = offeredCount <= 2 ? " trade-flow-card-slot--large" : "";
+  return `trade-flow-card-slot trade-flow-card-slot--offered${large}`;
+}
+
+function TradeFlowCardPreview({ card, token, role = "listing", offeredCount = 1, expandable = true }) {
   if (!card) return null;
-  const slotClass =
-    size === "offered" ? "offer-review-card-slot offer-review-card-slot--offered" : "offer-review-card-slot";
+  const slotClass = tradeFlowSlotClass({ role, offeredCount });
+  const image = (
+    <CardImage
+      card={card}
+      alt={card.player_name}
+      frameClassName={CARD_IMAGE_FRAME_OFFER_REVIEW}
+      infoBannerVariant="compact"
+      showInfoBanner
+      playOnHover
+    />
+  );
+  if (!expandable) {
+    return <div className={slotClass}>{image}</div>;
+  }
   return (
     <ExpandableCardView
       card={card}
@@ -911,14 +930,7 @@ function OfferReviewCardPreview({ card, token, size = "listing" }) {
       token={token}
       className={slotClass}
     >
-      <CardImage
-        card={card}
-        alt={card.player_name}
-        frameClassName={CARD_IMAGE_FRAME_OFFER_REVIEW}
-        infoBannerVariant="compact"
-        showInfoBanner
-        playOnHover
-      />
+      {image}
     </ExpandableCardView>
   );
 }
@@ -926,14 +938,10 @@ function OfferReviewCardPreview({ card, token, size = "listing" }) {
 function OfferReviewOfferedCards({ cards, token }) {
   if (!cards?.length) return null;
   const count = cards.length;
-  const gridClass =
-    count <= 2
-      ? "offer-review-offered-cards offer-review-offered-cards--few"
-      : "offer-review-offered-cards offer-review-offered-cards--many";
   return (
-    <div className={gridClass}>
+    <div className="offer-review-offered-cards">
       {cards.map((c) => (
-        <OfferReviewCardPreview key={c.card_id} card={c} token={token} size="offered" />
+        <TradeFlowCardPreview key={c.card_id} card={c} token={token} role="offered" offeredCount={count} />
       ))}
     </div>
   );
@@ -973,24 +981,25 @@ function OfferReviewModal({
     >
       <div className="offer-review-modal">
         <div className="offer-review-modal__header">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 id="review-offers-title" className="text-xl font-semibold text-white">
-                Review Offers
-              </h2>
-              <p className="mt-1 text-sm text-slate-400">{listing.player_name}</p>
-              <p className="mt-0.5 text-xs text-slate-500">
-                {offers.length} active offer{offers.length === 1 ? "" : "s"} · card trades first, then highest
-                cash
+          <div className="offer-review-modal__header-inner">
+            <h2 id="review-offers-title" className="text-xl font-semibold text-white">
+              Review Offers
+            </h2>
+            <p className="mt-1 text-sm text-slate-400">{listing.player_name}</p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              {offers.length} active offer{offers.length === 1 ? "" : "s"} · card trades first, then highest cash
+            </p>
+            {multiCopyReview ? (
+              <p className="mt-1 text-xs text-slate-500">
+                Across {excludeCounterCardIds.length} listed cop
+                {excludeCounterCardIds.length === 1 ? "y" : "ies"}
               </p>
-              {multiCopyReview ? (
-                <p className="mt-1 text-xs text-slate-500">
-                  Across {excludeCounterCardIds.length} listed cop
-                  {excludeCounterCardIds.length === 1 ? "y" : "ies"}
-                </p>
-              ) : null}
-            </div>
-            <button type="button" onClick={onClose} className="btn-ghost min-h-[40px] px-3 text-sm">
+            ) : null}
+            <button
+              type="button"
+              onClick={onClose}
+              className="offer-review-modal__close btn-ghost min-h-[40px] px-3 text-sm"
+            >
               Close
             </button>
           </div>
@@ -1021,7 +1030,7 @@ function OfferReviewModal({
 
                   <div className="offer-review-trade-block">
                     <p className="offer-review-trade-block__label">Your listing</p>
-                    <OfferReviewCardPreview card={offerListing} token={token} />
+                    <TradeFlowCardPreview card={offerListing} token={token} role="listing" />
                     <p className="offer-review-trade-block__name">{offerListing?.player_name || listing.player_name}</p>
                     {listingCardId ? (
                       <p className="offer-review-trade-block__id">{listingCardId}</p>
@@ -1234,11 +1243,12 @@ function UnlistAllConfirmModal({ open, group, busy, onClose, onConfirm }) {
   );
 }
 
-function AcceptOfferConfirmModal({ open, payload, actionBusy, onBack, onConfirm }) {
+function AcceptOfferConfirmModal({ open, payload, token, actionBusy, onBack, onConfirm }) {
   if (!open || !payload?.offer) return null;
   const offer = payload.offer;
   const listing = payload.listing;
   const isTrade = (offer.offer_type || "cash") === "card_trade";
+  const offeredCards = offer.trade_cards_offered || [];
   const gross = Number(offer.offer_amount || 0);
   const fee = computeRoyaltyPreview(gross);
   const net = Math.max(0, Math.round((gross - fee) * 100) / 100);
@@ -1259,52 +1269,40 @@ function AcceptOfferConfirmModal({ open, payload, actionBusy, onBack, onConfirm 
         </div>
 
         <div className="accept-offer-confirm-modal__scroll">
-          {listing ? (
-            <div className="accept-offer-confirm-modal__card">
-              <CardImage
-                card={listing}
-                alt={listing.player_name}
-                frameClassName="w-full"
-                infoBannerVariant="compact"
-                showInfoBanner
-              />
-            </div>
-          ) : null}
+          {isTrade ? (
+            <div className="accept-offer-confirm-modal__trade-stack">
+              <p className="accept-offer-confirm-modal__trade-label">You send</p>
+              {listing ? (
+                <TradeFlowCardPreview card={listing} token={token} role="listing" expandable={false} />
+              ) : null}
+              <p className="text-sm font-semibold text-white">{listing?.player_name || offer.player_name}</p>
+              {offer.card_id ? (
+                <p className="font-mono text-[11px] text-brand-gold/85">{offer.card_id}</p>
+              ) : null}
 
-          <div className="accept-offer-confirm-modal__summary">
-            <p className="text-base font-semibold text-white">{listing?.player_name || offer.player_name}</p>
-            {listing?.team_name ? <p className="mt-0.5 text-sm text-slate-400">{listing.team_name}</p> : null}
-            <dl className="accept-offer-confirm-modal__details">
-              <div className="accept-offer-confirm-modal__detail-row">
-                <dt>Buyer</dt>
-                <dd>{offer.buyer_display_name}</dd>
+              <div className="offer-review-trade-divider" aria-hidden>
+                <span className="offer-review-trade-divider__line" />
+                <span className="offer-review-trade-divider__text">↔ You receive</span>
+                <span className="offer-review-trade-divider__line" />
               </div>
-              {isTrade ? (
-                <>
+
+              <p className="accept-offer-confirm-modal__trade-label">
+                {offeredCards.length} card{offeredCards.length === 1 ? "" : "s"} from {offer.buyer_display_name}
+              </p>
+              <TradeCardsThumbRow cards={offeredCards} variant="tradeFlow" center />
+            </div>
+          ) : (
+            <>
+              {listing ? (
+                <TradeFlowCardPreview card={listing} token={token} role="listing" expandable={false} />
+              ) : null}
+              <div className="accept-offer-confirm-modal__summary">
+                <p className="text-base font-semibold text-white">{listing?.player_name || offer.player_name}</p>
+                <dl className="accept-offer-confirm-modal__details">
                   <div className="accept-offer-confirm-modal__detail-row">
-                    <dt>You receive</dt>
-                    <dd>
-                      {(offer.trade_cards_offered || []).length} card
-                      {(offer.trade_cards_offered || []).length === 1 ? "" : "s"} from the buyer
-                    </dd>
+                    <dt>Buyer</dt>
+                    <dd>{offer.buyer_display_name}</dd>
                   </div>
-                  {(offer.trade_cards_offered || []).length > 0 ? (
-                    <div className="accept-offer-confirm-modal__detail-row accept-offer-confirm-modal__detail-row--stack">
-                      <dt className="sr-only">Cards you receive</dt>
-                      <dd className="w-full">
-                        <TradeCardsThumbRow cards={offer.trade_cards_offered} />
-                      </dd>
-                    </div>
-                  ) : null}
-                  {offer.card_id ? (
-                    <div className="accept-offer-confirm-modal__detail-row">
-                      <dt>You send</dt>
-                      <dd className="font-mono text-xs text-slate-300">{offer.card_id}</dd>
-                    </div>
-                  ) : null}
-                </>
-              ) : (
-                <>
                   <div className="accept-offer-confirm-modal__detail-row">
                     <dt>Offer amount</dt>
                     <dd>{formatMoney(gross)}</dd>
@@ -1317,10 +1315,10 @@ function AcceptOfferConfirmModal({ open, payload, actionBusy, onBack, onConfirm 
                     <dt>Net to marketplace balance</dt>
                     <dd className="text-brand-gold">{formatMoney(net)}</dd>
                   </div>
-                </>
-              )}
-            </dl>
-          </div>
+                </dl>
+              </div>
+            </>
+          )}
         </div>
 
         <MarketplaceModalActions className="accept-offer-confirm-modal__actions">
@@ -1379,7 +1377,9 @@ function DeclineOfferConfirmModal({ open, payload, actionBusy, onCancel, onConfi
 
 function AcceptOfferSuccessModal({ open, payload, onGoProfile, onBackListings }) {
   if (!open || !payload) return null;
-  const { listing, isTrade, net, newBalance } = payload;
+  const { listing, offer, isTrade, net, newBalance } = payload;
+  const receivedCards = offer?.trade_cards_offered || [];
+  const primaryReceived = receivedCards[0] || null;
   return (
     <MarketplaceModalShell
       open={open}
@@ -1388,43 +1388,78 @@ function AcceptOfferSuccessModal({ open, payload, onGoProfile, onBackListings })
       borderClass="border-[var(--color-success)]/30"
       ariaLabelledBy="accept-offer-success-title"
     >
-      <MarketplaceModalContent>
-        <MarketplaceModalSuccessIcon />
-        <h3 id="accept-offer-success-title" className="mt-4 text-center text-xl font-semibold text-white sm:text-2xl">
-          Offer Accepted!
-        </h3>
-        <p className="mt-2 text-center text-[13px] text-slate-300">
-          {isTrade ? "Card added to your collection" : `You received ${formatMoney(net)}`}
-        </p>
-        {newBalance != null ? (
-          <p className="mt-1 text-center text-[13px] text-brand-gold">
-            Current marketplace balance: {formatMoney(newBalance)}
+      <div className="accept-offer-success-modal">
+        <div className="accept-offer-success-modal__body">
+          <MarketplaceModalSuccessIcon />
+          <h3 id="accept-offer-success-title" className="mt-4 text-xl font-semibold text-white sm:text-2xl">
+            {isTrade ? "Trade complete!" : "Offer Accepted!"}
+          </h3>
+          <p className="mt-2 text-[13px] text-slate-300">
+            {isTrade
+              ? "The cards have been exchanged."
+              : `You received ${formatMoney(net)} to your marketplace balance.`}
           </p>
-        ) : null}
+          {!isTrade && newBalance != null ? (
+            <p className="mt-1 text-[13px] text-brand-gold">
+              Current marketplace balance: {formatMoney(newBalance)}
+            </p>
+          ) : null}
 
-        <div className="mt-4 rounded-xl border border-white/10 bg-cardBg2 p-3 sm:mt-6 sm:p-4">
-          <MarketplaceModalCardSection card={listing} centered>
-            <MarketplaceModalCardDetails listing={listing} />
-          </MarketplaceModalCardSection>
+          {isTrade && listing && primaryReceived ? (
+            <div className="accept-offer-trade-complete">
+              <div className="accept-offer-trade-complete__col">
+                <p className="accept-offer-trade-complete__caption">You gave</p>
+                <TradeFlowCardPreview card={listing} role="listing" expandable={false} />
+                <p className="accept-offer-trade-complete__name">{listing.player_name}</p>
+              </div>
+              <span className="accept-offer-trade-complete__arrow" aria-hidden>
+                →
+              </span>
+              <div className="accept-offer-trade-complete__col">
+                <p className="accept-offer-trade-complete__caption">You received</p>
+                <TradeFlowCardPreview
+                  card={primaryReceived}
+                  role="offered"
+                  offeredCount={receivedCards.length}
+                  expandable={false}
+                />
+                <p className="accept-offer-trade-complete__name">{primaryReceived.player_name}</p>
+              </div>
+            </div>
+          ) : null}
+
+          {isTrade && receivedCards.length > 1 ? (
+            <p className="mt-3 text-[12px] text-slate-400">
+              + {receivedCards.length - 1} more card{receivedCards.length - 1 === 1 ? "" : "s"} in your collection
+            </p>
+          ) : null}
+
+          {!isTrade && listing ? (
+            <div className="mt-4 w-full rounded-xl border border-white/10 bg-cardBg2 p-3 sm:p-4">
+              <MarketplaceModalCardSection card={listing} centered>
+                <MarketplaceModalCardDetails listing={listing} />
+              </MarketplaceModalCardSection>
+            </div>
+          ) : null}
         </div>
-      </MarketplaceModalContent>
 
-      <MarketplaceModalActions className="marketplace-modal-actions--stacked">
-        <button
-          type="button"
-          onClick={onBackListings}
-          className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950"
-        >
-          Back to My Listings
-        </button>
-        <button
-          type="button"
-          onClick={onGoProfile}
-          className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg border border-white/20 bg-cardBg2 px-4 text-sm text-slate-100"
-        >
-          Go to My Profile
-        </button>
-      </MarketplaceModalActions>
+        <MarketplaceModalActions className="marketplace-modal-actions--stacked accept-offer-success-modal__actions">
+          <button
+            type="button"
+            onClick={onBackListings}
+            className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg btn-primary px-4 text-sm font-semibold text-slate-950"
+          >
+            Back to My Listings
+          </button>
+          <button
+            type="button"
+            onClick={onGoProfile}
+            className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg border border-white/20 bg-cardBg2 px-4 text-sm text-slate-100"
+          >
+            Go to My Profile
+          </button>
+        </MarketplaceModalActions>
+      </div>
     </MarketplaceModalShell>
   );
 }

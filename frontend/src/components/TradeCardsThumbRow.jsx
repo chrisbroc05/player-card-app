@@ -23,28 +23,45 @@ export default function TradeCardsThumbRow({
   className = "",
   variant = "default",
   showCaptions = true,
+  center = false,
 }) {
   const list = cards?.length ? cards : [];
   if (!list.length) return null;
 
   const count = list.length;
   const captions = variant === "inbox" ? false : showCaptions;
+  const isTradeFlow = variant === "tradeFlow";
   const rowClass =
     variant === "inbox"
       ? `${inboxLayoutClass(count)} ${className}`.trim()
-      : `flex gap-2 overflow-x-auto pb-1 ${className}`.trim();
+      : isTradeFlow
+        ? `trade-flow-offered-cards ${count > 2 ? "trade-flow-offered-cards--many" : ""} ${className}`.trim()
+        : `flex gap-2 overflow-x-auto pb-1 ${center ? "justify-center" : ""} ${className}`.trim();
 
   return (
     <div className={rowClass}>
       {list.map((c) => (
-        <div key={c.card_id} className={thumbShellClass(count, variant)}>
+        <div
+          key={c.card_id}
+          className={
+            isTradeFlow
+              ? `trade-flow-card-slot trade-flow-card-slot--offered${count <= 2 ? " trade-flow-card-slot--large" : ""}`
+              : thumbShellClass(count, variant)
+          }
+        >
           <CardImage
             card={c}
             alt={c.player_name}
-            frameClassName={variant === "inbox" ? INBOX_THUMB_FRAME : cardMediaFrameClass(c, { thumb: true })}
+            frameClassName={
+              variant === "inbox"
+                ? INBOX_THUMB_FRAME
+                : isTradeFlow
+                  ? INBOX_THUMB_FRAME
+                  : cardMediaFrameClass(c, { thumb: true })
+            }
             playOnHover
             infoBannerVariant="compact"
-            showInfoBanner={false}
+            showInfoBanner={isTradeFlow}
           />
           {captions ? (
             <>

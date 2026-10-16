@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import { createPortal } from "react-dom";
 import CardImage from "../components/CardImage";
 import CardDetailHero from "./CardDetailHero";
 import { CARD_IMAGE_FRAME_DETAIL } from "../utils/cardImageStyles";
@@ -31,9 +32,9 @@ export default function CardExpandModal({
 
   if (!open || !card) return null;
 
-  return (
+  const overlay = (
     <div
-      className="card-expand-modal fixed inset-0 z-[80] flex items-center justify-center bg-black/88 p-6"
+      className="card-expand-modal card-expand-modal--portal fixed inset-0 flex items-center justify-center bg-black/92 p-6"
       role="dialog"
       aria-modal="true"
       aria-label="Full size card preview"
@@ -74,4 +75,6 @@ export default function CardExpandModal({
       </div>
     </div>
   );
+
+  return createPortal(overlay, document.body);
 }
