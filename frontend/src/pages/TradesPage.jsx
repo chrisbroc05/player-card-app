@@ -44,16 +44,39 @@ function isMarketplaceCardTrade(offer) {
 
 const MARKETPLACE_OFFER_CARD_FRAME = `relative w-full ${CARD_ASPECT}`;
 
+/** Listed card for thumbnail — never use buyer trade_cards_offered here. */
+function listingCardFromOffer(offer) {
+  const listing = offer?.listing_card;
+  if (listing && typeof listing === "object") {
+    return {
+      ...listing,
+      card_id: listing.card_id || offer.card_id,
+    };
+  }
+  return {
+    card_id: offer.card_id,
+    player_name: offer.player_name,
+    image_url: offer.image_url,
+    tier: offer.tier,
+    theme: offer.theme,
+    special_theme: offer.special_theme,
+    rarity: offer.rarity,
+    is_animated: offer.is_animated,
+    is_highlight: offer.is_highlight,
+    animation_status: offer.animation_status,
+    highlight_status: offer.highlight_status,
+    animated_video_url: offer.animated_video_url,
+    highlight_video_url: offer.highlight_video_url,
+    created_at: offer.listing_created_at || offer.created_at,
+  };
+}
+
 function MarketplaceOfferInboxRow({ offer }) {
   const isTrade = isMarketplaceCardTrade(offer);
   const offeredCards = offer.trade_cards_offered || [];
   const counterCards = offer.trade_cards_counter || [];
   const awaitingBuyer = offer.counter_status === "pending";
-  const listingCard = {
-    card_id: offer.card_id,
-    player_name: offer.player_name,
-    image_url: offer.image_url,
-  };
+  const listingCard = listingCardFromOffer(offer);
 
   return (
     <li className="overflow-hidden rounded-2xl border border-white/10 bg-cardBg p-5 shadow-lg sm:p-6">
@@ -62,9 +85,11 @@ function MarketplaceOfferInboxRow({ offer }) {
           <div className="w-full rounded-xl border-2 border-white/15 bg-black/35 p-2 shadow-inner">
             <CardImage
               card={listingCard}
-              alt={offer.player_name}
+              alt={listingCard.player_name || offer.player_name}
+              cacheBust={listingCard.created_at}
               frameClassName={MARKETPLACE_OFFER_CARD_FRAME}
               playOnHover={cardPlaysVideoOnHover(listingCard)}
+              infoBannerVariant="compact"
             />
           </div>
           <p className="mt-2 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">

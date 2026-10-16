@@ -13,7 +13,7 @@ from sqlalchemy import asc, desc, func, or_
 from sqlalchemy.orm import Session
 
 from auth import get_current_user, get_optional_current_user
-from card_repo import get_card_by_card_id
+from card_repo import card_to_dict, get_card_by_card_id
 from copy_limits import validate_bulk_list_quantity
 from marketplace_service import (
     InsufficientMarketplaceBalanceError,
@@ -1168,11 +1168,13 @@ def marketplace_incoming_offers(
     )
     out = []
     for offer, card, buyer in rows:
+        listing = card_to_dict(card, db)
         row = {
             "offer_id": offer.id,
             "card_id": card.card_id,
             "player_name": card.player_name,
             "image_url": card.image_url,
+            "listing_card": listing,
             "offer_amount": float_from_decimal(offer.offer_amount),
             "asking_price": float_from_decimal(card.asking_price),
             "royalty_amount": float_from_decimal(offer.royalty_amount),
