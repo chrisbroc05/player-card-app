@@ -6,12 +6,13 @@ from datetime import timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from auth import get_optional_current_user
 from card_repo import list_user_public_profile_cards_dicts
 from database import get_db
+from marketplace_trade_repo import OFFER_TYPE_CARD_TRADE
 from models import Card, MarketplaceOffer, TradeOffer, User
 from profile_slug import find_user_by_profile_slug, profile_slug
 from user_settings import user_has_public_collection
@@ -119,13 +120,33 @@ def get_public_profile(
     uid = user.id
     cards_traded = int(
         db.query(func.count(TradeOffer.id))
-        .filter(TradeOffer.sender_id == uid, TradeOffer.status == "accepted")
+        .filter(
+            TradeOffer.status == "accepted",
+            (TradeOffer.sender_id == uid) | (TradeOffer.recipient_id == uid),
+        )
+        .scalar()
+        or 0
+    ) + int(
+        db.query(func.count(MarketplaceOffer.id))
+        .filter(
+            MarketplaceOffer.status == "accepted",
+            func.lower(MarketplaceOffer.offer_type) == OFFER_TYPE_CARD_TRADE,
+            (MarketplaceOffer.seller_id == uid) | (MarketplaceOffer.buyer_id == uid),
+        )
         .scalar()
         or 0
     )
     cards_sold = int(
         db.query(func.count(MarketplaceOffer.id))
-        .filter(MarketplaceOffer.seller_id == uid, MarketplaceOffer.status == "accepted")
+        .filter(
+            MarketplaceOffer.seller_id == uid,
+            MarketplaceOffer.status == "accepted",
+            or_(
+                MarketplaceOffer.offer_type.is_(None),
+                MarketplaceOffer.offer_type == "",
+                func.lower(MarketplaceOffer.offer_type) != OFFER_TYPE_CARD_TRADE,
+            ),
+        )
         .scalar()
         or 0
     )

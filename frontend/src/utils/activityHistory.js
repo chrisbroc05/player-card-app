@@ -11,6 +11,7 @@ export const ACTIVITY_FILTERS = [
   { id: "trades", label: "Trades", type: "trades" },
   { id: "bought", label: "Bought", type: "marketplace_bought" },
   { id: "sold", label: "Sold", type: "marketplace_sold" },
+  { id: "marketplace_traded", label: "Card Trades", type: "marketplace_traded" },
   { id: "animated", label: "Animated", type: "animated_upgrade" },
   { id: "highlight", label: "Highlight", type: "highlight_upgrade" },
 ];
@@ -43,6 +44,13 @@ export const ACTIVITY_META = {
     shortLabel: "Bought",
     badgeClass: "border-violet-400/40 bg-violet-500/15 text-violet-100",
     iconWrapClass: "border-violet-400/35 bg-violet-500/15 text-violet-100",
+  },
+  marketplace_traded: {
+    emoji: "🔄",
+    label: "Card Traded",
+    shortLabel: "Traded",
+    badgeClass: "border-[var(--color-border-gold)] bg-gold-subtle text-brand-gold",
+    iconWrapClass: "border-[var(--color-border-gold)] bg-gold-subtle text-brand-gold",
   },
   animated_upgrade: {
     emoji: "✨",
@@ -129,6 +137,12 @@ const ACTIVITY_ROW_STYLES = {
     badgeStyle: { backgroundColor: "#7c3aed", color: "#ffffff" },
     labelColor: "#c4b5fd",
   },
+  marketplace_traded: {
+    label: "CARD TRADED",
+    glyph: "⇄",
+    badgeStyle: { backgroundColor: "var(--color-gold-primary)", color: "#0a0a0a" },
+    labelColor: "#E8C56A",
+  },
   animated_upgrade: {
     label: "ANIMATED UPGRADE",
     glyph: "✦",
@@ -185,6 +199,30 @@ export function activityTierLabel(tier) {
   if (key === "legends") return "Legends";
   if (key === "allstar") return "All-Star";
   return "Rookie";
+}
+
+function tradeCardNames(tradeCards) {
+  if (!Array.isArray(tradeCards) || !tradeCards.length) return "";
+  return tradeCards.map((c) => c?.player_name || "Card").filter(Boolean).join(", ");
+}
+
+/** Headline for marketplace card-for-card trade rows. */
+export function activityTradeSummary(item) {
+  if (item?.activity_type !== "marketplace_traded") return null;
+  const listingName = item?.card?.player_name || "your card";
+  const offeredNames = tradeCardNames(item?.trade_cards);
+  const role = item?.trade_role;
+  if (role === "seller") {
+    return offeredNames
+      ? `Traded ${listingName} for ${offeredNames}`
+      : `Traded ${listingName}`;
+  }
+  if (role === "buyer") {
+    return offeredNames
+      ? `Traded ${offeredNames} for ${listingName}`
+      : `Received ${listingName} in a card trade`;
+  }
+  return offeredNames ? `Traded for ${offeredNames}` : "Card traded on marketplace";
 }
 
 export function activityCreationSummary(item) {
@@ -322,6 +360,7 @@ export function counterpartyPrefix(item) {
   }
   if (type === "trade_sent") return "Traded to";
   if (type === "trade_received") return "Received from";
+  if (type === "marketplace_traded") return "With";
   if (type === "marketplace_bought") return "Purchased from";
   if (type === "marketplace_sold") return "Sold to";
   return null;
@@ -360,8 +399,9 @@ export function formatActivityFullTimestamp(iso) {
 export function activityAmountDisplay(item) {
   const type = item?.activity_type;
 
-  if (type === "trade_sent" || type === "trade_received") {
-    return { text: "Free", tone: "muted", italic: true };
+  if (type === "trade_sent" || type === "trade_received" || type === "marketplace_traded") {
+    const subtext = activityTradeSummary(item);
+    return { text: "Card trade", tone: "muted", italic: true, subtext, small: Boolean(subtext) };
   }
 
   const raw = Number(item?.amount);
@@ -401,6 +441,9 @@ export function activityAmountDisplay(item) {
   if (!Number.isFinite(raw)) return { text: "—", tone: "muted" };
 
   if (type === "marketplace_sold") {
+    if (!Number.isFinite(raw) || raw <= 0) {
+      return { text: "—", tone: "muted" };
+    }
     const royalty = Number(item?.royalty_amount);
     const fee = Number.isFinite(royalty)
       ? Math.max(0, Math.round(royalty * 100) / 100)
@@ -414,6 +457,9 @@ export function activityAmountDisplay(item) {
   }
 
   if (type === "marketplace_bought") {
+    if (!Number.isFinite(raw) || raw <= 0) {
+      return { text: "—", tone: "muted" };
+    }
     return { text: `−${formatMoney(Math.abs(raw))}`, tone: "danger" };
   }
 
@@ -422,7 +468,7 @@ export function activityAmountDisplay(item) {
 
 export function marketplaceSoldAmountDisplay(item) {
   const gross = Number(item?.amount);
-  if (!Number.isFinite(gross)) return null;
+  if (!Number.isFinite(gross) || gross <= 0) return null;
   const royaltyRaw = Number(item?.royalty_amount);
   const fee = Number.isFinite(royaltyRaw)
     ? Math.max(0, Math.round(royaltyRaw * 100) / 100)
@@ -437,6 +483,13 @@ export function marketplaceSoldAmountDisplay(item) {
 }
 
 export function amountDisplay(item) {
+  if (item?.activity_type === "marketplace_traded") {
+    const summary = activityTradeSummary(item);
+    return summary
+      ? { text: "Card trade", className: "text-brand-gold", subtext: summary, subtextClassName: "text-[11px] leading-tight text-slate-400" }
+      : { text: "Card trade", className: "text-brand-gold" };
+  }
+
   if (item?.activity_type === "marketplace_sold") {
     return marketplaceSoldAmountDisplay(item);
   }
@@ -467,7 +520,7 @@ export function amountDisplay(item) {
     };
   }
 
-  if (item?.amount == null || Number.isNaN(raw)) return null;
+  if (item?.amount == null || Number.isNaN(raw) || raw <= 0) return null;
   const formatted = formatMoney(Math.abs(raw));
   if (item.activity_type === "marketplace_bought") {
     return { text: `-${formatted}`, className: "text-rose-300" };
@@ -479,7 +532,12 @@ export function filterActivityItems(items, filterId) {
   const filter = ACTIVITY_FILTERS.find((f) => f.id === filterId) || ACTIVITY_FILTERS[0];
   if (!filter.type) return items;
   if (filter.type === "trades") {
-    return items.filter((i) => i.activity_type === "trade_sent" || i.activity_type === "trade_received");
+    return items.filter(
+      (i) =>
+        i.activity_type === "trade_sent" ||
+        i.activity_type === "trade_received" ||
+        i.activity_type === "marketplace_traded"
+    );
   }
   return items.filter((i) => i.activity_type === filter.type);
 }

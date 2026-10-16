@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from card_repo import cards_created_by_user_filter, owned_collection_filter
@@ -19,6 +19,7 @@ from credit_service import (
     TX_ROYALTY,
 )
 from marketplace_repo import float_from_decimal
+from marketplace_trade_repo import OFFER_TYPE_CARD_TRADE
 from models import Card, CreditLedger, MarketplaceOffer
 
 VALID_PERIODS = frozenset({"this_month", "last_month", "this_year", "all_time"})
@@ -52,6 +53,7 @@ class TopSalePoint:
 class StatsSummary:
     cards_created: int
     cards_sold: int
+    cards_traded: int
     total_earned: float
     total_spent: float
     best_sale: float
@@ -169,6 +171,20 @@ def _chart_data_ranges(period: str, now: datetime) -> list[tuple[str, datetime, 
     return _last_n_month_ranges(12, now)
 
 
+def _marketplace_card_trade_filter():
+    """Accepted marketplace offers that exchanged cards (not cash sales)."""
+    return func.lower(MarketplaceOffer.offer_type) == OFFER_TYPE_CARD_TRADE
+
+
+def _marketplace_cash_sale_filter():
+    """Cash marketplace sales (exclude card-for-card trades)."""
+    return or_(
+        MarketplaceOffer.offer_type.is_(None),
+        MarketplaceOffer.offer_type == "",
+        func.lower(MarketplaceOffer.offer_type) != OFFER_TYPE_CARD_TRADE,
+    )
+
+
 def _apply_created_filter(query, model_created_col, start: datetime | None, end: datetime | None):
     if start is not None:
         query = query.filter(model_created_col >= start)
@@ -250,6 +266,7 @@ def _compute_top_sales(
         .filter(
             MarketplaceOffer.seller_id == user_id,
             MarketplaceOffer.status == "accepted",
+            _marketplace_cash_sale_filter(),
         )
         .order_by(MarketplaceOffer.offer_amount.desc(), MarketplaceOffer.id.desc())
     )
@@ -281,9 +298,18 @@ def compute_stats_summary(db: Session, user_id: int, period: str) -> StatsSummar
     sold_q = db.query(func.count(MarketplaceOffer.id)).filter(
         MarketplaceOffer.seller_id == user_id,
         MarketplaceOffer.status == "accepted",
+        _marketplace_cash_sale_filter(),
     )
     sold_q = _apply_created_filter(sold_q, MarketplaceOffer.updated_at, start, end)
     cards_sold = int(sold_q.scalar() or 0)
+
+    traded_q = db.query(func.count(MarketplaceOffer.id)).filter(
+        MarketplaceOffer.status == "accepted",
+        _marketplace_card_trade_filter(),
+        (MarketplaceOffer.seller_id == user_id) | (MarketplaceOffer.buyer_id == user_id),
+    )
+    traded_q = _apply_created_filter(traded_q, MarketplaceOffer.updated_at, start, end)
+    cards_traded = int(traded_q.scalar() or 0)
 
     earned_q = db.query(func.coalesce(func.sum(CreditLedger.amount), 0)).filter(
         CreditLedger.user_id == user_id,
@@ -306,6 +332,7 @@ def compute_stats_summary(db: Session, user_id: int, period: str) -> StatsSummar
         .filter(
             MarketplaceOffer.seller_id == user_id,
             MarketplaceOffer.status == "accepted",
+            _marketplace_cash_sale_filter(),
         )
     )
     best_sale_q = _apply_created_filter(best_sale_q, MarketplaceOffer.updated_at, start, end)
@@ -316,6 +343,7 @@ def compute_stats_summary(db: Session, user_id: int, period: str) -> StatsSummar
     return StatsSummary(
         cards_created=cards_created,
         cards_sold=cards_sold,
+        cards_traded=cards_traded,
         total_earned=total_earned,
         total_spent=total_spent,
         best_sale=best_sale,

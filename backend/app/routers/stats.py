@@ -35,6 +35,7 @@ class StatsSummaryResponse(BaseModel):
 
     cards_created: int
     cards_sold: int
+    cards_traded: int
     total_earned: float
     total_spent: float
     best_sale: float
@@ -59,6 +60,7 @@ def get_stats_summary(
     return StatsSummaryResponse(
         cards_created=summary.cards_created,
         cards_sold=summary.cards_sold,
+        cards_traded=summary.cards_traded,
         total_earned=summary.total_earned,
         total_spent=summary.total_spent,
         best_sale=summary.best_sale,

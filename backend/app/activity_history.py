@@ -20,7 +20,12 @@ from credit_service import (
     TX_HIGHLIGHT,
 )
 from marketplace_repo import float_from_decimal
-from marketplace_trade_repo import OFFER_TYPE_CASH
+from marketplace_trade_repo import (
+    OFFER_TYPE_CARD_TRADE,
+    OFFER_TYPE_CASH,
+    TRADE_SIDE_BUYER,
+    get_trade_cards_for_offer,
+)
 from models import Card, CreditLedger, MarketplaceOffer, TradeOffer, User
 
 logger = logging.getLogger(__name__)
@@ -31,6 +36,7 @@ ACTIVITY_TYPES = frozenset(
         "trade_received",
         "marketplace_sold",
         "marketplace_bought",
+        "marketplace_traded",
         "animated_upgrade",
         "highlight_upgrade",
         "card_created",
@@ -434,6 +440,9 @@ def _build_item(
     royalty_amount: float | None = None,
     additional_preview_count: int | None = None,
     quantity: int | None = None,
+    offer_type: str | None = None,
+    trade_role: str | None = None,
+    trade_cards: list[dict] | None = None,
 ) -> dict:
     when = completed_at or created_at
     row = {
@@ -453,7 +462,35 @@ def _build_item(
         row["additional_preview_count"] = additional_preview_count
     if quantity is not None and quantity > 0:
         row["quantity"] = quantity
+    if offer_type:
+        row["offer_type"] = offer_type
+    if trade_role:
+        row["trade_role"] = trade_role
+    if trade_cards:
+        row["trade_cards"] = trade_cards
     return row
+
+
+def _trade_cards_activity_payload(db: Session, offer_id: int) -> list[dict]:
+    """Minimal card payloads for trade activity descriptions."""
+    cards = get_trade_cards_for_offer(db, offer_id, TRADE_SIDE_BUYER)
+    return [
+        {
+            "card_id": c.get("card_id") or "",
+            "player_name": c.get("player_name") or "Card",
+            "image_url": c.get("image_url") or "",
+        }
+        for c in cards
+    ]
+
+
+def _is_marketplace_card_trade(db: Session, offer: MarketplaceOffer) -> bool:
+    ot = (offer.offer_type or OFFER_TYPE_CASH).strip().lower()
+    if ot == OFFER_TYPE_CARD_TRADE:
+        return True
+    if float_from_decimal(offer.offer_amount or 0) > 0.001:
+        return False
+    return bool(get_trade_cards_for_offer(db, offer.id, TRADE_SIDE_BUYER))
 
 
 def _build_card_creation_activity_items(
@@ -591,8 +628,49 @@ def gather_user_activity_items(db: Session, user_id: int) -> list[dict]:
         if (card.status or "active") == "deleted":
             continue
         when = offer.updated_at or offer.created_at
-        is_cash = (offer.offer_type or OFFER_TYPE_CASH).strip().lower() == OFFER_TYPE_CASH
+        is_trade = _is_marketplace_card_trade(db, offer)
+        is_cash = not is_trade
         amount = float_from_decimal(offer.offer_amount) if is_cash else None
+        trade_cards = _trade_cards_activity_payload(db, offer.id) if is_trade else None
+
+        if is_trade:
+            if offer.buyer_id == user_id:
+                items.append(
+                    _build_item(
+                        item_id=f"marketplace_traded-buyer-{offer.id}",
+                        activity_type="marketplace_traded",
+                        completed_at=when,
+                        created_at=offer.created_at,
+                        card=card,
+                        counterparty=_counterparty(
+                            offer.seller.display_name if offer.seller else None,
+                            offer.seller_id,
+                        ),
+                        amount=None,
+                        offer_type=OFFER_TYPE_CARD_TRADE,
+                        trade_role="buyer",
+                        trade_cards=trade_cards,
+                    )
+                )
+            if offer.seller_id == user_id:
+                items.append(
+                    _build_item(
+                        item_id=f"marketplace_traded-seller-{offer.id}",
+                        activity_type="marketplace_traded",
+                        completed_at=when,
+                        created_at=offer.created_at,
+                        card=card,
+                        counterparty=_counterparty(
+                            offer.buyer.display_name if offer.buyer else None,
+                            offer.buyer_id,
+                        ),
+                        amount=None,
+                        offer_type=OFFER_TYPE_CARD_TRADE,
+                        trade_role="seller",
+                        trade_cards=trade_cards,
+                    )
+                )
+            continue
 
         if offer.buyer_id == user_id:
             items.append(
@@ -607,6 +685,7 @@ def gather_user_activity_items(db: Session, user_id: int) -> list[dict]:
                         offer.seller_id,
                     ),
                     amount=amount,
+                    offer_type=OFFER_TYPE_CASH,
                 )
             )
         if offer.seller_id == user_id:
@@ -626,6 +705,7 @@ def gather_user_activity_items(db: Session, user_id: int) -> list[dict]:
                     ),
                     amount=amount,
                     royalty_amount=royalty_amount,
+                    offer_type=OFFER_TYPE_CASH,
                 )
             )
 
@@ -721,7 +801,12 @@ def list_user_activity_history(
         if normalized in ACTIVITY_TYPES:
             items = [i for i in items if i["activity_type"] == normalized]
         elif normalized == "trades":
-            items = [i for i in items if i["activity_type"] in ("trade_sent", "trade_received")]
+            items = [
+                i
+                for i in items
+                if i["activity_type"]
+                in ("trade_sent", "trade_received", "marketplace_traded")
+            ]
 
     items.sort(key=lambda row: row["_sort_ts"], reverse=True)
     total = len(items)

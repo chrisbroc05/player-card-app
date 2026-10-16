@@ -6,6 +6,7 @@ import {
   ACTIVITY_FILTERS,
   activityAmountDisplay,
   activityCreationSummary,
+  activityTradeSummary,
   activityMeta,
   activityRowStyle,
   amountDisplay,
@@ -138,6 +139,8 @@ function ActivityRow({ item }) {
   const amount = activityAmountDisplay(item);
   const timestamp = formatActivityFullTimestamp(item?.completed_at || item?.created_at);
   const creationSummary = activityCreationSummary(item);
+  const tradeSummary = activityTradeSummary(item);
+  const headline = tradeSummary || creationSummary;
 
   return (
     <li className="activity-row">
@@ -162,13 +165,13 @@ function ActivityRow({ item }) {
       </div>
 
       <div className="activity-row__details">
-        {!creationSummary ? (
+        {!headline ? (
           <p className="activity-row__label" style={{ color: style.labelColor }}>
             {style.label}
           </p>
         ) : null}
         <h3 className={`activity-row__name activity-row__name--${tierKey}`}>
-          {creationSummary || card?.player_name || "Card"}
+          {headline || card?.player_name || "Card"}
         </h3>
 
         <div className="activity-row__meta">

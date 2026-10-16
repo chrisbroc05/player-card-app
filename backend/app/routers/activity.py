@@ -59,6 +59,14 @@ class ActivityCounterpartyOut(BaseModel):
     user_id: int | None = None
 
 
+class ActivityTradeCardOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    card_id: str
+    player_name: str
+    image_url: str = ""
+
+
 class ActivityItemOut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -74,6 +82,9 @@ class ActivityItemOut(BaseModel):
     preview_label: str | None = None
     additional_preview_count: int | None = None
     quantity: int | None = None
+    offer_type: str | None = None
+    trade_role: str | None = None
+    trade_cards: list[ActivityTradeCardOut] | None = None
 
 
 class ActivityHistoryResponse(BaseModel):
