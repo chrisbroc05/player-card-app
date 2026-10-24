@@ -428,8 +428,8 @@ function OfferPanel({
   }
 
   return (
-    <form onSubmit={handleFormSubmit} className="rounded-xl border bg-gold-subtle p-4 space-y-3">
-      <h2 className="text-lg font-semibold text-white">Make an offer</h2>
+    <form onSubmit={handleFormSubmit} className="marketplace-offer-form rounded-xl border bg-gold-subtle p-4 space-y-3">
+      <h2 className="marketplace-offer-form__title text-lg font-semibold text-white">Make an offer</h2>
       {!user ? (
         <p className="text-sm text-slate-400">
           <button type="button" onClick={onLogin} className="font-medium text-brand-gold underline">
@@ -574,7 +574,7 @@ function CashOfferConfirmModal({
       ariaLabelledBy="offer-confirm-title"
       onBackdropClick={onCancel}
     >
-      <MarketplaceModalContent>
+      <MarketplaceModalContent className="marketplace-cash-offer-confirm">
         <h3 id="offer-confirm-title" className="text-xl font-semibold text-white">
           Confirm Offer
         </h3>

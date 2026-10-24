@@ -6231,7 +6231,17 @@
 }
 
 .marketplace-modal-panel--centered {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   overflow: hidden;
+}
+
+.marketplace-modal-panel--centered > .accept-offer-success-modal,
+.marketplace-modal-panel--centered > .accept-offer-confirm-modal,
+.marketplace-modal-panel--centered > .offer-review-modal {
+  width: 100%;
+  min-height: 0;
 }
 
 .marketplace-modal-handle {
@@ -6979,7 +6989,8 @@
 
 .accept-offer-confirm-modal__actions {
   flex-shrink: 0;
-  margin-top: 0;
+  margin-top: 0 !important;
+  width: 100%;
   padding-top: 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   background: var(--color-bg-card, var(--bg-primary));
@@ -7002,27 +7013,35 @@
 .accept-offer-success-modal__body {
   flex: 1 1 auto;
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   text-align: center;
-  padding: 8px 0 12px;
+  padding: 4px 2px 8px;
+  width: 100%;
 }
 
 .accept-offer-trade-complete {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: center;
-  gap: 10px 14px;
+  gap: 10px;
   width: 100%;
-  margin-top: 16px;
-  padding: 14px 12px;
+  max-width: 280px;
+  margin-top: 12px;
+  padding: 12px 10px;
   border-radius: 12px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .accept-offer-trade-complete__col {
@@ -7031,13 +7050,26 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
+  width: 100%;
+  max-width: 200px;
+}
+
+.accept-offer-trade-complete .trade-flow-card-slot {
+  width: min(158px, 72vw);
+  max-width: 100%;
 }
 
 .accept-offer-trade-complete__arrow {
-  font-size: 18px;
+  flex-shrink: 0;
+  padding: 2px 0;
+  font-size: 22px;
+  line-height: 1;
   font-weight: 700;
   color: var(--text-secondary);
-  flex-shrink: 0;
+}
+
+.accept-offer-trade-complete__arrow::before {
+  content: "↓";
 }
 
 .accept-offer-trade-complete__caption {
@@ -7052,15 +7084,125 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--text-primary);
-  max-width: 150px;
+  max-width: 100%;
+  padding: 0 4px;
+  word-break: break-word;
 }
 
 .accept-offer-success-modal__actions {
   flex-shrink: 0;
-  margin-top: 0;
+  margin-top: 0 !important;
+  width: 100%;
   padding-top: 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   background: var(--color-bg-card, var(--bg-primary));
+}
+
+/* ——— Marketplace trade flow (phone-first ~390px) ——— */
+.marketplace-offer-form {
+  text-align: center;
+}
+
+.marketplace-offer-form__title {
+  text-align: center;
+}
+
+.marketplace-cash-offer-confirm {
+  text-align: center;
+}
+
+.marketplace-cash-offer-confirm .marketplace-modal-card-section {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+@media (max-width: 639px) {
+  .marketplace-offer-form .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px;
+    justify-items: center;
+  }
+
+  .marketplace-offer-form .grid .card-display-container,
+  .marketplace-offer-form .grid .card-shell {
+    min-width: 0 !important;
+    width: 100%;
+  }
+}
+
+@media (max-width: 639px) {
+  .accept-offer-confirm-modal__header,
+  .accept-offer-success-modal__body,
+  .offer-review-modal__header {
+    text-align: center;
+  }
+
+  .accept-offer-confirm-modal__details {
+    text-align: center;
+  }
+
+  .accept-offer-confirm-modal__detail-row {
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    text-align: center;
+  }
+
+  .accept-offer-confirm-modal__detail-row dd {
+    text-align: center;
+  }
+
+  .accept-offer-confirm-modal__trade-stack,
+  .accept-offer-confirm-modal__scroll {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .trade-flow-card-slot {
+    width: min(158px, 42vw);
+  }
+
+  .trade-flow-card-slot--listing {
+    width: min(168px, 44vw);
+  }
+
+  .offer-review-modal__scroll {
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+
+  .offer-review-offer {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .marketplace-modal-panel--centered {
+    max-height: min(
+      88dvh,
+      calc(100dvh - var(--pill-nav-height, 88px) - env(safe-area-inset-top, 0px) - 16px)
+    );
+  }
+
+  .accept-offer-success-modal__actions .btn-primary,
+  .accept-offer-success-modal__actions .btn-ghost,
+  .accept-offer-confirm-modal__actions .btn-primary,
+  .accept-offer-confirm-modal__actions .btn-ghost {
+    min-height: 44px;
+  }
+}
+
+@media (min-width: 640px) {
+  .accept-offer-trade-complete {
+    flex-direction: row;
+    flex-wrap: wrap;
+    max-width: 100%;
+    gap: 10px 14px;
+  }
+
+  .accept-offer-trade-complete__arrow::before {
+    content: "→";
+  }
 }
 
 @media (min-width: 640px) {

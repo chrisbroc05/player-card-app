@@ -1412,9 +1412,7 @@ function AcceptOfferSuccessModal({ open, payload, onGoProfile, onBackListings })
                 <TradeFlowCardPreview card={listing} role="listing" expandable={false} />
                 <p className="accept-offer-trade-complete__name">{listing.player_name}</p>
               </div>
-              <span className="accept-offer-trade-complete__arrow" aria-hidden>
-                →
-              </span>
+              <span className="accept-offer-trade-complete__arrow" aria-hidden />
               <div className="accept-offer-trade-complete__col">
                 <p className="accept-offer-trade-complete__caption">You received</p>
                 <TradeFlowCardPreview
