@@ -1220,15 +1220,16 @@ def send_welcome_email(
             _subtext_plain("Your account is ready. Here's how to get started:"),
             _numbered_steps(
                 [
-                    "Load credits to your account",
-                    "Create your first card in the Studio",
+                    "You have free cards — go create your first one in the Studio",
                     "Share, trade, and sell on the marketplace",
+                    "Invite friends with code: PROSPECTLEGENDS2026",
                 ]
             ),
             _cta_button(studio_url, "Create Your First Card"),
             _divider(),
-            _subtext_plain(
-                "Share your experience with friends using invite code: PROSPECTLEGENDS2026"
+            _subtext_html(
+                "Share your experience with friends using invite code: "
+                '<strong style="color:#C9A84C;">PROSPECTLEGENDS2026</strong>'
             ),
             _muted_center(
                 "You're receiving this because you created a Prospect Legends account. "
