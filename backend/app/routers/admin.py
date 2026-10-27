@@ -5,6 +5,7 @@ Admin dashboard API — separate JWT (role=admin) from regular user auth.
 from __future__ import annotations
 
 import os
+import re
 import secrets
 import logging
 import uuid
@@ -20,7 +21,7 @@ from jose import JWTError, jwt
 from pydantic import BaseModel, ConfigDict, Field
 from decimal import Decimal
 
-from sqlalchemy import String, cast, func
+from sqlalchemy import String, and_, cast, func
 from sqlalchemy.orm import Session, aliased
 
 from auth import ALGORITHM, SECRET_KEY
@@ -30,8 +31,22 @@ from card_cleanup import permanently_delete_card
 from card_repo import get_card_by_card_id
 from database import get_db
 from marketplace_repo import float_from_decimal, listing_active_filter
-from models import Card, CreditLedger, MarketplaceOffer, PlatformRevenueLedger, TradeOffer, User, utcnow
-from marketplace_service import add_marketplace_balance, backfill_platform_revenue_ledger
+from models import (
+    Card,
+    CardCreationCheckout,
+    CreditLedger,
+    MarketplaceOffer,
+    PlatformRevenueLedger,
+    TradeOffer,
+    User,
+    utcnow,
+)
+from marketplace_service import (
+    REVENUE_SOURCE_MARKETPLACE_SALE,
+    add_marketplace_balance,
+    backfill_platform_revenue_ledger,
+)
+from marketplace_trade_repo import OFFER_TYPE_CARD_TRADE
 from stripe_connect import configure_stripe_client, create_onboarding_link, reset_user_stripe_connect
 from utils.usage import get_generation_caps, get_platform_generation_count, get_user_generation_count
 from utils.rarity import (
@@ -234,6 +249,49 @@ def _ensure_platform_revenue_ledger_current(db: Session) -> None:
     except Exception:
         logger.exception("platform_revenue_ledger backfill failed")
         db.rollback()
+
+
+_MARKETPLACE_FEE_NOTE_RE = re.compile(
+    r"^.+ — (?P<buyer>.+?) purchased (?P<player>.+?) \((?P<card_id>[^)]+)\) "
+    r"from (?P<seller>.+?) for \$",
+    re.IGNORECASE,
+)
+
+_CARD_CREATION_SOURCES = frozenset({"card_creation", "card_creation_repick"})
+
+
+def _user_display_label(user: User | None) -> str:
+    if user is None:
+        return "—"
+    name = (user.display_name or "").strip()
+    if name:
+        return name
+    email = (user.email or "").strip()
+    return email or "—"
+
+
+def _marketplace_offer_type_label(offer_type: str | None) -> str:
+    if (offer_type or "").strip().lower() == OFFER_TYPE_CARD_TRADE:
+        return "Card Trade"
+    return "Cash Sale"
+
+
+def _earnings_transaction_type(source: str | None, offer: MarketplaceOffer | None) -> str:
+    if offer is not None:
+        if (offer.offer_type or "").strip().lower() == OFFER_TYPE_CARD_TRADE:
+            return "Card Trade"
+        return "Card Purchase"
+    src = (source or "").strip().lower()
+    if src in _CARD_CREATION_SOURCES or src == REVENUE_SOURCE_MARKETPLACE_SALE:
+        return "Card Purchase"
+    return "Card Purchase"
+
+
+def _marketplace_context_from_note(note: str | None) -> dict[str, str]:
+    match = _MARKETPLACE_FEE_NOTE_RE.match((note or "").strip())
+    if not match:
+        return {}
+    return {k: (v or "").strip() for k, v in match.groupdict().items()}
 
 
 def _record_admin_royalty_withdrawal(
@@ -938,7 +996,10 @@ def admin_financials_royalties(
         )
         .outerjoin(
             MarketplaceOffer,
-            PlatformRevenueLedger.reference_id == cast(MarketplaceOffer.id, String),
+            and_(
+                PlatformRevenueLedger.source == REVENUE_SOURCE_MARKETPLACE_SALE,
+                PlatformRevenueLedger.reference_id == cast(MarketplaceOffer.id, String),
+            ),
         )
         .outerjoin(Card, MarketplaceOffer.card_id == Card.card_id)
         .outerjoin(SellerUser, MarketplaceOffer.seller_id == SellerUser.id)
@@ -968,6 +1029,46 @@ def admin_financials_royalties(
 
     rows = rows_query.offset(offset).limit(limit).all()
 
+    missing_mp_ids: list[int] = []
+    session_refs: list[str] = []
+    for revenue, offer, _player_name, _tier, _seller_dn, _buyer_dn in rows:
+        ref = (revenue.reference_id or "").strip()
+        src = (revenue.source or "").strip()
+        if offer is None and src == REVENUE_SOURCE_MARKETPLACE_SALE and ref.isdigit():
+            missing_mp_ids.append(int(ref))
+        elif offer is None and src in _CARD_CREATION_SOURCES and ref:
+            session_refs.append(ref)
+
+    mp_fallback: dict[int, tuple[MarketplaceOffer, Card | None, User | None, User | None]] = {}
+    if missing_mp_ids:
+        MpBuyer = aliased(User, name="mp_buyer")
+        MpSeller = aliased(User, name="mp_seller")
+        for offer, card, seller, buyer in (
+            db.query(MarketplaceOffer, Card, MpSeller, MpBuyer)
+            .outerjoin(Card, MarketplaceOffer.card_id == Card.card_id)
+            .outerjoin(MpSeller, MarketplaceOffer.seller_id == MpSeller.id)
+            .outerjoin(MpBuyer, MarketplaceOffer.buyer_id == MpBuyer.id)
+            .filter(MarketplaceOffer.id.in_(missing_mp_ids))
+            .all()
+        ):
+            mp_fallback[int(offer.id)] = (offer, card, seller, buyer)
+
+    checkout_fallback: dict[
+        str, tuple[CardCreationCheckout, User | None, Card | None]
+    ] = {}
+    if session_refs:
+        CreatorUser = aliased(User, name="creator_user")
+        for checkout, creator, card in (
+            db.query(CardCreationCheckout, CreatorUser, Card)
+            .join(CreatorUser, CardCreationCheckout.user_id == CreatorUser.id)
+            .outerjoin(Card, CardCreationCheckout.result_card_id == Card.card_id)
+            .filter(CardCreationCheckout.stripe_session_id.in_(session_refs))
+            .all()
+        ):
+            sid = (checkout.stripe_session_id or "").strip()
+            if sid:
+                checkout_fallback[sid] = (checkout, creator, card)
+
     all_rows_for_running_total = (
         db.query(PlatformRevenueLedger.id, PlatformRevenueLedger.amount)
         .filter(PlatformRevenueLedger.amount > 0)
@@ -982,21 +1083,83 @@ def admin_financials_royalties(
 
     entries = []
     for revenue, offer, player_name, tier, seller_dn, buyer_dn in rows:
+        ref = (revenue.reference_id or "").strip()
+        src = (revenue.source or "").strip()
+        resolved_offer = offer
+        resolved_card: Card | None = None
+        resolved_seller: User | None = None
+        resolved_buyer: User | None = None
+
+        if resolved_offer is None and src == REVENUE_SOURCE_MARKETPLACE_SALE and ref.isdigit():
+            fb = mp_fallback.get(int(ref))
+            if fb is not None:
+                resolved_offer, resolved_card, resolved_seller, resolved_buyer = fb
+
+        if resolved_offer is not None:
+            if not player_name and resolved_card is not None:
+                player_name = resolved_card.player_name
+                tier = resolved_card.tier
+            if (not seller_dn or seller_dn == "—") and resolved_seller is not None:
+                seller_dn = _user_display_label(resolved_seller)
+            if (not buyer_dn or buyer_dn == "—") and resolved_buyer is not None:
+                buyer_dn = _user_display_label(resolved_buyer)
+
+        if src in _CARD_CREATION_SOURCES and ref:
+            fb_checkout = checkout_fallback.get(ref)
+            if fb_checkout is not None:
+                checkout, creator, card = fb_checkout
+                if card is not None:
+                    player_name = player_name or (card.player_name or "")
+                    tier = tier or (card.tier or "")
+                if not (player_name or "").strip() and checkout.result_card_id:
+                    player_name = checkout.result_card_id
+                buyer_dn = buyer_dn if (buyer_dn and buyer_dn != "—") else _user_display_label(creator)
+                if not seller_dn or seller_dn == "—":
+                    seller_dn = "—"
+
+        note_ctx = _marketplace_context_from_note(revenue.note)
+        if note_ctx:
+            if not (player_name or "").strip():
+                player_name = note_ctx.get("player") or ""
+            if not buyer_dn or buyer_dn == "—":
+                buyer_dn = note_ctx.get("buyer") or buyer_dn
+            if not seller_dn or seller_dn == "—":
+                seller_dn = note_ctx.get("seller") or seller_dn
+
+        card_id_out = resolved_offer.card_id if resolved_offer is not None else ""
+        if not card_id_out and note_ctx.get("card_id"):
+            card_id_out = note_ctx["card_id"]
+        if not card_id_out and src in _CARD_CREATION_SOURCES and ref:
+            fb_checkout = checkout_fallback.get(ref)
+            if fb_checkout is not None:
+                checkout, _creator, card = fb_checkout
+                card_id_out = (card.card_id if card is not None else None) or checkout.result_card_id or ""
+
+        sale_amount = 0.0
+        if resolved_offer is not None:
+            sale_amount = float_from_decimal(resolved_offer.offer_amount)
+        elif src in _CARD_CREATION_SOURCES and ref:
+            fb_checkout = checkout_fallback.get(ref)
+            if fb_checkout is not None:
+                checkout, _creator, _card = fb_checkout
+                sale_amount = float_from_decimal(checkout.amount_dollars)
+
         entries.append(
             {
                 "ledger_id": revenue.id,
-                "offer_id": int(offer.id) if offer is not None else revenue.id,
-                "card_id": offer.card_id if offer is not None else "",
+                "offer_id": int(resolved_offer.id) if resolved_offer is not None else revenue.id,
+                "card_id": card_id_out or "",
                 "player_name": player_name or "",
                 "tier": tier or "",
                 "seller_display_name": seller_dn or "—",
                 "buyer_display_name": buyer_dn or "—",
-                "sale_amount": float_from_decimal(offer.offer_amount) if offer is not None else 0.0,
+                "sale_amount": sale_amount,
                 "royalty_amount": float_from_decimal(revenue.amount),
                 "date": _iso(revenue.created_at),
                 "running_total": running_total_by_ledger_id.get(int(revenue.id), 0.0),
-                "source": revenue.source or "",
+                "source": src,
                 "note": revenue.note or "",
+                "transaction_type": _earnings_transaction_type(src, resolved_offer),
             }
         )
     lifetime_total_royalties = _platform_revenue_earned_total(db)
@@ -1335,7 +1498,7 @@ def admin_trades(
 ):
     SenderUser = aliased(User, name="sender_user")
     RecipientUser = aliased(User, name="recipient_user")
-    rows = (
+    peer_rows = (
         db.query(
             TradeOffer,
             Card.card_id,
@@ -1348,14 +1511,33 @@ def admin_trades(
         .join(Card, TradeOffer.card_id == Card.id)
         .join(SenderUser, TradeOffer.sender_id == SenderUser.id)
         .join(RecipientUser, TradeOffer.recipient_id == RecipientUser.id)
-        .order_by(TradeOffer.created_at.desc())
         .all()
     )
-    out = []
-    for offer, cid, pname, sdn, sem, rdn, rem in rows:
+    BuyerUser = aliased(User, name="mp_buyer_user")
+    SellerUser = aliased(User, name="mp_seller_user")
+    marketplace_rows = (
+        db.query(
+            MarketplaceOffer,
+            Card.card_id,
+            Card.player_name,
+            BuyerUser.display_name,
+            BuyerUser.email,
+            SellerUser.display_name,
+            SellerUser.email,
+        )
+        .join(Card, MarketplaceOffer.card_id == Card.card_id)
+        .join(BuyerUser, MarketplaceOffer.buyer_id == BuyerUser.id)
+        .join(SellerUser, MarketplaceOffer.seller_id == SellerUser.id)
+        .filter(MarketplaceOffer.status == "accepted")
+        .all()
+    )
+    out: list[dict[str, Any]] = []
+    for offer, cid, pname, sdn, sem, rdn, rem in peer_rows:
         out.append(
             {
-                "id": offer.id,
+                "id": f"peer-{offer.id}",
+                "trade_id": offer.id,
+                "type": "Card Trade",
                 "card_id": cid,
                 "player_name": pname or "",
                 "status": offer.status,
@@ -1368,6 +1550,25 @@ def admin_trades(
                 "recipient_email": rem,
             }
         )
+    for offer, cid, pname, bdn, bem, sdn, sem in marketplace_rows:
+        out.append(
+            {
+                "id": f"mp-{offer.id}",
+                "trade_id": offer.id,
+                "type": _marketplace_offer_type_label(offer.offer_type),
+                "card_id": cid,
+                "player_name": pname or "",
+                "status": offer.status,
+                "created_at": _iso(offer.created_at),
+                "updated_at": _iso(offer.updated_at),
+                "message": offer.message or "",
+                "sender_display_name": bdn,
+                "sender_email": bem,
+                "recipient_display_name": sdn,
+                "recipient_email": sem,
+            }
+        )
+    out.sort(key=lambda row: row.get("updated_at") or row.get("created_at") or "", reverse=True)
     return out
 
 

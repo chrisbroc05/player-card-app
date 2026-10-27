@@ -486,6 +486,7 @@ export default function AdminDashboard() {
     const rows = Array.isArray(data.entries) ? data.entries : [];
     const header = [
       "Date",
+      "Type",
       "Player Name",
       "Card ID",
       "Tier",
@@ -497,6 +498,7 @@ export default function AdminDashboard() {
     ];
     const csvRows = rows.map((row) => [
       row.date || "",
+      row.transaction_type || "",
       row.player_name || "",
       row.card_id || "",
       row.tier || "",
@@ -1424,7 +1426,7 @@ export default function AdminDashboard() {
               <table className="w-full min-w-[900px] text-left text-sm">
                 <thead className="border-b border-white/10 bg-cardBg2 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
-                    {["Trade ID", "Card", "Sender", "Recipient", "Status", "Message", "Sent", "Updated"].map((h) => (
+                    {["Trade ID", "Type", "Card", "Sender", "Recipient", "Status", "Message", "Sent", "Updated"].map((h) => (
                       <th key={h} className="p-3 font-medium">
                         {h}
                       </th>
@@ -1434,14 +1436,15 @@ export default function AdminDashboard() {
                 <tbody>
                   {filteredTrades.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="p-6 text-center text-slate-500">
+                      <td colSpan={9} className="p-6 text-center text-slate-500">
                         No trades match.
                       </td>
                     </tr>
                   ) : (
                     filteredTrades.map((t) => (
                       <tr key={t.id} className="border-b border-white/5 hover:bg-white/[0.02]">
-                        <td className="p-3 text-slate-200">{t.id}</td>
+                        <td className="p-3 text-slate-200">{t.trade_id ?? t.id}</td>
+                        <td className="p-3 text-slate-300">{t.type || "—"}</td>
                         <td className="p-3">
                           <span className="font-mono text-xs text-brand-gold/90">{t.card_id}</span>
                           <span className="mt-0.5 block text-xs text-slate-500">{t.player_name}</span>
@@ -1716,6 +1719,7 @@ export default function AdminDashboard() {
                     <tr>
                       {[
                         "Date",
+                        "Type",
                         "Card Sold",
                         "Sold By",
                         "Bought By",
@@ -1732,7 +1736,7 @@ export default function AdminDashboard() {
                   <tbody>
                     {earningsEntries.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="p-6 text-center text-slate-500">
+                        <td colSpan={8} className="p-6 text-center text-slate-500">
                           No earnings rows found for this filter.
                         </td>
                       </tr>
@@ -1743,6 +1747,7 @@ export default function AdminDashboard() {
                           className={`${idx % 2 ? "bg-white/[0.015]" : ""} border-b border-white/5`}
                         >
                           <td className="p-3 text-xs text-slate-400">{formatDateTime(row.date)}</td>
+                          <td className="p-3 text-slate-300">{row.transaction_type || "—"}</td>
                           <td className="p-3">
                             <p className="text-slate-200">{row.player_name || "—"}</p>
                             <p className="font-mono text-xs text-brand-gold/90">{row.card_id}</p>
