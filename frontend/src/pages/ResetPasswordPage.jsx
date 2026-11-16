@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { CheckCircle2, Eye, EyeOff } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import BrandLogo from "../components/BrandLogo";
+import PasswordInput from "../components/PasswordInput";
 import { API_BASE_URL } from "../config/api";
 
 function formatApiError(detail, fallback) {
@@ -26,8 +27,6 @@ export default function ResetPasswordPage() {
   const [tokenValid, setTokenValid] = useState(false);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -136,23 +135,13 @@ export default function ResetPasswordPage() {
                   <label className="text-xs font-medium uppercase tracking-wide text-slate-400">
                     New password
                   </label>
-                  <div className="relative mt-1">
-                    <input
-                      type={showPassword ? "text" : "password"}
+                  <div className="mt-1">
+                    <PasswordInput
                       autoComplete="new-password"
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="min-h-[46px] w-full rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 pr-11 text-slate-100"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword((v) => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
-                      aria-label={showPassword ? "Hide password" : "Show password"}
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
                   </div>
                 </div>
 
@@ -160,23 +149,13 @@ export default function ResetPasswordPage() {
                   <label className="text-xs font-medium uppercase tracking-wide text-slate-400">
                     Confirm password
                   </label>
-                  <div className="relative mt-1">
-                    <input
-                      type={showConfirm ? "text" : "password"}
+                  <div className="mt-1">
+                    <PasswordInput
                       autoComplete="new-password"
                       required
                       value={confirm}
                       onChange={(e) => setConfirm(e.target.value)}
-                      className="min-h-[46px] w-full rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 pr-11 text-slate-100"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirm((v) => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
-                      aria-label={showConfirm ? "Hide password" : "Show password"}
-                    >
-                      {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
                   </div>
                 </div>
 

@@ -5,6 +5,7 @@ import AppFooter from "../components/AppFooter";
 import BrandLogo from "../components/BrandLogo";
 import { EnableBiometricPrompt } from "../components/EnableBiometricPrompt";
 import { GoogleLoginButton } from "../components/GoogleLoginButton";
+import PasswordInput from "../components/PasswordInput";
 import { API_BASE_URL, ADMIN_TOKEN_STORAGE_KEY } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import { clearBiometricRequired } from "../utils/activityTracker";
@@ -230,14 +231,14 @@ export default function LoginPage() {
             </div>
             <div>
               <label className="text-xs font-medium uppercase tracking-wide text-slate-400">Password</label>
-              <input
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 min-h-[46px] w-full rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 text-slate-100"
-              />
+              <div className="mt-1">
+                <PasswordInput
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
             </div>
             {!adminMode ? (
               <Link

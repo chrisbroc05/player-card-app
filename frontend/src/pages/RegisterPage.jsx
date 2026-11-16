@@ -4,6 +4,7 @@ import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import BrandLogo from "../components/BrandLogo";
 import { GoogleLoginButton } from "../components/GoogleLoginButton";
+import PasswordInput from "../components/PasswordInput";
 import { useAuth } from "../context/AuthContext";
 import { API_BASE_URL } from "../config/api";
 
@@ -170,26 +171,26 @@ export default function RegisterPage() {
             ) : null}
             <div>
               <label className="text-xs font-medium uppercase tracking-wide text-slate-400">Password</label>
-              <input
-                type="password"
-                autoComplete="new-password"
-                required
-                minLength={8}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 min-h-[46px] w-full rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 text-slate-100"
-              />
+              <div className="mt-1">
+                <PasswordInput
+                  autoComplete="new-password"
+                  required
+                  minLength={8}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
             </div>
             <div>
               <label className="text-xs font-medium uppercase tracking-wide text-slate-400">Confirm Password</label>
-              <input
-                type="password"
-                autoComplete="new-password"
-                required
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                className="mt-1 min-h-[46px] w-full rounded-xl border border-white/15 bg-cardBg2 px-3 py-2.5 text-slate-100"
-              />
+              <div className="mt-1">
+                <PasswordInput
+                  autoComplete="new-password"
+                  required
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                />
+              </div>
             </div>
 
             {error ? (

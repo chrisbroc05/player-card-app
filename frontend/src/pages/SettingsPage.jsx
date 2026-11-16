@@ -10,6 +10,7 @@ import {
 import AppHeader from "../components/AppHeader";
 import AppFooter from "../components/AppFooter";
 import LogoutConfirmModal from "../components/LogoutConfirmModal";
+import PasswordInput from "../components/PasswordInput";
 import SettingsToggle from "../components/SettingsToggle";
 import { API_BASE_URL, authHeaders } from "../config/api";
 import { useAuth } from "../context/AuthContext";
@@ -545,8 +546,7 @@ export default function SettingsPage() {
         <SimpleModal title="Change Password" onClose={closeModal}>
           <div className="settings-modal__field">
             <label className="settings-modal__label">Current password</label>
-            <input
-              type="password"
+            <PasswordInput
               value={passwordForm.current}
               onChange={(e) => setPasswordForm((p) => ({ ...p, current: e.target.value }))}
               className="settings-modal__input"
@@ -555,8 +555,7 @@ export default function SettingsPage() {
           </div>
           <div className="settings-modal__field">
             <label className="settings-modal__label">New password</label>
-            <input
-              type="password"
+            <PasswordInput
               value={passwordForm.next}
               onChange={(e) => setPasswordForm((p) => ({ ...p, next: e.target.value }))}
               className="settings-modal__input"
@@ -565,8 +564,7 @@ export default function SettingsPage() {
           </div>
           <div className="settings-modal__field">
             <label className="settings-modal__label">Confirm new password</label>
-            <input
-              type="password"
+            <PasswordInput
               value={passwordForm.confirm}
               onChange={(e) => setPasswordForm((p) => ({ ...p, confirm: e.target.value }))}
               className="settings-modal__input"
