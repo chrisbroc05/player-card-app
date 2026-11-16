@@ -24,6 +24,13 @@ def frontend_url() -> str:
 
 def _from_email() -> str:
     raw = (os.environ.get("FROM_EMAIL") or "onboarding@resend.dev").strip()
+    if raw.lower() == "onboarding@resend.dev" or "onboarding@resend.dev" in raw.lower():
+        logger.error(
+            "FROM_EMAIL is %r (Resend test sender). Resend only delivers test-sender "
+            "mail to your own verified address — real user welcome/trade emails will fail. "
+            "Set FROM_EMAIL to an address on a verified domain (e.g. support@prospectlegends.com).",
+            raw,
+        )
     if "<" in raw:
         return raw
     return f"Prospect Legends <{raw}>"
@@ -304,6 +311,16 @@ def _notification_recipients(primary: str, parent_email: str | None) -> list[str
     return recipients
 
 
+def _format_resend_error(exc: BaseException) -> str:
+    """Best-effort detail string from Resend SDK / generic exceptions."""
+    parts: list[str] = [f"{type(exc).__name__}: {exc}"]
+    for attr in ("code", "error_type", "message", "suggested_action"):
+        val = getattr(exc, attr, None)
+        if val is not None and str(val).strip():
+            parts.append(f"{attr}={val}")
+    return " | ".join(parts)
+
+
 def _send_resend_html(
     to: str,
     subject: str,
@@ -318,14 +335,49 @@ def _send_resend_html(
         logger.warning("RESEND_API_KEY unset; skipping %s email to %s", kind, to)
         return
     resend.api_key = key
-    for recipient in _notification_recipients(to, parent_email):
+    from_addr = _from_email()
+    recipients = _notification_recipients(to, parent_email)
+    if not recipients:
+        logger.error(
+            "Skipping %s email: no recipients (to=%r parent_email=%r)",
+            kind,
+            to,
+            parent_email,
+        )
+        return
+    for recipient in recipients:
         params: dict[str, Any] = {
-            "from": _from_email(),
+            "from": from_addr,
             "to": [recipient],
             "subject": subject,
             "html": html,
         }
-        resend.Emails.send(params)
+        try:
+            result = resend.Emails.send(params)
+            email_id = None
+            if isinstance(result, dict):
+                email_id = result.get("id")
+            else:
+                email_id = getattr(result, "id", None)
+            logger.info(
+                "Sent %s email to %s from %s id=%s trade_id=%s",
+                kind,
+                recipient,
+                from_addr,
+                email_id,
+                trade_id,
+            )
+        except Exception as exc:
+            logger.error(
+                "Resend failed for %s email to %s from %s trade_id=%s: %s",
+                kind,
+                recipient,
+                from_addr,
+                trade_id,
+                _format_resend_error(exc),
+                exc_info=True,
+            )
+            raise
 
 
 def send_trade_offer_email(
@@ -1240,7 +1292,12 @@ def send_welcome_email(
         subject = "Welcome to Prospect Legends! 🎉"
         _send_resend_html(user_email, subject, html, 0, "welcome", parent_email=parent_email)
     except Exception as e:
-        logger.error("Welcome email failed for %s: %s", user_email, e)
+        logger.error(
+            "Welcome email failed for %s: %s",
+            user_email,
+            _format_resend_error(e),
+            exc_info=True,
+        )
 
 
 def support_inbox_email() -> str:
