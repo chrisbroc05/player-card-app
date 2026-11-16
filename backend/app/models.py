@@ -43,6 +43,7 @@ class User(Base):
     webauthn_sign_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     webauthn_challenge: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     cards: Mapped[list["Card"]] = relationship(
         "Card",

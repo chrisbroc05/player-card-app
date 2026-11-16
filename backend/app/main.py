@@ -23,22 +23,42 @@ sys.path.insert(0, _app_dir)
 
 from utils.storage import is_r2_configured, resolve_source_image_path, save_bytes_to_storage
 from utils.rarity import resolve_rarity_pull, get_template_prompt
-from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from openai import OpenAI
 from PIL import Image, ImageDraw, ImageFont
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from dotenv import load_dotenv
+import sentry_sdk
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.starlette import StarletteIntegration
 
 # Load repo-root .env (e.g. OPENAI_API_KEY).
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 load_dotenv(_REPO_ROOT / ".env")
 
 logger = logging.getLogger(__name__)
+
+_sentry_dsn = (os.environ.get("SENTRY_DSN") or "").strip()
+if _sentry_dsn:
+    sentry_sdk.init(
+        dsn=_sentry_dsn,
+        integrations=[
+            StarletteIntegration(transaction_style="endpoint"),
+            FastApiIntegration(transaction_style="endpoint"),
+        ],
+        traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE") or "0.0"),
+        send_default_pii=False,
+    )
+    logger.info("Sentry error monitoring initialized")
+else:
+    logger.warning("SENTRY_DSN unset; Sentry error monitoring is disabled")
 
 # ---------------------------------------------------------------------------
 # App
@@ -49,6 +69,7 @@ from auth import (  # noqa: E402
     get_current_user,
     get_optional_current_user,
     hash_password,
+    record_last_login,
     verify_password,
 )
 from credit_service import (  # noqa: E402
@@ -251,6 +272,28 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Capture unexpected errors in Sentry; leave HTTP/validation errors to their handlers."""
+    if isinstance(exc, (HTTPException, StarletteHTTPException, RequestValidationError)):
+        if isinstance(exc, RequestValidationError):
+            return JSONResponse(status_code=422, content={"detail": exc.errors()})
+        status_code = getattr(exc, "status_code", 500)
+        detail = getattr(exc, "detail", "Request error")
+        headers = getattr(exc, "headers", None)
+        return JSONResponse(status_code=status_code, content={"detail": detail}, headers=headers)
+
+    sentry_sdk.capture_exception(exc)
+    logger.exception(
+        "Unhandled exception on %s %s",
+        request.method,
+        request.url.path,
+    )
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
+
 app.include_router(trade_router, prefix="/trades", tags=["trades"])
 app.include_router(admin_router, prefix="/admin", tags=["admin"])
 app.include_router(auth_user_router, prefix="/auth", tags=["auth"])
@@ -2438,6 +2481,8 @@ def auth_login(body: LoginBody, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == email).first()
     if user is None or not user.hashed_password or not verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    record_last_login(db, user)
+    db.refresh(user)
     token = create_access_token({"sub": user.email})
     return AuthTokenResponse(access_token=token, user=_user_public(user))
 

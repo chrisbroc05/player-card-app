@@ -39,6 +39,16 @@ def create_access_token(data: dict[str, Any]) -> str:
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
+def record_last_login(db: Session, user: User, *, commit: bool = True) -> None:
+    """Stamp successful authentication on the user row."""
+    user.last_login = datetime.now(timezone.utc)
+    db.add(user)
+    if commit:
+        db.commit()
+    else:
+        db.flush()
+
+
 def decode_access_token(token: str) -> dict[str, Any] | None:
     try:
         return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])

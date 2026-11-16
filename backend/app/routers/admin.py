@@ -893,6 +893,7 @@ def admin_users(
             "email": u.email,
             "parent_email": u.parent_email or "",
             "created_at": _iso(u.created_at),
+            "last_login": _iso(u.last_login) if getattr(u, "last_login", None) else None,
             "card_count": card_counts.get(u.id, 0),
             "monthly_generations": monthly_generation_counts.get(u.id, 0),
             "trades_sent": sent_counts.get(u.id, 0),

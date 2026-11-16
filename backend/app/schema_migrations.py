@@ -1072,5 +1072,19 @@ def run_connect_marketplace_migrations(engine: Engine) -> None:
                         )
                     )
 
+        if "users" in table_names:
+            user_cols = {c["name"] for c in insp.get_columns("users")}
+            if "last_login" not in user_cols:
+                logger.info("Migration: adding users.last_login")
+                if dialect == "postgresql":
+                    conn.execute(
+                        text(
+                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS "
+                            "last_login TIMESTAMP WITH TIME ZONE"
+                        )
+                    )
+                else:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN last_login DATETIME"))
+
     logger.info("Connect/marketplace migrations complete")
 

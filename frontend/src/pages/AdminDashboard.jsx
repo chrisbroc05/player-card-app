@@ -591,7 +591,7 @@ export default function AdminDashboard() {
     rows = [...rows].sort((a, b) => {
       let va = a[key];
       let vb = b[key];
-      if (key === "created_at") {
+      if (key === "created_at" || key === "last_login") {
         va = new Date(va || 0).getTime();
         vb = new Date(vb || 0).getTime();
       } else if (key === "credit_balance") {
@@ -1183,6 +1183,7 @@ export default function AdminDashboard() {
                       ["free_card_tokens_used", "Tokens used"],
                       ["free_card_tokens_remaining", "Tokens remaining"],
                       ["created_at", "Member since"],
+                      ["last_login", "Last login"],
                     ].map(([key, label]) => (
                       <th key={key} className="p-3">
                         <button type="button" className="font-medium hover:text-brand-gold-bright" onClick={() => toggleUserSort(key)}>
@@ -1197,7 +1198,7 @@ export default function AdminDashboard() {
                 <tbody>
                   {filteredSortedUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={13} className="p-6 text-center text-slate-500">
+                      <td colSpan={14} className="p-6 text-center text-slate-500">
                         No users found.
                       </td>
                     </tr>
@@ -1216,6 +1217,7 @@ export default function AdminDashboard() {
                         <td className="p-3 tabular-nums text-slate-300">{u.free_card_tokens_used ?? 0}</td>
                         <td className="p-3 tabular-nums text-slate-300">{u.free_card_tokens_remaining ?? 0}</td>
                         <td className="p-3 text-slate-500">{u.created_at?.slice(0, 10) || "—"}</td>
+                        <td className="p-3 text-slate-500">{u.last_login?.slice(0, 16) || "—"}</td>
                         <td className="p-3">
                           {u.stripe_payouts_enabled ? (
                             <span className="font-medium text-success">Yes</span>

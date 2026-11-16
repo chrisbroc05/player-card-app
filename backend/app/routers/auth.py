@@ -19,7 +19,13 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from auth import create_access_token, get_current_user, hash_password, verify_password
+from auth import (
+    create_access_token,
+    get_current_user,
+    hash_password,
+    record_last_login,
+    verify_password,
+)
 from credit_service import (
     TX_ANIMATION,
     TX_CARD_SALE,
@@ -737,7 +743,8 @@ def google_callback(
         if user:
             if not user.google_id:
                 user.google_id = google_id
-                db.commit()
+            record_last_login(db, user)
+            db.refresh(user)
             token = create_access_token({"sub": user.email})
             return google_success_redirect(token=token, user=user, is_new=False)
 
@@ -763,6 +770,8 @@ def google_callback(
             google_name=google_name,
             google_id=google_id,
         )
+        record_last_login(db, user)
+        db.refresh(user)
         token = create_access_token({"sub": user.email})
         return google_success_redirect(token=token, user=user, is_new=True)
     except HTTPException:
@@ -802,6 +811,7 @@ def google_complete(body: GoogleCompleteBody, db: Session = Depends(get_db)):
     from free_card_token_service import grant_signup_free_card_tokens
 
     grant_signup_free_card_tokens(db, user)
+    record_last_login(db, user, commit=False)
     db.commit()
     db.refresh(user)
     token = create_access_token({"sub": user.email})
